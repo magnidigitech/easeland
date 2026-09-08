@@ -1,0 +1,51 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // SOLE SOURCE OF TRUTH FOR ADMIN AUTHORIZATION:
+    // Firebase Authentication Custom Claim (request.auth.token.adminRole) ONLY.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.keys().hasAll(['adminRole']) && request.auth.token.adminRole != null;
+    }
+
+    // =============================================================
+    // 1. PUBLIC PROPERTY MEDIA: /public_media/properties/{propertyId}/{allPaths=**}
+    // =============================================================
+    match /public_media/properties/{propertyId}/{allPaths=**} {
+      allow read: if true;
+
+      allow write: if isSignedIn() && (
+        (request.resource != null && request.resource.metadata != null && request.resource.metadata.ownerId == request.auth.uid) ||
+        isAdmin()
+      );
+    }
+
+    // =============================================================
+    // 2. CONFIDENTIAL PROPERTY DOCUMENTS: /private_docs/properties/{propertyId}/{allPaths=**}
+    // =============================================================
+    match /private_docs/properties/{propertyId}/{allPaths=**} {
+      allow read: if isSignedIn() && (
+        (resource != null && resource.metadata != null && resource.metadata.ownerId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      allow write: if isSignedIn() && (
+        (request.resource != null && request.resource.metadata != null && request.resource.metadata.ownerId == request.auth.uid) ||
+        isAdmin()
+      );
+    }
+
+    // =============================================================
+    // 3. USER PROFILE PHOTOS: /users/{userId}/{allPaths=**}
+    // =============================================================
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+  }
+}

@@ -1,0 +1,271 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =============================================================
+    // AUTHORITATIVE ADMIN AUTHORIZATION & HELPER FUNCTIONS
+    // =============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // SOLE SOURCE OF TRUTH FOR ADMIN AUTHORIZATION:
+    // Firebase Authentication Custom Claim (request.auth.token.adminRole) ONLY.
+    // Database document attributes in users/{uid} DO NOT grant admin access.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.keys().hasAll(['adminRole']) && request.auth.token.adminRole != null;
+    }
+
+    function isNotSuspended() {
+      return !isSignedIn() || !exists(/databases/$(database)/documents/users/$(request.auth.uid)) || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountStatus != 'SUSPENDED';
+    }
+
+    function isValidOwnerStatusTransition() {
+      let oldStatus = resource.data.listingStatus;
+      let newStatus = request.resource.data.listingStatus;
+      let newPub = request.resource.data.isPublished;
+
+      return (
+        // 1. Initial submission or resubmission: status becomes PENDING_VERIFICATION, isPublished must be false
+        (oldStatus in ['DRAFT', 'CHANGES_REQUIRED'] && newStatus == 'PENDING_VERIFICATION' && newPub == false) ||
+
+        // 2. Owner pausing or closing a LIVE property: status becomes UNAVAILABLE/SOLD/RENTED/ARCHIVED, isPublished must become false
+        (oldStatus == 'LIVE' && newStatus in ['UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'] && newPub == false) ||
+
+        // 3. Owner unpausing a previously verified property: status becomes LIVE, isPublished becomes true (Requires isPlatformVerified == true)
+        (oldStatus == 'UNAVAILABLE' && newStatus == 'LIVE' && resource.data.isPlatformVerified == true && newPub == true)
+      );
+    }
+
+    // Strict Differential Validation: Detects addition, deletion, or modification of protected system fields or invalid publication/status changes
+    function isModifyingProtectedPropertyFields() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      let statusChanged = affected.hasAny(['listingStatus']);
+      let pubChanged = affected.hasAny(['isPublished']);
+
+      let invalidStatusOrPub = (statusChanged || pubChanged) && !isValidOwnerStatusTransition();
+
+      return invalidStatusOrPub || affected.hasAny([
+        'isPlatformVerified',
+        'verificationStatus',
+        'boundaryStatus',
+        'boundary',
+        'views',
+        'enquiriesCount',
+        'ownerId',
+        'referenceId',
+        'verifiedDate',
+        'verificationNotes'
+      ]);
+    }
+
+    // =============================================================
+    // 1. PUBLIC MARKETPLACE PROPERTIES: properties/{propertyId}
+    // =============================================================
+    match /properties/{propertyId} {
+      allow read: if (resource != null && resource.data.listingStatus == 'LIVE' && resource.data.isPublished == true)
+                  || (isSignedIn() && resource != null && resource.data.ownerId == request.auth.uid)
+                  || isAdmin();
+
+      allow create: if isSignedIn()
+                    && isNotSuspended()
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.resource.data.listingStatus in ['DRAFT', 'PENDING_VERIFICATION']
+                    && request.resource.data.isPlatformVerified == false
+                    && request.resource.data.views == 0
+                    && request.resource.data.enquiriesCount == 0;
+
+      allow update: if (
+        isSignedIn()
+        && isNotSuspended()
+        && resource.data.ownerId == request.auth.uid
+        && !isModifyingProtectedPropertyFields()
+      ) || isAdmin();
+
+      allow delete: if (isSignedIn() && resource.data.ownerId == request.auth.uid && isNotSuspended()) || isAdmin();
+    }
+
+    // =============================================================
+    // 2. OWNER-VISIBLE PRIVATE DATA & MEDIA MODERATION: propertyPrivate/{propertyId} & propertyMediaPrivate/{propertyId}
+    // =============================================================
+    match /propertyPrivate/{propertyId} {
+      allow read: if (isSignedIn() && resource != null && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow create: if (isSignedIn() && isNotSuspended() && request.resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow update: if (
+        isSignedIn()
+        && isNotSuspended()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+      ) || isAdmin();
+      allow delete: if (isSignedIn() && isNotSuspended() && resource.data.ownerId == request.auth.uid) || isAdmin();
+    }
+
+    match /propertyMediaPrivate/{propertyId} {
+      allow read: if (isSignedIn() && resource != null && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow create: if (isSignedIn() && isNotSuspended() && request.resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow update: if (
+        isSignedIn()
+        && isNotSuspended()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+      ) || isAdmin();
+      allow delete: if (isSignedIn() && isNotSuspended() && resource.data.ownerId == request.auth.uid) || isAdmin();
+    }
+
+    // =============================================================
+    // 3. ADMIN-ONLY INTERNAL AUDIT DATA: propertyAdminInternal/{propertyId}
+    // =============================================================
+    match /propertyAdminInternal/{propertyId} {
+      allow read, write: if isAdmin();
+    }
+
+    // =============================================================
+    // 4. CONFIDENTIAL LEGAL DOCUMENTS: propertyDocuments/{docId}
+    // =============================================================
+    match /propertyDocuments/{docId} {
+      allow read: if (isSignedIn() && resource != null && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() && isNotSuspended() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if (
+        isSignedIn()
+        && isNotSuspended()
+        && resource.data.ownerId == request.auth.uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'adminFeedback'])
+      ) || isAdmin();
+      allow delete: if (isSignedIn() && isNotSuspended() && resource.data.ownerId == request.auth.uid) || isAdmin();
+    }
+
+    // =============================================================
+    // 5. USER PROFILES & SUBCOLLECTIONS
+    // =============================================================
+    match /users/{uid} {
+      allow read: if isUser(uid) || isAdmin();
+      allow create: if isUser(uid);
+      
+      // Strict rule: Users CANNOT self-assign or modify adminRole or role attributes
+      allow update: if isUser(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['adminRole', 'role']);
+      allow delete: if isAdmin();
+
+      match /wishlist/{propertyId} {
+        allow read, write: if (isUser(uid) && isNotSuspended()) || isAdmin();
+      }
+    }
+
+    // =============================================================
+    // 6. DIRECT ENQUIRIES: enquiries/{enquiryId} & NOTIFICATIONS: notifications/{notificationId}
+    // =============================================================
+    match /enquiries/{enquiryId} {
+      allow read: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isSignedIn()
+        && isNotSuspended()
+        && (request.resource.data.customerId == request.auth.uid || request.resource.data.buyerId == request.auth.uid)
+        && request.resource.data.propertyId is string
+        && exists(/databases/$(database)/documents/properties/$(request.resource.data.propertyId))
+        && get(/databases/$(database)/documents/properties/$(request.resource.data.propertyId)).data.listingStatus == 'LIVE'
+        && get(/databases/$(database)/documents/properties/$(request.resource.data.propertyId)).data.isPublished == true
+        && request.resource.data.ownerId == get(/databases/$(database)/documents/properties/$(request.resource.data.propertyId)).data.ownerId;
+
+      allow update: if isSignedIn() && (
+        (
+          resource.data.ownerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && (
+            request.resource.data.status == resource.data.status ||
+            (resource.data.status == 'SUBMITTED' && request.resource.data.status == 'CONTACTED') ||
+            (resource.data.status == 'CONTACTED' && request.resource.data.status == 'IN_PROGRESS') ||
+            (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'COMPLETED') ||
+            (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'CLOSED')
+          )
+        ) ||
+        (
+          (resource.data.customerId == request.auth.uid || resource.data.buyerId == request.auth.uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && resource.data.status == 'SUBMITTED'
+          && request.resource.data.status == 'CLOSED'
+        ) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.recipientId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isAdmin();
+
+      allow update: if isSignedIn() && (
+        (
+          resource.data.recipientId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        ) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // =============================================================
+    // 7. VERIFICATION RECORDS & IMMUTABLE AUDIT LOGS
+    // =============================================================
+    match /verificationRecords/{verificationId} {
+      allow read: if (isSignedIn() && resource != null && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /activityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // =============================================================
+    // 8. SITE MANAGEMENT (CMS)
+    // =============================================================
+    match /siteManagement/{moduleId} {
+      allow read: if (resource != null && resource.data.state == 'PUBLISHED') || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // =============================================================
+    // 9. DEALS, FOLLOW-UPS & REPORTS
+    // =============================================================
+    match /deals/{dealId} {
+      allow read: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    match /followUps/{followUpId} {
+      allow read: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid ||
+        resource.data.customerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if (isSignedIn() && resource.data.reporterId == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
+

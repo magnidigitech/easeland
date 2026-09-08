@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-yellow: #F4C542;
+  --brand-yellow-hover: #E5B42E;
+  --brand-charcoal: #0B2545;
+  --brand-charcoal-light: #134074;
+  --brand-blue: #2563EB;
+  --brand-font: 'Plus Jakarta Sans', sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: #FAF9F5;
+    color: var(--brand-charcoal);
+    font-family: var(--brand-font);
+  }
+}
+
+/* DYNAMIC BRAND COLOR THEME ENGINE OVERRIDES */
+.bg-brand-yellow {
+  background-color: var(--brand-yellow) !important;
+}
+
+.hover\:bg-brand-yellowHover:hover {
+  background-color: var(--brand-yellow-hover) !important;
+}
+
+.text-brand-yellow {
+  color: var(--brand-yellow) !important;
+}
+
+.border-brand-yellow {
+  border-color: var(--brand-yellow) !important;
+}
+
+.bg-brand-charcoal {
+  background-color: var(--brand-charcoal) !important;
+}
+
+.hover\:bg-brand-charcoalLight:hover {
+  background-color: var(--brand-charcoal-light) !important;
+}
+
+.text-brand-charcoal {
+  color: var(--brand-charcoal) !important;
+}
+
+.border-brand-charcoal {
+  border-color: var(--brand-charcoal) !important;
+}
+
+/* ACCENT ELECTRIC COLOR DYNAMIC OVERRIDES */
+.bg-brand-blue,
+.bg-blue-600,
+.bg-blue-500 {
+  background-color: var(--brand-blue) !important;
+  opacity: 1 !important;
+}
+
+.hover\:bg-brand-blue:hover,
+.hover\:bg-blue-700:hover,
+.hover\:bg-blue-600:hover {
+  background-color: var(--brand-blue) !important;
+  filter: brightness(0.9);
+}
+
+.text-brand-blue,
+.text-blue-600,
+.text-blue-500,
+.text-blue-700 {
+  color: var(--brand-blue) !important;
+  opacity: 1 !important;
+}
+
+.border-brand-blue,
+.border-blue-600,
+.border-blue-500,
+.border-blue-300,
+.border-blue-200 {
+  border-color: var(--brand-blue) !important;
+}
+
+/* Soft Tint Background without reducing child element opacity */
+.bg-blue-50 {
+  background-color: color-mix(in srgb, var(--brand-blue) 15%, #ffffff) !important;
+  opacity: 1 !important;
+}
+
+.ring-brand-yellow:focus,
+.focus\:ring-brand-yellow:focus {
+  --tw-ring-color: var(--brand-yellow) !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF9F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D5D3C8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B5B2A4;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 224, 216, 0.8);
+}
+
+.glass-dark {
+  background: var(--brand-charcoal) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Leaflet Custom Marker & Popup Overrides */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  padding: 4px !important;
+  background: #FFFFFF !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  line-height: 1.4 !important;
+}
+
+.custom-map-marker {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.custom-map-marker:hover {
+  transform: scale(1.18);
+  z-index: 9999 !important;
+}
