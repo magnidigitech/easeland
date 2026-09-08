@@ -412,7 +412,8 @@ export const mockApi = {
 
   // -------------------------------------------------------------
   // 2. OWNER PROPERTY APIS
-  // -------------------------------------------------------  createOwnerListing: (newPropertyPayload, isDraft = false) => {
+  // -------------------------------------------------------------
+  createOwnerListing: (newPropertyPayload, isDraft = false) => {
     const freshProps = getStoredData('easeland_properties', properties);
     const newId = newPropertyPayload.id || newPropertyPayload.propertyId || ('prop-' + Date.now());
     
