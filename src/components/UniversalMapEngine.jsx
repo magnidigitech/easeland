@@ -577,9 +577,11 @@ export default function UniversalMapEngine({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     
-                    <div className="absolute top-3 left-3 bg-brand-charcoal/90 backdrop-blur-md text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow">
-                      <ShieldCheck className="w-3 h-3 text-brand-yellow" />
-                      <span>{prop.verificationStatus}</span>
+                    <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1 shadow.md border border-amber-400/40">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="bg-metallic-gold bg-clip-text text-transparent">
+                        {prop.verificationStatus || 'PLATFORM VERIFIED'}
+                      </span>
                     </div>
 
                     <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md text-brand-charcoal text-[10px] font-bold px-2 py-1 rounded">

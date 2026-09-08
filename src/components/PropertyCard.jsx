@@ -97,9 +97,11 @@ export default function PropertyCard({
         {/* Bottom Overlay Badges */}
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
           {property.isPlatformVerified && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600/90 backdrop-blur-md text-white text-[11px] font-bold rounded-lg shadow-md border border-emerald-400/30">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
-              Platform Verified
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950/90 backdrop-blur-md text-[11px] font-black tracking-widest uppercase rounded-lg shadow-[0_2px_10px_rgba(212,175,55,0.25)] border border-amber-400/50">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="bg-metallic-gold bg-clip-text text-transparent drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]">
+                Platform Verified
+              </span>
             </span>
           )}
 

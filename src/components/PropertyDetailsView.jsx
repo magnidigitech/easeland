@@ -90,9 +90,11 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
           </button>
 
           {/* VERIFIED BADGE */}
-          <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-extrabold text-brand-yellow border border-white/15">
-            <ShieldCheck className="w-4 h-4 text-brand-yellow" />
-            <span>{property.verificationStatus}</span>
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-slate-950/90 text-amber-400 border border-amber-400/50 shadow-md backdrop-blur-md">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span className="bg-metallic-gold bg-clip-text text-transparent">
+              {property.verificationStatus || 'PLATFORM VERIFIED'}
+            </span>
           </div>
         </div>
       </div>

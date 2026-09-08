@@ -389,9 +389,11 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
           {/* VERIFIED BY EASELAND BADGE */}
           {property.isPlatformVerified && (
-            <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 rounded-full text-xs font-extrabold text-emerald-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Verified by EaseLand</span>
+            <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-md border border-amber-400/50 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-[0_2px_10px_rgba(212,175,55,0.2)]">
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span className="bg-metallic-gold bg-clip-text text-transparent">
+                Platform Verified
+              </span>
             </div>
           )}
         </div>
@@ -554,11 +556,13 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
             
             {/* EASELAND PLATFORM VERIFICATION NOTICE CARD */}
             {property.isPlatformVerified && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-emerald-900 flex items-start gap-4 shadow-sm">
-                <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="bg-slate-900 border border-amber-400/40 rounded-2xl p-5 text-slate-100 flex items-start gap-4 shadow-lg">
+                <ShieldCheck className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-bold">Verified by EaseLand</h4>
-                  <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                  <h4 className="text-sm font-black uppercase tracking-wide bg-metallic-gold bg-clip-text text-transparent">
+                    Platform Verified Listing
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed font-medium">
                     This property listing has been reviewed and verified by the EaseLand platform audit team. Verification indicates platform review and location confirmation. It does not constitute a legal title warranty or government approval.
                   </p>
                 </div>
