@@ -104,17 +104,19 @@ export default function DynamicFilterPanel({
 
   // Active filter chips list
   const activeChips = [];
-  if (filters.purpose) activeChips.push({ label: `Purpose: ${filters.purpose}`, key: 'purpose', val: '' });
-  if (filters.propertyType) activeChips.push({ label: `Type: ${filters.propertyType}`, key: 'propertyType', val: '' });
+  if (filters.purpose && filters.purpose !== 'ALL' && filters.purpose !== 'ANY') activeChips.push({ label: `Purpose: ${filters.purpose}`, key: 'purpose', val: '' });
+  if (filters.propertyType && filters.propertyType !== 'ALL' && filters.propertyType !== 'ANY') activeChips.push({ label: `Type: ${filters.propertyType.replace(/_/g, ' ')}`, key: 'propertyType', val: '' });
+  if (filters.state) activeChips.push({ label: `State: ${filters.state}`, key: 'state', val: '' });
+  if (filters.district) activeChips.push({ label: `District: ${filters.district}`, key: 'district', val: '' });
   if (filters.city) activeChips.push({ label: `City: ${filters.city}`, key: 'city', val: '' });
   if (filters.locality) activeChips.push({ label: `Locality: ${filters.locality}`, key: 'locality', val: '' });
   if (filters.minPrice) activeChips.push({ label: `Min Price: Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`, key: 'minPrice', val: '' });
   if (filters.maxPrice) activeChips.push({ label: `Max Price: Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`, key: 'maxPrice', val: '' });
-  if (filters.minArea) activeChips.push({ label: `Min Area: ${filters.minArea} sq ft`, key: 'minArea', val: '' });
-  if (filters.maxArea) activeChips.push({ label: `Max Area: ${filters.maxArea} sq ft`, key: 'maxArea', val: '' });
-  if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY') activeChips.push({ label: `BHK: ${filters.bedrooms}+`, key: 'bedrooms', val: '' });
-  if (filters.facing) activeChips.push({ label: `Facing: ${filters.facing}`, key: 'facing', val: '' });
-  if (filters.furnishing) activeChips.push({ label: `Furnishing: ${filters.furnishing}`, key: 'furnishing', val: '' });
+  if (filters.minAreaSqFt || filters.minArea) activeChips.push({ label: `Min Area: ${filters.minAreaSqFt || filters.minArea} sq ft`, key: 'minArea', val: '' });
+  if (filters.maxAreaSqFt || filters.maxArea) activeChips.push({ label: `Max Area: ${filters.maxAreaSqFt || filters.maxArea} sq ft`, key: 'maxArea', val: '' });
+  if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY' && filters.bedrooms !== 'ALL') activeChips.push({ label: `BHK: ${filters.bedrooms}+`, key: 'bedrooms', val: '' });
+  if (filters.facing && filters.facing !== 'ALL' && filters.facing !== 'ANY') activeChips.push({ label: `Facing: ${filters.facing}`, key: 'facing', val: '' });
+  if (filters.furnishing && filters.furnishing !== 'ALL' && filters.furnishing !== 'ANY') activeChips.push({ label: `Furnishing: ${filters.furnishing}`, key: 'furnishing', val: '' });
   if (filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
   if (filters.amenities && filters.amenities.length > 0) {
     filters.amenities.forEach(a => {

@@ -198,17 +198,19 @@ export default function PropertiesSearchPage({
   // Active Filter Counter
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (searchState.purpose && searchState.purpose !== 'ALL') count++;
-    if (searchState.propertyType && searchState.propertyType !== 'ALL') count++;
+    if (searchState.purpose && searchState.purpose !== 'ALL' && searchState.purpose !== 'ANY') count++;
+    if (searchState.propertyType && searchState.propertyType !== 'ALL' && searchState.propertyType !== 'ANY') count++;
+    if (searchState.state) count++;
+    if (searchState.district) count++;
     if (searchState.city) count++;
     if (searchState.locality) count++;
     if (searchState.minPrice) count++;
     if (searchState.maxPrice) count++;
     if (searchState.minAreaSqFt || searchState.minArea) count++;
     if (searchState.maxAreaSqFt || searchState.maxArea) count++;
-    if (searchState.bedrooms && searchState.bedrooms !== 'ANY') count++;
-    if (searchState.facing && searchState.facing !== 'ALL') count++;
-    if (searchState.furnishing && searchState.furnishing !== 'ALL') count++;
+    if (searchState.bedrooms && searchState.bedrooms !== 'ANY' && searchState.bedrooms !== 'ALL') count++;
+    if (searchState.facing && searchState.facing !== 'ALL' && searchState.facing !== 'ANY') count++;
+    if (searchState.furnishing && searchState.furnishing !== 'ALL' && searchState.furnishing !== 'ANY') count++;
     if (searchState.radiusKm) count++;
     if (searchState.amenities && searchState.amenities.length > 0) count += searchState.amenities.length;
     return count;
