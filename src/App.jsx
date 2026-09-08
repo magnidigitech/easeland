@@ -396,26 +396,26 @@ export default function App() {
             {/* FAQ ACCORDION SECTION */}
             <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
               <div className="text-center mb-10">
-                <span className="text-xs font-extrabold uppercase tracking-widest text-brand-yellow bg-brand-charcoal px-3 py-1 rounded-md">
+                <span className="text-xs font-extrabold uppercase tracking-widest text-slate-950 bg-metallic-gold px-3 py-1 rounded-md shadow-md border border-amber-300">
                   Frequently Asked Questions
                 </span>
-                <h2 className="text-2xl sm:text-4xl font-extrabold text-brand-charcoal tracking-tight mt-3">
+                <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100 tracking-tight mt-3">
                   Everything You Need to Know About EaseLand
                 </h2>
               </div>
 
               <div className="space-y-4">
                 {faqs.map((faq, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl border border-brand-bordergray overflow-hidden shadow-sm">
+                  <div key={idx} className="bg-white rounded-2xl border border-slate-300 overflow-hidden shadow-lg">
                     <button
                       onClick={() => setFaqOpenIndex(faqOpenIndex === idx ? null : idx)}
-                      className="w-full p-5 text-left font-bold text-sm sm:text-base text-brand-charcoal flex items-center justify-between gap-4"
+                      className="w-full p-5 text-left font-bold text-sm sm:text-base text-slate-900 hover:text-amber-600 flex items-center justify-between gap-4 transition-colors"
                     >
-                      <span>{faq.q}</span>
-                      <ChevronDown className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${faqOpenIndex === idx ? 'rotate-180 text-brand-yellow' : ''}`} />
+                      <span className="text-slate-900 font-bold">{faq.q}</span>
+                      <ChevronDown className={`w-5 h-5 text-slate-500 shrink-0 transition-transform ${faqOpenIndex === idx ? 'rotate-180 text-amber-500' : ''}`} />
                     </button>
                     {faqOpenIndex === idx && (
-                      <div className="px-5 pb-5 text-xs sm:text-sm text-gray-600 font-medium leading-relaxed border-t border-gray-100 pt-3">
+                      <div className="px-5 pb-5 text-xs sm:text-sm text-slate-700 font-medium leading-relaxed border-t border-slate-200 pt-3">
                         {faq.a}
                       </div>
                     )}
@@ -426,73 +426,74 @@ export default function App() {
 
             {/* GENERAL CONTACT FORM */}
             <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
-              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-brand-bordergray shadow-lg">
-                <h3 className="text-xl font-extrabold text-brand-charcoal mb-1">Have Questions? Contact EaseLand Admin</h3>
-                <p className="text-xs text-gray-500 font-medium mb-6">Website inquiries, platform feedback, or support assistance.</p>
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-300 shadow-xl text-slate-900">
+                <h3 className="text-xl font-extrabold text-slate-900 mb-1">Have Questions? Contact EaseLand Admin</h3>
+                <p className="text-xs text-slate-600 font-medium mb-6">Website inquiries, platform feedback, or support assistance.</p>
 
                 {generalContactSubmitted ? (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center text-emerald-900 space-y-2">
                     <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-                    <h4 className="text-base font-bold">Message Delivered to EaseLand Support!</h4>
+                    <h4 className="text-base font-bold text-emerald-950">Message Delivered to EaseLand Support!</h4>
                     <p className="text-xs text-emerald-800">Our platform team will review your message and reach out shortly.</p>
                   </div>
                 ) : (
                   <form onSubmit={handleGeneralContactSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">Your Name</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Your Name</label>
                         <input
                           type="text"
                           required
                           placeholder="Ryuu"
                           value={generalContact.name}
                           onChange={(e) => setGeneralContact({ ...generalContact, name: e.target.value })}
-                          className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                          className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">Email Address</label>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
                         <input
                           type="email"
                           required
                           placeholder="ryuu@example.com"
                           value={generalContact.email}
                           onChange={(e) => setGeneralContact({ ...generalContact, email: e.target.value })}
-                          className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                          className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Subject</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
                       <input
                         type="text"
                         required
                         placeholder="Inquiry about platform verification"
                         value={generalContact.subject}
                         onChange={(e) => setGeneralContact({ ...generalContact, subject: e.target.value })}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                        className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Message</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Message</label>
                       <textarea
                         rows={3}
                         required
                         placeholder="Enter your message here..."
                         value={generalContact.message}
                         onChange={(e) => setGeneralContact({ ...generalContact, message: e.target.value })}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold resize-none"
+                        className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none resize-none"
                       ></textarea>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-sm py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2"
+                      disabled={generalContactLoading}
+                      className="w-full bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-sm py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all border border-amber-300"
                     >
-                      <Send className="w-4 h-4" />
-                      Send Message
+                      <Send className="w-4 h-4 text-slate-950" />
+                      <span>{generalContactLoading ? 'Sending Message...' : 'Send Message'}</span>
                     </button>
                   </form>
                 )}

@@ -181,12 +181,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         </div>
 
         {/* MODE TABS */}
-        <div className="grid grid-cols-2 bg-gray-100 p-1 text-xs font-bold border-b border-gray-200">
+        <div className="grid grid-cols-2 bg-slate-100 p-1 text-xs font-bold border-b border-slate-200">
           <button
             type="button"
             onClick={() => { setMode('login'); setError(null); }}
-            className={`py-2 rounded-lg transition-colors ${
-              mode === 'login' ? 'bg-white text-brand-charcoal shadow-sm' : 'text-gray-500 hover:text-brand-charcoal'
+            className={`py-2 rounded-lg transition-all font-extrabold ${
+              mode === 'login' ? 'bg-slate-900 text-amber-400 shadow-md' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             Log In
@@ -195,8 +195,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
           <button
             type="button"
             onClick={() => { setMode('register'); setError(null); }}
-            className={`py-2 rounded-lg transition-colors ${
-              mode === 'register' ? 'bg-white text-brand-charcoal shadow-sm' : 'text-gray-500 hover:text-brand-charcoal'
+            className={`py-2 rounded-lg transition-all font-extrabold ${
+              mode === 'register' ? 'bg-slate-900 text-amber-400 shadow-md' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             Register New Account
@@ -218,25 +218,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* FULL NAME */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Full Name</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     required
                     placeholder="e.g. Suresh Kumar"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* MOBILE NUMBER */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Mobile Number (10 Digits)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number (10 Digits)</label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="tel"
                     required
@@ -244,50 +244,50 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     placeholder="e.g. 9876543210"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* EMAIL */}
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-gray-600 mb-1">Email Address</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="email"
                     required
                     placeholder="name@domain.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* PASSWORD */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Password</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-1 transition-colors"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 transition-colors"
                     title={showPassword ? "Hide password text" : "Show password text"}
                   >
                     {showPassword ? (
-                      <EyeOff className="w-4 h-4 text-brand-charcoal" />
+                      <EyeOff className="w-4 h-4 text-slate-700" />
                     ) : (
-                      <Eye className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                      <Eye className="w-4 h-4 text-slate-400 hover:text-slate-600" />
                     )}
                   </button>
                 </div>
@@ -295,16 +295,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
               {/* CONFIRM PASSWORD */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Confirm Password</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Confirm Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.confirmPassword || ''}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -313,42 +313,42 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
             <div className="space-y-3">
               {/* LOGIN MODE INPUTS */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Email Address</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="email"
                     required
                     placeholder="name@domain.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Password</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                    className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-1 transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 transition-colors"
                     title={showPassword ? "Hide password text" : "Show password text"}
                   >
                     {showPassword ? (
-                      <EyeOff className="w-4 h-4 text-brand-charcoal" />
+                      <EyeOff className="w-4 h-4 text-slate-700" />
                     ) : (
-                      <Eye className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                      <Eye className="w-4 h-4 text-slate-400 hover:text-slate-600" />
                     )}
                   </button>
                 </div>
