@@ -13,7 +13,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-brand-charcoal text-white border-b border-white/10 shadow-xl">
+    <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-xl text-white border-b border-slate-800 shadow-2xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
@@ -25,13 +25,13 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             <img
               src={siteConfig.navbar?.logoEmblemUrl || "/easeland_emblem_transparent.png"}
               alt="EaseLand Logo"
-              className="h-11 w-auto object-contain group-hover:scale-105 transition-transform"
+              className="h-11 w-auto object-contain group-hover:scale-105 transition-transform drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]"
             />
             <div>
-              <span className="text-2xl font-extrabold tracking-tight text-white font-sans">
-                {siteConfig.navbar?.logoTextPrefix || 'Ease'}<span className="text-brand-yellow">{siteConfig.navbar?.logoTextSuffix || 'Land'}</span>
+              <span className="text-2xl font-extrabold tracking-tight text-slate-100 font-sans">
+                {siteConfig.navbar?.logoTextPrefix || 'Ease'}<span className="text-metallic-gold">{siteConfig.navbar?.logoTextSuffix || 'Land'}</span>
               </span>
-              <span className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold">
+              <span className="block text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
                 {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig.navbar?.logoSubtext || 'Direct Property Platform')}
               </span>
             </div>
@@ -42,7 +42,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             <button
               onClick={() => setActivePage('buy')}
               className={`text-sm font-semibold tracking-wide transition-colors py-2 border-b-2 ${
-                activePage === 'buy' ? 'border-brand-yellow text-brand-yellow' : 'border-transparent text-gray-300 hover:text-white'
+                activePage === 'buy' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
               }`}
             >
               {siteConfig.navbar?.buyLabel || 'BUY'}
@@ -51,7 +51,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             <button
               onClick={() => setActivePage('rent')}
               className={`text-sm font-semibold tracking-wide transition-colors py-2 border-b-2 ${
-                activePage === 'rent' ? 'border-brand-yellow text-brand-yellow' : 'border-transparent text-gray-300 hover:text-white'
+                activePage === 'rent' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
               }`}
             >
               {siteConfig.navbar?.rentLabel || 'RENT'}
@@ -60,7 +60,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             <button
               onClick={() => setActivePage('sell')}
               className={`text-sm font-semibold tracking-wide transition-colors py-2 border-b-2 ${
-                activePage === 'sell' ? 'border-brand-yellow text-brand-yellow' : 'border-transparent text-gray-300 hover:text-white'
+                activePage === 'sell' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
               }`}
             >
               {siteConfig.navbar?.sellLabel || 'SELL'}
@@ -74,12 +74,12 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             {user && (
               <button
                 onClick={() => setActivePage('wishlist')}
-                className="relative p-2.5 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                className="relative p-2.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
                 title="My Saved Properties"
               >
                 <Heart className="w-5 h-5" />
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-brand-yellow text-brand-charcoal text-[11px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">
+                  <span className="absolute -top-1 -right-1 bg-metallic-gold text-slate-950 text-[11px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-amber-300">
                     {wishlistCount}
                   </span>
                 )}
@@ -91,7 +91,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               activePage === 'admin' ? (
                 <button
                   onClick={() => setActivePage('home')}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg border border-emerald-400/30 flex items-center gap-2 transition-all transform hover:scale-105 select-none"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg border border-emerald-400/40 flex items-center gap-2 transition-all transform hover:scale-105 select-none"
                   title="Preview consumer live site"
                 >
                   <ShieldCheck className="w-4 h-4 text-emerald-100" />
@@ -100,10 +100,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               ) : (
                 <button
                   onClick={() => setActivePage('admin')}
-                  className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 select-none"
+                  className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 border border-amber-300/40 select-none"
                   title="Return to Admin Site Control Studio"
                 >
-                  <ShieldCheck className="w-4 h-4 text-brand-charcoal" />
+                  <ShieldCheck className="w-4 h-4 text-slate-950" />
                   <span>ADMIN SITE STUDIO</span>
                 </button>
               )
@@ -116,12 +116,12 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                   onClick={() => setActivePage('dashboard')}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-colors ${
                     activePage === 'dashboard'
-                      ? 'bg-brand-yellow text-brand-charcoal border-brand-yellow font-extrabold shadow'
-                      : 'bg-white/10 text-white border-white/10 hover:bg-white/20'
+                      ? 'bg-metallic-gold text-slate-950 border-amber-300 font-extrabold shadow-md'
+                      : 'bg-slate-900 text-slate-200 border-slate-700 hover:bg-slate-800'
                   }`}
                   title="Open User Dashboard"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-brand-yellow text-brand-charcoal font-black text-xs flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow">
                     {user.name ? user.name.charAt(0).toLowerCase() : 'u'}
                   </div>
                   <div className="text-left">
@@ -136,7 +136,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
                 <button
                   onClick={onOpenProfileSettings}
-                  className="p-2 text-gray-300 hover:text-brand-yellow hover:bg-white/10 rounded-xl transition-colors"
+                  className="p-2 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
                   title="Profile & Security Settings"
                 >
                   <Settings className="w-5 h-5" />
@@ -144,7 +144,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
                 <button
                   onClick={onLogoutClick}
-                  className="p-2 text-gray-400 hover:text-red-400 hover:bg-white/10 rounded-xl transition-colors"
+                  className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
                   title="Sign Out"
                 >
                   <LogOut className="w-5 h-5" />
@@ -153,7 +153,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             ) : (
               <button
                 onClick={onLoginClick}
-                className="text-xs font-bold text-white hover:text-brand-yellow flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-white/10 transition-colors"
+                className="text-xs font-bold text-slate-200 hover:text-amber-400 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
               >
                 <User className="w-4 h-4" />
                 <span>LOGIN / REGISTER</span>
@@ -163,7 +163,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             {/* POST PROPERTY PRIMARY BUTTON */}
             <button
               onClick={onPostPropertyClick}
-              className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-5 py-3 rounded-xl shadow-lg flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5"
+              className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5 border border-amber-300/40"
             >
               <PlusCircle className="w-4 h-4 stroke-[2.5]" />
               <span>POST PROPERTY</span>

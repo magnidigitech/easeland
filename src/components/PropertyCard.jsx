@@ -50,31 +50,31 @@ export default function PropertyCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`group bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col cursor-pointer ${className}`}
+      className={`group bg-metallic-card rounded-2xl border border-slate-700/60 hover:border-amber-400/50 shadow-lg hover:shadow-[0_10px_30px_rgba(212,175,55,0.15)] transition-all duration-300 overflow-hidden flex flex-col cursor-pointer ${className}`}
     >
       {/* Image Container */}
-      <div className="relative aspect-[16/10] w-full bg-brand-softgray overflow-hidden">
+      <div className="relative aspect-[16/10] w-full bg-slate-950 overflow-hidden">
         {thumbnail ? (
           <img
             src={thumbnail}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-100 p-4">
-            <Building className="w-10 h-10 mb-2 opacity-50 text-brand-charcoal" />
-            <span className="text-xs font-semibold text-gray-500">No Image Available</span>
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900 p-4">
+            <Building className="w-10 h-10 mb-2 opacity-50 text-amber-400" />
+            <span className="text-xs font-semibold text-slate-400">No Image Available</span>
           </div>
         )}
 
         {/* Top Overlay Badges */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide bg-brand-charcoal text-brand-yellow rounded-lg shadow-md">
+            <span className="px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide bg-metallic-gold text-slate-950 rounded-lg shadow-md border border-amber-300/40">
               {purpose === 'RENT' ? 'FOR RENT' : purpose === 'LEASE' ? 'FOR LEASE' : 'FOR SALE'}
             </span>
-            <span className="px-2.5 py-1 text-[11px] font-bold bg-white/95 text-brand-charcoal backdrop-blur-md rounded-lg shadow-sm border border-gray-200">
+            <span className="px-2.5 py-1 text-[11px] font-bold bg-slate-900/90 text-slate-200 backdrop-blur-md rounded-lg shadow-sm border border-slate-700">
               {propertyType.replace(/_/g, ' ')}
             </span>
           </div>
@@ -86,8 +86,8 @@ export default function PropertyCard({
             aria-label={isWishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shadow-md ${
               isWishlisted
-                ? 'bg-red-500 text-white scale-105'
-                : 'bg-white/90 text-gray-600 hover:text-red-500 hover:bg-white border border-gray-200'
+                ? 'bg-rose-600 text-white scale-105 shadow-rose-900/50'
+                : 'bg-slate-900/80 text-slate-300 hover:text-rose-400 hover:bg-slate-800 border border-slate-700'
             }`}
           >
             <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
@@ -97,14 +97,14 @@ export default function PropertyCard({
         {/* Bottom Overlay Badges */}
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
           {property.isPlatformVerified && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white text-[11px] font-bold rounded-lg shadow-md">
-              <ShieldCheck className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600/90 backdrop-blur-md text-white text-[11px] font-bold rounded-lg shadow-md border border-emerald-400/30">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
               Platform Verified
             </span>
           )}
 
           {property.distKm != null && property.distKm < Infinity && (
-            <span className="ml-auto px-2 py-0.5 bg-brand-charcoal/80 backdrop-blur-md text-white text-[10px] font-medium rounded-md">
+            <span className="ml-auto px-2 py-0.5 bg-slate-900/80 backdrop-blur-md text-slate-300 text-[10px] font-medium rounded-md border border-slate-700">
               {property.distKm} km away
             </span>
           )}
@@ -112,56 +112,56 @@ export default function PropertyCard({
       </div>
 
       {/* Content Container */}
-      <div className="p-4 flex-1 flex flex-col justify-between">
+      <div className="p-4 flex-1 flex flex-col justify-between bg-gradient-to-b from-slate-900/80 to-slate-950">
         <div>
           {/* Price Header */}
           <div className="flex items-baseline justify-between gap-2 mb-1.5">
-            <h3 className="text-xl font-extrabold text-brand-charcoal group-hover:text-amber-600 transition-colors">
+            <h3 className="text-xl font-extrabold text-metallic-gold group-hover:text-amber-300 transition-colors">
               {priceDisplay}
             </h3>
             {areaDisplay && (
-              <span className="text-xs font-semibold text-gray-500">
+              <span className="text-xs font-semibold text-slate-400">
                 {areaDisplay}
               </span>
             )}
           </div>
 
           {/* Title */}
-          <h4 className="text-sm font-bold text-gray-800 line-clamp-1 mb-2 group-hover:text-brand-charcoal">
+          <h4 className="text-sm font-bold text-slate-100 line-clamp-1 mb-2 group-hover:text-amber-400 transition-colors">
             {title}
           </h4>
 
           {/* Location */}
-          <div className="flex items-center gap-1 text-xs text-gray-600 mb-3">
-            <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <div className="flex items-center gap-1 text-xs text-slate-400 mb-3">
+            <MapPin className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
             <span className="truncate">{locationText}</span>
           </div>
         </div>
 
         {/* Specifications Footer */}
-        <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600">
+        <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-3">
             {!isPlotOrLand && bedrooms > 0 && (
-              <div className="flex items-center gap-1 font-semibold">
-                <Bed className="w-3.5 h-3.5 text-gray-500" />
+              <div className="flex items-center gap-1 font-semibold text-slate-300">
+                <Bed className="w-3.5 h-3.5 text-slate-400" />
                 <span>{bedrooms} BHK</span>
               </div>
             )}
             {!isPlotOrLand && bathrooms > 0 && (
-              <div className="flex items-center gap-1 font-semibold">
-                <Bath className="w-3.5 h-3.5 text-gray-500" />
+              <div className="flex items-center gap-1 font-semibold text-slate-300">
+                <Bath className="w-3.5 h-3.5 text-slate-400" />
                 <span>{bathrooms} Bath</span>
               </div>
             )}
             {areaDisplay && (
-              <div className="flex items-center gap-1 font-semibold">
-                <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
+              <div className="flex items-center gap-1 font-semibold text-slate-300">
+                <Maximize2 className="w-3.5 h-3.5 text-slate-400" />
                 <span>{areaDisplay}</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-0.5 text-xs font-bold text-brand-charcoal group-hover:translate-x-0.5 transition-transform">
+          <div className="flex items-center gap-0.5 text-xs font-bold text-amber-400 group-hover:translate-x-0.5 transition-transform">
             <span>View</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </div>

@@ -3,75 +3,157 @@
 @tailwind utilities;
 
 :root {
-  --brand-yellow: #F4C542;
-  --brand-yellow-hover: #E5B42E;
-  --brand-charcoal: #0B2545;
-  --brand-charcoal-light: #134074;
-  --brand-blue: #2563EB;
+  --brand-yellow: #d4af37;
+  --brand-yellow-hover: #b8860b;
+  --brand-charcoal: #0f172a;
+  --brand-charcoal-light: #1e293b;
+  --brand-blue: #38bdf8;
   --brand-font: 'Plus Jakarta Sans', sans-serif;
+  
+  --metallic-dark: #090d16;
+  --metallic-steel: #0f172a;
+  --metallic-titanium: #1e293b;
+  --metallic-slate: #334155;
+  --metallic-chrome: #cbd5e1;
+  --metallic-gold: #d4af37;
+  --metallic-gold-light: #fef08a;
 }
 
 @layer base {
   body {
-    background-color: #FAF9F5;
-    color: var(--brand-charcoal);
+    background-color: var(--metallic-dark);
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(212, 175, 55, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.05) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(30, 41, 59, 0.5) 0px, transparent 100%);
+    background-attachment: fixed;
+    color: #f1f5f9;
     font-family: var(--brand-font);
   }
 }
 
+/* METALLIC THEME UTILITY CLASSES */
+.bg-metallic-dark {
+  background: linear-gradient(135deg, #060911 0%, #0f172a 40%, #1e293b 80%, #0f172a 100%) !important;
+}
+
+.bg-metallic-steel {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+}
+
+.bg-metallic-card {
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.bg-metallic-gold {
+  background: linear-gradient(135deg, #b8860b 0%, #d4af37 35%, #fef08a 50%, #d4af37 65%, #92400e 100%) !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+.bg-metallic-gold-hover:hover {
+  background: linear-gradient(135deg, #92400e 0%, #b8860b 35%, #fef08a 50%, #b8860b 70%, #78350f 100%) !important;
+}
+
+.bg-metallic-silver {
+  background: linear-gradient(135deg, #475569 0%, #94a3b8 30%, #f8fafc 50%, #cbd5e1 70%, #334155 100%) !important;
+  color: #0f172a !important;
+}
+
+.text-metallic-gold {
+  background: linear-gradient(135deg, #fef08a 0%, #d4af37 50%, #b8860b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-metallic-silver {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-metallic-gold {
+  border-color: #d4af37 !important;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+.border-metallic-slate {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* METALLIC SHINE / SHIMMER ANIMATION */
+@keyframes metallicShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.metallic-shimmer {
+  background: linear-gradient(
+    90deg, 
+    rgba(255,255,255,0) 0%, 
+    rgba(255,255,255,0.2) 50%, 
+    rgba(255,255,255,0) 100%
+  );
+  background-size: 200% 100%;
+  animation: metallicShimmer 3s infinite linear;
+}
+
 /* DYNAMIC BRAND COLOR THEME ENGINE OVERRIDES */
 .bg-brand-yellow {
-  background-color: var(--brand-yellow) !important;
+  background: linear-gradient(135deg, #b8860b 0%, #d4af37 40%, #fef08a 55%, #d4af37 80%, #92400e 100%) !important;
+  color: #0f172a !important;
 }
 
 .hover\:bg-brand-yellowHover:hover {
-  background-color: var(--brand-yellow-hover) !important;
+  background: linear-gradient(135deg, #92400e 0%, #b8860b 40%, #fef08a 55%, #b8860b 80%, #78350f 100%) !important;
 }
 
 .text-brand-yellow {
-  color: var(--brand-yellow) !important;
+  color: #d4af37 !important;
 }
 
 .border-brand-yellow {
-  border-color: var(--brand-yellow) !important;
+  border-color: #d4af37 !important;
 }
 
 .bg-brand-charcoal {
-  background-color: var(--brand-charcoal) !important;
+  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%) !important;
 }
 
 .hover\:bg-brand-charcoalLight:hover {
-  background-color: var(--brand-charcoal-light) !important;
+  background: linear-gradient(145deg, #334155 0%, #1e293b 100%) !important;
 }
 
 .text-brand-charcoal {
-  color: var(--brand-charcoal) !important;
+  color: #f8fafc !important;
 }
 
 .border-brand-charcoal {
-  border-color: var(--brand-charcoal) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* ACCENT ELECTRIC COLOR DYNAMIC OVERRIDES */
 .bg-brand-blue,
 .bg-blue-600,
 .bg-blue-500 {
-  background-color: var(--brand-blue) !important;
+  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 50%, #0284c7 100%) !important;
   opacity: 1 !important;
 }
 
 .hover\:bg-brand-blue:hover,
 .hover\:bg-blue-700:hover,
 .hover\:bg-blue-600:hover {
-  background-color: var(--brand-blue) !important;
-  filter: brightness(0.9);
+  background: linear-gradient(135deg, #0369a1 0%, #0284c7 50%, #0369a1 100%) !important;
+  filter: brightness(1.1);
 }
 
 .text-brand-blue,
 .text-blue-600,
 .text-blue-500,
 .text-blue-700 {
-  color: var(--brand-blue) !important;
+  color: #38bdf8 !important;
   opacity: 1 !important;
 }
 
@@ -80,60 +162,64 @@
 .border-blue-500,
 .border-blue-300,
 .border-blue-200 {
-  border-color: var(--brand-blue) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
 }
 
-/* Soft Tint Background without reducing child element opacity */
 .bg-blue-50 {
-  background-color: color-mix(in srgb, var(--brand-blue) 15%, #ffffff) !important;
+  background-color: rgba(56, 189, 248, 0.12) !important;
+  color: #38bdf8 !important;
   opacity: 1 !important;
 }
 
 .ring-brand-yellow:focus,
 .focus\:ring-brand-yellow:focus {
-  --tw-ring-color: var(--brand-yellow) !important;
+  --tw-ring-color: #d4af37 !important;
 }
 
-/* Custom Scrollbar */
+/* Custom Metallic Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #FAF9F5;
+  background: #090d16;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D5D3C8;
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
   border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #B5B2A4;
+  background: linear-gradient(180deg, #d4af37 0%, #b8860b 100%);
 }
 
-/* Glassmorphism utility */
+/* Glassmorphism Metallic utility */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 224, 216, 0.8);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .glass-dark {
-  background: var(--brand-charcoal) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(9, 13, 22, 0.92) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* Leaflet Custom Marker & Popup Overrides */
 .leaflet-popup-content-wrapper {
   border-radius: 12px !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
   padding: 4px !important;
-  background: #FFFFFF !important;
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(212, 175, 55, 0.4) !important;
 }
 
 .leaflet-popup-content {

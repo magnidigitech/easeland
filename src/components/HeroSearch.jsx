@@ -159,42 +159,42 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   }
 
   return (
-    <div className="relative bg-brand-charcoal text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <div className="relative bg-metallic-dark text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
       
       {/* Background Decorative Graphic */}
-      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#F4C542_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+      <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#d4af37_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
       
       <div className="max-w-5xl mx-auto text-center relative z-10">
         
         {/* Verification Tagline */}
-        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/15 text-xs font-semibold text-brand-yellow mb-6">
-          <ShieldCheck className="w-4 h-4 text-brand-yellow" />
+        <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-6 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
           <span>{siteConfig.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
         </div>
 
         {/* Hero Title */}
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-4">
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-100 leading-tight mb-4">
           {siteConfig.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
-          <span className="text-brand-yellow">{siteConfig.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
+          <span className="text-metallic-gold">{siteConfig.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
         </h1>
         
-        <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto mb-8 font-medium">
+        <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-8 font-medium">
           {siteConfig.homepage?.heroSubtitle || 'Zero agents. Zero commission. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'}
         </p>
 
         {/* DEEP SEARCH CARD */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-2xl text-brand-charcoal max-w-4xl mx-auto border border-brand-bordergray">
+        <div className="bg-metallic-card rounded-2xl p-4 sm:p-6 shadow-2xl text-slate-100 max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
           
           {/* Purpose Tabs */}
-          <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPurpose('buy')}
-                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border ${
                   purpose === 'buy'
-                    ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
-                    : 'text-gray-500 hover:text-brand-charcoal hover:bg-gray-100'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
                 }`}
               >
                 Buy Property
@@ -203,10 +203,10 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               <button
                 type="button"
                 onClick={() => setPurpose('rent')}
-                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border ${
                   purpose === 'rent'
-                    ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
-                    : 'text-gray-500 hover:text-brand-charcoal hover:bg-gray-100'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
                 }`}
               >
                 Rent Property
@@ -214,7 +214,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             </div>
 
             {locationStatus && (
-              <span className="text-xs font-bold text-emerald-700 animate-pulse bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+              <span className="text-xs font-bold text-emerald-400 animate-pulse bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/40">
                 {locationStatus}
               </span>
             )}
@@ -225,14 +225,14 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             
             {/* Input with Map Pin Icon, Google Places Autocomplete, & Detect Current Location Button */}
             <div className="relative flex-1 w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-400/80 z-10" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder='Try "3 BHK villa in Gachibowli under 1.5 Cr"...'
-                className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
+                className="w-full pl-12 pr-12 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
               />
 
               {/* DETECT MY CURRENT LOCATION CROSSHAIR BUTTON */}
@@ -241,12 +241,12 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 onClick={handleDetectCurrentLocation}
                 disabled={isLocating}
                 title="Detect My Current Location"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-all shadow-sm group border border-blue-200"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center justify-center transition-all shadow-sm group border border-slate-700"
               >
                 {isLocating ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
                 ) : (
-                  <LocateFixed className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
+                  <LocateFixed className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
                 )}
               </button>
             </div>
@@ -256,7 +256,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full py-3.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
+                className="w-full py-3.5 px-3 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900"
               >
                 <option value="All">All Categories</option>
                 <option value="Open Plots">Open Plots</option>
@@ -270,7 +270,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             {/* Search Submit Button */}
             <button
               type="submit"
-              className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
+              className="w-full sm:w-auto bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-amber-300/40"
             >
               <Search className="w-4 h-4 stroke-[2.5]" />
               Search
@@ -278,9 +278,9 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           </form>
 
           {/* POPULAR SEARCHES PILLS BAR */}
-          <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-start sm:justify-center gap-2 text-xs font-bold text-gray-500">
-            <span className="flex items-center gap-1 text-gray-400 font-bold mr-1">
-              <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
+          <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-start sm:justify-center gap-2 text-xs font-bold text-slate-400">
+            <span className="flex items-center gap-1 text-slate-400 font-bold mr-1">
+              <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
               Popular Searches:
             </span>
             {popularSearches.map((item, idx) => (
@@ -297,12 +297,12 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 }}
                 className={`px-3.5 py-1.5 rounded-full border transition-all flex items-center gap-1.5 font-bold ${
                   item.isNearMe
-                    ? 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 shadow-sm font-extrabold'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-brand-yellow/20 hover:border-brand-yellow/40 hover:text-brand-charcoal'
+                    ? 'bg-sky-950/80 text-sky-400 border-sky-600/50 hover:bg-sky-900 shadow-sm font-extrabold'
+                    : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800 hover:border-amber-400/50 hover:text-amber-400'
                 }`}
               >
-                {item.isNearMe && <LocateFixed className="w-3.5 h-3.5 text-blue-700 stroke-[2.5]" />}
-                <span className={item.isNearMe ? 'text-blue-700 font-extrabold' : ''}>{item.label}</span>
+                {item.isNearMe && <LocateFixed className="w-3.5 h-3.5 text-sky-400 stroke-[2.5]" />}
+                <span className={item.isNearMe ? 'text-sky-400 font-extrabold' : ''}>{item.label}</span>
               </button>
             ))}
           </div>

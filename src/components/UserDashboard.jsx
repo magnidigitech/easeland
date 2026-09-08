@@ -315,38 +315,38 @@ export default function UserDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-brand-charcoal py-8">
+    <div className="min-h-screen bg-metallic-dark text-slate-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* HEADER BAR */}
-        <div className="bg-brand-charcoal text-white rounded-3xl p-6 sm:p-8 shadow-xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-white/10">
+        <div className="bg-metallic-card text-white rounded-3xl p-6 sm:p-8 shadow-2xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-700/60 backdrop-blur-xl">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-brand-yellow text-brand-charcoal font-black text-2xl flex items-center justify-center shadow-lg border-2 border-white/20">
+            <div className="w-16 h-16 rounded-2xl bg-metallic-gold text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg border-2 border-amber-300/40">
               {profileForm.name.charAt(0).toLowerCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-extrabold tracking-tight text-white">
+                <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">
                   {profileForm.name}
                 </h1>
-                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
                   Verified User
                 </span>
               </div>
-              <p className="text-gray-300 text-xs mt-1 font-medium flex items-center gap-3">
+              <p className="text-slate-300 text-xs mt-1 font-medium flex items-center gap-3">
                 <span>{profileForm.email}</span>
                 <span>•</span>
                 <span>{profileForm.phone}</span>
                 <span>•</span>
-                <span className="text-brand-yellow font-bold">{profileForm.city}</span>
+                <span className="text-metallic-gold font-bold">{profileForm.city}</span>
               </p>
             </div>
           </div>
 
           <button
             onClick={onPostProperty}
-            className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-5 py-3.5 rounded-xl shadow-lg flex items-center gap-2 transition-transform hover:scale-105"
+            className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center gap-2 transition-transform hover:scale-105 border border-amber-300/40"
           >
             <PlusCircle className="w-4 h-4 stroke-[2.5]" />
             <span>POST NEW PROPERTY</span>
@@ -358,17 +358,17 @@ export default function UserDashboard({
 
           {/* BLOCK 1: SIDEBAR NAVIGATION */}
           <div className="lg:col-span-3 space-y-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3 space-y-1">
+            <div className="bg-metallic-card rounded-2xl shadow-lg border border-slate-700/60 p-3 space-y-1">
 
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'overview'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'overview'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-brand-yellow' : 'text-gray-500'}`} />
+                  <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-slate-950' : 'text-amber-400'}`} />
                   <span>Overview</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
@@ -376,94 +376,96 @@ export default function UserDashboard({
 
               <button
                 onClick={() => setActiveTab('properties')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'properties'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'properties'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Building2 className={`w-4 h-4 ${activeTab === 'properties' ? 'text-brand-yellow' : 'text-gray-500'}`} />
-                  <span>My Properties</span>
+                  <Building2 className={`w-4 h-4 ${activeTab === 'properties' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <span>My Properties ({userProperties.length})</span>
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${activeTab === 'properties' ? 'bg-brand-yellow text-brand-charcoal' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                  {userProperties.length}
-                </span>
+                <ChevronRight className="w-4 h-4 opacity-50" />
               </button>
 
               <button
                 onClick={() => setActiveTab('verification')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'verification'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'verification'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <ShieldCheck className={`w-4 h-4 ${activeTab === 'verification' ? 'text-brand-yellow' : 'text-gray-500'}`} />
+                  <ShieldCheck className={`w-4 h-4 ${activeTab === 'verification' ? 'text-slate-950' : 'text-amber-400'}`} />
                   <span>Verification Status</span>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                {userProperties.some(p => p.status === 'PENDING_VERIFICATION') && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                )}
               </button>
 
               <button
                 onClick={() => setActiveTab('enquiries')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'enquiries'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'enquiries'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <MessageSquare className={`w-4 h-4 ${activeTab === 'enquiries' ? 'text-brand-yellow' : 'text-gray-500'}`} />
-                  <span>My Enquiries</span>
+                  <MessageSquare className={`w-4 h-4 ${activeTab === 'enquiries' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <span>Enquiries</span>
                 </div>
-                <span className="bg-brand-yellow text-brand-charcoal text-[10px] px-2 py-0.5 rounded-full font-black">
-                  {enquiriesReceived.length}
-                </span>
+                {enquiriesReceived.filter(e => e.status === 'SUBMITTED').length > 0 && (
+                  <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {enquiriesReceived.filter(e => e.status === 'SUBMITTED').length}
+                  </span>
+                )}
               </button>
 
               <button
                 onClick={() => setActiveTab('wishlist')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'wishlist'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'wishlist'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Heart className={`w-4 h-4 ${activeTab === 'wishlist' ? 'text-brand-yellow' : 'text-gray-500'}`} />
-                  <span>Saved Wishlist</span>
+                  <Heart className={`w-4 h-4 ${activeTab === 'wishlist' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <span>Wishlist ({wishlistProperties.length})</span>
                 </div>
-                <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-black">
-                  {wishlist.length}
-                </span>
+                <ChevronRight className="w-4 h-4 opacity-50" />
               </button>
 
               <button
                 onClick={() => setActiveTab('notifications')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'notifications'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'notifications'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-brand-yellow' : 'text-gray-500'}`} />
+                  <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-slate-950' : 'text-amber-400'}`} />
                   <span>Notifications</span>
                 </div>
-                {notifications.some(n => !n.read) && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {unreadNotificationsCount}
+                  </span>
                 )}
               </button>
 
               <button
                 onClick={() => setActiveTab('account')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'account'
-                    ? 'bg-brand-charcoal text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'account'
+                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Settings className={`w-4 h-4 ${activeTab === 'account' ? 'text-brand-yellow' : 'text-gray-500'}`} />
+                  <Settings className={`w-4 h-4 ${activeTab === 'account' ? 'text-slate-950' : 'text-amber-400'}`} />
                   <span>Account Settings</span>
                 </div>
+                <ChevronRight className="w-4 h-4 opacity-50" />
               </button>
 
             </div>
