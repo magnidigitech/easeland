@@ -69,6 +69,7 @@ export default function App() {
   // General Contact Us Form State
   const [generalContact, setGeneralContact] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
   const [generalContactSubmitted, setGeneralContactSubmitted] = useState(false);
+  const [generalContactLoading, setGeneralContactLoading] = useState(false);
 
   // Fetch properties based on active filters
   const loadProperties = () => {
@@ -154,9 +155,7 @@ export default function App() {
 
     // 4. Listen for session profile updates
     const handleProfileUpdated = (e) => {
-      if (e.detail) {
-        setUser(prev => prev ? { ...prev, ...e.detail } : e.detail);
-      }
+      // Handled via AuthContext state updates
     };
     window.addEventListener('easeland-user-profile-updated', handleProfileUpdated);
 
@@ -249,7 +248,11 @@ export default function App() {
 
   const handleGeneralContactSubmit = (e) => {
     e.preventDefault();
-    setGeneralContactSubmitted(true);
+    setGeneralContactLoading(true);
+    setTimeout(() => {
+      setGeneralContactLoading(false);
+      setGeneralContactSubmitted(true);
+    }, 600);
   };
 
   const faqs = (siteConfig.faqs || []).map(f => ({
