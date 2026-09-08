@@ -296,7 +296,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             <span className="text-xs font-extrabold uppercase tracking-wider text-brand-charcoal bg-brand-yellow px-3 py-1 rounded-full">
               Step {step} of 8
             </span>
-          </d        </div>
+          </div>
+        </div>
 
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100">
           List Your Property on EaseLand
