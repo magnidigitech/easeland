@@ -165,7 +165,15 @@ export default function AdminPortal() {
   const [activeTab, setActiveTab] = useState('cms'); 
   // 'cms', 'verification', 'workspace', 'users', 'enquiries', 'crm', 'followups', 'reports', 'archive', 'security'
 
+  // Admin Profile & Dedicated Security Credentials State
+  const [adminName, setAdminName] = useState(() => localStorage.getItem('easeland_admin_name') || 'EaseLand Admin (Ryuu)');
+  const [adminEmail, setAdminEmail] = useState(() => localStorage.getItem('easeland_admin_email') || 'admin@easeland.in');
+  const [adminPhone, setAdminPhone] = useState(() => localStorage.getItem('easeland_admin_phone') || '+91 98765 00000');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+
   // Master Site Management CMS State (All 16 Modules)
+
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
   const [cmsTab, setCmsTab] = useState('overview'); // 1-16 modules
   const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
@@ -2339,11 +2347,11 @@ export default function AdminPortal() {
 
                 <div className="p-4 bg-purple-50 rounded-2xl border border-purple-200 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-brand-charcoal text-brand-yellow font-black text-base flex items-center justify-center shadow-sm">
-                    S
+                    {adminName ? adminName.charAt(0).toUpperCase() : 'A'}
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-sm text-brand-charcoal">Scarlett (Admin)</h4>
-                    <p className="text-xs text-purple-900 font-semibold">admin@easeland.in • +91 98765 00000</p>
+                    <h4 className="font-extrabold text-sm text-brand-charcoal">{adminName}</h4>
+                    <p className="text-xs text-purple-900 font-semibold">{adminEmail} • {adminPhone}</p>
                   </div>
                 </div>
 
@@ -2355,7 +2363,8 @@ export default function AdminPortal() {
                       <label className="block text-xs font-bold text-gray-700 mb-1">Admin Display Name</label>
                       <input
                         type="text"
-                        defaultValue="Scarlett (Admin)"
+                        value={adminName}
+                        onChange={(e) => setAdminName(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
                       />
                     </div>
@@ -2363,7 +2372,8 @@ export default function AdminPortal() {
                       <label className="block text-xs font-bold text-gray-700 mb-1">Admin Email Address</label>
                       <input
                         type="email"
-                        defaultValue="admin@easeland.in"
+                        value={adminEmail}
+                        onChange={(e) => setAdminEmail(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
                       />
                     </div>
@@ -2371,7 +2381,8 @@ export default function AdminPortal() {
                       <label className="block text-xs font-bold text-gray-700 mb-1">Emergency Mobile Number (+91)</label>
                       <input
                         type="tel"
-                        defaultValue="9876500000"
+                        value={adminPhone}
+                        onChange={(e) => setAdminPhone(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
                       />
                     </div>
@@ -2385,6 +2396,8 @@ export default function AdminPortal() {
                       <input
                         type="password"
                         placeholder="••••••••"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
                       />
                     </div>
@@ -2393,6 +2406,8 @@ export default function AdminPortal() {
                       <input
                         type="password"
                         placeholder="••••••••"
+                        value={adminConfirmPassword}
+                        onChange={(e) => setAdminConfirmPassword(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
                       />
                     </div>
@@ -2406,7 +2421,22 @@ export default function AdminPortal() {
                 <div className="pt-2 flex justify-end">
                   <button
                     onClick={() => {
+                      if (adminPassword && adminPassword !== adminConfirmPassword) {
+                        alert('Password and Confirm Password do not match.');
+                        return;
+                      }
+                      localStorage.setItem('easeland_admin_name', adminName);
+                      localStorage.setItem('easeland_admin_email', adminEmail);
+                      localStorage.setItem('easeland_admin_phone', adminPhone);
+                      if (adminPassword) {
+                        localStorage.setItem('easeland_admin_password', adminPassword);
+                      }
                       setPublishSuccessMessage('Admin Profile & Security Settings updated successfully!');
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('easeland-admin-updated', {
+                          detail: { name: adminName, email: adminEmail, phone: adminPhone }
+                        }));
+                      }
                       setTimeout(() => setPublishSuccessMessage(''), 3000);
                     }}
                     className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all"
@@ -2417,6 +2447,7 @@ export default function AdminPortal() {
                 </div>
               </div>
             )}
+
 
           </div>
         </div>

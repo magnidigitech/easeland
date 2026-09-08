@@ -412,68 +412,89 @@ export const mockApi = {
 
   // -------------------------------------------------------------
   // 2. OWNER PROPERTY APIS
-  // -------------------------------------------------------------
-  createOwnerListing: (newPropertyPayload, isDraft = false) => {
-    // Check if property with same title & owner already exists to prevent duplicate listings
-    const existingIndex = properties.findIndex(
-      p => p.title && newPropertyPayload.title &&
-           p.title.toLowerCase().trim() === newPropertyPayload.title.toLowerCase().trim() &&
-           p.owner && newPropertyPayload.owner &&
-           p.owner.id === newPropertyPayload.owner.id
-    );
-
-    if (existingIndex !== -1 && !isDraft) {
-      // Update existing property instead of creating duplicate
-      properties[existingIndex] = {
-        ...properties[existingIndex],
-        ...newPropertyPayload,
-        status: 'PENDING_VERIFICATION',
-        verificationStatus: 'Pending Admin Verification',
-        updatedAt: new Date().toISOString()
-      };
-      setStoredData('easeland_properties', properties);
-      return properties[existingIndex];
-    }
-
-    const newId = 'prop-' + (Date.now() % 100000);
-    const newProperty = {
-      ...newPropertyPayload,
-      id: newId,
-      status: isDraft ? 'DRAFT' : 'PENDING_VERIFICATION',
-      verificationStatus: isDraft ? 'Draft' : 'Pending Admin Verification',
-      createdAt: new Date().toISOString(),
-      photos: newPropertyPayload.photos?.length ? newPropertyPayload.photos : [
-        'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80'
-      ]
+  // -------------------------------------------------------  createOwnerListing: (newPropertyPayload, isDraft = false) => {
+    const freshProps = getStoredData('easeland_properties', properties);
+    const newId = newPropertyPayload.id || newPropertyPayload.propertyId || ('prop-' + Date.now());
+    
+    const ownerObj = newPropertyPayload.owner || {
+      id: newPropertyPayload.ownerId || 'owner_default',
+      name: newPropertyPayload.ownerPublicName || 'Property Owner',
+      email: newPropertyPayload.ownerPrivateEmail || ''
     };
 
-    properties.unshift(newProperty);
-    setStoredData('easeland_properties', properties);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: newProperty }));
+    const targetProp = {
+      ...newPropertyPayload,
+      id: newId,
+      propertyId: newId,
+      referenceId: newPropertyPayload.referenceId || `EL-PROP-${Math.floor(10000 + Math.random() * 90000)}`,
+      title: newPropertyPayload.title || 'Submitted Property Listing',
+      price: Number(newPropertyPayload.price) || 0,
+      priceDisplay: newPropertyPayload.priceDisplay || `Rs. ${newPropertyPayload.price || 0}`,
+      area: Number(newPropertyPayload.area) || 0,
+      areaDisplay: newPropertyPayload.areaDisplay || `${newPropertyPayload.area || 0} sq ft`,
+      location: newPropertyPayload.location || {},
+      propertyType: newPropertyPayload.propertyType || 'OPEN_PLOT',
+      purpose: newPropertyPayload.purpose || 'SALE',
+      status: isDraft ? 'DRAFT' : 'PENDING_VERIFICATION',
+      listingStatus: isDraft ? 'DRAFT' : 'PENDING_VERIFICATION',
+      verificationStatus: isDraft ? 'Draft' : 'Pending Admin Verification',
+      isPlatformVerified: false,
+      isPublished: false,
+      ownerId: newPropertyPayload.ownerId || ownerObj.id,
+      ownerPrivateEmail: newPropertyPayload.ownerPrivateEmail || ownerObj.email,
+      owner: ownerObj,
+      isUserSubmitted: true,
+      createdAt: newPropertyPayload.createdAt || new Date().toISOString()
+    };
+
+    const existingIndex = freshProps.findIndex(
+      p => p.id === newId || p.propertyId === newId ||
+           (p.title && newPropertyPayload.title && p.title.toLowerCase().trim() === newPropertyPayload.title.toLowerCase().trim())
+    );
+
+    if (existingIndex !== -1) {
+      freshProps[existingIndex] = { ...freshProps[existingIndex], ...targetProp };
+    } else {
+      freshProps.unshift(targetProp);
     }
-    return newProperty;
+
+    properties = freshProps;
+    setStoredData('easeland_properties', freshProps);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: targetProp }));
+      window.dispatchEvent(new CustomEvent('easeland-property-submitted', { detail: targetProp }));
+    }
+    return targetProp;
+  },
+
+  addProperty: function(payload, isDraft = false) {
+    return this.createOwnerListing(payload, isDraft);
   },
 
   getMyProperties: (ownerId, ownerEmail) => {
-    if (!ownerId && !ownerEmail) return [];
     const targetEmail = (ownerEmail || '').toLowerCase().trim();
-    return properties.filter(p => {
+    const targetId = ownerId || '';
+
+    const currentProps = getStoredData('easeland_properties', properties);
+
+    return currentProps.filter(p => {
       if (!p) return false;
-      if (ownerId && (p.ownerId === ownerId || p.owner?.id === ownerId)) return true;
+      if (targetId && (p.ownerId === targetId || p.owner?.id === targetId)) return true;
       if (targetEmail && ((p.ownerPrivateEmail && p.ownerPrivateEmail.toLowerCase() === targetEmail) || (p.owner?.email && p.owner.email.toLowerCase() === targetEmail))) return true;
+      if (p.isUserSubmitted) return true; // Include user-submitted property for current active user session
       return false;
     });
   },
 
-
   submitDraftForVerification: (propertyId) => {
-    const prop = properties.find(p => (p.id === propertyId || p.propertyId === propertyId));
+    const currentProps = getStoredData('easeland_properties', properties);
+    const prop = currentProps.find(p => (p.id === propertyId || p.propertyId === propertyId));
     if (prop) {
       prop.status = 'PENDING_VERIFICATION';
       prop.listingStatus = 'PENDING_VERIFICATION';
       prop.verificationStatus = 'Pending Admin Verification';
-      setStoredData('easeland_properties', properties);
+      setStoredData('easeland_properties', currentProps);
     }
     return prop;
   },
@@ -482,8 +503,13 @@ export const mockApi = {
   // 3. ADMIN VERIFICATION & MANAGEMENT APIS
   // -------------------------------------------------------------
   getVerificationQueue: () => {
-    return properties.filter(p => ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) || ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.listingStatus));
+    const currentProps = getStoredData('easeland_properties', properties);
+    return currentProps.filter(p => 
+      ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) || 
+      ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.listingStatus)
+    );
   },
+
 
 
   getAllPropertiesAdmin: () => {

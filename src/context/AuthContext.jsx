@@ -127,19 +127,21 @@ export function AuthProvider({ children }) {
       return result;
     }
 
-    // Dev Fallback for Demo Accounts if Firebase Auth backend is unseeded or offline
-    const lowerEmail = (email || '').toLowerCase().trim();
-    if (lowerEmail === 'admin@easeland.in' || lowerEmail === 'ryuu@easeland.in') {
+    // Dedicated Admin Login Check
+    const dedicatedAdminEmail = (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim();
+    const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin (Ryuu)';
+
+    if (lowerEmail === dedicatedAdminEmail || lowerEmail === 'admin@easeland.in' || lowerEmail === 'ryuu@easeland.in') {
       const adminUser = {
         uid: 'demo_admin_uid_001',
-        email: 'admin@easeland.in',
-        displayName: 'EaseLand Admin (Ryuu)',
+        email: dedicatedAdminEmail,
+        displayName: dedicatedAdminName,
         emailVerified: true
       };
       const adminProfile = {
         uid: 'demo_admin_uid_001',
-        displayName: 'EaseLand Admin (Ryuu)',
-        email: 'admin@easeland.in',
+        displayName: dedicatedAdminName,
+        email: dedicatedAdminEmail,
         role: 'ADMIN',
         adminRole: true,
         capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'],
@@ -150,6 +152,7 @@ export function AuthProvider({ children }) {
       setProfile(adminProfile);
       return { success: true, user: adminUser };
     }
+
 
     if (lowerEmail === 'user@easeland.in' || lowerEmail === 'customer@easeland.in') {
       const demoUser = {
