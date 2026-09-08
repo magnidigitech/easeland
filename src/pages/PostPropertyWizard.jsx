@@ -296,20 +296,19 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             <span className="text-xs font-extrabold uppercase tracking-wider text-brand-charcoal bg-brand-yellow px-3 py-1 rounded-full">
               Step {step} of 8
             </span>
-          </div>
-        </div>
+          </d        </div>
 
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-charcoal">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100">
           List Your Property on EaseLand
         </h1>
-        <p className="text-xs text-gray-500 font-medium mt-1">
+        <p className="text-xs text-slate-400 font-medium mt-1">
           Direct Property Owner Draft Workflow — Step {step} of 8.
         </p>
 
         {/* STEPPER PROGRESS BAR */}
-        <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mt-4">
+        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-4">
           <div
-            className="bg-brand-yellow h-full transition-all duration-300"
+            className="bg-metallic-gold h-full transition-all duration-300"
             style={{ width: `${(step / 8) * 100}%` }}
           ></div>
         </div>
@@ -317,32 +316,32 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
       {/* MESSAGES */}
       {errorMsg && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+        <div className="mb-4 p-3 bg-red-950/80 border border-red-500/40 text-red-300 text-xs font-semibold rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {successMsg && (
-        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold rounded-xl flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div className="mb-4 p-3 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold rounded-xl flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {/* WIZARD STEP CONTAINER */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-brand-bordergray shadow-sm space-y-6">
+      <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-300 shadow-2xl space-y-6">
         
         {/* STEP 1: PROPERTY TYPE & PURPOSE */}
         {step === 1 && (
           <div className="space-y-6">
-            <h3 className="text-lg font-bold text-brand-charcoal pb-2 border-b border-gray-100 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-brand-yellow" />
+            <h3 className="text-lg font-bold text-slate-900 pb-2 border-b border-gray-200 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-amber-500" />
               <span>1. Property Type & Transaction Purpose</span>
             </h3>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                 Transaction Purpose
               </label>
               <div className="grid grid-cols-3 gap-3">
@@ -357,8 +356,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                     onClick={() => setFormData({ ...formData, purpose: item.value })}
                     className={`p-3.5 rounded-xl border font-extrabold text-xs text-center transition-all ${
                       formData.purpose === item.value
-                        ? 'bg-brand-yellow border-brand-yellow text-brand-charcoal shadow-sm scale-105'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        ? 'bg-metallic-gold border-amber-400 text-slate-950 shadow-md scale-105'
+                        : 'bg-gray-50 border-gray-300 text-slate-700 hover:bg-gray-100'
                     }`}
                   >
                     {item.label}
@@ -368,7 +367,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                 Property Type
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -388,8 +387,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                     onClick={() => setFormData({ ...formData, propertyType: item.value })}
                     className={`p-3 rounded-xl border text-xs font-bold transition-all ${
                       formData.propertyType === item.value
-                        ? 'bg-brand-charcoal border-brand-charcoal text-brand-yellow shadow-md scale-105'
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                        ? 'bg-slate-900 border-slate-900 text-amber-400 shadow-md scale-105'
+                        : 'bg-gray-50 border-gray-300 text-slate-700 hover:bg-gray-100'
                     }`}
                   >
                     {item.label}
@@ -403,13 +402,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         {/* STEP 2: BASIC INFORMATION & PRICING */}
         {step === 2 && (
           <div className="space-y-6">
-            <h3 className="text-lg font-bold text-brand-charcoal pb-2 border-b border-gray-100 flex items-center gap-2">
-              <Tag className="w-5 h-5 text-brand-yellow" />
+            <h3 className="text-lg font-bold text-slate-900 pb-2 border-b border-gray-200 flex items-center gap-2">
+              <Tag className="w-5 h-5 text-amber-500" />
               <span>2. Basic Information & Pricing</span>
             </h3>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                 Property Title
               </label>
               <input
@@ -418,13 +417,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 placeholder="e.g. Premium 200 Sq Yds East Facing Residential Plot"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Expected Price (INR)
                 </label>
                 <input
@@ -433,17 +432,17 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   placeholder="e.g. 4500000"
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
                 />
                 {formData.price && (
-                  <span className="text-[11px] font-bold text-emerald-600 mt-1 block">
+                  <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
                     Display: {getPriceDisplay()}
                   </span>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Total Area
                 </label>
                 <input
@@ -452,10 +451,10 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   placeholder="e.g. 1800"
                   value={formData.area}
                   onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                  className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
                 />
                 {formData.area && (
-                  <span className="text-[11px] font-bold text-slate-600 mt-1 block">
+                  <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
                     Display: {getAreaDisplay()}
                   </span>
                 )}
@@ -463,7 +462,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                 Property Description
               </label>
               <textarea
@@ -472,7 +471,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 placeholder="Describe key features, surroundings, approach road, and highlights..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
               />
             </div>
           </div>

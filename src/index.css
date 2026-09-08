@@ -127,11 +127,60 @@
 }
 
 .text-brand-charcoal {
-  color: #f8fafc !important;
+  color: #0f172a !important;
 }
 
 .border-brand-charcoal {
   border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* FORM ELEMENTS & DROPDOWN ACCESSIBILITY - High Contrast Legible Text */
+input, select, textarea {
+  color: #0f172a !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Ensure options in select dropdowns have crystal clear white background & dark text */
+select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Dark mode inputs override when explicitly on dark containers */
+.bg-slate-950 input,
+.bg-slate-900 input,
+.bg-slate-800 input,
+.bg-slate-950 select,
+.bg-slate-900 select,
+.bg-slate-800 select,
+.bg-slate-950 textarea,
+.bg-slate-900 textarea,
+.bg-slate-800 textarea,
+input.bg-slate-950,
+input.bg-slate-900,
+input.bg-slate-800,
+input.bg-gray-800,
+input.text-white,
+input.text-slate-100,
+select.bg-slate-950,
+select.bg-slate-900,
+select.bg-slate-800,
+select.bg-gray-800,
+select.text-white,
+select.text-slate-100 {
+  color: #f8fafc !important;
+}
+
+select.bg-slate-950 option,
+select.bg-slate-900 option,
+select.bg-slate-800 option,
+select.bg-gray-800 option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
 }
 
 /* ACCENT ELECTRIC COLOR DYNAMIC OVERRIDES */
