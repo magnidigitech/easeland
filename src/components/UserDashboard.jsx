@@ -96,8 +96,10 @@ export default function UserDashboard({
 
 
   const isRyuu = (user?.email || '').toLowerCase() === 'ryuu@easeland.in';
-  // Use real Firebase derived notifications
+  // Use real Firebase derived notifications & wishlist items
   const notifications = fbNotifications;
+  const wishlistProperties = fbWishlistProps.length > 0 ? fbWishlistProps : (wishlist || []);
+  const unreadNotificationsCount = (notifications || []).filter(n => !n.read).length;
 
 
   // Account settings form state
@@ -109,6 +111,7 @@ export default function UserDashboard({
     accountType: 'Verified Property Owner & Buyer'
   });
   const [myPropertiesList, setMyPropertiesList] = useState([]);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   // Load user properties from mockApi storage on mount and when events fire
   const refreshUserProperties = () => {
@@ -245,7 +248,7 @@ export default function UserDashboard({
   };
 
   const markAllNotificationsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setFbNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   // Strict Account Suspension Lockout Check

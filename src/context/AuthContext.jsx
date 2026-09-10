@@ -121,6 +121,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginUser = async (email, password) => {
+    const lowerEmail = (email || '').toLowerCase().trim();
     const result = await apiLoginUser(email, password);
     if (result.success && result.user) {
       await reloadProfile(result.user.uid);

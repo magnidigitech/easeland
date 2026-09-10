@@ -18,8 +18,8 @@ import {
 const PAGE_SIZE = 12;
 
 export default function PropertiesSearchPage({
-  onNavigateToProperty = () => {},
-  onOpenAuthModal = () => {}
+  onNavigateToProperty = () => { },
+  onOpenAuthModal = () => { }
 }) {
   const { user: authUser } = useAuth();
   const uid = authUser?.uid || null;
@@ -149,7 +149,7 @@ export default function PropertiesSearchPage({
     const hasAreaRange = searchState.minAreaSqFt != null || searchState.maxAreaSqFt != null || searchState.minArea != null || searchState.maxArea != null;
 
     const check = validateSortCompatibility(newSort, hasPriceRange, hasAreaRange);
-    
+
     if (!check.compatible) {
       setWishlistNotice(check.reason || "This sorting option isn't available with your current filters.");
       setTimeout(() => setWishlistNotice(null), 4000);
@@ -217,12 +217,12 @@ export default function PropertiesSearchPage({
   }, [searchState]);
 
   return (
-    <div className="h-[calc(100vh-64px)] w-full flex flex-col font-sans text-slate-100 overflow-hidden bg-slate-950">
+    <div className="h-[calc(100vh-64px)] w-full flex flex-col font-sans text-brand-charcoal overflow-hidden bg-brand-offwhite">
 
       {/* SEARCH HEADER & NAVIGATION BAR */}
-      <div className="bg-slate-900/90 backdrop-blur-md text-white border-b border-slate-800 shrink-0 z-30 shadow-lg">
+      <div className="bg-brand-charcoal text-white border-b border-gray-800 shrink-0 z-30 shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
-          
+
           {/* Quick Search Controls */}
           <div className="w-full md:w-auto flex items-center gap-2 flex-1 max-w-2xl">
             <HeroSearch
@@ -236,12 +236,12 @@ export default function PropertiesSearchPage({
           <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
             <button
               onClick={() => setFilterPanelOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-metallic-gold hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black border border-amber-300 shadow-md transition-all transform hover:scale-105"
+              className="flex items-center gap-2 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold border border-gray-700 transition-all"
             >
-              <SlidersHorizontal className="w-4 h-4 text-slate-950" />
+              <SlidersHorizontal className="w-4 h-4 text-brand-yellow" />
               <span>Filters</span>
               {activeFilterCount > 0 && (
-                <span className="w-5 h-5 bg-slate-950 text-amber-400 rounded-full text-[10px] font-black flex items-center justify-center border border-amber-400">
+                <span className="w-5 h-5 bg-brand-yellow text-brand-charcoal rounded-full text-[10px] font-extrabold flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -252,32 +252,30 @@ export default function PropertiesSearchPage({
               <select
                 value={searchState.sortBy || 'newest'}
                 onChange={(e) => handleSortChange(e.target.value)}
-                className="appearance-none bg-slate-900 text-amber-300 text-xs font-black py-2 pl-3 pr-8 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 shadow-md"
+                className="appearance-none bg-gray-800 text-white text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-gray-700 focus:outline-none focus:border-brand-yellow"
               >
-                <option value="newest" className="bg-slate-900 text-amber-300 font-bold">Newest First</option>
-                <option value="price_asc" className="bg-slate-900 text-amber-300 font-bold">Price: Low to High</option>
-                <option value="price_desc" className="bg-slate-900 text-amber-300 font-bold">Price: High to Low</option>
-                <option value="area_asc" className="bg-slate-900 text-amber-300 font-bold">Area: Small to Large</option>
-                <option value="area_desc" className="bg-slate-900 text-amber-300 font-bold">Area: Large to Small</option>
+                <option value="newest">Newest First</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="area_asc">Area: Small to Large</option>
+                <option value="area_desc">Area: Large to Small</option>
               </select>
-              <ArrowUpDown className="w-3.5 h-3.5 text-amber-400 absolute right-2.5 top-2.5 pointer-events-none" />
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
             </div>
 
             {/* Mobile View Switcher (List vs Map) */}
-            <div className="flex md:hidden items-center bg-slate-900 p-0.5 rounded-xl border border-slate-700">
+            <div className="flex md:hidden items-center bg-gray-800 p-0.5 rounded-xl border border-gray-700">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${
-                  viewMode === 'list' ? 'bg-metallic-gold text-slate-950' : 'text-slate-400'
-                }`}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'list' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
+                  }`}
               >
                 <List className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('map')}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${
-                  viewMode === 'map' ? 'bg-metallic-gold text-slate-950' : 'text-slate-400'
-                }`}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'map' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
+                  }`}
               >
                 <MapIcon className="w-4 h-4" />
               </button>
