@@ -17,6 +17,7 @@ import PropertiesSearchPage from './pages/PropertiesSearchPage';
 import { mockApi, applySiteTheme } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
+import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown } from 'lucide-react';
 
 export default function App() {
@@ -95,11 +96,11 @@ export default function App() {
           window.history.pushState(null, '', targetUrl);
         }
       } else if (pageName === 'admin') {
-        if (!window.location.search.includes('mode=admin')) {
-          window.history.replaceState(null, '', '?mode=admin');
+        if (window.location.pathname !== '/admin' && !window.location.search.includes('mode=admin')) {
+          window.history.pushState(null, '', '/admin');
         }
       } else {
-        if (window.location.pathname.startsWith('/property/') || window.location.pathname.startsWith('/properties')) {
+        if (window.location.pathname.startsWith('/property/') || window.location.pathname.startsWith('/properties') || window.location.pathname === '/admin') {
           window.history.pushState(null, '', '/');
         } else if (window.location.search.includes('mode=admin')) {
           window.history.replaceState(null, '', window.location.pathname);
@@ -113,6 +114,7 @@ export default function App() {
     const path = window.location.pathname;
     const propertyMatch = path.match(/\/property\/([a-zA-Z0-9_-]+)/);
     const isSearchRoute = path.startsWith('/properties');
+    const isAdminRoute = path === '/admin' || path.startsWith('/admin');
 
     // 2. Re-hydrate active page route
     const urlParams = new URLSearchParams(window.location.search);
@@ -126,7 +128,7 @@ export default function App() {
       const parsedFilters = urlParamsToSearchState(window.location.search);
       setFilters(prev => ({ ...prev, ...parsedFilters }));
       setActivePage('map');
-    } else if (modeParam === 'admin') {
+    } else if (isAdminRoute || modeParam === 'admin') {
       setActivePage('admin');
       try { localStorage.setItem('easeland_active_page', 'admin'); } catch(e){}
     } else if (path === '/') {
@@ -147,6 +149,8 @@ export default function App() {
         const parsed = urlParamsToSearchState(window.location.search);
         setFilters(prev => ({ ...prev, ...parsed }));
         setActivePage('map');
+      } else if (currentPath === '/admin' || currentPath.startsWith('/admin')) {
+        setActivePage('admin');
       } else if (currentPath === '/') {
         setActivePage('home');
       }
@@ -167,6 +171,14 @@ export default function App() {
 
   useEffect(() => {
     loadProperties();
+    
+    getSiteConfigAdmin().then(res => {
+      if (res && res.success && res.config && Object.keys(res.config).length > 0) {
+        setSiteConfig(prev => ({ ...prev, ...res.config }));
+        if (res.config.theme) applySiteTheme(res.config.theme);
+      }
+    }).catch(err => console.warn('Live CMS config fetch warning:', err));
+
     if (siteConfig && siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
     }
@@ -243,6 +255,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await logoutUser();
+    try { localStorage.removeItem('easeland_admin_authenticated'); } catch(e){}
     changeActivePage('home');
   };
 

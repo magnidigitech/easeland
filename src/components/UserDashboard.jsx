@@ -40,6 +40,7 @@ import {
   archiveProperty
 } from '../firebase/propertyService.js';
 import { mockApi } from '../services/mockApi';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function UserDashboard({
   user,
@@ -49,6 +50,7 @@ export default function UserDashboard({
   onNavigate,
   onPostProperty
 }) {
+  const { updateProfileData } = useAuth();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'properties', 'verification', 'enquiries', 'wishlist', 'notifications', 'account'
   const [propertyFilter, setPropertyFilter] = useState('ALL'); // 'ALL', 'LIVE', 'PENDING_VERIFICATION', 'CHANGES_REQUIRED', 'REJECTED', 'DRAFT', 'UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'
   const [enquiryType, setEnquiryType] = useState('RECEIVED'); // 'RECEIVED', 'SENT'
@@ -104,14 +106,25 @@ export default function UserDashboard({
 
   // Account settings form state
   const [profileForm, setProfileForm] = useState({
-    name: user?.name || 'Ryuu',
-    email: user?.email || 'ryuu@easeland.in',
-    phone: user?.phone || '+91 98765 43210',
+    name: user?.name || user?.displayName || 'EaseLand User',
+    email: user?.email || '',
+    phone: user?.phone || user?.phoneNumber || '',
     city: 'Guntur, Andhra Pradesh',
     accountType: 'Verified Property Owner & Buyer'
   });
   const [myPropertiesList, setMyPropertiesList] = useState([]);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    setProfileForm({
+      name: user?.name || user?.displayName || 'EaseLand User',
+      email: user?.email || '',
+      phone: user?.phone || user?.phoneNumber || '',
+      city: 'Guntur, Andhra Pradesh',
+      accountType: 'Verified Property Owner & Buyer'
+    });
+  }, [user]);
 
   // Load user properties from mockApi storage on mount and when events fire
   const refreshUserProperties = () => {
@@ -241,10 +254,29 @@ export default function UserDashboard({
     return p.status === propertyFilter;
   });
 
-  const handleProfileSave = (e) => {
+  const handleProfileSave = async (e) => {
     e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setSavingProfile(true);
+    try {
+      const res = await updateProfileData({
+        displayName: profileForm.name,
+        name: profileForm.name,
+        phone: profileForm.phone,
+        phoneNumber: profileForm.phone,
+        city: profileForm.city
+      });
+      if (res && res.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      } else if (res && res.error) {
+        alert(`Error updating profile: ${res.error}`);
+      }
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const markAllNotificationsRead = () => {
@@ -338,11 +370,19 @@ export default function UserDashboard({
                 </span>
               </div>
               <p className="text-slate-300 text-xs mt-1 font-medium flex items-center gap-3">
-                <span>{profileForm.email}</span>
-                <span>•</span>
-                <span>{profileForm.phone}</span>
-                <span>•</span>
-                <span className="text-metallic-gold font-bold">{profileForm.city}</span>
+                {profileForm.email && <span>{profileForm.email}</span>}
+                {profileForm.phone && (
+                  <>
+                    <span>•</span>
+                    <span>{profileForm.phone}</span>
+                  </>
+                )}
+                {profileForm.city && (
+                  <>
+                    <span>•</span>
+                    <span className="text-metallic-gold font-bold">{profileForm.city}</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -1177,10 +1217,11 @@ export default function UserDashboard({
                   <div className="pt-4 border-t border-gray-100 flex items-center justify-end">
                     <button
                       type="submit"
-                      className="bg-brand-charcoal hover:bg-brand-charcoalLight text-white font-extrabold text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-2"
+                      disabled={savingProfile}
+                      className="bg-brand-charcoal hover:bg-brand-charcoalLight disabled:opacity-50 text-white font-extrabold text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-2"
                     >
                       <Save className="w-4 h-4 text-brand-yellow" />
-                      <span>Save Changes</span>
+                      <span>{savingProfile ? 'Saving...' : 'Save Changes'}</span>
                     </button>
                   </div>
                 </form>

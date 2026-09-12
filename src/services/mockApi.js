@@ -259,8 +259,8 @@ let rawUsers = getStoredData('easeland_registered_users', INITIAL_USERS);
 let registeredUsers = rawUsers.filter(u =>
   u && u.status !== 'DELETED' &&
   (u.email === 'ryuu@easeland.in' ||
-   u.email === 'admin@easeland.in' ||
-   u.isCustomRegistered)
+    u.email === 'admin@easeland.in' ||
+    u.isCustomRegistered)
 );
 
 // Guarantee admin@easeland.in exists
@@ -416,7 +416,7 @@ export const mockApi = {
   createOwnerListing: (newPropertyPayload, isDraft = false) => {
     const freshProps = getStoredData('easeland_properties', properties);
     const newId = newPropertyPayload.id || newPropertyPayload.propertyId || ('prop-' + Date.now());
-    
+
     const ownerObj = newPropertyPayload.owner || {
       id: newPropertyPayload.ownerId || 'owner_default',
       name: newPropertyPayload.ownerPublicName || 'Property Owner',
@@ -450,7 +450,7 @@ export const mockApi = {
 
     const existingIndex = freshProps.findIndex(
       p => p.id === newId || p.propertyId === newId ||
-           (p.title && newPropertyPayload.title && p.title.toLowerCase().trim() === newPropertyPayload.title.toLowerCase().trim())
+        (p.title && newPropertyPayload.title && p.title.toLowerCase().trim() === newPropertyPayload.title.toLowerCase().trim())
     );
 
     if (existingIndex !== -1) {
@@ -469,7 +469,7 @@ export const mockApi = {
     return targetProp;
   },
 
-  addProperty: function(payload, isDraft = false) {
+  addProperty: function (payload, isDraft = false) {
     return this.createOwnerListing(payload, isDraft);
   },
 
@@ -505,8 +505,8 @@ export const mockApi = {
   // -------------------------------------------------------------
   getVerificationQueue: () => {
     const currentProps = getStoredData('easeland_properties', properties);
-    return currentProps.filter(p => 
-      ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) || 
+    return currentProps.filter(p =>
+      ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) ||
       ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.listingStatus)
     );
   },

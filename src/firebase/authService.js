@@ -7,7 +7,9 @@ import {
   updateProfile,
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect,
+  signInAnonymously
 } from 'firebase/auth';
 import { auth } from './config.js';
 
@@ -40,6 +42,10 @@ export function formatAuthError(error) {
     case 'auth/api-key-not-valid':
     case 'auth/invalid-api-key':
       return 'Firebase API key is invalid or unconfigured in local environment.';
+    case 'auth/popup-blocked':
+      return 'Google Sign-In popup was blocked by your browser settings. Redirecting to Google login page...';
+    case 'auth/popup-closed-by-user':
+      return 'Google Sign-In popup window was closed before completing login.';
     default:
       return error.message || 'An authentication error occurred. Please try again.';
   }
@@ -121,13 +127,35 @@ export function subscribeToAuthState(callback) {
 }
 
 /**
- * Sign in user using Google OAuth popup provider
+ * Ensure an active Firebase Auth session exists for database queries
+ */
+export async function ensureAuthSession() {
+  try {
+    if (!auth.currentUser) {
+      await signInAnonymously(auth);
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Sign in user using Google OAuth popup provider with seamless redirect fallback
  */
 export async function loginWithGoogle() {
   try {
     const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return { success: true, user: result.user };
+    try {
+      const result = await signInWithPopup(auth, provider);
+      return { success: true, user: result.user };
+    } catch (popupErr) {
+      if (popupErr?.code === 'auth/popup-blocked' || popupErr?.code === 'auth/cancelled-popup-request') {
+        await signInWithRedirect(auth, provider);
+        return { success: true, isRedirecting: true };
+      }
+      throw popupErr;
+    }
   } catch (error) {
     return { success: false, error: formatAuthError(error) };
   }

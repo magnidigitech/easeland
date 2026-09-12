@@ -5,6 +5,7 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  deleteField,
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './config.js';
@@ -28,7 +29,7 @@ export function formatFirestoreError(error) {
     return 'Firebase Storage Not Enabled: Please open Firebase Console -> Storage and click "Get Started".';
   }
   if (code === 'not-found' || code === 'storage/object-not-found') {
-    return 'Resource Not Found: The requested property or record does not exist.';
+    return 'Requested Data Not Found.';
   }
   if (code === 'unavailable') {
     return 'Connection Error: Unable to reach EaseLand database servers. Please check your internet connection and retry.';
@@ -74,7 +75,14 @@ export async function getCurrentUserProfile(uid) {
     const userRef = doc(db, 'users', uid);
     const snap = await getDoc(userRef);
     if (snap.exists()) {
-      return { success: true, profile: { uid: snap.id, ...snap.data() } };
+      const data = snap.data();
+      if (data.phoneNumber !== undefined || data.name !== undefined) {
+        updateDoc(userRef, {
+          phoneNumber: deleteField(),
+          name: deleteField()
+        }).catch(e => console.warn('Auto-cleanup warning:', e));
+      }
+      return { success: true, profile: { uid: snap.id, ...data } };
     }
     return { success: false, error: 'Profile not found' };
   } catch (error) {
@@ -90,10 +98,17 @@ export async function updateOwnProfile(uid, updates) {
   try {
     if (!uid) return { success: false, error: 'UID required' };
     const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      ...updates,
+
+    const cleanedUpdates = { ...updates };
+    delete cleanedUpdates.phoneNumber;
+    delete cleanedUpdates.name;
+
+    await setDoc(userRef, {
+      ...cleanedUpdates,
+      phoneNumber: deleteField(),
+      name: deleteField(),
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
     return { success: true };
   } catch (error) {
     console.error(`Error updating profile for ${uid}:`, error);
@@ -119,29 +134,61 @@ export async function updateCommunicationPreferences(uid, preferences) {
   }
 }
 
+import { ensureAuthSession } from './authService.js';
+
 /**
- * Fetch all registered users for Admin Governance Directory.
+ * Fetch all registered users for Admin Governance Directory directly from Cloud Firestore.
  */
 export async function getAllUsersAdmin() {
   try {
+    await ensureAuthSession();
     const usersRef = collection(db, 'users');
     const snapshot = await getDocs(usersRef);
+
     const users = [];
 
     snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      users.push({
-        id: docSnap.id,
-        uid: docSnap.id,
-        name: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
-        email: data.email || '',
-        phone: data.phone || data.phoneNumber || '+91 98765 00000',
-        role: data.adminRole ? 'ADMIN' : (data.role || 'USER'),
-        status: data.accountStatus || 'ACTIVE',
-        postedListingsCount: data.postedListingsCount || 0,
-        createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : null,
-        suspension: data.suspension || null
-      });
+      try {
+        const data = docSnap.data();
+
+        // Auto cleanup legacy fields on fetch if any present
+        if (data.phoneNumber !== undefined || data.name !== undefined) {
+          updateDoc(doc(db, 'users', docSnap.id), {
+            phoneNumber: deleteField(),
+            name: deleteField()
+          }).catch(() => {});
+        }
+
+        let createdAtFormatted = null;
+        if (data.createdAt) {
+          try {
+            if (typeof data.createdAt.toDate === 'function') {
+              createdAtFormatted = data.createdAt.toDate().toISOString();
+            } else if (typeof data.createdAt.seconds === 'number') {
+              createdAtFormatted = new Date(data.createdAt.seconds * 1000).toISOString();
+            } else if (typeof data.createdAt === 'string' || typeof data.createdAt === 'number') {
+              createdAtFormatted = new Date(data.createdAt).toISOString();
+            }
+          } catch (e) {
+            createdAtFormatted = new Date().toISOString();
+          }
+        }
+
+        users.push({
+          id: docSnap.id,
+          uid: docSnap.id,
+          name: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
+          email: data.email || '',
+          phone: data.phone || data.phoneNumber || '',
+          role: data.adminRole ? 'ADMIN' : (data.role || 'USER'),
+          status: data.accountStatus || 'ACTIVE',
+          postedListingsCount: data.postedListingsCount || 0,
+          createdAt: createdAtFormatted,
+          suspension: data.suspension || null
+        });
+      } catch (errDoc) {
+        console.error(`Error processing user document ${docSnap.id}:`, errDoc);
+      }
     });
 
     return { success: true, users };
@@ -219,6 +266,35 @@ export async function unsuspendUserAccount(userId, adminUid) {
     return { success: true };
   } catch (error) {
     console.error(`Error lifting suspension for user ${userId}:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Permanently remove user account document from Firestore.
+ */
+export async function removeUserAccount(userId, adminUid, reason = 'Policy Violation') {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required to remove account.');
+    }
+
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      accountStatus: 'REMOVED',
+      removalReason: reason,
+      updatedAt: serverTimestamp()
+    });
+
+    await logAdminActivity(
+      'USER_REMOVED',
+      `User ${userId} account permanently removed by admin. Reason: ${reason}`,
+      adminUid || 'admin_uid_001'
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error(`Error removing user account ${userId}:`, error);
     return { success: false, error: error.message };
   }
 }

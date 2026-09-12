@@ -1,5 +1,5 @@
-import {
-  doc,
+i'llimport {
+doc,
   getDoc,
   setDoc,
   getDocs,
@@ -43,11 +43,12 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
     if (!moduleId) throw new Error('Module ID is required');
 
     const docRef = doc(db, 'siteManagement', moduleId);
-    await setDoc(docRef, {
+    const payload = {
       ...moduleData,
       updatedAt: serverTimestamp(),
       updatedBy: adminUid || 'admin'
-    }, { merge: true });
+    };
+    await setDoc(docRef, payload, { merge: true });
 
     return { success: true };
   } catch (error) {
@@ -63,10 +64,13 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   try {
     const promises = [];
 
-    Object.keys(fullConfig).forEach((modId) => {
+    Object.keys(fullConfig || {}).forEach((modId) => {
       const docRef = doc(db, 'siteManagement', modId);
+      const modData = fullConfig[modId];
+      const payload = typeof modData === 'object' && modData !== null ? modData : { value: modData };
+
       promises.push(setDoc(docRef, {
-        ...fullConfig[modId],
+        ...payload,
         state: 'PUBLISHED',
         publishedAt: serverTimestamp(),
         publishedBy: adminUid || 'admin'
@@ -81,6 +85,10 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
         'Published all 16 CMS modules live to marketplace.',
         adminUid
       );
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: fullConfig }));
     }
 
     return { success: true };

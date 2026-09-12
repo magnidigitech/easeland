@@ -122,14 +122,14 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                   title="Open User Dashboard"
                 >
                   <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow">
-                    {user.name ? user.name.charAt(0).toLowerCase() : 'u'}
+                    {(user.name || user.displayName || user.email || 'u').charAt(0).toLowerCase()}
                   </div>
                   <div className="text-left">
-                    <span className="block text-xs font-bold line-clamp-1 max-w-[100px]">
-                      {user.name}
+                    <span className="block text-xs font-bold line-clamp-1 max-w-[110px]">
+                      {user.name || user.displayName || 'EaseLand User'}
                     </span>
                     <span className="block text-[9px] uppercase font-semibold opacity-80">
-                      Dashboard
+                      {user.role === 'ADMIN' ? 'DASHBOARD' : 'Dashboard'}
                     </span>
                   </div>
                 </button>

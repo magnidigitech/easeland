@@ -20,6 +20,8 @@ import {
   Building2,
   MapPin,
   Eye,
+  EyeOff,
+  LogOut,
   FileCheck,
   Filter,
   DollarSign,
@@ -59,7 +61,8 @@ import {
 import {
   getAllUsersAdmin,
   suspendUserAccount,
-  unsuspendUserAccount
+  unsuspendUserAccount,
+  removeUserAccount
 } from '../firebase/userService.js';
 import {
   getAllEnquiriesAdmin,
@@ -162,15 +165,34 @@ function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/v
 }
 
 export default function AdminPortal() {
+  const { user, profile, loginAdmin, logoutUser } = useAuth();
+
+  // Admin Auth Gate State
+  const [adminAuthEmail, setAdminAuthEmail] = useState('');
+  const [adminAuthPassword, setAdminAuthPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
+  const [adminLoginError, setAdminLoginError] = useState(null);
+
+  const isAdminAuthenticated = profile?.role === 'ADMIN' || profile?.adminRole === true || localStorage.getItem('easeland_admin_authenticated') === 'true';
+
   const [activeTab, setActiveTab] = useState('cms'); 
   // 'cms', 'verification', 'workspace', 'users', 'enquiries', 'crm', 'followups', 'reports', 'archive', 'security'
 
   // Admin Profile & Dedicated Security Credentials State
-  const [adminName, setAdminName] = useState(() => localStorage.getItem('easeland_admin_name') || 'EaseLand Admin (Ryuu)');
+  const [adminName, setAdminName] = useState(() => localStorage.getItem('easeland_admin_name') || 'EaseLand Admin');
   const [adminEmail, setAdminEmail] = useState(() => localStorage.getItem('easeland_admin_email') || 'admin@easeland.in');
-  const [adminPhone, setAdminPhone] = useState(() => localStorage.getItem('easeland_admin_phone') || '+91 98765 00000');
+  const [adminPhone, setAdminPhone] = useState(() => localStorage.getItem('easeland_admin_phone') || '');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+
+  useEffect(() => {
+    if (isAdminAuthenticated) {
+      setAdminName(localStorage.getItem('easeland_admin_name') || 'EaseLand Admin');
+      setAdminEmail(localStorage.getItem('easeland_admin_email') || 'admin@easeland.in');
+      setAdminPhone(localStorage.getItem('easeland_admin_phone') || '');
+    }
+  }, [isAdminAuthenticated]);
 
   // Master Site Management CMS State (All 16 Modules)
 
@@ -298,38 +320,61 @@ export default function AdminPortal() {
 
   const loadData = async () => {
     // 1. Verification Queue
-    const queueRes = await getVerificationQueue();
-    let fbQueue = (queueRes.success && Array.isArray(queueRes.properties)) ? queueRes.properties : [];
-    let mockQueue = mockApi.getVerificationQueue() || [];
-    const queueMap = new Map();
-    [...fbQueue, ...mockQueue].forEach(p => {
-      const id = p.propertyId || p.id;
-      if (id && !queueMap.has(id)) {
-        queueMap.set(id, p);
-      }
-    });
-    let queue = Array.from(queueMap.values());
+    let queue = [];
+    try {
+      const vRes = await getVerificationQueue();
+      let firebaseProps = (vRes.success && Array.isArray(vRes.properties)) ? vRes.properties : [];
+      let mockProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : (typeof mockApi.getVerificationQueueAdmin === 'function' ? mockApi.getVerificationQueueAdmin() : []);
 
+      const queueMap = new Map();
+      [...mockProps, ...firebaseProps].forEach(p => {
+        const pId = p.id || p.propertyId;
+        if (pId) queueMap.set(pId, p);
+      });
+      queue = Array.from(queueMap.values());
+    } catch (e1) {
+      console.warn('Error loading verification queue:', e1);
+    }
 
-    // 2. Users
-    const usersRes = await getAllUsersAdmin();
-    let users = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users : mockApi.getAllUsersAdmin();
+    // 2. Users (Strictly Cloud Firestore Data)
+    let users = [];
+    try {
+      const usersRes = await getAllUsersAdmin();
+      users = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users : [];
+    } catch (e2) {
+      console.warn('Error loading users from Firestore:', e2);
+    }
 
     // 3. Enquiries
-    const enqsRes = await getAllEnquiriesAdmin();
-    let enqs = (enqsRes.success && Array.isArray(enqsRes.enquiries)) ? enqsRes.enquiries : mockApi.getEnquiriesAdmin();
+    let enqs = [];
+    try {
+      const enqsRes = await getAllEnquiriesAdmin();
+      enqs = (enqsRes.success && Array.isArray(enqsRes.enquiries)) ? enqsRes.enquiries : (typeof mockApi.getEnquiriesAdmin === 'function' ? mockApi.getEnquiriesAdmin() : []);
+    } catch (e3) {
+      console.warn('Error loading enquiries:', e3);
+    }
 
     // 4. Reports
-    const reportsRes = await getAllReportsAdmin();
-    let reports = (reportsRes.success && Array.isArray(reportsRes.reports)) ? reportsRes.reports : [];
+    let reports = [];
+    try {
+      const reportsRes = await getAllReportsAdmin();
+      reports = (reportsRes.success && Array.isArray(reportsRes.reports)) ? reportsRes.reports : [];
+    } catch (e4) {
+      console.warn('Error loading reports:', e4);
+    }
 
     // 5. Site Config
-    const cfgRes = await getSiteConfigAdmin();
-    let cfg = (cfgRes.success && Object.keys(cfgRes.config).length > 0) ? cfgRes.config : mockApi.getSiteConfig();
+    let cfg = {};
+    try {
+      const cfgRes = await getSiteConfigAdmin();
+      cfg = (cfgRes.success && Object.keys(cfgRes.config).length > 0) ? cfgRes.config : mockApi.getSiteConfig();
+    } catch (e5) {
+      console.warn('Error loading site config:', e5);
+    }
 
-    const dls = mockApi.getDealsAdmin();
-    const fups = mockApi.getFollowUpsAdmin();
-    const props = mockApi.getAllPropertiesAdmin();
+    const dls = typeof mockApi.getDealsAdmin === 'function' ? mockApi.getDealsAdmin() : [];
+    const fups = typeof mockApi.getFollowUpsAdmin === 'function' ? mockApi.getFollowUpsAdmin() : [];
+    const props = typeof mockApi.getAllPropertiesAdmin === 'function' ? mockApi.getAllPropertiesAdmin() : [];
 
     setVerificationQueue(queue);
     setDeals(dls);
@@ -429,7 +474,7 @@ export default function AdminPortal() {
     try {
       const adminUid = user?.uid || 'admin_auditor';
       const adminName = user?.displayName || 'EaseLand Auditor';
-      const note = feedbackNote || 'Please re-upload clearer land title deed document (Pahani / Adangal extract).';
+      const note = feedbackNote || 'Please update boundary coordinates and upload clear encumbrance certificate.';
 
       await requestVerificationChanges(propId, adminUid, adminName, note);
       setFeedbackNote('');
@@ -458,51 +503,65 @@ export default function AdminPortal() {
   };
 
   // User Suspension & Removal Handlers
-  const handleOpenSuspendModal = (user) => {
-    setSelectedUserForSuspension(user);
-    setSuspensionDays(7);
-    setSuspensionHours(0);
-    setSuspensionReason('Fraudulent Land Title Document Upload');
-    setCustomReasonText('');
+  const handleSuspendUserModalOpen = (u) => {
+    setSelectedUserForSuspension(u);
     setIsSuspendModalOpen(true);
   };
 
-  const handleApplySuspension = async () => {
-    if (!selectedUserForSuspension || adminActionProcessing) return;
-    setAdminActionProcessing(true);
+  const handleConfirmSuspendUser = async () => {
+    if (!selectedUserForSuspension) return;
+    const totalHours = (suspensionDays * 24) + parseInt(suspensionHours || 0);
+    const reasonText = suspensionReason === 'Other' ? customReasonText : suspensionReason;
+    
     try {
-      const finalReason = suspensionReason === 'Custom Reason' ? (customReasonText || 'Violation of platform verification guidelines') : suspensionReason;
-      const adminUid = user?.uid || 'admin_auditor';
-      const userId = selectedUserForSuspension.id || selectedUserForSuspension.uid;
-      await suspendUserAccount(userId, adminUid, suspensionDays, finalReason);
-      setIsSuspendModalOpen(false);
-      setSelectedUserForSuspension(null);
-      await loadData();
-    } finally {
-      setAdminActionProcessing(false);
-    }
+      await suspendUserAccount(selectedUserForSuspension.id || selectedUserForSuspension.uid, user?.uid || 'admin_uid_001', suspensionDays, reasonText);
+    } catch(e) {}
+    mockApi.suspendUserAdmin(selectedUserForSuspension.id, totalHours, reasonText);
+    
+    setRegisteredUsersList(prev => prev.map(u => {
+      if (u.id === selectedUserForSuspension.id || u.email === selectedUserForSuspension.email) {
+        return {
+          ...u,
+          accountStatus: 'SUSPENDED',
+          status: 'SUSPENDED',
+          suspensionReason: reasonText
+        };
+      }
+      return u;
+    }));
+
+    setIsSuspendModalOpen(false);
+    setSelectedUserForSuspension(null);
   };
 
-  const handleUnsuspendUser = async (userId) => {
-    if (adminActionProcessing) return;
-    setAdminActionProcessing(true);
+  const handleUnsuspendUser = async (u) => {
     try {
-      const adminUid = user?.uid || 'admin_auditor';
-      await unsuspendUserAccount(userId, adminUid);
-      await loadData();
-    } finally {
-      setAdminActionProcessing(false);
-    }
+      await unsuspendUserAccount(u.id || u.uid, user?.uid || 'admin_uid_001');
+    } catch(e) {}
+    mockApi.unsuspendUserAdmin(u.id);
+    setRegisteredUsersList(prev => prev.map(usr => {
+      if (usr.id === u.id || usr.email === usr.email) {
+        return {
+          ...usr,
+          accountStatus: 'ACTIVE',
+          status: 'ACTIVE'
+        };
+      }
+      return usr;
+    }));
   };
 
-  const handleOpenRemoveModal = (user) => {
-    setSelectedUserForRemoval(user);
+  const handleRemoveUserModalOpen = (u) => {
+    setSelectedUserForRemoval(u);
     setRemovalReason('Account permanently deleted by platform admin for policy violation');
     setIsRemoveModalOpen(true);
   };
 
-  const handleConfirmRemoveUser = () => {
+  const handleConfirmRemoveUser = async () => {
     if (!selectedUserForRemoval) return;
+    try {
+      await removeUserAccount(selectedUserForRemoval.id || selectedUserForRemoval.uid, user?.uid || 'admin_uid_001', removalReason);
+    } catch(e) {}
     mockApi.removeUserAdmin(selectedUserForRemoval.id, removalReason);
     setRegisteredUsersList(prev => prev.filter(u => u.id !== selectedUserForRemoval.id && u.email !== selectedUserForRemoval.email));
     setIsRemoveModalOpen(false);
@@ -548,6 +607,110 @@ export default function AdminPortal() {
     { id: 'publish', label: '16. Publish Live', icon: CheckSquare }
   ];
 
+  if (!isAdminAuthenticated) {
+    return (
+      <div className="min-h-screen bg-brand-charcoal flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-14 h-14 bg-amber-400/10 border border-amber-400/30 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+              <ShieldCheck className="w-8 h-8 text-amber-400" />
+            </div>
+            <h2 className="text-2xl font-extrabold text-white tracking-tight font-sans">
+              Ease<span className="text-brand-yellow">Land</span> Admin Studio
+            </h2>
+            <p className="text-xs text-slate-400 font-medium">
+              Restricted Portal • Enter Administrator Credentials
+            </p>
+          </div>
+
+          {adminLoginError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <span>{adminLoginError}</span>
+            </div>
+          )}
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setAdminLoginLoading(true);
+              setAdminLoginError(null);
+              const res = await loginAdmin(adminAuthEmail, adminAuthPassword);
+              setAdminLoginLoading(false);
+              if (!res.success) {
+                setAdminLoginError(res.error || 'Access Denied. Invalid Admin Credentials.');
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                Admin Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  required
+                  value={adminAuthEmail}
+                  onChange={(e) => setAdminAuthEmail(e.target.value)}
+                  placeholder="admin@easeland.in"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                Admin Access Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type={showAdminPassword ? 'text' : 'password'}
+                  required
+                  value={adminAuthPassword}
+                  onChange={(e) => setAdminAuthPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-10 pr-10 py-3 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPassword(!showAdminPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={adminLoginLoading}
+              className="w-full bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-sm py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all border border-amber-300 mt-2 cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4 text-slate-950" />
+              <span>{adminLoginLoading ? 'Authenticating Admin...' : 'Log In to Admin Portal →'}</span>
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-slate-800/80 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                window.history.pushState(null, '', '/');
+                window.dispatchEvent(new Event('popstate'));
+              }}
+              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              ← Return to EaseLand Main Site
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-metallic-dark text-slate-100">
       
@@ -568,7 +731,7 @@ export default function AdminPortal() {
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             <button
               onClick={() => setIsResetModalOpen(true)}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-gray-600"
+              className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-gray-600 cursor-pointer"
               title="Reset all 16 CMS modules to factory default"
             >
               <RotateCcw className="w-3.5 h-3.5 text-brand-yellow" />
@@ -577,7 +740,7 @@ export default function AdminPortal() {
 
             <button
               onClick={handleSaveDraftConfig}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Archive className="w-3.5 h-3.5 text-blue-100" />
               <span>SAVE CHANGES</span>
@@ -585,11 +748,12 @@ export default function AdminPortal() {
 
             <button
               onClick={handlePublishSiteConfig}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 cursor-pointer"
             >
               <Globe className="w-4 h-4 text-emerald-100 animate-pulse" />
               <span>PUBLISH TO LIVE SITE</span>
             </button>
+
           </div>
 
         </div>
@@ -2431,6 +2595,8 @@ export default function AdminPortal() {
                       if (adminPassword) {
                         localStorage.setItem('easeland_admin_password', adminPassword);
                       }
+                      setAdminPassword('');
+                      setAdminConfirmPassword('');
                       setPublishSuccessMessage('Admin Profile & Security Settings updated successfully!');
                       if (typeof window !== 'undefined') {
                         window.dispatchEvent(new CustomEvent('easeland-admin-updated', {

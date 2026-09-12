@@ -428,53 +428,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
             )}
           </div>
 
-          {mode === 'login' && (
-            <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
-              <span className="text-[10px] uppercase tracking-wider font-extrabold text-gray-400 text-center">Quick Verification Demo Presets:</span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    setError(null);
-                    const res = await loginUser('user@easeland.in', 'Password123!');
-                    setLoading(false);
-                    if (res.success) {
-                      if (onAuthSuccess) onAuthSuccess(res.user, initialIntent);
-                      onClose();
-                    } else {
-                      setError(res.error);
-                    }
-                  }}
-                  className="bg-gray-100 hover:bg-gray-200 text-brand-charcoal font-bold text-xs py-2 px-3 rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <User className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Demo User Account</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    setError(null);
-                    const res = await loginUser('admin@easeland.in', 'AdminPassword123!');
-                    setLoading(false);
-                    if (res.success) {
-                      if (onAuthSuccess) onAuthSuccess(res.user, initialIntent);
-                      onClose();
-                    } else {
-                      setError(res.error);
-                    }
-                  }}
-                  className="bg-brand-charcoal hover:bg-brand-charcoalLight text-white font-bold text-xs py-2 px-3 rounded-xl border border-gray-700 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-brand-yellow" />
-                  <span>Demo Admin Account</span>
-                </button>
-              </div>
-            </div>
-          )}
-
         </form>
 
       </div>
