@@ -34,32 +34,38 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
 
     setUploading(true);
     setErrorMsg(null);
+    setUploadProgress(0);
 
-    const newlyAdded = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isFirstPhoto = photos.length === 0 && i === 0;
+    try {
+      const newlyAdded = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isFirstPhoto = photos.length === 0 && i === 0;
 
-      const result = await uploadPropertyMediaFile(propertyId, ownerId, file, {
-        mediaType: MediaType.PHOTO,
-        isPrimary: isFirstPhoto,
-        onProgress: (pct) => setUploadProgress(pct)
-      });
+        const result = await uploadPropertyMediaFile(propertyId, ownerId, file, {
+          mediaType: MediaType.PHOTO,
+          isPrimary: isFirstPhoto,
+          onProgress: (pct) => setUploadProgress(pct)
+        });
 
-      if (result.success && result.mediaItem) {
-        newlyAdded.push(result.mediaItem);
-      } else if (!result.success) {
-        setErrorMsg(`Failed to upload ${file.name}: ${result.error || 'Upload error'}`);
-        setUploading(false);
-        return;
+        if (result.success && result.mediaItem) {
+          newlyAdded.push(result.mediaItem);
+        } else if (!result.success) {
+          setErrorMsg(`Failed to upload ${file.name}: ${result.error || 'Upload error'}`);
+          return;
+        }
       }
-    }
 
-    setInternalMedia(prev => [...prev, ...newlyAdded]);
-    setUploading(false);
-    setSuccessMsg('Photo(s) uploaded successfully. Saved for listing preview.');
-    setTimeout(() => setSuccessMsg(null), 3000);
-    if (onUpdateMedia) onUpdateMedia();
+      setInternalMedia(prev => [...prev, ...newlyAdded]);
+      setSuccessMsg('Photo(s) uploaded successfully. Saved for listing preview.');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      if (onUpdateMedia) onUpdateMedia();
+    } catch (err) {
+      setErrorMsg(`Upload failed: ${err.message || 'Network error'}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
   };
 
   // Video Upload Handler
@@ -73,30 +79,36 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
 
     setUploading(true);
     setErrorMsg(null);
+    setUploadProgress(0);
 
-    const newlyAdded = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    try {
+      const newlyAdded = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
 
-      const result = await uploadPropertyMediaFile(propertyId, ownerId, file, {
-        mediaType: selectedVideoCategory,
-        onProgress: (pct) => setUploadProgress(pct)
-      });
+        const result = await uploadPropertyMediaFile(propertyId, ownerId, file, {
+          mediaType: selectedVideoCategory,
+          onProgress: (pct) => setUploadProgress(pct)
+        });
 
-      if (result.success && result.mediaItem) {
-        newlyAdded.push(result.mediaItem);
-      } else if (!result.success) {
-        setErrorMsg(`Failed to upload video ${file.name}: ${result.error || 'Upload error'}`);
-        setUploading(false);
-        return;
+        if (result.success && result.mediaItem) {
+          newlyAdded.push(result.mediaItem);
+        } else if (!result.success) {
+          setErrorMsg(`Failed to upload video ${file.name}: ${result.error || 'Upload error'}`);
+          return;
+        }
       }
-    }
 
-    setInternalMedia(prev => [...prev, ...newlyAdded]);
-    setUploading(false);
-    setSuccessMsg('Video uploaded successfully. Saved for listing preview.');
-    setTimeout(() => setSuccessMsg(null), 3000);
-    if (onUpdateMedia) onUpdateMedia();
+      setInternalMedia(prev => [...prev, ...newlyAdded]);
+      setSuccessMsg('Video uploaded successfully. Saved for listing preview.');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      if (onUpdateMedia) onUpdateMedia();
+    } catch (err) {
+      setErrorMsg(`Video upload failed: ${err.message || 'Network error'}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
   };
 
   // Remove Media Handler

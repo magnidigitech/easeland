@@ -183,21 +183,35 @@ export async function uploadPropertyMediaFile(
     const storagePath = `public_media/properties/${propertyId}/${mediaId}_${sanitizedFileName}`;
     const storageRef = ref(storage, storagePath);
 
+    const currentUserId = ownerId || auth.currentUser?.uid;
+    if (!currentUserId) {
+      return { success: false, error: 'User authentication required for media upload. Please sign in.' };
+    }
+
     const metadata = {
       contentType: uploadFile.type,
       customMetadata: {
-        ownerId: ownerId || 'anonymous-owner',
+        ownerId: currentUserId,
         propertyId,
         mediaId,
         mediaType
       }
     };
 
-    // Upload file to Firebase Storage with full progress monitoring
+    // Upload file to Firebase Storage with full progress monitoring and 45s safety timeout
     let downloadUrl = '';
     const uploadTask = uploadBytesResumable(storageRef, uploadFile, metadata);
 
     downloadUrl = await new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          try { uploadTask.cancel(); } catch (e) {}
+          reject(new Error('Media upload connection timed out. Please check network connection or re-login.'));
+        }
+      }, 45000);
+
       uploadTask.on(
         'state_changed',
         (snapshot) => {
@@ -207,15 +221,23 @@ export async function uploadPropertyMediaFile(
           }
         },
         (error) => {
-          reject(error);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeoutId);
+            reject(error);
+          }
         },
         async () => {
-          try {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            if (onProgress) onProgress(100);
-            resolve(url);
-          } catch (err) {
-            reject(err);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeoutId);
+            try {
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              if (onProgress) onProgress(100);
+              resolve(url);
+            } catch (err) {
+              reject(err);
+            }
           }
         }
       );
