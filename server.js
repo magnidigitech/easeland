@@ -275,7 +275,7 @@ app.get('/api/properties/:id', async (req, res) => {
 });
 
 // SPA Routing Fallback (for React Router / single page app)
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
