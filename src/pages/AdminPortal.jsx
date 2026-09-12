@@ -320,17 +320,38 @@ export default function AdminPortal() {
   };
 
   const loadData = async () => {
-    // 1. Verification Queue
+    // 1. Verification Queue (Retrieved directly from Cloud Firestore & PostgreSQL Database)
     let queue = [];
     try {
       const vRes = await getVerificationQueue();
       let firebaseProps = (vRes.success && Array.isArray(vRes.properties)) ? vRes.properties : [];
-      let mockProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : (typeof mockApi.getVerificationQueueAdmin === 'function' ? mockApi.getVerificationQueueAdmin() : []);
+
+      let postgresProps = [];
+      try {
+        const pgRes = await fetch('/api/properties');
+        if (pgRes.ok) {
+          const pgData = await pgRes.json();
+          if (pgData.success && Array.isArray(pgData.properties)) {
+            postgresProps = pgData.properties;
+          }
+        }
+      } catch (pgErr) {}
+
+      let localProps = [];
+      try {
+        const localRaw = localStorage.getItem('easeland_user_properties');
+        if (localRaw) localProps = JSON.parse(localRaw);
+      } catch (lErr) {}
 
       const queueMap = new Map();
-      [...mockProps, ...firebaseProps].forEach(p => {
+      // Order: mockProps -> localProps -> postgresProps -> firebaseProps (Real database properties overwrite mock)
+      let mockProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : (typeof mockApi.getVerificationQueueAdmin === 'function' ? mockApi.getVerificationQueueAdmin() : []);
+
+      [...mockProps, ...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
         const pId = p.id || p.propertyId;
-        if (pId) queueMap.set(pId, p);
+        if (pId) {
+          queueMap.set(pId, { ...queueMap.get(pId), ...p });
+        }
       });
       queue = Array.from(queueMap.values());
     } catch (e1) {
@@ -500,7 +521,52 @@ export default function AdminPortal() {
     setIsWorkspaceOpen(true);
     setActiveTab('workspace');
     const pId = prop?.id || prop?.propertyId;
-    if (pId && user?.uid) {
+    if (!pId) return;
+
+    // 1. Fetch full database property record from PostgreSQL
+    try {
+      const pgRes = await fetch(`/api/properties/${pId}`);
+      if (pgRes.ok) {
+        const pgData = await pgRes.json();
+        if (pgData.success && pgData.property) {
+          setSelectedProperty(prev => ({
+            ...prev,
+            ...pgData.property,
+            owner: {
+              ...(prev?.owner || {}),
+              ...(pgData.property?.owner || {}),
+              name: pgData.property?.ownerPublicName || pgData.property?.owner?.name || prev?.owner?.name,
+              phone: pgData.property?.ownerPrivatePhone || pgData.property?.ownerPublicPhone || pgData.property?.owner?.phone || prev?.owner?.phone,
+              email: pgData.property?.ownerPrivateEmail || pgData.property?.owner?.email || prev?.owner?.email
+            }
+          }));
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fetch confidential documents and verification evidence from Firestore
+    try {
+      const workspaceRes = await getVerificationWorkspaceData(pId);
+      if (workspaceRes.success && workspaceRes.workspace?.property) {
+        const wProp = workspaceRes.workspace.property;
+        const wPrivate = workspaceRes.workspace.privateData || {};
+        const wDocs = workspaceRes.workspace.documents || [];
+
+        setSelectedProperty(prev => ({
+          ...prev,
+          ...wProp,
+          owner: {
+            ...(prev?.owner || {}),
+            name: wProp.ownerPublicName || wProp.owner?.name || prev?.owner?.name,
+            phone: wPrivate.ownerPrivatePhone || wProp.ownerPublicPhone || prev?.owner?.phone,
+            email: wPrivate.ownerPrivateEmail || prev?.owner?.email
+          },
+          documents: (wDocs.length > 0) ? wDocs : (prev?.documents || [])
+        }));
+      }
+    } catch (e) {}
+
+    if (user?.uid) {
       await startPropertyReview(pId, user.uid, user.displayName || 'EaseLand Auditor');
     }
   };

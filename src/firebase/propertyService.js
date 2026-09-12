@@ -455,6 +455,7 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
     try {
       const { mockApi } = await import('../services/mockApi.js');
       mockApi.addProperty({
+        ...payload,
         id: propertyId,
         propertyId,
         referenceId: payload.referenceId || `EL-PROP-${propertyId}`,
