@@ -208,6 +208,7 @@ export default function AdminPortal() {
   const [allProperties, setAllProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
 
   // Custom feedback text for verification review
   const [feedbackNote, setFeedbackNote] = useState('');
@@ -497,8 +498,10 @@ export default function AdminPortal() {
   const openWorkspace = async (prop) => {
     setSelectedProperty(prop);
     setIsWorkspaceOpen(true);
-    if (prop?.propertyId && user?.uid) {
-      await startPropertyReview(prop.propertyId, user.uid, user.displayName || 'EaseLand Auditor');
+    setActiveTab('workspace');
+    const pId = prop?.id || prop?.propertyId;
+    if (pId && user?.uid) {
+      await startPropertyReview(pId, user.uid, user.displayName || 'EaseLand Auditor');
     }
   };
 
@@ -1862,105 +1865,326 @@ export default function AdminPortal() {
 
             {/* TAB: VERIFICATION WORKSPACE */}
             {activeTab === 'workspace' && (
-              verificationQueue.length === 0 ? (
+              verificationQueue.length === 0 && !selectedProperty ? (
                 <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-3">
                   <div className="text-4xl">🎉</div>
                   <h3 className="font-black text-xl text-emerald-800 uppercase tracking-wide">
                     ALL VERIFICATIONS ARE CLEAR !!
                   </h3>
-                  <p className="text-xs text-gray-500 font-semibold max-w-md mx-auto">
+                  <p className="text-xs text-slate-600 font-semibold max-w-md mx-auto">
                     There are no pending property audits or verification documents requiring attention. The workspace is clear!
                   </p>
                 </div>
               ) : (
                 (() => {
-                  const activeAuditProp = (selectedProperty && verificationQueue.some(p => p.id === selectedProperty.id))
-                    ? selectedProperty
-                    : verificationQueue[0];
+                  const activeAuditProp = selectedProperty || verificationQueue[0];
 
                   if (!activeAuditProp) return null;
 
                   return (
-                    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                      <div className="border-b border-gray-100 pb-4 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl p-6 border border-slate-300 shadow-lg space-y-6 text-slate-900">
+                      
+                      {/* HEADER BAR */}
+                      <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
                         <div>
-                          <span className="text-xs font-extrabold text-amber-600 bg-amber-100 px-3 py-1 rounded-md">AUDIT IN PROGRESS</span>
-                          <h3 className="text-xl font-black text-brand-charcoal mt-2">{activeAuditProp.title}</h3>
-                          <p className="text-xs text-gray-500 font-medium">{activeAuditProp.location?.address}</p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-black text-amber-900 bg-amber-200 px-3 py-1 rounded-md tracking-wider">
+                              AUDIT IN PROGRESS
+                            </span>
+                            <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-md">
+                              ID: {activeAuditProp.id || activeAuditProp.propertyId}
+                            </span>
+                          </div>
+                          <h3 className="text-2xl font-black text-slate-900 mt-1">{activeAuditProp.title}</h3>
+                          <p className="text-xs font-extrabold text-slate-700 mt-0.5 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>
+                              {[
+                                activeAuditProp.location?.address || activeAuditProp.address,
+                                activeAuditProp.location?.locality || activeAuditProp.locality,
+                                activeAuditProp.location?.city || activeAuditProp.city,
+                                activeAuditProp.location?.district || activeAuditProp.district,
+                                activeAuditProp.location?.state || activeAuditProp.state
+                              ].filter(Boolean).join(', ')}
+                              {(activeAuditProp.location?.pincode || activeAuditProp.pincode) ? ` - ${activeAuditProp.location?.pincode || activeAuditProp.pincode}` : ''}
+                            </span>
+                          </p>
                         </div>
-                        <span className="text-lg font-black text-emerald-600">{activeAuditProp.priceDisplay}</span>
+                        <div className="text-right">
+                          <span className="text-2xl font-black text-emerald-700 block">
+                            {activeAuditProp.priceDisplay || (activeAuditProp.price ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}` : 'Price on Request')}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                            Submitted: {activeAuditProp.submittedDate || 'Recent'}
+                          </span>
+                        </div>
                       </div>
 
+                      {/* 2-COLUMN DATA CARDS */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-500">Property Details & Owner</h4>
-                          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs space-y-2">
-                            <div><span className="font-bold text-gray-500">Owner Name:</span> {activeAuditProp.owner?.name}</div>
-                            <div><span className="font-bold text-gray-500">Phone:</span> {activeAuditProp.owner?.phone}</div>
-                            <div><span className="font-bold text-gray-500">Email:</span> {activeAuditProp.owner?.email}</div>
-                            <div><span className="font-bold text-gray-500">Category:</span> {activeAuditProp.category}</div>
-                            <div><span className="font-bold text-gray-500">Property Type:</span> {activeAuditProp.propertyType}</div>
-                            <div><span className="font-bold text-gray-500">Area:</span> {activeAuditProp.areaDisplay}</div>
+                        
+                        {/* OWNER & CONTACT INFORMATION CARD */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                            <User className="w-4 h-4 text-blue-600" />
+                            <span>Owner & Contact Verification</span>
+                          </h4>
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Owner Name:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.name || activeAuditProp.userName || 'Property Owner'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Phone Number:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.phone || activeAuditProp.userPhone || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Email Address:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.email || activeAuditProp.userEmail || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Listing Role:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.role || 'Property Owner'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-600 font-bold">KYC / Identity Status:</span>
+                              <span className="text-emerald-700 font-black bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
+                                VERIFIED OWNER
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-500">Uploaded Verification Documents</h4>
-                          <div className="space-y-2">
-                            {(activeAuditProp.documents || []).length === 0 ? (
-                              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 italic">
-                                No physical documents attached. Property under basic title check.
-                              </div>
-                            ) : (
-                              (activeAuditProp.documents || []).map((doc, idx) => (
-                                <div key={idx} className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-blue-600" />
-                                    <span className="font-bold text-blue-950">{doc.name}</span>
+                        {/* SPECIFICATIONS & FINANCIAL DETAILS */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                            <Building2 className="w-4 h-4 text-emerald-600" />
+                            <span>Property Specifications & Financials</span>
+                          </h4>
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Category & Type:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.category || 'Real Estate'} • {activeAuditProp.propertyType || 'Plot/Property'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Listing Intent:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.transactionType || activeAuditProp.intent || 'FOR SALE'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Total Area:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.areaDisplay || `${activeAuditProp.area || 0} ${activeAuditProp.areaUnit || 'sq ft'}`}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                              <span className="text-slate-600 font-bold">Facing & Dimensions:</span>
+                              <span className="text-slate-900 font-extrabold">{activeAuditProp.facing || 'East'} • {activeAuditProp.dimensions || 'Standard Plot'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-600 font-bold">Survey / LP Identifiers:</span>
+                              <span className="text-slate-900 font-extrabold">Sy. No: {activeAuditProp.location?.surveyNo || activeAuditProp.surveyNo || 'N/A'} • LP: {activeAuditProp.location?.lpNo || activeAuditProp.lpNo || 'N/A'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* FULL DESCRIPTION & AMENITIES */}
+                      {(activeAuditProp.description || (activeAuditProp.amenities && activeAuditProp.amenities.length > 0)) && (
+                        <div className="space-y-3 pt-4 border-t border-slate-200">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-purple-600" />
+                            <span>Property Description & Key Amenities</span>
+                          </h4>
+                          {activeAuditProp.description && (
+                            <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 leading-relaxed">
+                              {activeAuditProp.description}
+                            </div>
+                          )}
+                          {activeAuditProp.amenities && activeAuditProp.amenities.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {activeAuditProp.amenities.map((amenity, idx) => (
+                                <span key={idx} className="bg-slate-200 text-slate-900 font-extrabold text-[11px] px-3 py-1 rounded-lg border border-slate-300">
+                                  ✓ {amenity}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* SUBMITTED MEDIA PHOTO GALLERY */}
+                      {(() => {
+                        const rawMedia = activeAuditProp.media || activeAuditProp.photos || activeAuditProp.images || activeAuditProp.publicApprovedMedia || [];
+                        if (!rawMedia || rawMedia.length === 0) return null;
+                        return (
+                          <div className="space-y-3 pt-4 border-t border-slate-200">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                              <ImageIcon className="w-4 h-4 text-blue-600" />
+                              <span>Submitted Property Photos ({rawMedia.length})</span>
+                            </h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                              {rawMedia.map((m, idx) => {
+                                const imgUrl = typeof m === 'string' ? m : (m.url || m.mediaUrl || m.publicUrl);
+                                if (!imgUrl) return null;
+                                return (
+                                  <div
+                                    key={idx}
+                                    onClick={() => setEnlargedMediaUrl(imgUrl)}
+                                    className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt={`Submitted photo ${idx + 1}`}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                                      <Eye className="w-4 h-4" />
+                                      <span>Enlarge</span>
+                                    </div>
                                   </div>
-                                  <span className="bg-blue-200 text-blue-900 font-extrabold text-[10px] px-2 py-0.5 rounded">{doc.type}</span>
-                                </div>
-                              ))
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* SUBMITTED VIDEO (EMBEDDED YOUTUBE/GOOGLE DRIVE OR DIRECT UPLOAD) */}
+                      {(activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl) && (
+                        <div className="space-y-3 pt-4 border-t border-slate-200">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                            <Eye className="w-4 h-4 text-amber-600" />
+                            <span>Submitted Video Presentation</span>
+                          </h4>
+                          <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-md max-w-3xl mx-auto">
+                            {(activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtube.com') ||
+                             (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtu.be') ||
+                             (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('drive.google.com') ? (
+                              <iframe
+                                src={
+                                  (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtube.com/watch?v=')
+                                    ? (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).replace('watch?v=', 'embed/')
+                                    : (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtu.be/')
+                                    ? `https://www.youtube.com/embed/${(activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).split('youtu.be/')[1]}`
+                                    : (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl)
+                                }
+                                className="w-full aspect-video rounded-2xl"
+                                allowFullScreen
+                                title="Property Video"
+                              />
+                            ) : (
+                              <video
+                                src={activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl}
+                                controls
+                                className="w-full aspect-video rounded-2xl max-h-96"
+                              />
                             )}
                           </div>
                         </div>
+                      )}
+
+                      {/* UPLOADED VERIFICATION DOCUMENTS */}
+                      <div className="space-y-3 pt-4 border-t border-slate-200">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-indigo-600" />
+                          <span>Uploaded Verification Documents</span>
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {(activeAuditProp.documents || []).length === 0 ? (
+                            <div className="col-span-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 italic font-semibold">
+                              No physical documents attached. Property subject to basic title and field verification.
+                            </div>
+                          ) : (
+                            (activeAuditProp.documents || []).map((docItem, idx) => (
+                              <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-slate-900">
+                                <div className="flex items-center gap-2.5">
+                                  <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                                  <div>
+                                    <span className="font-extrabold text-blue-950 block">{docItem.name || `Document ${idx + 1}`}</span>
+                                    <span className="text-[10px] text-blue-700 font-bold">{docItem.type || 'Legal Deed'}</span>
+                                  </div>
+                                </div>
+                                {docItem.url && (
+                                  <a
+                                    href={docItem.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                                  >
+                                    View / Download
+                                  </a>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
 
-                      <div className="space-y-3 pt-4 border-t border-gray-100">
-                        <label className="block text-xs font-bold text-gray-700">Auditor Notes / Reason for Feedback</label>
+                      {/* AUDITOR NOTES & FEEDBACK TEXTAREA */}
+                      <div className="space-y-3 pt-4 border-t border-slate-200">
+                        <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Auditor Notes / Reason for Feedback
+                        </label>
                         <textarea
                           rows={3}
                           placeholder="Enter official legal audit notes, boundary verification remarks, or document rejection details..."
                           value={feedbackNote}
                           onChange={(e) => setFeedbackNote(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                          className="w-full bg-white text-slate-900 border-2 border-slate-300 rounded-xl p-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400 shadow-inner"
                         />
                       </div>
 
-                      <div className="flex items-center justify-end gap-3 pt-2">
+                      {/* ACTION BUTTONS */}
+                      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
                         <button
-                          onClick={() => handleReject(activeAuditProp.id)}
-                          className="px-5 py-2.5 rounded-xl bg-red-100 text-red-700 font-extrabold text-xs hover:bg-red-200 transition-colors"
+                          onClick={() => handleReject(activeAuditProp.id || activeAuditProp.propertyId)}
+                          disabled={adminActionProcessing}
+                          className="px-5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300"
                         >
                           Reject Listing
                         </button>
                         <button
-                          onClick={() => handleRequestChanges(activeAuditProp.id)}
-                          className="px-5 py-2.5 rounded-xl bg-amber-100 text-amber-800 font-extrabold text-xs hover:bg-amber-200 transition-colors"
+                          onClick={() => handleRequestChanges(activeAuditProp.id || activeAuditProp.propertyId)}
+                          disabled={adminActionProcessing}
+                          className="px-5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs transition-colors cursor-pointer border border-amber-300"
                         >
                           Request Document Changes
                         </button>
                         <button
-                          onClick={() => handleApprove(activeAuditProp.id)}
-                          className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs hover:bg-emerald-700 shadow-md transition-all"
+                          onClick={() => handleApprove(activeAuditProp.id || activeAuditProp.propertyId)}
+                          disabled={adminActionProcessing}
+                          className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
                         >
-                          Approve & Publish Live
+                          <CheckCircle2 className="w-4 h-4 text-emerald-100" />
+                          <span>Approve & Publish Live</span>
                         </button>
                       </div>
+
                     </div>
                   );
                 })()
               )
+            )}
+
+            {/* LIGHTBOX MODAL FOR ENLARGED MEDIA */}
+            {enlargedMediaUrl && (
+              <div
+                className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={() => setEnlargedMediaUrl(null)}
+              >
+                <div className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => setEnlargedMediaUrl(null)}
+                    className="absolute -top-12 right-0 bg-white/20 hover:bg-white/40 text-white rounded-full p-2 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                  <img
+                    src={enlargedMediaUrl}
+                    alt="Enlarged property photo"
+                    className="max-w-full max-h-[85vh] object-contain rounded-2xl border-2 border-slate-700 shadow-2xl"
+                  />
+                </div>
+              </div>
             )}
 
             {/* TAB: USER GOVERNANCE & TEMPORARY SUSPENSION */}
