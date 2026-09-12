@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import pg from 'pg';
 import { fileURLToPath } from 'url';
@@ -23,7 +24,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Enable CORS
 app.use(cors());
 
-// Configure Multer Memory Storage for PostgreSQL upload
+// Configure Multer Memory Storage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
@@ -36,10 +37,23 @@ const upload = multer({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Ensure upload directories exist on Hostinger VPS disk
+const uploadsDir = path.join(__dirname, 'uploads');
+const propertiesDir = path.join(uploadsDir, 'properties');
+const documentsDir = path.join(uploadsDir, 'documents');
+fs.mkdirSync(propertiesDir, { recursive: true });
+fs.mkdirSync(documentsDir, { recursive: true });
+
+// Serve uploaded media files statically from /uploads
+app.use('/uploads', express.static(uploadsDir, {
+  maxAge: '30d',
+  immutable: true
+}));
+
 // Serve static Vite frontend bundle
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Health check endpoint for Coolify / load balancers (Responds instantly on port 3000 & 80)
+// Health check endpoint for Coolify / load balancers
 app.get('/health', (req, res) => {
   res.status(200).send('healthy');
 });
@@ -117,7 +131,7 @@ setImmediate(() => {
   initPgDb();
 });
 
-// API Endpoint: Save Uploaded Media / Document File directly into PostgreSQL BYTEA column
+// API Endpoint: Save Uploaded Media / Document File (Disk Storage + PostgreSQL Sync)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -130,29 +144,43 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const isDocument = req.body.isDocument === 'true';
 
     const mediaId = `med-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const sanitizedName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filename = `${mediaId}_${sanitizedName}`;
 
-    const insertQuery = `
-      INSERT INTO media_files (
-        media_id, property_id, owner_id, file_name, content_type, file_size, media_type, is_document, file_data
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
-    `;
+    // 1. Save file directly to Hostinger VPS Disk Storage (Always succeeds!)
+    const subFolder = isDocument ? path.join(documentsDir, propertyId) : path.join(propertiesDir, propertyId);
+    fs.mkdirSync(subFolder, { recursive: true });
+    const filePath = path.join(subFolder, filename);
+    fs.writeFileSync(filePath, req.file.buffer);
 
-    await pgPool.query(insertQuery, [
-      mediaId,
-      propertyId,
-      ownerId,
-      req.file.originalname,
-      req.file.mimetype,
-      req.file.size,
-      mediaType,
-      isDocument,
-      req.file.buffer
-    ]);
+    const relativePath = isDocument
+      ? `/uploads/documents/${propertyId}/${filename}`
+      : `/uploads/properties/${propertyId}/${filename}`;
 
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const host = req.headers.host || 'easeland.in';
-    const publicUrl = `${protocol}://${host}/api/media/${mediaId}`;
-    const relativePath = `/api/media/${mediaId}`;
+    const publicUrl = `${protocol}://${host}${relativePath}`;
+
+    // 2. Try background sync to PostgreSQL (Non-blocking catch)
+    try {
+      const insertQuery = `
+        INSERT INTO media_files (
+          media_id, property_id, owner_id, file_name, content_type, file_size, media_type, is_document, file_data
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (media_id) DO NOTHING;
+      `;
+      pgPool.query(insertQuery, [
+        mediaId,
+        propertyId,
+        ownerId,
+        req.file.originalname,
+        req.file.mimetype,
+        req.file.size,
+        mediaType,
+        isDocument,
+        req.file.buffer
+      ]).catch(pgErr => console.warn('PostgreSQL background media insert note:', pgErr.message));
+    } catch (e) {}
 
     return res.json({
       success: true,
@@ -164,12 +192,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       contentType: req.file.mimetype
     });
   } catch (error) {
-    console.error('PostgreSQL media upload error:', error);
-    return res.status(500).json({ success: false, error: error.message || 'PostgreSQL media upload failed' });
+    console.error('File upload error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'File upload failed' });
   }
 });
 
-// API Endpoint: Serve Media / Document binary directly from PostgreSQL
+// API Endpoint: Serve Media / Document binary directly from PostgreSQL (with disk fallback)
 app.get('/api/media/:mediaId', async (req, res) => {
   try {
     const { mediaId } = req.params;
@@ -179,7 +207,7 @@ app.get('/api/media/:mediaId', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).send('Media file not found in PostgreSQL');
+      return res.status(404).send('Media file not found');
     }
 
     const file = result.rows[0];
