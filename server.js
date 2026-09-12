@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
+import pg from 'pg';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,6 +11,49 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// PostgreSQL Connection Pool Setup
+const { Pool } = pg;
+const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || 'postgres://postgres:g7YivfxcSdNUC9rXFg0y5iSGT00er3NhXqVVc1SI20Y9o4nN7XFTEvAmmTQCT7su@of36x8wuw0wn4j0x2y6c8eso:5432/postgres';
+
+const pgPool = new Pool({
+  connectionString: dbUrl,
+  ssl: false,
+  connectionTimeoutMillis: 10000
+});
+
+// Auto-initialize PostgreSQL properties table
+async function initPgDb() {
+  try {
+    const client = await pgPool.connect();
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS properties (
+        property_id VARCHAR(100) PRIMARY KEY,
+        reference_id VARCHAR(100),
+        owner_id VARCHAR(100),
+        title TEXT,
+        property_type VARCHAR(50),
+        purpose VARCHAR(50),
+        price NUMERIC,
+        area NUMERIC,
+        location JSONB,
+        specs JSONB,
+        amenities JSONB,
+        media JSONB,
+        listing_status VARCHAR(50),
+        is_published BOOLEAN DEFAULT false,
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    client.release();
+    console.log('PostgreSQL properties table initialized successfully.');
+  } catch (err) {
+    console.warn('PostgreSQL connection/init note:', err.message);
+  }
+}
+initPgDb();
 
 // Enable CORS
 app.use(cors());
@@ -93,6 +137,88 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message || 'Storage server error' });
+  }
+});
+
+// API Endpoint: Sync/Save property record to PostgreSQL database
+app.post('/api/properties', async (req, res) => {
+  try {
+    const p = req.body;
+    if (!p || !p.propertyId) {
+      return res.status(400).json({ success: false, error: 'Property payload with propertyId is required.' });
+    }
+
+    const queryText = `
+      INSERT INTO properties (
+        property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW()
+      )
+      ON CONFLICT (property_id) DO UPDATE SET
+        reference_id = EXCLUDED.reference_id,
+        owner_id = EXCLUDED.owner_id,
+        title = EXCLUDED.title,
+        property_type = EXCLUDED.property_type,
+        purpose = EXCLUDED.purpose,
+        price = EXCLUDED.price,
+        area = EXCLUDED.area,
+        location = EXCLUDED.location,
+        specs = EXCLUDED.specs,
+        amenities = EXCLUDED.amenities,
+        media = EXCLUDED.media,
+        listing_status = EXCLUDED.listing_status,
+        is_published = EXCLUDED.is_published,
+        raw_data = EXCLUDED.raw_data,
+        updated_at = NOW();
+    `;
+
+    const values = [
+      p.propertyId,
+      p.referenceId || null,
+      p.ownerId || null,
+      p.title || 'Untitled Property',
+      p.propertyType || null,
+      p.purpose || null,
+      Number(p.price) || 0,
+      Number(p.area) || 0,
+      JSON.stringify(p.location || {}),
+      JSON.stringify(p.specs || {}),
+      JSON.stringify(p.amenities || []),
+      JSON.stringify(p.media || []),
+      p.listingStatus || 'DRAFT',
+      Boolean(p.isPublished),
+      JSON.stringify(p)
+    ];
+
+    await pgPool.query(queryText, values);
+    return res.json({ success: true, message: 'Property synchronized to PostgreSQL database.' });
+  } catch (err) {
+    console.error('PostgreSQL property save error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Endpoint: Get all property records from PostgreSQL database
+app.get('/api/properties', async (req, res) => {
+  try {
+    const result = await pgPool.query('SELECT raw_data FROM properties ORDER BY updated_at DESC LIMIT 100;');
+    const properties = result.rows.map(row => row.raw_data);
+    return res.json({ success: true, properties });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Endpoint: Get single property by ID from PostgreSQL database
+app.get('/api/properties/:id', async (req, res) => {
+  try {
+    const result = await pgPool.query('SELECT raw_data FROM properties WHERE property_id = $1;', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Property not found in PostgreSQL database.' });
+    }
+    return res.json({ success: true, property: result.rows[0].raw_data });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

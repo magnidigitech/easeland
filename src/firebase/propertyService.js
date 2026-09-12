@@ -17,6 +17,22 @@ import { ListingStatus, VerificationStatus, BoundaryStatus, MediaStatus } from '
 import { formatFirestoreError } from './userService.js';
 
 /**
+ * Helper to sync property payload to PostgreSQL database (/api/properties)
+ */
+export async function syncPropertyToPostgres(propertyData) {
+  try {
+    if (!propertyData || !propertyData.propertyId) return;
+    await fetch('/api/properties', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(propertyData)
+    });
+  } catch (err) {
+    console.warn('PostgreSQL sync note:', err);
+  }
+}
+
+/**
  * Generate human readable property reference ID e.g. EL-PROP-10042
  */
 function generateReferenceId() {
@@ -251,6 +267,8 @@ export async function createPropertyDraft(ownerId, propertyData) {
 
     await Promise.race([savePromise, timeoutPromise]);
 
+    syncPropertyToPostgres(publicPayload);
+
     return { success: true, propertyId, referenceId: refId };
   } catch (error) {
     console.warn('Property draft create fallback:', error);
@@ -430,6 +448,8 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
     const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 3500));
 
     await Promise.race([savePromise, timeoutPromise]);
+
+    syncPropertyToPostgres(payload);
 
     // Also sync submitted property to local store & dispatch event so dashboard & admin queue reflect it immediately
     try {
