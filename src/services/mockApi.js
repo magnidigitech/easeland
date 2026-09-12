@@ -518,38 +518,55 @@ export const mockApi = {
   },
 
   approvePropertyAdmin: (propertyId, notes = 'Approved by Admin') => {
-    const prop = properties.find(p => p.id === propertyId);
+    const prop = properties.find(p => p.id === propertyId || p.propertyId === propertyId);
     if (prop) {
-      prop.status = 'APPROVED_LIVE';
+      prop.status = 'LIVE';
+      prop.listingStatus = 'LIVE';
+      prop.isPlatformVerified = true;
+      prop.isPublished = true;
       prop.verificationStatus = 'Platform Verified';
       prop.verifiedDate = new Date().toISOString().split('T')[0];
       prop.verificationNotes = notes;
       setStoredData('easeland_properties', properties);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-property-approved', { detail: prop }));
+        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: prop }));
       }
     }
     return prop;
   },
 
   rejectPropertyAdmin: (propertyId, reason = 'Listing information incomplete') => {
-    const prop = properties.find(p => p.id === propertyId);
+    const prop = properties.find(p => p.id === propertyId || p.propertyId === propertyId);
     if (prop) {
       prop.status = 'REJECTED';
+      prop.listingStatus = 'REJECTED';
+      prop.isPublished = false;
+      prop.isPlatformVerified = false;
       prop.verificationStatus = 'Verification Rejected';
       prop.rejectionReason = reason;
+      prop.verificationNotes = reason;
       setStoredData('easeland_properties', properties);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: prop }));
+      }
     }
     return prop;
   },
 
   requestChangesAdmin: (propertyId, feedback = 'Please update layout boundary and tax receipt') => {
-    const prop = properties.find(p => p.id === propertyId);
+    const prop = properties.find(p => p.id === propertyId || p.propertyId === propertyId);
     if (prop) {
       prop.status = 'CHANGES_REQUIRED';
+      prop.listingStatus = 'CHANGES_REQUIRED';
+      prop.isPublished = false;
       prop.verificationStatus = 'Changes Requested by Admin';
       prop.adminFeedback = feedback;
+      prop.ownerFacingNotes = feedback;
       setStoredData('easeland_properties', properties);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: prop }));
+      }
     }
     return prop;
   },

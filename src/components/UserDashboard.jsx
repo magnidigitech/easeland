@@ -137,20 +137,53 @@ export default function UserDashboard({
     refreshUserProperties();
     const handleCreated = () => refreshUserProperties();
     const handleApproved = () => refreshUserProperties();
+    const handleStatusUpdated = () => refreshUserProperties();
+
     window.addEventListener('easeland-property-created', handleCreated);
     window.addEventListener('easeland-property-approved', handleApproved);
+    window.addEventListener('easeland-property-status-updated', handleStatusUpdated);
+    window.addEventListener('storage', handleStatusUpdated);
+
     return () => {
       window.removeEventListener('easeland-property-created', handleCreated);
       window.removeEventListener('easeland-property-approved', handleApproved);
+      window.removeEventListener('easeland-property-status-updated', handleStatusUpdated);
+      window.removeEventListener('storage', handleStatusUpdated);
     };
   }, [user]);
 
-  // Transform raw properties to dashboard format
-  const activePropsSource = fbOwnerProperties.length > 0 ? fbOwnerProperties : myPropertiesList;
+  // Combine Firestore and local/database properties cleanly so user always sees live status updates
+  const combinedPropsMap = new Map();
+  [...myPropertiesList, ...fbOwnerProperties].forEach(p => {
+    const pId = p.propertyId || p.id;
+    if (pId) {
+      const existing = combinedPropsMap.get(pId) || {};
+      const statusResolved = (p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.isPublished || p.isPlatformVerified || existing.status === 'LIVE' || existing.listingStatus === 'LIVE')
+        ? 'LIVE'
+        : (p.listingStatus === 'REJECTED' || p.status === 'REJECTED' || existing.status === 'REJECTED')
+        ? 'REJECTED'
+        : (p.listingStatus === 'CHANGES_REQUIRED' || p.status === 'CHANGES_REQUIRED' || existing.status === 'CHANGES_REQUIRED')
+        ? 'CHANGES_REQUIRED'
+        : (p.listingStatus || existing.listingStatus || p.status || existing.status || 'DRAFT');
+
+      combinedPropsMap.set(pId, {
+        ...existing,
+        ...p,
+        listingStatus: statusResolved,
+        status: statusResolved,
+        isPlatformVerified: Boolean(p.isPlatformVerified || existing.isPlatformVerified || statusResolved === 'LIVE'),
+        isPublished: Boolean(p.isPublished || existing.isPublished || statusResolved === 'LIVE'),
+        verificationNotes: p.verificationNotes || existing.verificationNotes || p.ownerFacingNotes || existing.ownerFacingNotes
+      });
+    }
+  });
+
+  const activePropsSource = Array.from(combinedPropsMap.values());
+
   const userProperties = activePropsSource.map(p => {
     const locObj = p.location || {};
-    const locParts = [locObj.locality, locObj.city, locObj.state].filter(Boolean);
-    const locString = locParts.join(', ') || 'India';
+    const locParts = typeof locObj === 'object' ? [locObj.locality, locObj.city, locObj.state].filter(Boolean) : [];
+    const locString = locParts.length > 0 ? locParts.join(', ') : (typeof p.location === 'string' ? p.location : 'India');
 
     let displayPrice = p.priceDisplay;
     if (!displayPrice && p.price) {
@@ -159,15 +192,33 @@ export default function UserDashboard({
       } else if (p.price >= 100000) {
         displayPrice = `Rs. ${(p.price / 100000).toFixed(2)} Lakhs`;
       } else {
-        displayPrice = `Rs. ${p.price.toLocaleString('en-IN')}`;
+        displayPrice = `Rs. ${Number(p.price).toLocaleString('en-IN')}`;
       }
     }
 
     const thumbImage = (Array.isArray(p.publicApprovedMedia) && p.publicApprovedMedia.length > 0)
       ? p.publicApprovedMedia[0].url
       : (Array.isArray(p.media) && p.media.length > 0)
-        ? (typeof p.media[0] === 'string' ? p.media[0] : p.media[0].url)
+        ? (typeof p.media[0] === 'string' ? p.media[0] : (p.media[0].url || p.media[0].mediaUrl))
         : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+
+    const statusVal = (p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.isPublished || p.isPlatformVerified)
+      ? 'LIVE'
+      : (p.status === 'REJECTED' || p.listingStatus === 'REJECTED')
+      ? 'REJECTED'
+      : (p.status === 'CHANGES_REQUIRED' || p.listingStatus === 'CHANGES_REQUIRED')
+      ? 'CHANGES_REQUIRED'
+      : (p.status === 'PENDING_VERIFICATION' || p.listingStatus === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.listingStatus === 'UNDER_REVIEW')
+      ? 'PENDING_VERIFICATION'
+      : (p.status || p.listingStatus || 'DRAFT');
+
+    let adminNoteVal = p.verificationNotes || p.ownerFacingNotes || p.adminFeedback;
+    if (!adminNoteVal) {
+      if (statusVal === 'LIVE') adminNoteVal = 'Platform Verified: Title and survey documents verified.';
+      else if (statusVal === 'REJECTED') adminNoteVal = 'Listing rejected by platform auditor.';
+      else if (statusVal === 'CHANGES_REQUIRED') adminNoteVal = 'Document changes requested by auditor.';
+      else adminNoteVal = 'Verification audit in progress.';
+    }
 
     return {
       id: p.propertyId || p.id,
@@ -180,11 +231,11 @@ export default function UserDashboard({
       purpose: p.purpose || 'SALE',
       facing: p.specs?.facing || p.facing || 'East',
       area: p.areaDisplay || `${p.area || 0} sq ft`,
-      status: p.listingStatus || (p.status === 'APPROVED_LIVE' ? 'LIVE' : p.status || 'DRAFT'),
-      isPlatformVerified: Boolean(p.isPlatformVerified),
-      isPublished: Boolean(p.isPublished),
-      adminNote: p.verificationNotes || p.ownerFacingNotes || (p.listingStatus === 'LIVE' ? 'Platform Verified: Title and survey documents verified.' : 'Verification audit in progress.'),
-      dateListed: p.createdAt ? (p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toISOString().split('T')[0] : 'Recent') : 'Recent',
+      status: statusVal,
+      isPlatformVerified: Boolean(p.isPlatformVerified || statusVal === 'LIVE'),
+      isPublished: Boolean(p.isPublished || statusVal === 'LIVE'),
+      adminNote: adminNoteVal,
+      dateListed: p.createdAt ? (p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toISOString().split('T')[0] : (typeof p.createdAt === 'string' ? p.createdAt.split('T')[0] : 'Recent')) : 'Recent',
       views: p.views || 0,
       enquiriesCount: p.enquiriesCount || 0,
       image: thumbImage,
