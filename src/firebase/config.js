@@ -7,7 +7,7 @@ const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.met
 
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY || 'AIzaSyB6x3JQ9wrYIZRYg0C36cd_5Gvhfmds4EQ',
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'easeland-fba04.firebaseapp.com',
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'easeland.in',
   projectId: env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04',
   storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || 'easeland-fba04.firebasestorage.app',
   messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '109876543210',
