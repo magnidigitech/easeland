@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Video, Upload, Trash2, Star, ArrowUp, ArrowDown, RefreshCw, CheckCircle2, AlertCircle, Film } from 'lucide-react';
+import { Camera, Video, Upload, Trash2, Star, ArrowUp, ArrowDown, RefreshCw, CheckCircle2, AlertCircle, Film, Link as LinkIcon, PlusCircle, ExternalLink, Youtube } from 'lucide-react';
 import { MediaType, MediaStatus } from '../firebase/schema.js';
-import { uploadPropertyMediaFile, removePropertyMediaFile, setPrimaryPropertyPhoto, updatePropertyMediaOrder } from '../firebase/mediaService.js';
+import { uploadPropertyMediaFile, removePropertyMediaFile, setPrimaryPropertyPhoto, updatePropertyMediaOrder, addPropertyVideoLink } from '../firebase/mediaService.js';
 
 export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [], onUpdateMedia }) {
   const [internalMedia, setInternalMedia] = useState(mediaList || []);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedVideoCategory, setSelectedVideoCategory] = useState(MediaType.WALKTHROUGH_VIDEO);
+  const [videoLinkInput, setVideoLinkInput] = useState('');
+  const [linkingVideo, setLinkingVideo] = useState(false);
 
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -108,6 +110,38 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
     } finally {
       setUploading(false);
       setUploadProgress(0);
+    }
+  };
+
+  // Video Link Handler (YouTube or Google Drive)
+  const handleAddVideoLink = async () => {
+    if (!videoLinkInput || !videoLinkInput.trim()) return;
+    if (!propertyId) {
+      setErrorMsg('Please complete step 1 (Basic Details) before attaching video links.');
+      return;
+    }
+
+    setLinkingVideo(true);
+    setErrorMsg(null);
+
+    try {
+      const result = await addPropertyVideoLink(propertyId, ownerId, videoLinkInput.trim(), {
+        mediaType: selectedVideoCategory
+      });
+
+      if (result.success && result.mediaItem) {
+        setInternalMedia(prev => [...prev, result.mediaItem]);
+        setVideoLinkInput('');
+        setSuccessMsg('Video link attached successfully.');
+        setTimeout(() => setSuccessMsg(null), 3000);
+        if (onUpdateMedia) onUpdateMedia();
+      } else {
+        setErrorMsg(result.error || 'Failed to attach video link.');
+      }
+    } catch (err) {
+      setErrorMsg(`Link error: ${err.message}`);
+    } finally {
+      setLinkingVideo(false);
     }
   };
 
@@ -319,10 +353,10 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-2 flex-wrap">
               <Video className="w-4 h-4 text-brand-yellow shrink-0" />
               <span>Walkthrough & Drone Videos</span>
-              <span className="text-gray-500 font-bold font-mono">({videos.length} uploaded)</span>
+              <span className="text-gray-500 font-bold font-mono">({videos.length} added)</span>
             </h4>
             <p className="text-[11px] text-gray-500 font-medium">
-              Max 100MB per video (MP4, WebM, MOV). Select video category before uploading.
+              Attach YouTube / Google Drive links or upload MP4/WebM video files.
             </p>
           </div>
 
@@ -338,7 +372,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
 
             <label className="cursor-pointer bg-brand-charcoal hover:bg-black text-brand-yellow font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 shrink-0 transition-all">
               <Film className="w-4 h-4" />
-              <span>Upload Video</span>
+              <span>Upload File</span>
               <input
                 type="file"
                 accept="video/mp4,video/webm,video/quicktime"
@@ -347,6 +381,32 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
                 className="hidden"
               />
             </label>
+          </div>
+        </div>
+
+        {/* YOUTUBE / GOOGLE DRIVE LINK ATTACHMENT BOX */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 space-y-2">
+          <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+            <LinkIcon className="w-4 h-4 text-brand-yellow" />
+            <span>Add YouTube or Google Drive Video Link</span>
+          </label>
+          <div className="flex flex-col sm:flex-row items-center gap-2">
+            <input
+              type="url"
+              placeholder="Paste YouTube link (e.g. https://youtu.be/...) or Google Drive preview link..."
+              value={videoLinkInput}
+              onChange={(e) => setVideoLinkInput(e.target.value)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={linkingVideo || !videoLinkInput.trim()}
+              onClick={handleAddVideoLink}
+              className="w-full sm:w-auto px-4 py-2.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-bold text-xs rounded-xl shadow-sm shrink-0 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>{linkingVideo ? 'Attaching...' : 'Add Link'}</span>
+            </button>
           </div>
         </div>
 
@@ -359,6 +419,16 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
                   <span className="flex items-center gap-1.5">
                     <Video className="w-4 h-4 text-brand-yellow" />
                     <span>{vid.type === MediaType.DRONE_VIDEO ? 'Drone Aerial Footage' : 'Walkthrough Video'}</span>
+                    {vid.provider === 'youtube' && (
+                      <span className="text-[10px] bg-red-100 text-red-700 font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Youtube className="w-3 h-3" /> YouTube
+                      </span>
+                    )}
+                    {vid.provider === 'gdrive' && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-1.5 py-0.5 rounded">
+                        Google Drive
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -370,23 +440,43 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
                 </div>
 
                 <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  <video
-                    src={vid.publicUrl || vid.url}
-                    controls
-                    className="w-full h-full object-contain"
-                  />
+                  {vid.embedUrl ? (
+                    <iframe
+                      src={vid.embedUrl}
+                      title={vid.fileName || 'Embedded Video'}
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={vid.publicUrl || vid.url}
+                      controls
+                      className="w-full h-full object-contain"
+                    />
+                  )}
                 </div>
 
                 <div className="text-[11px] font-mono text-gray-500 flex items-center justify-between">
                   <span className="truncate max-w-[200px]">{vid.fileName}</span>
-                  <span>{vid.fileSize ? (vid.fileSize / (1024 * 1024)).toFixed(1) + ' MB' : 'Video'}</span>
+                  {vid.publicUrl && (
+                    <a
+                      href={vid.publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-charcoal hover:underline font-bold text-[10px] flex items-center gap-1"
+                    >
+                      <span>Open Link</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="p-6 bg-white rounded-xl border border-gray-200 text-xs text-gray-500 text-center font-medium">
-            No videos uploaded yet. Upload walkthrough tours or drone aerial footage.
+            No videos added yet. Paste a YouTube / Google Drive link above or upload a video file.
           </div>
         )}
       </div>

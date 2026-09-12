@@ -5,6 +5,126 @@ import { MediaStatus, MediaType } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 
 /**
+ * Helper to parse YouTube and Google Drive video URLs into embed URLs and metadata
+ */
+export function parseVideoLink(url) {
+  if (!url || typeof url !== 'string') return null;
+
+  const cleanUrl = url.trim();
+
+  // YouTube Patterns: watch?v=, youtu.be/, shorts/, embed/
+  const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    const videoId = ytMatch[1];
+    return {
+      provider: 'youtube',
+      videoId,
+      publicUrl: cleanUrl,
+      embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`,
+      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+      title: 'YouTube Video'
+    };
+  }
+
+  // Google Drive Patterns: file/d/{id}/view, open?id={id}
+  const driveMatch = cleanUrl.match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+  if (driveMatch) {
+    const fileId = driveMatch[1] || driveMatch[2];
+    return {
+      provider: 'gdrive',
+      fileId,
+      publicUrl: cleanUrl,
+      embedUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+      thumbnailUrl: null,
+      title: 'Google Drive Video'
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Add external YouTube or Google Drive video link to property media
+ */
+export async function addPropertyVideoLink(
+  propertyId,
+  ownerId,
+  url,
+  {
+    mediaType = MediaType.WALKTHROUGH_VIDEO,
+    caption = ''
+  } = {}
+) {
+  try {
+    if (!propertyId || !url) {
+      return { success: false, error: 'Property ID and video link URL are required.' };
+    }
+
+    const parsed = parseVideoLink(url);
+    if (!parsed) {
+      return { success: false, error: 'Invalid link. Please enter a valid YouTube or Google Drive URL.' };
+    }
+
+    const propRef = doc(db, 'properties', propertyId);
+    let masterMedia = [];
+
+    const snap = await getDoc(propRef);
+    if (snap.exists()) {
+      masterMedia = sanitizeMediaArray(snap.data().media);
+    }
+
+    const mediaId = `med-link-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const newMediaObj = {
+      mediaId,
+      propertyId,
+      ownerId: ownerId || auth.currentUser?.uid || 'anonymous-owner',
+      type: mediaType,
+      provider: parsed.provider,
+      storagePath: `external_link:${parsed.provider}:${parsed.videoId || parsed.fileId}`,
+      publicUrl: parsed.publicUrl,
+      embedUrl: parsed.embedUrl,
+      thumbnailUrl: parsed.thumbnailUrl,
+      fileName: `${parsed.title} (${parsed.provider === 'youtube' ? 'YouTube' : 'Google Drive'})`,
+      contentType: 'video/external-link',
+      fileSize: 0,
+      displayOrder: masterMedia.length + 1,
+      isPrimary: false,
+      caption: caption || '',
+      verificationStatus: MediaStatus.PENDING_REVIEW,
+      uploadedAt: new Date().toISOString()
+    };
+
+    masterMedia.push(newMediaObj);
+    masterMedia = sanitizeMediaArray(masterMedia);
+
+    const publicApprovedMedia = masterMedia.filter(
+      item => item && item.verificationStatus === MediaStatus.APPROVED
+    );
+
+    const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
+    try {
+      await setDoc(mediaPrivateRef, {
+        propertyId,
+        ownerId: ownerId || 'anonymous-owner',
+        masterMedia,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {}
+
+    await updateDoc(propRef, {
+      media: masterMedia,
+      publicApprovedMedia,
+      updatedAt: serverTimestamp()
+    });
+
+    return { success: true, mediaItem: newMediaObj };
+  } catch (error) {
+    return { success: false, error: formatFirestoreError(error) };
+  }
+}
+
+/**
  * Sanitizes media array items to ensure no bloated base64 Data URLs are stored in Firestore
  */
 export function sanitizeMediaArray(mediaArray) {

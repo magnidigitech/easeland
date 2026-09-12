@@ -477,11 +477,21 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           <div className="relative w-full h-[360px] sm:h-[480px] bg-brand-charcoal rounded-xl overflow-hidden flex items-center justify-center">
             {activeMedia ? (
               activeMedia.mediaType === 'WALKTHROUGH_VIDEO' || activeMedia.mediaType === 'DRONE_VIDEO' ? (
-                <video
-                  src={activeMedia.url}
-                  controls
-                  className="w-full h-full object-contain"
-                />
+                activeMedia.embedUrl ? (
+                  <iframe
+                    src={activeMedia.embedUrl}
+                    title={activeMedia.caption || property.title}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={activeMedia.url || activeMedia.publicUrl}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                )
               ) : (
                 <img
                   src={activeMedia.url}
