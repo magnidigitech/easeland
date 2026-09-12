@@ -88,50 +88,26 @@ export async function uploadConfidentialPropertyDocument({
     });
 
     let docUrl = '';
-    try {
-      // Try Cloud Storage upload with a 3s fast fallback timeout
-      const uploadTask = uploadBytesResumable(storageRef, file, metadata);
-      await new Promise((resolve, reject) => {
-        let settled = false;
-        const timeoutId = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            try { uploadTask.cancel(); } catch (e) {}
-            reject(new Error('STORAGE_UNAVAILABLE'));
+    const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+    await new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          if (onProgress && snapshot.totalBytes > 0) {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            onProgress(Math.min(99, Math.round(progress)));
           }
-        }, 3000);
-
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            if (onProgress && snapshot.totalBytes > 0) {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              onProgress(Math.round(progress));
-            }
-          },
-          (error) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeoutId);
-              reject(error);
-            }
-          },
-          () => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeoutId);
-              resolve();
-            }
-          }
-        );
-      });
-      docUrl = storagePath;
-    } catch (storageErr) {
-      // Fallback: Convert file to Base64 Data URL so confidential document upload succeeds on Spark plan
-      if (onProgress) onProgress(50);
-      docUrl = await fileToBase64(file);
-      if (onProgress) onProgress(100);
-    }
+        },
+        (error) => {
+          reject(error);
+        },
+        () => {
+          if (onProgress) onProgress(100);
+          resolve();
+        }
+      );
+    });
+    docUrl = storagePath;
 
     const docPayload = {
       docId,

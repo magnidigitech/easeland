@@ -5,6 +5,66 @@ import { MediaStatus, MediaType } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 
 /**
+ * Client-side image compression helper (downscales & compresses images to ~200KB-800KB)
+ */
+export async function compressImageFile(file, maxWidth = 1920, maxHeight = 1080, quality = 0.82) {
+  if (!file || !file.type.startsWith('image/')) {
+    return file;
+  }
+  // Skip compression for small files (< 400KB)
+  if (file.size < 400 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width / height > maxWidth / maxHeight) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
+/**
  * File validation helper for property media uploads
  */
 export function validateMediaFile(file, mediaType = MediaType.PHOTO) {
@@ -42,7 +102,7 @@ export function validateMediaFile(file, mediaType = MediaType.PHOTO) {
 }
 
 /**
- * Upload property media file (Storage upload + Firestore persistence with fallback protection)
+ * Upload property media file to Firebase Storage & update Firestore property record
  */
 export async function uploadPropertyMediaFile(
   propertyId,
@@ -74,28 +134,27 @@ export async function uploadPropertyMediaFile(
       masterMedia = Array.isArray(data.media) ? data.media : [];
     }
 
-    // Check private media document if accessible
-    const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
-    try {
-      const pSnap = await getDoc(mediaPrivateRef);
-      if (pSnap.exists() && Array.isArray(pSnap.data().masterMedia)) {
-        masterMedia = pSnap.data().masterMedia;
-      }
-    } catch (e) {
-      // Ignore private doc permission checks
-    }
-
     if (masterMedia.length >= 30) {
       return { success: false, error: 'Maximum 30 media items allowed per property.' };
     }
 
+    // Compress photo on client side for fast upload performance
+    let uploadFile = file;
+    if (mediaType === MediaType.PHOTO) {
+      try {
+        uploadFile = await compressImageFile(file);
+      } catch (compErr) {
+        uploadFile = file;
+      }
+    }
+
     const mediaId = `med-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const sanitizedFileName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `public_media/properties/${propertyId}/${mediaId}_${sanitizedFileName}`;
     const storageRef = ref(storage, storagePath);
 
     const metadata = {
-      contentType: file.type,
+      contentType: uploadFile.type,
       customMetadata: {
         ownerId: ownerId || 'anonymous-owner',
         propertyId,
@@ -104,63 +163,33 @@ export async function uploadPropertyMediaFile(
       }
     };
 
-    // Helper to convert file to Data URL fallback
-    const fileToBase64 = (f) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(f);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (err) => reject(err);
-    });
-
+    // Upload file to Firebase Storage with full progress monitoring
     let downloadUrl = '';
-    try {
-      // Upload to Firebase Storage with fast 3s fallback timeout
-      const uploadTask = uploadBytesResumable(storageRef, file, metadata);
-      downloadUrl = await new Promise((resolve, reject) => {
-        let settled = false;
-        const timeoutId = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            try { uploadTask.cancel(); } catch (e) {}
-            reject(new Error('STORAGE_UNAVAILABLE'));
-          }
-        }, 3000);
+    const uploadTask = uploadBytesResumable(storageRef, uploadFile, metadata);
 
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            if (onProgress && snapshot.totalBytes > 0) {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              onProgress(Math.round(progress));
-            }
-          },
-          (error) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeoutId);
-              reject(error);
-            }
-          },
-          async () => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeoutId);
-              try {
-                const url = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(url);
-              } catch (err) {
-                reject(err);
-              }
-            }
+    downloadUrl = await new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          if (onProgress && snapshot.totalBytes > 0) {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            onProgress(Math.min(99, Math.round(progress)));
           }
-        );
-      });
-    } catch (storageErr) {
-      // Fallback: Convert file to Base64 Data URL so photo/video upload NEVER fails
-      if (onProgress) onProgress(50);
-      downloadUrl = await fileToBase64(file);
-      if (onProgress) onProgress(100);
-    }
+        },
+        (error) => {
+          reject(error);
+        },
+        async () => {
+          try {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            if (onProgress) onProgress(100);
+            resolve(url);
+          } catch (err) {
+            reject(err);
+          }
+        }
+      );
+    });
 
     // Enforce single primary cover image in masterMedia
     let updatedMasterMedia = masterMedia.map(item => {
@@ -178,8 +207,8 @@ export async function uploadPropertyMediaFile(
       storagePath,
       publicUrl: downloadUrl,
       fileName: file.name,
-      contentType: file.type,
-      fileSize: file.size,
+      contentType: uploadFile.type,
+      fileSize: uploadFile.size,
       displayOrder: updatedMasterMedia.length + 1,
       isPrimary: mediaType === MediaType.PHOTO ? isPrimary : false,
       caption: caption || '',
@@ -194,6 +223,7 @@ export async function uploadPropertyMediaFile(
     );
 
     // Update propertyMediaPrivate safely
+    const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
     try {
       await setDoc(mediaPrivateRef, {
         propertyId,
@@ -249,7 +279,7 @@ export async function removePropertyMediaFile(propertyId, ownerId, mediaId) {
       return { success: false, error: 'Media item not found.' };
     }
 
-    // Try deleting file object from Storage if applicable
+    // Delete file object from Storage if applicable
     if (targetItem.storagePath && !targetItem.storagePath.startsWith('data:')) {
       try {
         const fileRef = ref(storage, targetItem.storagePath);
