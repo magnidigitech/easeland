@@ -279,19 +279,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Listen on configured PORT (default 3000)
+// Listen on configured PORT (3000)
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Easeland Coolify Node Server listening on port ${PORT}`);
+  console.log(`Easeland Coolify Node Server running smoothly on port ${PORT}`);
 });
-
-// Also listen on Port 80 if main PORT is 3000 to catch Traefik port 80 routing
-if (Number(PORT) !== 80) {
-  try {
-    const server80 = app.listen(80, '0.0.0.0', () => {
-      console.log('Easeland Coolify Node Server also listening on port 80');
-    });
-    server80.on('error', () => {
-      // Ignore if port 80 is already bound
-    });
-  } catch (e) {}
-}

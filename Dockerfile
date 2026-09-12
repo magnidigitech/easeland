@@ -41,6 +41,6 @@ COPY server.js ./
 # Create uploads volume directory
 RUN mkdir -p uploads/properties uploads/documents
 
-EXPOSE 3000 80
+EXPOSE 3000
 ENV PORT=3000
 CMD ["node", "server.js"]
