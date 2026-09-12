@@ -24,6 +24,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   const [savingDraft, setSavingDraft] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form State (Clean initialized state with 0 defaults)
   const [formData, setFormData] = useState({
@@ -132,36 +133,45 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   // Step Validations
   const validateCurrentStep = () => {
     setErrorMsg(null);
+    setFieldErrors({});
+
+    const errors = {};
+
     if (step === 1) {
-      if (!formData.propertyType || !formData.purpose) {
-        setErrorMsg('Please select both Property Type and Purpose.');
-        return false;
+      if (!formData.purpose) {
+        errors.purpose = 'Please select a transaction purpose (Sale, Rent, or Lease).';
+      }
+      if (!formData.propertyType) {
+        errors.propertyType = 'Please select a property type (e.g. Open Plot, House, Villa).';
       }
     } else if (step === 2) {
-      if (!formData.title || formData.title.trim().length < 3) {
-        setErrorMsg('Please enter a descriptive property title (min 3 characters).');
-        return false;
+      if (!formData.title || formData.title.trim().length < 2) {
+        errors.title = 'Property Title is required (minimum 2 characters).';
       }
       const priceNum = Number(formData.price);
-      if (!priceNum || priceNum <= 0) {
-        setErrorMsg('Please enter a valid positive price amount.');
-        return false;
+      if (!formData.price || isNaN(priceNum) || priceNum <= 0) {
+        errors.price = 'Please enter a valid positive price amount.';
       }
       const areaNum = Number(formData.area);
-      if (!areaNum || areaNum <= 0) {
-        setErrorMsg('Please enter a valid positive total area.');
-        return false;
+      if (!formData.area || isNaN(areaNum) || areaNum <= 0) {
+        errors.area = 'Please enter a valid total area in sq ft.';
       }
-      if (!formData.description || formData.description.trim().length < 10) {
-        setErrorMsg('Please provide a property description (min 10 characters).');
-        return false;
+      if (!formData.description || formData.description.trim().length < 3) {
+        errors.description = 'Property Description is required (minimum 3 characters).';
       }
     } else if (step === 3) {
       if (!formData.location || !formData.location.confirmed || !formData.location.geoPoint) {
-        setErrorMsg('Please explicitly confirm the property location before proceeding.');
-        return false;
+        errors.location = 'Please click "Confirm Location & Continue" on the map before proceeding.';
       }
     }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstError = Object.values(errors)[0];
+      setErrorMsg(firstError);
+      return false;
+    }
+
     return true;
   };
 
@@ -449,71 +459,125 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             </h3>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Property Title
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Property Title *
+                </label>
+                <span className={`text-[11px] font-bold ${(formData.title || '').trim().length >= 2 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {(formData.title || '').trim().length} / 2 min chars
+                </span>
+              </div>
               <input
                 type="text"
                 required
-                placeholder="e.g. Premium 200 Sq Yds East Facing Residential Plot"
+                placeholder="e.g. MD Plot or Premium 200 Sq Yds Plot"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value });
+                  if (fieldErrors.title) setFieldErrors(prev => ({ ...prev, title: null }));
+                  if (errorMsg) setErrorMsg(null);
+                }}
+                className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                  fieldErrors.title ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                }`}
               />
+              {fieldErrors.title && (
+                <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                  ⚠️ {fieldErrors.title}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Expected Price (INR)
+                  Expected Price (INR) *
                 </label>
                 <input
                   type="number"
                   required
-                  placeholder="e.g. 4500000"
+                  placeholder="e.g. 1000000"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
+                  onChange={(e) => {
+                    setFormData({ ...formData, price: e.target.value });
+                    if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
+                    if (errorMsg) setErrorMsg(null);
+                  }}
+                  className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                    fieldErrors.price ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                  }`}
                 />
-                {formData.price && (
+                {formData.price && !fieldErrors.price && (
                   <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
                     Display: {getPriceDisplay()}
                   </span>
+                )}
+                {fieldErrors.price && (
+                  <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                    ⚠️ {fieldErrors.price}
+                  </p>
                 )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Total Area
+                  Total Area *
                 </label>
                 <input
                   type="number"
                   required
-                  placeholder="e.g. 1800"
+                  placeholder="e.g. 500"
                   value={formData.area}
-                  onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
+                  onChange={(e) => {
+                    setFormData({ ...formData, area: e.target.value });
+                    if (fieldErrors.area) setFieldErrors(prev => ({ ...prev, area: null }));
+                    if (errorMsg) setErrorMsg(null);
+                  }}
+                  className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                    fieldErrors.area ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                  }`}
                 />
-                {formData.area && (
+                {formData.area && !fieldErrors.area && (
                   <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
                     Display: {getAreaDisplay()}
                   </span>
+                )}
+                {fieldErrors.area && (
+                  <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                    ⚠️ {fieldErrors.area}
+                  </p>
                 )}
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Property Description
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Property Description *
+                </label>
+                <span className={`text-[11px] font-bold ${(formData.description || '').trim().length >= 3 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {(formData.description || '').trim().length} / 3 min chars
+                </span>
+              </div>
               <textarea
                 rows={4}
                 required
                 placeholder="Describe key features, surroundings, approach road, and highlights..."
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:bg-white focus:outline-none"
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value });
+                  if (fieldErrors.description) setFieldErrors(prev => ({ ...prev, description: null }));
+                  if (errorMsg) setErrorMsg(null);
+                }}
+                className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                  fieldErrors.description ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                }`}
               />
+              {fieldErrors.description && (
+                <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                  ⚠️ {fieldErrors.description}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -595,38 +659,47 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
         {/* WIZARD BOTTOM ACTIONS */}
         {step < 8 && (
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handlePrevStep}
-              disabled={step === 1}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors ${
-                step === 1 ? 'opacity-40 cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Previous Step</span>
-            </button>
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            {errorMsg && (
+              <div className="p-3.5 bg-red-50 border-2 border-red-400 text-red-700 text-xs font-extrabold rounded-xl flex items-center gap-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>Validation Error: {errorMsg}</span>
+              </div>
+            )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => handleSaveDraft(step)}
-                disabled={savingDraft}
-                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
+                onClick={handlePrevStep}
+                disabled={step === 1}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors ${
+                  step === 1 ? 'opacity-40 cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-100'
+                }`}
               >
-                <Save className="w-4 h-4 text-brand-charcoal" />
-                <span>{savingDraft ? 'Saving...' : 'Save Draft'}</span>
+                <ChevronLeft className="w-4 h-4" />
+                <span>Previous Step</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleNextStep}
-                className="px-6 py-2.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all"
-              >
-                <span>{step === 7 ? 'Proceed to Review' : 'Next Step'}</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleSaveDraft(step)}
+                  disabled={savingDraft}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
+                >
+                  <Save className="w-4 h-4 text-brand-charcoal" />
+                  <span>{savingDraft ? 'Saving...' : 'Save Draft'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="px-6 py-2.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all"
+                >
+                  <span>{step === 7 ? 'Proceed to Review' : 'Next Step'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         )}
