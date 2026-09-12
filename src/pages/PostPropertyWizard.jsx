@@ -165,6 +165,39 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     return true;
   };
 
+  const handleRefreshMedia = async () => {
+    if (!propertyId) return;
+    try {
+      const { getPropertyById } = await import('../firebase/propertyService.js');
+      const pRes = await getPropertyById(propertyId);
+      if (pRes.success && pRes.property) {
+        const prop = pRes.property;
+        setFormData(prev => ({
+          ...prev,
+          media: prop.media || prev.media || [],
+          photos: prop.photos || prop.media || prev.photos || [],
+          videoUrl: prop.videoUrl || prop.videoLink || prev.videoUrl || null,
+          videoLink: prop.videoLink || prop.videoUrl || prev.videoLink || null,
+          embeddedVideoUrl: prop.embeddedVideoUrl || prev.embeddedVideoUrl || null
+        }));
+      }
+    } catch (e) {}
+  };
+
+  const handleRefreshDocuments = async () => {
+    if (!propertyId || !user?.uid) return;
+    try {
+      const { getPropertyDocuments } = await import('../firebase/documentService.js');
+      const dRes = await getPropertyDocuments(propertyId, user.uid);
+      if (dRes.success && Array.isArray(dRes.documents)) {
+        setFormData(prev => ({
+          ...prev,
+          documents: dRes.documents
+        }));
+      }
+    } catch (e) {}
+  };
+
   // Auto-Save / Save Draft
   const handleSaveDraft = async (targetStep = step) => {
     if (!user?.uid) return;
@@ -176,6 +209,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       const areaNum = Number(formData.area) || 0;
 
       const draftData = {
+        ...formData,
         title: formData.title,
         propertyType: formData.propertyType,
         purpose: formData.purpose,
@@ -186,7 +220,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         description: formData.description,
         specs: formData.specs || {},
         amenities: formData.amenities || [],
-        location: formData.location || null
+        location: formData.location || null,
+        media: formData.media || [],
+        photos: formData.photos || [],
+        videoUrl: formData.videoUrl || formData.videoLink || null,
+        videoLink: formData.videoLink || formData.videoUrl || null,
+        embeddedVideoUrl: formData.embeddedVideoUrl || null,
+        documents: formData.documents || []
       };
 
       let pId = propertyId;

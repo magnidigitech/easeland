@@ -2253,32 +2253,155 @@ export default function AdminPortal() {
 
                       {/* SUBMITTED MEDIA PHOTO GALLERY */}
                       {(() => {
-                        const rawMedia = activeAuditProp.media || activeAuditProp.photos || activeAuditProp.images || activeAuditProp.publicApprovedMedia || [];
-                        if (!rawMedia || rawMedia.length === 0) return null;
+                        const isPhotoItem = (m) => {
+                          if (!m) return false;
+                          if (typeof m === 'string') {
+                            const clean = m.toLowerCase().trim();
+                            if (!clean) return false;
+                            if (clean.includes('youtube.com') || clean.includes('youtu.be') || clean.includes('drive.google.com')) return false;
+                            if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.avi') || clean.endsWith('.pdf') || clean.endsWith('.doc') || clean.endsWith('.docx')) return false;
+                            return true;
+                          }
+                          if (m.type === 'WALKTHROUGH_VIDEO' || m.type === 'DRONE_VIDEO' || m.type === 'VIDEO' || m.type === 'DOCUMENT') return false;
+                          if (m.contentType && (m.contentType.startsWith('video/') || m.contentType.startsWith('application/'))) return false;
+                          if (m.provider || m.videoId || m.fileId || m.embedUrl) return false;
+                          const url = (m.url || m.mediaUrl || m.publicUrl || '').toLowerCase();
+                          if (!url) return false;
+                          if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('drive.google.com') || url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.endsWith('.pdf')) return false;
+                          return true;
+                        };
+
+                        const rawMediaCandidates = [
+                          ...(Array.isArray(activeAuditProp.photos) ? activeAuditProp.photos : []),
+                          ...(Array.isArray(activeAuditProp.media) ? activeAuditProp.media : []),
+                          ...(Array.isArray(activeAuditProp.images) ? activeAuditProp.images : []),
+                          ...(Array.isArray(activeAuditProp.publicApprovedMedia) ? activeAuditProp.publicApprovedMedia : [])
+                        ];
+
+                        const photoList = [];
+                        const seenUrls = new Set();
+
+                        rawMediaCandidates.forEach(m => {
+                          if (isPhotoItem(m)) {
+                            const imgUrl = typeof m === 'string' ? m : (m.url || m.mediaUrl || m.publicUrl);
+                            if (imgUrl && !seenUrls.has(imgUrl)) {
+                              seenUrls.add(imgUrl);
+                              photoList.push(imgUrl);
+                            }
+                          }
+                        });
+
+                        if (photoList.length === 0) return null;
+
                         return (
                           <div className="space-y-3 pt-4 border-t border-slate-200">
                             <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
                               <ImageIcon className="w-4 h-4 text-blue-600" />
-                              <span>Submitted Property Photos ({rawMedia.length})</span>
+                              <span>Submitted Property Photos ({photoList.length})</span>
                             </h4>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                              {rawMedia.map((m, idx) => {
-                                const imgUrl = typeof m === 'string' ? m : (m.url || m.mediaUrl || m.publicUrl);
-                                if (!imgUrl) return null;
+                              {photoList.map((imgUrl, idx) => (
+                                <div
+                                  key={idx}
+                                  onClick={() => setEnlargedMediaUrl(imgUrl)}
+                                  className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                                >
+                                  <img
+                                    src={imgUrl}
+                                    alt={`Submitted photo ${idx + 1}`}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                                    <Eye className="w-4 h-4" />
+                                    <span>Enlarge</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* SUBMITTED VIDEO PRESENTATION (EMBEDDED YOUTUBE/GOOGLE DRIVE OR DIRECT UPLOAD) */}
+                      {(() => {
+                        const videoCandidates = [];
+                        const vUrl = activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl;
+                        if (vUrl) videoCandidates.push(vUrl);
+
+                        const allMedia = Array.isArray(activeAuditProp.media) ? activeAuditProp.media : [];
+                        allMedia.forEach(m => {
+                          if (m) {
+                            if (typeof m === 'string') {
+                              const clean = m.toLowerCase();
+                              if (clean.includes('youtube.com') || clean.includes('youtu.be') || clean.includes('drive.google.com') || clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov')) {
+                                videoCandidates.push(m);
+                              }
+                            } else if (m.type === 'WALKTHROUGH_VIDEO' || m.type === 'DRONE_VIDEO' || m.type === 'VIDEO' || m.provider || (m.contentType && m.contentType.startsWith('video/'))) {
+                              const u = m.publicUrl || m.url || m.embedUrl || m.mediaUrl;
+                              if (u) videoCandidates.push(u);
+                            }
+                          }
+                        });
+
+                        const uniqueVideos = Array.from(new Set(videoCandidates.filter(Boolean)));
+                        if (uniqueVideos.length === 0) return null;
+
+                        return (
+                          <div className="space-y-4 pt-4 border-t border-slate-200">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                              <Eye className="w-4 h-4 text-amber-600" />
+                              <span>Submitted Video Presentation ({uniqueVideos.length})</span>
+                            </h4>
+                            <div className="space-y-4">
+                              {uniqueVideos.map((vItem, vIdx) => {
+                                const isYoutube = vItem.includes('youtube.com') || vItem.includes('youtu.be');
+                                const isDrive = vItem.includes('drive.google.com');
+
+                                let embedSrc = vItem;
+                                if (isYoutube) {
+                                  if (vItem.includes('watch?v=')) {
+                                    embedSrc = vItem.replace('watch?v=', 'embed/').split('&')[0];
+                                  } else if (vItem.includes('youtu.be/')) {
+                                    const id = vItem.split('youtu.be/')[1]?.split('?')[0];
+                                    embedSrc = `https://www.youtube.com/embed/${id}`;
+                                  }
+                                } else if (isDrive) {
+                                  if (vItem.includes('/view')) {
+                                    embedSrc = vItem.replace('/view', '/preview');
+                                  } else if (!vItem.includes('/preview')) {
+                                    const match = vItem.match(/d\/([a-zA-Z0-9_-]+)/);
+                                    if (match && match[1]) embedSrc = `https://drive.google.com/file/d/${match[1]}/preview`;
+                                  }
+                                }
+
                                 return (
-                                  <div
-                                    key={idx}
-                                    onClick={() => setEnlargedMediaUrl(imgUrl)}
-                                    className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                                  >
-                                    <img
-                                      src={imgUrl}
-                                      alt={`Submitted photo ${idx + 1}`}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                                      <Eye className="w-4 h-4" />
-                                      <span>Enlarge</span>
+                                  <div key={vIdx} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-md max-w-3xl mx-auto p-2">
+                                    {isYoutube || isDrive ? (
+                                      <iframe
+                                        src={embedSrc}
+                                        className="w-full aspect-video rounded-xl border-0"
+                                        allowFullScreen
+                                        title={`Property Video ${vIdx + 1}`}
+                                      />
+                                    ) : (
+                                      <video
+                                        src={vItem}
+                                        controls
+                                        className="w-full aspect-video rounded-xl max-h-96"
+                                      />
+                                    )}
+                                    <div className="p-2 flex items-center justify-between text-xs text-slate-300 border-t border-slate-800 mt-2">
+                                      <span className="font-bold flex items-center gap-1.5 text-amber-400">
+                                        🎬 {isYoutube ? 'YouTube Video' : isDrive ? 'Google Drive Video' : 'Direct Upload Video'}
+                                      </span>
+                                      <a
+                                        href={vItem}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-amber-400 hover:text-amber-300 font-extrabold underline flex items-center gap-1"
+                                      >
+                                        <span>Open External Link ↗</span>
+                                      </a>
                                     </div>
                                   </div>
                                 );
@@ -2288,76 +2411,63 @@ export default function AdminPortal() {
                         );
                       })()}
 
-                      {/* SUBMITTED VIDEO (EMBEDDED YOUTUBE/GOOGLE DRIVE OR DIRECT UPLOAD) */}
-                      {(activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl) && (
-                        <div className="space-y-3 pt-4 border-t border-slate-200">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                            <Eye className="w-4 h-4 text-amber-600" />
-                            <span>Submitted Video Presentation</span>
-                          </h4>
-                          <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-md max-w-3xl mx-auto">
-                            {(activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtube.com') ||
-                             (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtu.be') ||
-                             (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('drive.google.com') ? (
-                              <iframe
-                                src={
-                                  (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtube.com/watch?v=')
-                                    ? (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).replace('watch?v=', 'embed/')
-                                    : (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).includes('youtu.be/')
-                                    ? `https://www.youtube.com/embed/${(activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl).split('youtu.be/')[1]}`
-                                    : (activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl)
-                                }
-                                className="w-full aspect-video rounded-2xl"
-                                allowFullScreen
-                                title="Property Video"
-                              />
-                            ) : (
-                              <video
-                                src={activeAuditProp.videoUrl || activeAuditProp.videoLink || activeAuditProp.embeddedVideoUrl}
-                                controls
-                                className="w-full aspect-video rounded-2xl max-h-96"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       {/* UPLOADED VERIFICATION DOCUMENTS */}
-                      <div className="space-y-3 pt-4 border-t border-slate-200">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-indigo-600" />
-                          <span>Uploaded Verification Documents</span>
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {(activeAuditProp.documents || []).length === 0 ? (
-                            <div className="col-span-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 italic font-semibold">
-                              No physical documents attached. Property subject to basic title and field verification.
-                            </div>
-                          ) : (
-                            (activeAuditProp.documents || []).map((docItem, idx) => (
-                              <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-slate-900">
-                                <div className="flex items-center gap-2.5">
-                                  <FileText className="w-5 h-5 text-blue-600 shrink-0" />
-                                  <div>
-                                    <span className="font-extrabold text-blue-950 block">{docItem.name || `Document ${idx + 1}`}</span>
-                                    <span className="text-[10px] text-blue-700 font-bold">{docItem.type || 'Legal Deed'}</span>
-                                  </div>
+                      {(() => {
+                        const docsList = [
+                          ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
+                          ...(Array.isArray(activeAuditProp.propertyDocuments) ? activeAuditProp.propertyDocuments : []),
+                          ...(Array.isArray(activeAuditProp.confidentialDocuments) ? activeAuditProp.confidentialDocuments : [])
+                        ];
+
+                        const uniqueDocs = [];
+                        const seenDocs = new Set();
+                        docsList.forEach(d => {
+                          if (!d) return;
+                          const key = d.docId || d.url || d.name || JSON.stringify(d);
+                          if (!seenDocs.has(key)) {
+                            seenDocs.add(key);
+                            uniqueDocs.push(d);
+                          }
+                        });
+
+                        return (
+                          <div className="space-y-3 pt-4 border-t border-slate-200">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-indigo-600" />
+                              <span>Uploaded Verification Documents ({uniqueDocs.length})</span>
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {uniqueDocs.length === 0 ? (
+                                <div className="col-span-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 italic font-semibold">
+                                  No physical documents attached. Property subject to basic title and field verification.
                                 </div>
-                                {docItem.url && (
-                                  <a
-                                    href={docItem.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm"
-                                  >
-                                    View / Download
-                                  </a>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                              ) : (
+                                uniqueDocs.map((docItem, idx) => (
+                                  <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-slate-900">
+                                    <div className="flex items-center gap-2.5">
+                                      <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                                      <div>
+                                        <span className="font-extrabold text-blue-950 block">{docItem.name || docItem.documentName || `Document ${idx + 1}`}</span>
+                                        <span className="text-[10px] text-blue-700 font-bold">{docItem.type || docItem.documentType || 'Legal Deed'}</span>
+                                      </div>
+                                    </div>
+                                    {(docItem.url || docItem.publicUrl) && (
+                                      <a
+                                        href={docItem.url || docItem.publicUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0"
+                                      >
+                                        View / Download
+                                      </a>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* AUDITOR NOTES & FEEDBACK TEXTAREA */}
                       <div className="space-y-3 pt-4 border-t border-slate-200">

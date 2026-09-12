@@ -112,11 +112,35 @@ export async function addPropertyVideoLink(
       }, { merge: true });
     } catch (e) {}
 
+    const vUrl = parsed.publicUrl || parsed.embedUrl || parsed.url;
     await updateDoc(propRef, {
       media: masterMedia,
+      videoUrl: vUrl,
+      videoLink: vUrl,
+      embeddedVideoUrl: parsed.embedUrl || vUrl,
       publicApprovedMedia,
       updatedAt: serverTimestamp()
     });
+
+    // Also sync to PostgreSQL & mockApi
+    try {
+      const { syncPropertyToPostgres } = await import('./propertyService.js');
+      const snapData = (await getDoc(propRef)).data();
+      if (snapData) {
+        syncPropertyToPostgres({ ...snapData, videoUrl: vUrl, videoLink: vUrl, embeddedVideoUrl: parsed.embedUrl || vUrl, media: masterMedia });
+      }
+    } catch (e) {}
+
+    try {
+      const { mockApi } = await import('../services/mockApi.js');
+      const pObj = mockApi.getPropertyById(propertyId);
+      if (pObj) {
+        pObj.videoUrl = vUrl;
+        pObj.videoLink = vUrl;
+        pObj.embeddedVideoUrl = parsed.embedUrl || vUrl;
+        pObj.media = masterMedia;
+      }
+    } catch (e) {}
 
     return { success: true, mediaItem: newMediaObj };
   } catch (error) {
@@ -130,25 +154,20 @@ export async function addPropertyVideoLink(
 export function sanitizeMediaArray(mediaArray) {
   if (!Array.isArray(mediaArray)) return [];
   return mediaArray.map(item => {
-    if (!item || typeof item !== 'object') return null;
-
-    let publicUrl = item.publicUrl || item.url || '';
-    if (typeof publicUrl === 'string' && publicUrl.startsWith('data:')) {
-      publicUrl = '';
+    if (!item) return null;
+    if (typeof item === 'string') {
+      return item.trim().length > 0 ? item : null;
     }
+    let publicUrl = item.publicUrl || item.url || item.mediaUrl || item.embedUrl || '';
     let storagePath = item.storagePath || '';
-    if (typeof storagePath === 'string' && storagePath.startsWith('data:')) {
-      storagePath = '';
-    }
-
-    // Skip items that have neither a valid storage path nor a valid public HTTP URL
     if (!publicUrl && !storagePath) {
       return null;
     }
-
     return {
       ...item,
-      publicUrl,
+      publicUrl: publicUrl || '',
+      url: publicUrl || '',
+      mediaUrl: publicUrl || '',
       storagePath
     };
   }).filter(Boolean);
@@ -390,12 +409,28 @@ export async function uploadPropertyMediaFile(
       // Ignore private doc permission errors
     }
 
-    // Always update main property document with media array
-    await updateDoc(propRef, {
+    const updatePayload = {
       media: updatedMasterMedia,
       publicApprovedMedia,
       updatedAt: serverTimestamp()
-    });
+    };
+
+    if (mediaType === MediaType.WALKTHROUGH_VIDEO || mediaType === MediaType.DRONE_VIDEO) {
+      updatePayload.videoUrl = downloadUrl;
+      updatePayload.videoLink = downloadUrl;
+      updatePayload.embeddedVideoUrl = downloadUrl;
+    }
+
+    await updateDoc(propRef, updatePayload);
+
+    // Sync to PostgreSQL & mockApi
+    try {
+      const { syncPropertyToPostgres } = await import('./propertyService.js');
+      const snapData = (await getDoc(propRef)).data();
+      if (snapData) {
+        syncPropertyToPostgres({ ...snapData, media: updatedMasterMedia });
+      }
+    } catch (e) {}
 
     return { success: true, mediaItem: newMediaObj };
   } catch (error) {

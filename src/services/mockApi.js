@@ -93,13 +93,33 @@ export const deduplicateProperties = (items) => {
 let rawProperties = getStoredData('easeland_properties', INITIAL_PROPERTIES);
 let properties = deduplicateProperties(rawProperties).map(p => {
   if (!p) return p;
-  const validPhotos = (p.photos || []).filter(url => url && typeof url === 'string' && url.trim().length > 0);
+  const isPhotoUrl = (m) => {
+    if (!m) return false;
+    if (typeof m === 'string') {
+      const u = m.toLowerCase().trim();
+      if (!u) return false;
+      if (u.includes('youtube.com') || u.includes('youtu.be') || u.includes('drive.google.com')) return false;
+      if (u.endsWith('.mp4') || u.endsWith('.webm') || u.endsWith('.mov') || u.endsWith('.avi') || u.endsWith('.pdf') || u.endsWith('.doc') || u.endsWith('.docx')) return false;
+      return true;
+    }
+    if (m.type === 'WALKTHROUGH_VIDEO' || m.type === 'DRONE_VIDEO' || m.type === 'VIDEO' || m.type === 'DOCUMENT') return false;
+    if (m.contentType && (m.contentType.startsWith('video/') || m.contentType.startsWith('application/'))) return false;
+    if (m.provider || m.videoId || m.fileId || m.embedUrl) return false;
+    const u = (m.url || m.mediaUrl || m.publicUrl || '').toLowerCase();
+    if (!u) return false;
+    if (u.includes('youtube.com') || u.includes('youtu.be') || u.includes('drive.google.com') || u.endsWith('.mp4') || u.endsWith('.webm') || u.endsWith('.mov') || u.endsWith('.pdf')) return false;
+    return true;
+  };
+  const extractUrl = (m) => {
+    if (!isPhotoUrl(m)) return null;
+    return typeof m === 'string' ? m : (m?.url || m?.mediaUrl || m?.publicUrl || null);
+  };
+  const mediaPhotos = (Array.isArray(p.media) ? p.media : []).map(extractUrl).filter(Boolean);
+  const photosArray = (Array.isArray(p.photos) ? p.photos : []).map(extractUrl).filter(Boolean);
+  const combinedPhotos = Array.from(new Set([...photosArray, ...mediaPhotos]));
   return {
     ...p,
-    photos: validPhotos.length > 0 ? validPhotos : [
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
-    ]
+    photos: combinedPhotos
   };
 });
 setStoredData('easeland_properties', properties);

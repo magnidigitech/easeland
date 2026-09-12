@@ -132,6 +132,40 @@ export async function uploadConfidentialPropertyDocument({
     };
 
     await setDoc(docRef, docPayload);
+
+    // Sync documents array to properties document & PostgreSQL
+    try {
+      const docItemObj = {
+        docId,
+        name: documentName || file.name || 'Confidential Property Document',
+        type: documentType,
+        url: publicUrl,
+        size: file.size
+      };
+
+      const propRef = doc(db, 'properties', propertyId);
+      const propSnap = await getDoc(propRef);
+      if (propSnap.exists()) {
+        const existingDocs = Array.isArray(propSnap.data().documents) ? propSnap.data().documents : [];
+        const updatedDocs = [...existingDocs.filter(d => d.docId !== docId), docItemObj];
+
+        await updateDoc(propRef, {
+          documents: updatedDocs,
+          updatedAt: serverTimestamp()
+        });
+
+        const updatedPropData = { ...propSnap.data(), documents: updatedDocs };
+        const { syncPropertyToPostgres } = await import('./propertyService.js');
+        syncPropertyToPostgres(updatedPropData);
+
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) {
+          pObj.documents = updatedDocs;
+        }
+      }
+    } catch (syncErr) {}
+
     return { success: true, docId, document: docPayload };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };
