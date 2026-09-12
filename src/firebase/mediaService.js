@@ -178,70 +178,52 @@ export async function uploadPropertyMediaFile(
       }
     }
 
-    const mediaId = `med-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const sanitizedFileName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `public_media/properties/${propertyId}/${mediaId}_${sanitizedFileName}`;
-    const storageRef = ref(storage, storagePath);
+    // Upload file directly to Hostinger Coolify Storage API (/api/upload)
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+    formData.append('propertyId', propertyId);
+    formData.append('ownerId', ownerId || auth.currentUser?.uid || 'anonymous');
+    formData.append('mediaType', mediaType);
 
-    const currentUserId = ownerId || auth.currentUser?.uid;
-    if (!currentUserId) {
-      return { success: false, error: 'User authentication required for media upload. Please sign in.' };
-    }
+    const uploadResult = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload', true);
 
-    const metadata = {
-      contentType: uploadFile.type,
-      customMetadata: {
-        ownerId: currentUserId,
-        propertyId,
-        mediaId,
-        mediaType
-      }
-    };
-
-    // Upload file to Firebase Storage with full progress monitoring and 45s safety timeout
-    let downloadUrl = '';
-    const uploadTask = uploadBytesResumable(storageRef, uploadFile, metadata);
-
-    downloadUrl = await new Promise((resolve, reject) => {
-      let settled = false;
-      const timeoutId = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          try { uploadTask.cancel(); } catch (e) {}
-          reject(new Error('Media upload connection timed out. Please check network connection or re-login.'));
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          onProgress(Math.min(99, pct));
         }
-      }, 45000);
+      };
 
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          if (onProgress && snapshot.totalBytes > 0) {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            onProgress(Math.min(99, Math.round(progress)));
-          }
-        },
-        (error) => {
-          if (!settled) {
-            settled = true;
-            clearTimeout(timeoutId);
-            reject(error);
-          }
-        },
-        async () => {
-          if (!settled) {
-            settled = true;
-            clearTimeout(timeoutId);
-            try {
-              const url = await getDownloadURL(uploadTask.snapshot.ref);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const resp = JSON.parse(xhr.responseText);
+            if (resp.success) {
               if (onProgress) onProgress(100);
-              resolve(url);
-            } catch (err) {
-              reject(err);
+              resolve(resp);
+            } else {
+              reject(new Error(resp.error || 'Hostinger storage upload failed.'));
             }
+          } catch (e) {
+            reject(new Error('Invalid response from storage server.'));
           }
+        } else {
+          reject(new Error(`Storage server returned error code ${xhr.status}`));
         }
-      );
+      };
+
+      xhr.onerror = () => reject(new Error('Network error uploading file to Hostinger storage server.'));
+      xhr.ontimeout = () => reject(new Error('Upload request timed out.'));
+      xhr.timeout = 300000; // 5 minute timeout for large 200MB videos
+
+      xhr.send(formData);
     });
+
+    const mediaId = `med-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const downloadUrl = uploadResult.publicUrl;
+    const storagePath = uploadResult.relativePath;
 
     // Enforce single primary cover image in masterMedia
     let updatedMasterMedia = masterMedia.map(item => {

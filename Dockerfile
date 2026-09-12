@@ -28,10 +28,19 @@ ENV VITE_POSTGRES_URL=$VITE_POSTGRES_URL
 
 RUN npm run build
 
-# Step 2: Serve static app using Nginx
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Step 2: Serve application and Hostinger Storage API using Node.js
+FROM node:20-alpine
+WORKDIR /app
 
-EXPOSE 80 3000
-CMD ["nginx", "-g", "daemon off;"]
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY --from=build /app/dist ./dist
+COPY server.js ./
+
+# Create uploads volume directory
+RUN mkdir -p uploads/properties uploads/documents
+
+EXPOSE 3000 80
+ENV PORT=3000
+CMD ["node", "server.js"]

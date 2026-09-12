@@ -68,46 +68,51 @@ export async function uploadConfidentialPropertyDocument({
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `private_docs/properties/${propertyId}/${docId}_${sanitizedFileName}`;
 
-    const storageRef = ref(storage, storagePath);
-    const metadata = {
-      contentType: file.type,
-      customMetadata: {
-        ownerId,
-        propertyId,
-        docId,
-        documentType
-      }
-    };
+    // Upload document directly to Hostinger Coolify Storage API (/api/upload)
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('propertyId', propertyId);
+    formData.append('ownerId', ownerId);
+    formData.append('isDocument', 'true');
 
-    // Helper to convert file to Data URL fallback
-    const fileToBase64 = (f) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(f);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (err) => reject(err);
-    });
+    const uploadResult = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload', true);
 
-    let docUrl = '';
-    const uploadTask = uploadBytesResumable(storageRef, file, metadata);
-    await new Promise((resolve, reject) => {
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          if (onProgress && snapshot.totalBytes > 0) {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            onProgress(Math.min(99, Math.round(progress)));
-          }
-        },
-        (error) => {
-          reject(error);
-        },
-        () => {
-          if (onProgress) onProgress(100);
-          resolve();
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          onProgress(Math.min(99, pct));
         }
-      );
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const resp = JSON.parse(xhr.responseText);
+            if (resp.success) {
+              if (onProgress) onProgress(100);
+              resolve(resp);
+            } else {
+              reject(new Error(resp.error || 'Hostinger document upload failed.'));
+            }
+          } catch (e) {
+            reject(new Error('Invalid response from storage server.'));
+          }
+        } else {
+          reject(new Error(`Storage server returned error code ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error uploading document to Hostinger storage server.'));
+      xhr.ontimeout = () => reject(new Error('Document upload request timed out.'));
+      xhr.timeout = 180000;
+
+      xhr.send(formData);
     });
-    docUrl = storagePath;
+
+    const finalStoragePath = uploadResult.relativePath || storagePath;
+    const publicUrl = uploadResult.publicUrl;
 
     const docPayload = {
       docId,
@@ -118,7 +123,8 @@ export async function uploadConfidentialPropertyDocument({
       fileName: file.name,
       contentType: file.type,
       fileSize: file.size,
-      storagePath, // Saved safely in private_docs path
+      storagePath: finalStoragePath, // Saved safely in private_docs path
+      publicUrl,
       verificationStatus: VerificationStatus.PENDING,
       adminFeedback: null,
       createdAt: serverTimestamp(),
