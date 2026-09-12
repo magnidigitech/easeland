@@ -11,6 +11,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Prevent uncaught exceptions from crashing the server
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception caught:', err.message || err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection caught:', reason);
+});
+
 // PostgreSQL Connection Pool Setup
 const { Pool } = pg;
 const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || 'postgres://postgres:g7YivfxcSdNUC9rXFg0y5iSGT00er3NhXqVVc1SI20Y9o4nN7XFTEvAmmTQCT7su@of36x8wuw0wn4j0x2y6c8eso:5432/postgres';
@@ -18,11 +27,17 @@ const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || 'post
 const pgPool = new Pool({
   connectionString: dbUrl,
   ssl: false,
-  connectionTimeoutMillis: 15000,
-  max: 25
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20
 });
 
-// Auto-initialize PostgreSQL tables for properties and media_files
+// IMPORTANT: Catch idle pool errors so connection drops never crash Node process
+pgPool.on('error', (err) => {
+  console.warn('PostgreSQL Pool background client error:', err.message);
+});
+
+// Auto-initialize PostgreSQL tables for properties and media_files safely
 async function initPgDb() {
   try {
     const client = await pgPool.connect();
@@ -260,6 +275,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
+// Listen on configured PORT (default 3000)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Easeland Coolify Node Server listening on port ${PORT}`);
 });
+
+// Also listen on Port 80 if main PORT is 3000 to catch Traefik port 80 routing
+if (Number(PORT) !== 80) {
+  try {
+    const server80 = app.listen(80, '0.0.0.0', () => {
+      console.log('Easeland Coolify Node Server also listening on port 80');
+    });
+    server80.on('error', () => {
+      // Ignore if port 80 is already bound
+    });
+  } catch (e) {}
+}
