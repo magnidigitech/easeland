@@ -1,5 +1,5 @@
-i'llimport {
-doc,
+import {
+  doc,
   getDoc,
   setDoc,
   getDocs,
