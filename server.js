@@ -20,6 +20,30 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection caught:', reason);
 });
 
+// Enable CORS
+app.use(cors());
+
+// Configure Multer Memory Storage for PostgreSQL upload
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 200 * 1024 * 1024 // 200MB file size limit
+  }
+});
+
+// Middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Serve static Vite frontend bundle
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Health check endpoint for Coolify / load balancers (Responds instantly on port 3000 & 80)
+app.get('/health', (req, res) => {
+  res.status(200).send('healthy');
+});
+
 // PostgreSQL Connection Pool Setup
 const { Pool } = pg;
 const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || 'postgres://postgres:g7YivfxcSdNUC9rXFg0y5iSGT00er3NhXqVVc1SI20Y9o4nN7XFTEvAmmTQCT7su@of36x8wuw0wn4j0x2y6c8eso:5432/postgres';
@@ -27,7 +51,7 @@ const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || 'post
 const pgPool = new Pool({
   connectionString: dbUrl,
   ssl: false,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 8000,
   idleTimeoutMillis: 30000,
   max: 20
 });
@@ -37,7 +61,7 @@ pgPool.on('error', (err) => {
   console.warn('PostgreSQL Pool background client error:', err.message);
 });
 
-// Auto-initialize PostgreSQL tables for properties and media_files safely
+// Auto-initialize PostgreSQL tables asynchronously (Non-blocking)
 async function initPgDb() {
   try {
     const client = await pgPool.connect();
@@ -87,30 +111,10 @@ async function initPgDb() {
     console.warn('PostgreSQL connection/init note:', err.message);
   }
 }
-initPgDb();
 
-// Enable CORS
-app.use(cors());
-
-// Configure Multer Memory Storage for PostgreSQL upload
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 200 * 1024 * 1024 // 200MB file size limit
-  }
-});
-
-// Middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Serve static Vite frontend bundle
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Health check endpoint for Coolify / load balancers
-app.get('/health', (req, res) => {
-  res.status(200).send('healthy');
+// Trigger DB init asynchronously so server startup is 100% instant
+setImmediate(() => {
+  initPgDb();
 });
 
 // API Endpoint: Save Uploaded Media / Document File directly into PostgreSQL BYTEA column
