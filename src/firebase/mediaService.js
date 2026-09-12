@@ -5,6 +5,36 @@ import { MediaStatus, MediaType } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 
 /**
+ * Sanitizes media array items to ensure no bloated base64 Data URLs are stored in Firestore
+ */
+export function sanitizeMediaArray(mediaArray) {
+  if (!Array.isArray(mediaArray)) return [];
+  return mediaArray.map(item => {
+    if (!item || typeof item !== 'object') return null;
+
+    let publicUrl = item.publicUrl || item.url || '';
+    if (typeof publicUrl === 'string' && publicUrl.startsWith('data:')) {
+      publicUrl = '';
+    }
+    let storagePath = item.storagePath || '';
+    if (typeof storagePath === 'string' && storagePath.startsWith('data:')) {
+      storagePath = '';
+    }
+
+    // Skip items that have neither a valid storage path nor a valid public HTTP URL
+    if (!publicUrl && !storagePath) {
+      return null;
+    }
+
+    return {
+      ...item,
+      publicUrl,
+      storagePath
+    };
+  }).filter(Boolean);
+}
+
+/**
  * Client-side image compression helper (downscales & compresses images to ~200KB-800KB)
  */
 export async function compressImageFile(file, maxWidth = 1920, maxHeight = 1080, quality = 0.82) {
@@ -131,7 +161,7 @@ export async function uploadPropertyMediaFile(
     const snap = await getDoc(propRef);
     if (snap.exists()) {
       const data = snap.data();
-      masterMedia = Array.isArray(data.media) ? data.media : [];
+      masterMedia = sanitizeMediaArray(data.media);
     }
 
     if (masterMedia.length >= 30) {
@@ -217,6 +247,7 @@ export async function uploadPropertyMediaFile(
     };
 
     updatedMasterMedia.push(newMediaObj);
+    updatedMasterMedia = sanitizeMediaArray(updatedMasterMedia);
 
     const publicApprovedMedia = updatedMasterMedia.filter(
       item => item && item.verificationStatus === MediaStatus.APPROVED
@@ -264,13 +295,13 @@ export async function removePropertyMediaFile(propertyId, ownerId, mediaId) {
     }
 
     const data = snap.data();
-    let masterMedia = Array.isArray(data.media) ? data.media : [];
+    let masterMedia = sanitizeMediaArray(data.media);
 
     const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
     try {
       const pSnap = await getDoc(mediaPrivateRef);
       if (pSnap.exists() && Array.isArray(pSnap.data().masterMedia)) {
-        masterMedia = pSnap.data().masterMedia;
+        masterMedia = sanitizeMediaArray(pSnap.data().masterMedia);
       }
     } catch (e) {}
 
@@ -287,7 +318,7 @@ export async function removePropertyMediaFile(propertyId, ownerId, mediaId) {
       } catch (err) {}
     }
 
-    const updatedMasterMedia = masterMedia.filter(item => item.mediaId !== mediaId);
+    const updatedMasterMedia = sanitizeMediaArray(masterMedia.filter(item => item.mediaId !== mediaId));
     const publicApprovedMedia = updatedMasterMedia.filter(
       item => item && item.verificationStatus === MediaStatus.APPROVED
     );
@@ -329,10 +360,12 @@ export async function updatePropertyMediaOrder(propertyId, ownerId, reorderedMed
     }
 
     const data = snap.data();
-    const updatedMasterMedia = reorderedMediaList.map((item, idx) => ({
-      ...item,
-      displayOrder: idx + 1
-    }));
+    const updatedMasterMedia = sanitizeMediaArray(
+      reorderedMediaList.map((item, idx) => ({
+        ...item,
+        displayOrder: idx + 1
+      }))
+    );
 
     const publicApprovedMedia = updatedMasterMedia.filter(
       item => item && item.verificationStatus === MediaStatus.APPROVED
@@ -376,25 +409,27 @@ export async function setPrimaryPropertyPhoto(propertyId, ownerId, mediaId) {
     }
 
     const data = snap.data();
-    let masterMedia = Array.isArray(data.media) ? data.media : [];
+    let masterMedia = sanitizeMediaArray(data.media);
 
     const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
     try {
       const pSnap = await getDoc(mediaPrivateRef);
       if (pSnap.exists() && Array.isArray(pSnap.data().masterMedia)) {
-        masterMedia = pSnap.data().masterMedia;
+        masterMedia = sanitizeMediaArray(pSnap.data().masterMedia);
       }
     } catch (e) {}
 
-    const updatedMasterMedia = masterMedia.map(item => {
-      if (item.type === MediaType.PHOTO) {
-        return {
-          ...item,
-          isPrimary: item.mediaId === mediaId
-        };
-      }
-      return item;
-    });
+    const updatedMasterMedia = sanitizeMediaArray(
+      masterMedia.map(item => {
+        if (item.type === MediaType.PHOTO) {
+          return {
+            ...item,
+            isPrimary: item.mediaId === mediaId
+          };
+        }
+        return item;
+      })
+    );
 
     const publicApprovedMedia = updatedMasterMedia.filter(
       item => item && item.verificationStatus === MediaStatus.APPROVED
