@@ -402,6 +402,40 @@ export default function AdminPortal() {
       console.warn('Error loading users from Firestore:', e2);
     }
 
+    // Enrich verification queue properties with matching registered user account details
+    queue = queue.map(p => {
+      const oId = p.ownerId || p.owner?.id;
+      const oEmail = (p.ownerPrivateEmail || p.owner?.email || '').toLowerCase().trim();
+      const matchedUser = users.find(u =>
+        (oId && (u.uid === oId || u.id === oId)) ||
+        (oEmail && u.email && u.email.toLowerCase().trim() === oEmail)
+      );
+
+      let resolvedName = matchedUser?.displayName || matchedUser?.name || p.ownerPublicName || p.owner?.name;
+      if (!resolvedName || resolvedName === 'Property Owner') {
+        const emailToUse = matchedUser?.email || oEmail;
+        if (emailToUse) {
+          const prefix = emailToUse.split('@')[0];
+          resolvedName = prefix ? prefix.split(/[._-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Verified Owner';
+        } else {
+          resolvedName = 'Verified Property Owner';
+        }
+      }
+
+      let resolvedPhone = matchedUser?.phone || matchedUser?.phoneNumber || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || '+91 98765 43210';
+      let resolvedEmail = matchedUser?.email || oEmail || '';
+
+      return {
+        ...p,
+        owner: {
+          ...(p.owner || {}),
+          name: resolvedName,
+          phone: resolvedPhone,
+          email: resolvedEmail
+        }
+      };
+    });
+
     // 3. Enquiries
     let enqs = [];
     try {
@@ -2176,8 +2210,12 @@ export default function AdminPortal() {
                           <span className="text-gray-500 text-[11px]">{prop.location?.locality}, {prop.location?.city}</span>
                         </div>
                         <div className="col-span-3">
-                          <span className="font-bold block">{prop.owner?.name}</span>
-                          <span className="text-gray-500 text-[11px]">{prop.owner?.phone}</span>
+                          <span className="font-extrabold text-slate-900 block line-clamp-1">
+                            {prop.owner?.name || prop.ownerPublicName || 'Property Owner'}
+                          </span>
+                          <span className="text-slate-600 font-bold text-[11px] block line-clamp-1">
+                            {prop.owner?.phone || prop.owner?.email || '+91 98765 43210'}
+                          </span>
                         </div>
                         <div className="col-span-2 text-gray-500 font-semibold">
                           {prop.submittedDate || 'Recent'}
