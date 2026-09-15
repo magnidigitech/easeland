@@ -83,84 +83,131 @@ export default function App() {
     setActivePage(pageName);
     try {
       localStorage.setItem('easeland_active_page', pageName);
+
+      let targetPath = '/';
       if (pageName === 'property-detail' && propId) {
         setActivePropertyId(propId);
-        if (window.location.pathname !== `/property/${propId}`) {
-          window.history.pushState(null, '', `/property/${propId}`);
-        }
-      } else if (pageName === 'map') {
+        targetPath = `/property/${propId}`;
+      } else if (pageName === 'map' || pageName === 'properties') {
         const queryParams = searchStateToUrlParams(filters);
         const searchString = queryParams.toString();
-        const targetUrl = searchString ? `/properties?${searchString}` : '/properties';
-        if (window.location.pathname !== '/properties') {
-          window.history.pushState(null, '', targetUrl);
-        }
+        targetPath = searchString ? `/properties?${searchString}` : '/properties';
       } else if (pageName === 'admin') {
-        if (window.location.pathname !== '/admin' && !window.location.search.includes('mode=admin')) {
-          window.history.pushState(null, '', '/admin');
-        }
+        targetPath = '/admin';
+      } else if (pageName === 'buy') {
+        targetPath = '/buy';
+      } else if (pageName === 'rent') {
+        targetPath = '/rent';
+      } else if (pageName === 'sell') {
+        targetPath = '/sell';
+      } else if (pageName === 'post-property') {
+        targetPath = '/post-property';
+      } else if (pageName === 'dashboard') {
+        targetPath = '/dashboard';
+      } else if (pageName === 'wishlist') {
+        targetPath = '/wishlist';
       } else {
-        if (window.location.pathname.startsWith('/property/') || window.location.pathname.startsWith('/properties') || window.location.pathname === '/admin') {
-          window.history.pushState(null, '', '/');
-        } else if (window.location.search.includes('mode=admin')) {
-          window.history.replaceState(null, '', window.location.pathname);
-        }
+        targetPath = '/';
+      }
+
+      if (window.location.pathname + window.location.search !== targetPath) {
+        window.history.pushState(null, '', targetPath);
       }
     } catch (err) {}
   };
 
-  useEffect(() => {
-    // 1. Check for direct /property/:propertyId URL path navigation or /properties search route
-    const path = window.location.pathname;
-    const propertyMatch = path.match(/\/property\/([a-zA-Z0-9_-]+)/);
-    const isSearchRoute = path.startsWith('/properties');
-    const isAdminRoute = path === '/admin' || path.startsWith('/admin');
-
-    // 2. Re-hydrate active page route
-    const urlParams = new URLSearchParams(window.location.search);
+  const syncStateFromUrl = () => {
+    const rawPath = window.location.pathname || '/';
+    const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
+    const search = window.location.search || '';
+    const urlParams = new URLSearchParams(search);
     const modeParam = urlParams.get('mode');
-    const savedPage = localStorage.getItem('easeland_active_page');
 
-    if (propertyMatch) {
+    const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
+    if (propertyMatch && propertyMatch[1]) {
       setActivePropertyId(propertyMatch[1]);
       setActivePage('property-detail');
-    } else if (isSearchRoute) {
-      const parsedFilters = urlParamsToSearchState(window.location.search);
-      setFilters(prev => ({ ...prev, ...parsedFilters }));
-      setActivePage('map');
-    } else if (isAdminRoute || modeParam === 'admin') {
-      setActivePage('admin');
-      try { localStorage.setItem('easeland_active_page', 'admin'); } catch(e){}
-    } else if (path === '/') {
-      setActivePage('home');
-      try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
-    } else if (savedPage && savedPage !== 'admin') {
-      setActivePage(savedPage);
+      try { localStorage.setItem('easeland_active_page', 'property-detail'); } catch(e){}
+      return;
     }
 
-    // 3. Handle PopState Browser History Navigation
+    if (cleanPath.startsWith('/properties')) {
+      const parsedFilters = urlParamsToSearchState(search);
+      setFilters(prev => ({ ...prev, ...parsedFilters }));
+      setActivePage('map');
+      try { localStorage.setItem('easeland_active_page', 'map'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/admin' || modeParam === 'admin') {
+      setActivePage('admin');
+      try { localStorage.setItem('easeland_active_page', 'admin'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/buy') {
+      setActivePage('buy');
+      try { localStorage.setItem('easeland_active_page', 'buy'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/rent') {
+      setActivePage('rent');
+      try { localStorage.setItem('easeland_active_page', 'rent'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/sell') {
+      setActivePage('sell');
+      try { localStorage.setItem('easeland_active_page', 'sell'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/post-property') {
+      setActivePage('post-property');
+      try { localStorage.setItem('easeland_active_page', 'post-property'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/dashboard') {
+      setActivePage('dashboard');
+      try { localStorage.setItem('easeland_active_page', 'dashboard'); } catch(e){}
+      return;
+    }
+
+    if (cleanPath === '/wishlist') {
+      setActivePage('wishlist');
+      try { localStorage.setItem('easeland_active_page', 'wishlist'); } catch(e){}
+      return;
+    }
+
+    // Default '/' path or unmapped route: check savedPage
+    const savedPage = localStorage.getItem('easeland_active_page');
+    if (savedPage && ['buy', 'rent', 'sell', 'post-property', 'dashboard', 'wishlist', 'map', 'admin'].includes(savedPage)) {
+      setActivePage(savedPage);
+      let syncUrl = '/';
+      if (savedPage === 'map') syncUrl = '/properties';
+      else if (savedPage === 'admin') syncUrl = '/admin';
+      else syncUrl = `/${savedPage}`;
+      try { window.history.replaceState(null, '', syncUrl); } catch(e){}
+    } else {
+      setActivePage('home');
+      try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
+    }
+  };
+
+  useEffect(() => {
+    // 1. Synchronize state with current URL on mount / reload
+    syncStateFromUrl();
+
+    // 2. Handle PopState Browser History Navigation
     const handlePopState = () => {
-      const currentPath = window.location.pathname;
-      const match = currentPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
-      if (match) {
-        setActivePropertyId(match[1]);
-        setActivePage('property-detail');
-      } else if (currentPath.startsWith('/properties')) {
-        const parsed = urlParamsToSearchState(window.location.search);
-        setFilters(prev => ({ ...prev, ...parsed }));
-        setActivePage('map');
-      } else if (currentPath === '/admin' || currentPath.startsWith('/admin')) {
-        setActivePage('admin');
-      } else if (currentPath === '/') {
-        setActivePage('home');
-      }
+      syncStateFromUrl();
     };
     window.addEventListener('popstate', handlePopState);
 
-    // 4. Listen for session profile updates
-    const handleProfileUpdated = (e) => {
-      // Handled via AuthContext state updates
-    };
+    // 3. Listen for session profile updates
+    const handleProfileUpdated = () => {};
     window.addEventListener('easeland-user-profile-updated', handleProfileUpdated);
 
     return () => {
@@ -279,7 +326,7 @@ export default function App() {
       {/* NAVBAR */}
       <Navbar
         activePage={activePage}
-        setActivePage={setActivePage}
+        setActivePage={changeActivePage}
         wishlistCount={wishlistCount}
         user={currentUser}
         onLoginClick={() => {
@@ -299,7 +346,7 @@ export default function App() {
             <span>YOU ARE VIEWING THE LIVE SITE (ADMIN PREVIEW MODE). All text, colors & elements match your Admin Studio edits.</span>
           </div>
           <button
-            onClick={() => setActivePage('admin')}
+            onClick={() => changeActivePage('admin')}
             className="bg-emerald-900 hover:bg-emerald-950 text-emerald-200 font-extrabold px-3 py-1 rounded-lg border border-emerald-500/40 text-[11px] transition-colors"
           >
             RETURN TO ADMIN STUDIO →
@@ -549,11 +596,11 @@ export default function App() {
             resumePropertyId={editingPropertyId}
             onComplete={() => {
               setEditingPropertyId(null);
-              setActivePage('dashboard');
+              changeActivePage('dashboard');
             }}
             onCancel={() => {
               setEditingPropertyId(null);
-              setActivePage('dashboard');
+              changeActivePage('dashboard');
             }}
           />
         )}
@@ -567,7 +614,7 @@ export default function App() {
             properties={properties}
             wishlist={mockApi.getWishlist()}
             onWishlistToggle={handleWishlistToggle}
-            onNavigate={(page) => setActivePage(page)}
+            onNavigate={(page) => changeActivePage(page)}
             onPostProperty={handlePostPropertyClick}
           />
         )}
@@ -580,7 +627,7 @@ export default function App() {
               <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 text-gray-500">
                 <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="text-base font-bold text-brand-charcoal">No saved properties yet</h3>
-                <button onClick={() => setActivePage('map')} className="mt-4 bg-brand-yellow text-brand-charcoal font-bold text-xs px-4 py-2.5 rounded-xl">
+                <button onClick={() => changeActivePage('map')} className="mt-4 bg-brand-yellow text-brand-charcoal font-bold text-xs px-4 py-2.5 rounded-xl">
                   Explore Map to Save Properties
                 </button>
               </div>
@@ -637,10 +684,10 @@ export default function App() {
             <div>
               <h4 className="font-extrabold text-brand-yellow uppercase tracking-wider mb-3">Explore</h4>
               <ul className="space-y-2 text-gray-300 font-semibold">
-                <li><button onClick={() => setActivePage('buy')} className="hover:text-white">Buy Property Info</button></li>
-                <li><button onClick={() => setActivePage('rent')} className="hover:text-white">Rent Property Info</button></li>
-                <li><button onClick={() => setActivePage('sell')} className="hover:text-white">Sell Property Info</button></li>
-                <li><button onClick={() => setActivePage('map')} className="hover:text-white">Explore Universal Map</button></li>
+                <li><button onClick={() => changeActivePage('buy')} className="hover:text-white">Buy Property Info</button></li>
+                <li><button onClick={() => changeActivePage('rent')} className="hover:text-white">Rent Property Info</button></li>
+                <li><button onClick={() => changeActivePage('sell')} className="hover:text-white">Sell Property Info</button></li>
+                <li><button onClick={() => changeActivePage('map')} className="hover:text-white">Explore Universal Map</button></li>
               </ul>
             </div>
 
@@ -648,7 +695,7 @@ export default function App() {
               <h4 className="font-extrabold text-brand-yellow uppercase tracking-wider mb-3">For Owners</h4>
               <ul className="space-y-2 text-gray-300 font-semibold">
                 <li><button onClick={handlePostPropertyClick} className="hover:text-white">Post Free Listing</button></li>
-                <li><button onClick={() => setActivePage('sell')} className="hover:text-white">Verification Process</button></li>
+                <li><button onClick={() => changeActivePage('sell')} className="hover:text-white">Verification Process</button></li>
               </ul>
             </div>
 
