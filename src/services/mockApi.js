@@ -522,21 +522,77 @@ export const mockApi = {
     return prop;
   },
 
+  deleteProperty: (propertyId) => {
+    if (!propertyId) return false;
+    const pIdStr = String(propertyId);
+
+    // 1. Remove from in-memory properties array
+    const idx = properties.findIndex(p => p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr));
+    if (idx !== -1) {
+      properties.splice(idx, 1);
+    }
+
+    // 2. Remove from stored easeland_properties in localStorage
+    const currentProps = getStoredData('easeland_properties', properties);
+    const updatedProps = currentProps.filter(p => p && String(p.id) !== pIdStr && String(p.propertyId) !== pIdStr);
+    setStoredData('easeland_properties', updatedProps);
+
+    // 3. Track deleted ID in localStorage to prevent re-hydration
+    try {
+      if (typeof window !== 'undefined') {
+        const rawUserProps = localStorage.getItem('easeland_user_properties');
+        if (rawUserProps) {
+          const parsed = JSON.parse(rawUserProps);
+          const updatedUserProps = parsed.filter(p => p && String(p.id || p.propertyId) !== pIdStr);
+          localStorage.setItem('easeland_user_properties', JSON.stringify(updatedUserProps));
+        }
+
+        const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
+        const parsedDeleted = JSON.parse(rawDeleted);
+        if (!parsedDeleted.includes(pIdStr)) {
+          parsedDeleted.push(pIdStr);
+          localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+        }
+
+        window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: pIdStr } }));
+      }
+    } catch (e) {}
+
+    return true;
+  },
+
   // -------------------------------------------------------------
   // 3. ADMIN VERIFICATION & MANAGEMENT APIS
   // -------------------------------------------------------------
   getVerificationQueue: () => {
+    let deletedIds = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_deleted_properties');
+        if (raw) deletedIds = JSON.parse(raw);
+      }
+    } catch (e) {}
+
     const currentProps = getStoredData('easeland_properties', properties);
-    return currentProps.filter(p =>
-      ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) ||
-      ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.listingStatus)
-    );
+    return currentProps.filter(p => {
+      if (!p) return false;
+      const pId = String(p.id || p.propertyId || '');
+      if (deletedIds.includes(pId)) return false;
+
+      return ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) ||
+             ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.listingStatus);
+    });
   },
 
-
-
   getAllPropertiesAdmin: () => {
-    return properties;
+    let deletedIds = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_deleted_properties');
+        if (raw) deletedIds = JSON.parse(raw);
+      }
+    } catch (e) {}
+    return properties.filter(p => p && !deletedIds.includes(String(p.id || p.propertyId)));
   },
 
   approvePropertyAdmin: (propertyId, notes = 'Approved by Admin') => {

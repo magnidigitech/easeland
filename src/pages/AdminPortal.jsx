@@ -384,8 +384,18 @@ export default function AdminPortal() {
           });
         }
       });
+      let deletedIds = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const rawDeleted = localStorage.getItem('easeland_deleted_properties');
+          if (rawDeleted) deletedIds = JSON.parse(rawDeleted);
+        }
+      } catch (e) {}
+
       queue = Array.from(queueMap.values()).filter(p => {
         if (!p) return false;
+        const pId = String(p.id || p.propertyId || '');
+        if (deletedIds.includes(pId)) return false;
         const title = (p.title || '').trim();
         return title.length > 0 && title !== '.' && title !== ',';
       });
@@ -769,8 +779,25 @@ export default function AdminPortal() {
 
     setAdminActionProcessing(true);
     try {
+      const pIdStr = String(propId);
+      try {
+        const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
+        const parsedDeleted = JSON.parse(rawDeleted);
+        if (!parsedDeleted.includes(pIdStr)) {
+          parsedDeleted.push(pIdStr);
+          localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+        }
+      } catch (e) {}
+
       const { deletePropertyListing } = await import('../firebase/propertyService.js');
       await deletePropertyListing(propId, user?.uid, true);
+
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        if (typeof mockApi.deleteProperty === 'function') {
+          mockApi.deleteProperty(propId);
+        }
+      } catch (e) {}
 
       setPublishSuccessMessage('Property listing deleted successfully.');
       setIsWorkspaceOpen(false);

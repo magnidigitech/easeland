@@ -841,34 +841,53 @@ export async function getPublicPropertyById(propertyId) {
 export async function deletePropertyListing(propertyId, ownerId = null, isAdmin = false) {
   try {
     if (!propertyId) return { success: false, error: 'Property ID is required.' };
+    const pIdStr = String(propertyId);
 
-    // 1. Call backend API DELETE /api/properties/:id
+    // 1. Record in localStorage deleted IDs list immediately
+    if (typeof window !== 'undefined') {
+      try {
+        const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
+        const parsedDeleted = JSON.parse(rawDeleted);
+        if (!parsedDeleted.includes(pIdStr)) {
+          parsedDeleted.push(pIdStr);
+          localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+        }
+
+        const rawLocal = localStorage.getItem('easeland_user_properties');
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          const updated = parsed.filter(p => String(p.id || p.propertyId) !== pIdStr);
+          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
+        }
+
+        const rawStored = localStorage.getItem('easeland_properties');
+        if (rawStored) {
+          const parsed = JSON.parse(rawStored);
+          const updated = parsed.filter(p => String(p.id || p.propertyId) !== pIdStr);
+          localStorage.setItem('easeland_properties', JSON.stringify(updated));
+        }
+
+        localStorage.removeItem(`easeland_media_${pIdStr}`);
+        localStorage.removeItem(`easeland_docs_${pIdStr}`);
+      } catch (e) {}
+    }
+
+    // 2. Call backend API DELETE /api/properties/:id
     try {
       await fetch(`/api/properties/${propertyId}`, { method: 'DELETE' });
     } catch (e) {}
 
-    // 2. Remove from Firestore
+    // 3. Remove from Firestore
     try {
       const propRef = doc(db, 'properties', propertyId);
       await deleteDoc(propRef);
     } catch (e) {}
 
-    // 3. Remove from mockApi & LocalStorage
+    // 4. Remove from mockApi
     try {
       const { mockApi } = await import('../services/mockApi.js');
       if (typeof mockApi.deleteProperty === 'function') {
         mockApi.deleteProperty(propertyId);
-      }
-
-      if (typeof window !== 'undefined') {
-        const rawLocal = localStorage.getItem('easeland_user_properties');
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          const updated = parsed.filter(p => (p.id || p.propertyId) !== propertyId);
-          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
-        }
-        localStorage.removeItem(`easeland_media_${propertyId}`);
-        localStorage.removeItem(`easeland_docs_${propertyId}`);
       }
     } catch (e) {}
 
