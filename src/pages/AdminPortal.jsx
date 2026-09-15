@@ -773,8 +773,13 @@ export default function AdminPortal() {
     }
   };
 
-  const handleDeleteProperty = async (propId) => {
-    if (adminActionProcessing || !propId) return;
+  const handleDeleteProperty = async (targetProp) => {
+    const propId = typeof targetProp === 'object' ? (targetProp?.id || targetProp?.propertyId || targetProp?.referenceId) : targetProp;
+    if (adminActionProcessing || !propId) {
+      console.warn('Cannot delete property listing: Property ID is undefined or missing', targetProp);
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to PERMANENTLY delete this property listing from the platform? This cannot be undone.')) return;
 
     setAdminActionProcessing(true);
@@ -788,6 +793,15 @@ export default function AdminPortal() {
           localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
         }
       } catch (e) {}
+
+      // Immediately remove from UI state for 0ms lag
+      setVerificationQueue(prev => prev.filter(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        return id1 !== pIdStr && id2 !== pIdStr && id3 !== pIdStr;
+      }));
 
       const { deletePropertyListing } = await import('../firebase/propertyService.js');
       await deletePropertyListing(propId, user?.uid, true);
@@ -2298,7 +2312,7 @@ export default function AdminPortal() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleDeleteProperty(prop.id);
+                              handleDeleteProperty(prop);
                             }}
                             className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white font-extrabold px-2.5 py-1.5 rounded-xl transition-all text-[11px] shadow-sm"
                             title="Delete Property Listing"
@@ -2371,7 +2385,7 @@ export default function AdminPortal() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleDeleteProperty(activeAuditProp.id || activeAuditProp.propertyId)}
+                            onClick={() => handleDeleteProperty(activeAuditProp)}
                             className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-extrabold px-3 py-1.5 rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
