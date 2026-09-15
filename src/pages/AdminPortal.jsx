@@ -2253,10 +2253,25 @@ export default function AdminPortal() {
 
                       {/* SUBMITTED MEDIA, VIDEO PRESENTATION & UPLOADED DOCUMENTS */}
                       {(() => {
+                        const propId = activeAuditProp.id || activeAuditProp.propertyId;
+
+                        // Local & session document fallbacks
+                        let extraDocs = [];
+                        try {
+                          const storedDocs = localStorage.getItem(`easeland_docs_${propId}`) || localStorage.getItem('easeland_user_documents');
+                          if (storedDocs) {
+                            const parsedDocs = JSON.parse(storedDocs);
+                            if (Array.isArray(parsedDocs)) {
+                              extraDocs = parsedDocs.filter(d => (d.propertyId === propId || !d.propertyId));
+                            }
+                          }
+                        } catch (e) {}
+
                         const rawItems = [
                           ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
                           ...(Array.isArray(activeAuditProp.propertyDocuments) ? activeAuditProp.propertyDocuments : []),
                           ...(Array.isArray(activeAuditProp.confidentialDocuments) ? activeAuditProp.confidentialDocuments : []),
+                          ...extraDocs,
                           ...(Array.isArray(activeAuditProp.media) ? activeAuditProp.media : []),
                           ...(Array.isArray(activeAuditProp.photos) ? activeAuditProp.photos : []),
                           ...(Array.isArray(activeAuditProp.images) ? activeAuditProp.images : []),
@@ -2266,6 +2281,7 @@ export default function AdminPortal() {
                         if (activeAuditProp.videoUrl) rawItems.push(activeAuditProp.videoUrl);
                         if (activeAuditProp.videoLink) rawItems.push(activeAuditProp.videoLink);
                         if (activeAuditProp.embeddedVideoUrl) rawItems.push(activeAuditProp.embeddedVideoUrl);
+                        if (activeAuditProp.droneVideoUrl) rawItems.push(activeAuditProp.droneVideoUrl);
 
                         const photos = [];
                         const videos = [];
@@ -2275,6 +2291,16 @@ export default function AdminPortal() {
                         const seenVideoUrls = new Set();
                         const seenDocKeys = new Set();
 
+                        const isValidPhotoUrl = (u) => {
+                          if (!u || typeof u !== 'string') return false;
+                          const s = u.trim().toLowerCase();
+                          if (s.length < 5) return false;
+                          if (s.includes('placeholder') || s.includes('dummy') || s.includes('submitted photo') || s === '[object object]') return false;
+                          if (s.includes('youtube.com') || s.includes('youtu.be') || s.includes('drive.google.com')) return false;
+                          if (s.endsWith('.mp4') || s.endsWith('.webm') || s.endsWith('.mov') || s.endsWith('.avi') || s.endsWith('.pdf') || s.endsWith('.doc')) return false;
+                          return s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:image/') || s.startsWith('blob:') || s.startsWith('/');
+                        };
+
                         rawItems.forEach(item => {
                           if (!item) return;
 
@@ -2282,7 +2308,7 @@ export default function AdminPortal() {
                           if (typeof item === 'string') {
                             urlStr = item.trim();
                           } else if (typeof item === 'object') {
-                            urlStr = item.url || item.publicUrl || item.mediaUrl || item.embedUrl || '';
+                            urlStr = item.url || item.publicUrl || item.mediaUrl || item.embedUrl || item.storagePath || '';
                           }
 
                           const cleanUrl = urlStr.toLowerCase();
@@ -2290,7 +2316,7 @@ export default function AdminPortal() {
                           // 1. CHECK IF DOCUMENT
                           let isDocument = false;
                           if (typeof item === 'object') {
-                            if (item.isDocument === true || item.docId) isDocument = true;
+                            if (item.isDocument === true || item.docId || item.documentType) isDocument = true;
                             const typeUpper = String(item.documentType || item.type || item.documentName || '').toUpperCase();
                             if (['DOCUMENT', 'TITLE_DEED', 'LAYOUT_APPROVAL', 'TAX_RECEIPT', 'ENCUMBRANCE_CERTIFICATE', 'FIELD_MEASUREMENT', 'OTHER', 'LEGAL_DEED', 'MUTATION', 'KHATA', 'PASSPORT', 'AADHAAR', 'PAN'].includes(typeUpper)) {
                               isDocument = true;
@@ -2312,9 +2338,10 @@ export default function AdminPortal() {
                           }
 
                           if (isDocument) {
-                            const docName = (typeof item === 'object' && (item.name || item.documentName || item.fileName)) || 'Confidential Property Document';
+                            const docName = (typeof item === 'object' && (item.name || item.documentName || item.fileName || item.title)) || 'Confidential Property Document';
                             const docType = (typeof item === 'object' && (item.type || item.documentType)) || 'Verification Document';
-                            const key = urlStr || (typeof item === 'object' && item.docId) || docName;
+                            const docUrl = urlStr || (typeof item === 'object' && (item.url || item.publicUrl || item.storagePath)) || '#';
+                            const key = docUrl !== '#' ? docUrl : (typeof item === 'object' && item.docId) || docName;
 
                             if (key && !seenDocKeys.has(key)) {
                               seenDocKeys.add(key);
@@ -2322,7 +2349,7 @@ export default function AdminPortal() {
                                 docId: (typeof item === 'object' && item.docId) || `doc-${documents.length + 1}`,
                                 name: docName,
                                 type: docType,
-                                url: urlStr,
+                                url: docUrl,
                                 size: (typeof item === 'object' && item.fileSize) || null
                               });
                             }
@@ -2354,14 +2381,14 @@ export default function AdminPortal() {
                                 url: videoUrl,
                                 embedUrl: (typeof item === 'object' && item.embedUrl) || videoUrl,
                                 provider: (typeof item === 'object' && item.provider) || (cleanUrl.includes('youtube') || cleanUrl.includes('youtu.be') ? 'youtube' : cleanUrl.includes('drive.google') ? 'gdrive' : 'direct'),
-                                title: (typeof item === 'object' && (item.title || item.fileName || item.caption)) || 'Submitted Video Presentation'
+                                title: (typeof item === 'object' && (item.title || item.fileName || item.caption)) || 'Submitted Property Video'
                               });
                             }
                             return;
                           }
 
-                          // 3. IF NOT DOCUMENT AND NOT VIDEO -> EVALUATE AS PHOTO
-                          if (urlStr && !seenPhotoUrls.has(urlStr)) {
+                          // 3. IF NOT DOCUMENT AND NOT VIDEO -> EVALUATE AS USER UPLOADED PHOTO
+                          if (urlStr && isValidPhotoUrl(urlStr) && !seenPhotoUrls.has(urlStr)) {
                             seenPhotoUrls.add(urlStr);
                             photos.push(urlStr);
                           }
@@ -2378,7 +2405,7 @@ export default function AdminPortal() {
                               </h4>
                               {photos.length === 0 ? (
                                 <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic">
-                                  No property photos uploaded.
+                                  No property photos uploaded by user.
                                 </div>
                               ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -2390,8 +2417,13 @@ export default function AdminPortal() {
                                     >
                                       <img
                                         src={imgUrl}
-                                        alt={`Submitted photo ${idx + 1}`}
+                                        alt={`User property photo ${idx + 1}`}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                        onError={(e) => {
+                                          if (e.currentTarget && e.currentTarget.parentElement) {
+                                            e.currentTarget.parentElement.style.display = 'none';
+                                          }
+                                        }}
                                       />
                                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
                                         <Eye className="w-4 h-4" />
@@ -2403,16 +2435,16 @@ export default function AdminPortal() {
                               )}
                             </div>
 
-                            {/* SUBMITTED VIDEO PRESENTATION (ALWAYS VISIBLE SECTION) */}
+                            {/* SUBMITTED VIDEO PRESENTATION & REVIEW SECTION */}
                             <div className="space-y-4 pt-4 border-t border-slate-200">
                               <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                <Eye className="w-4 h-4 text-amber-600" />
-                                <span>Submitted Video Presentation ({videos.length})</span>
+                                <Video className="w-4 h-4 text-amber-600" />
+                                <span>Submitted Property Videos & Walkthroughs ({videos.length})</span>
                               </h4>
                               {videos.length === 0 ? (
                                 <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic flex items-center gap-2">
                                   <Video className="w-4 h-4 text-amber-500 shrink-0" />
-                                  <span>No video presentation attached. (Owners can attach YouTube/Google Drive video links or upload MP4/WebM files).</span>
+                                  <span>No video walkthrough attached. (Owners can attach YouTube/Google Drive video links or upload MP4/WebM files).</span>
                                 </div>
                               ) : (
                                 <div className="space-y-4">
@@ -2495,14 +2527,14 @@ export default function AdminPortal() {
                                           <span className="text-[10px] text-blue-700 font-bold">{docItem.type || 'Verification Document'}</span>
                                         </div>
                                       </div>
-                                      {docItem.url && (
+                                      {docItem.url && docItem.url !== '#' && (
                                         <a
                                           href={docItem.url}
                                           target="_blank"
                                           rel="noreferrer"
                                           className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0"
                                         >
-                                          View / Download ↗
+                                          View / Download PDF ↗
                                         </a>
                                       )}
                                     </div>

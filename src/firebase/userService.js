@@ -29,7 +29,7 @@ export function formatFirestoreError(error) {
     return 'Firebase Storage Not Enabled: Please open Firebase Console -> Storage and click "Get Started".';
   }
   if (code === 'not-found' || code === 'storage/object-not-found') {
-    return 'Requested Data Not Found.';
+    return 'Resource Not Found: Requested Data Not Found.';
   }
   if (code === 'unavailable') {
     return 'Connection Error: Unable to reach EaseLand database servers. Please check your internet connection and retry.';
