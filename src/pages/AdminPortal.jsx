@@ -413,16 +413,14 @@ export default function AdminPortal() {
 
       let rawName = matchedUser?.displayName || matchedUser?.name || p.ownerPublicName || p.owner?.name;
       let resolvedName = '';
-      if (rawName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(rawName.trim())) {
+      if (rawName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(rawName.trim()) && !rawName.startsWith('Account ID:')) {
         resolvedName = rawName.trim();
       } else {
         const emailToUse = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email;
         if (emailToUse) {
           resolvedName = emailToUse;
-        } else if (oId) {
-          resolvedName = `Account ID: ${oId}`;
         } else {
-          resolvedName = 'Account Name Not Set';
+          resolvedName = 'Property Owner';
         }
       }
 
@@ -2194,9 +2192,10 @@ export default function AdminPortal() {
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                   <div className="p-4 border-b border-gray-100 bg-gray-50 font-extrabold text-xs text-gray-500 uppercase tracking-wider grid grid-cols-12 gap-4">
-                    <span className="col-span-5">Property Title & Location</span>
-                    <span className="col-span-3">Owner Contact</span>
-                    <span className="col-span-2">Submitted</span>
+                    <span className="col-span-4">Property Title & Location</span>
+                    <span className="col-span-3">Owner Name</span>
+                    <span className="col-span-2">Owner Contact</span>
+                    <span className="col-span-1">Submitted</span>
                     <span className="col-span-2 text-right">Action</span>
                   </div>
 
@@ -2213,27 +2212,45 @@ export default function AdminPortal() {
                   ) : (
                     verificationQueue.map((prop) => (
                       <div key={prop.id} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-4 items-center text-xs hover:bg-gray-50 transition-colors">
-                        <div className="col-span-5">
+                        {/* TITLE & LOCATION */}
+                        <div className="col-span-4">
                           <span className="font-bold text-brand-charcoal block line-clamp-1">{prop.title}</span>
                           <span className="text-gray-500 text-[11px]">{prop.location?.locality}, {prop.location?.city}</span>
                         </div>
+
+                        {/* SEPARATE COLUMN: OWNER NAME */}
                         <div className="col-span-3">
                           <span className="font-extrabold text-slate-900 block line-clamp-1">
-                            {prop.owner?.name && !['Property Owner', 'Verified Property Owner'].includes(prop.owner.name)
+                            {prop.owner?.name && !['Property Owner', 'Verified Property Owner'].includes(prop.owner.name) && !prop.owner.name.startsWith('Account ID:')
                               ? prop.owner.name
-                              : (prop.owner?.email || prop.ownerPublicName || 'Account Name Not Set')}
+                              : (prop.owner?.email || prop.ownerPublicName || 'Property Owner')}
                           </span>
+                          {prop.owner?.email && (
+                            <span className="text-slate-500 text-[10px] block line-clamp-1 font-semibold">
+                              {prop.owner.email}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* SEPARATE COLUMN: OWNER CONTACT */}
+                        <div className="col-span-2">
                           <span className={`font-extrabold text-[11px] block line-clamp-1 ${
-                            prop.owner?.phone && prop.owner.phone !== 'Number Not Updated'
-                              ? 'text-slate-800'
-                              : 'text-amber-700'
+                            prop.owner?.phone && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
+                              ? 'text-slate-900'
+                              : 'text-amber-700 font-semibold'
                           }`}>
-                            {prop.owner?.phone || 'Number Not Updated'}
+                            {prop.owner?.phone && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
+                              ? prop.owner.phone
+                              : 'Number Not Updated'}
                           </span>
                         </div>
-                        <div className="col-span-2 text-gray-500 font-semibold">
+
+                        {/* SUBMITTED */}
+                        <div className="col-span-1 text-gray-500 font-semibold">
                           {prop.submittedDate || 'Recent'}
                         </div>
+
+                        {/* ACTION */}
                         <div className="col-span-2 text-right flex items-center justify-end gap-1.5">
                           <button
                             type="button"
