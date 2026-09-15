@@ -2092,7 +2092,12 @@ export default function AdminPortal() {
                         </div>
                         <div className="col-span-2 text-right">
                           <button
-                            onClick={() => openWorkspace(prop)}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openWorkspace(prop);
+                            }}
                             className="bg-brand-charcoal text-white font-bold px-3 py-1.5 rounded-xl hover:bg-brand-yellow hover:text-brand-charcoal transition-all text-[11px]"
                           >
                             Audit Now

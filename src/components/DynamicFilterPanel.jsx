@@ -46,7 +46,7 @@ export default function DynamicFilterPanel({
 }) {
   if (!isOpen) return null;
 
-  const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters.propertyType);
+  const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType);
 
   const handleChange = (key, value) => {
     setFilters(prev => ({

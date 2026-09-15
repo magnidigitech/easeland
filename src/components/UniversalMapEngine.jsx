@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
 
 export default function UniversalMapEngine({
   properties = [],
-  filters,
+  filters = {},
   setFilters,
   onSelectProperty,
   onWishlistToggle,
@@ -112,7 +112,7 @@ export default function UniversalMapEngine({
       setCurrentZoom(activeZoom);
 
       if (userLocationMarkerRef.current) {
-        const isAdjusted = filters.locationAdjusted;
+        const isAdjusted = filters?.locationAdjusted;
         const titleText = isAdjusted ? 'Adjusted Location' : 'YOUR CURRENT LOCATION';
         const bodyText = isAdjusted ? 'Exact Location Confirmed' : '📍 You Are Here';
         
@@ -156,7 +156,7 @@ export default function UniversalMapEngine({
         mapInstanceRef.current = null;
       }
     };
-  }, [filters.locationAdjusted]);
+  }, [filters?.locationAdjusted]);
 
   useEffect(() => {
     if (mapInstanceRef.current) {
@@ -186,7 +186,7 @@ export default function UniversalMapEngine({
 
   // 250% AUTO-ZOOM ON DETECT MY LOCATION
   useEffect(() => {
-    if (filters.userLat && filters.userLng && mapInstanceRef.current) {
+    if (filters?.userLat && filters?.userLng && mapInstanceRef.current) {
       const userLat = filters.userLat;
       const userLng = filters.userLng;
       const siteConfig = mockApi.getSiteConfig();
@@ -217,13 +217,13 @@ export default function UniversalMapEngine({
       const marker = L.marker([userLat, userLng], { icon: pulseIcon, draggable: true }).addTo(mapInstanceRef.current);
       
       const currentMapZoom = mapInstanceRef.current ? mapInstanceRef.current.getZoom() : locZoom;
-      const popupText = filters.locationAdjusted 
+      const popupText = filters?.locationAdjusted 
         ? `Exact Location Confirmed (Zoom Level ${currentMapZoom})`
         : `📍 You Are Here (Zoom Level ${currentMapZoom})`;
 
       marker.bindPopup(`
         <div style="font-family: 'Plus Jakarta Sans', sans-serif; text-align: center; padding: 6px 8px;">
-          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563eb; letter-spacing: 0.5px;">${filters.locationAdjusted ? 'Adjusted Location' : 'YOUR CURRENT LOCATION'}</div>
+          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563eb; letter-spacing: 0.5px;">${filters?.locationAdjusted ? 'Adjusted Location' : 'YOUR CURRENT LOCATION'}</div>
           <div style="font-size: 13px; font-weight: 800; color: #0b2545; margin-top: 2px;">${popupText}</div>
           <div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 4px;">Click pin anytime to zoom to MAX (Level 22)</div>
         </div>
@@ -249,11 +249,11 @@ export default function UniversalMapEngine({
 
       userLocationMarkerRef.current = marker;
     }
-  }, [filters.userLat, filters.userLng]);
+  }, [filters?.userLat, filters?.userLng]);
 
   // Click map anywhere to reposition your location pin to exact building
   useEffect(() => {
-    if (!mapInstanceRef.current || !filters.userLat) return;
+    if (!mapInstanceRef.current || !filters?.userLat) return;
 
     const onMapClick = (e) => {
       const { lat, lng } = e.latlng;
@@ -274,7 +274,7 @@ export default function UniversalMapEngine({
         mapInstanceRef.current.off('click', onMapClick);
       }
     };
-  }, [filters.userLat]);
+  }, [filters?.userLat]);
 
   // Update Base Tile Layer when mapType, showLabels, or activeDetail changes
   useEffect(() => {
@@ -438,10 +438,10 @@ export default function UniversalMapEngine({
       }
     });
 
-    if (!focusedProperty && !filters.userLat && bounds.length > 0) {
+    if (!focusedProperty && !filters?.userLat && bounds.length > 0) {
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
-  }, [displayProperties, filters.userLat]);
+  }, [displayProperties, filters?.userLat]);
 
   return (
     <div className="relative w-full h-full bg-gray-100 flex flex-row overflow-hidden">
@@ -490,7 +490,7 @@ export default function UniversalMapEngine({
               <input
                 type="text"
                 placeholder='Try searching "Hyderabad" or click detect location...'
-                value={filters.query || filters.address || ''}
+                value={filters?.query || filters?.address || ''}
                 onChange={(e) => {
                   const val = e.target.value;
                   setFilters(prev => ({
