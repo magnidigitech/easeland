@@ -174,26 +174,28 @@ export function filterApprovedPublicMedia(mediaArray = []) {
 export async function createPropertyDraft(ownerId, propertyData) {
   try {
     if (!ownerId) return { success: false, error: 'Owner UID is required.' };
-    const propertyRef = doc(collection(db, 'properties'));
-    const propertyId = propertyRef.id;
-    const refId = generateReferenceId();
+    const propertyId = propertyData.propertyId || propertyData.id || 'prop_' + Date.now();
+    const refId = propertyData.referenceId || generateReferenceId();
 
     const derived = computeDerivedPropertyFields(propertyData);
 
     const publicPayload = {
       propertyId,
+      id: propertyId,
       referenceId: refId,
       ownerId,
-      ownerPublicName: propertyData.ownerPublicName || 'Property Owner',
-      ownerPublicPhone: propertyData.ownerPublicPhone || null,
+      ownerPublicName: propertyData.ownerPublicName || 'EaseLand User',
+      ownerPublicPhone: propertyData.ownerPublicPhone || propertyData.ownerPrivatePhone || null,
+      ownerPrivateEmail: propertyData.ownerPrivateEmail || propertyData.email || '',
+      ownerPrivatePhone: propertyData.ownerPrivatePhone || '',
       title: propertyData.title || 'Untitled Property Listing',
       propertyType: propertyData.propertyType || 'OPEN_PLOT',
       purpose: propertyData.purpose || 'SALE',
       description: propertyData.description || '',
       price: Number(propertyData.price) || 0,
-      priceDisplay: propertyData.priceDisplay || 'Rs. 0',
+      priceDisplay: propertyData.priceDisplay || `Rs. ${Number(propertyData.price) || 0}`,
       area: Number(propertyData.area) || 0,
-      areaDisplay: propertyData.areaDisplay || '0 sq ft',
+      areaDisplay: propertyData.areaDisplay || `${Number(propertyData.area) || 0} sq ft`,
       specs: propertyData.specs || {},
       amenities: Array.isArray(propertyData.amenities) ? propertyData.amenities : [],
 
@@ -225,49 +227,65 @@ export async function createPropertyDraft(ownerId, propertyData) {
 
       // Protected System Fields
       listingStatus: ListingStatus.DRAFT,
+      status: ListingStatus.DRAFT,
       isPlatformVerified: false,
       isPublished: false,
       views: 0,
       enquiriesCount: 0,
 
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
-    // Also initialize private document for owner details
-    const privateRef = doc(db, 'propertyPrivate', propertyId);
-    const privatePayload = {
-      propertyId,
-      ownerId,
-      ownerPrivateEmail: propertyData.ownerPrivateEmail || '',
-      ownerPrivatePhone: propertyData.ownerPrivatePhone || '',
-      ownerFacingNotes: null,
-      changesRequestedChecklist: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
+    // 1. ALWAYS sync directly to PostgreSQL Server API (/api/properties)
+    await syncPropertyToPostgres(publicPayload);
 
-    // Initialize private master media moderation document
-    const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
-    const mediaPrivatePayload = {
-      propertyId,
-      ownerId,
-      masterMedia: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
+    // 2. ALWAYS sync to mockApi & Local Storage
+    try {
+      const { mockApi } = await import('../services/mockApi.js');
+      mockApi.addProperty(publicPayload, true);
+    } catch (e) {}
 
-    const savePromise = Promise.all([
-      setDoc(propertyRef, publicPayload),
-      setDoc(privateRef, privatePayload),
-      setDoc(mediaPrivateRef, mediaPrivatePayload)
-    ]);
+    // 3. Attempt Firestore write (non-blocking fallback for unauthenticated/dummy admin sessions)
+    try {
+      const propertyRef = doc(db, 'properties', propertyId);
+      const privateRef = doc(db, 'propertyPrivate', propertyId);
+      const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
 
-    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 3500));
+      const privatePayload = {
+        propertyId,
+        ownerId,
+        ownerPrivateEmail: propertyData.ownerPrivateEmail || '',
+        ownerPrivatePhone: propertyData.ownerPrivatePhone || '',
+        ownerFacingNotes: null,
+        changesRequestedChecklist: [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
 
-    await Promise.race([savePromise, timeoutPromise]);
+      const mediaPrivatePayload = {
+        propertyId,
+        ownerId,
+        masterMedia: [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
 
-    syncPropertyToPostgres(publicPayload);
+      const savePromise = Promise.all([
+        setDoc(propertyRef, { ...publicPayload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }),
+        setDoc(privateRef, privatePayload),
+        setDoc(mediaPrivateRef, mediaPrivatePayload)
+      ]);
+
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 2000));
+      await Promise.race([savePromise, timeoutPromise]);
+    } catch (fsErr) {
+      console.warn('Firestore draft save fallback:', fsErr.message || fsErr);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: publicPayload }));
+    }
 
     return { success: true, propertyId, referenceId: refId };
   } catch (error) {
@@ -428,54 +446,68 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
       ...(formData || {}),
       ownerId: propData.ownerId || ownerId,
       listingStatus: ListingStatus.PENDING_VERIFICATION,
-      isPublished: false,
-      submittedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      isPublished: false
     };
 
     const derived = computeDerivedPropertyFields(mergedData);
 
-    const payload = {
+    const publicPayload = {
       ...mergedData,
       ...derived,
       listingStatus: ListingStatus.PENDING_VERIFICATION,
+      status: ListingStatus.PENDING_VERIFICATION,
       isPublished: false,
-      submittedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      submittedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
-    const savePromise = setDoc(propRef, payload, { merge: true });
-    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 3500));
+    // 1. ALWAYS sync directly to PostgreSQL Server API (/api/properties)
+    await syncPropertyToPostgres(publicPayload);
 
-    await Promise.race([savePromise, timeoutPromise]);
-
-    syncPropertyToPostgres(payload);
-
-    // Also sync submitted property to local store & dispatch event so dashboard & admin queue reflect it immediately
+    // 2. ALWAYS sync to mockApi & Local Storage & dispatch events
     try {
       const { mockApi } = await import('../services/mockApi.js');
       mockApi.addProperty({
-        ...payload,
+        ...publicPayload,
         id: propertyId,
         propertyId,
-        referenceId: payload.referenceId || `EL-PROP-${propertyId}`,
-        title: payload.title || 'Submitted Property',
-        price: payload.price || 0,
-        priceDisplay: payload.priceDisplay || `Rs. ${payload.price || 0}`,
-        area: payload.area || 0,
-        areaDisplay: payload.areaDisplay || `${payload.area || 0} sq ft`,
-        location: payload.location || {},
-        propertyType: payload.propertyType || 'OPEN_PLOT',
-        purpose: payload.purpose || 'SALE',
+        referenceId: publicPayload.referenceId || `EL-PROP-${propertyId}`,
+        title: publicPayload.title || 'Submitted Property',
+        price: publicPayload.price || 0,
+        priceDisplay: publicPayload.priceDisplay || `Rs. ${publicPayload.price || 0}`,
+        area: publicPayload.area || 0,
+        areaDisplay: publicPayload.areaDisplay || `${publicPayload.area || 0} sq ft`,
+        location: publicPayload.location || {},
+        propertyType: publicPayload.propertyType || 'OPEN_PLOT',
+        purpose: publicPayload.purpose || 'SALE',
         listingStatus: ListingStatus.PENDING_VERIFICATION,
         status: ListingStatus.PENDING_VERIFICATION,
         isPlatformVerified: false,
         isPublished: false,
         ownerId,
-        ownerPrivateEmail: payload.ownerPrivateEmail || '',
-        createdAt: new Date().toISOString()
-      });
+        ownerPrivateEmail: publicPayload.ownerPrivateEmail || '',
+        createdAt: publicPayload.createdAt || new Date().toISOString()
+      }, true);
     } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-submitted', { detail: publicPayload }));
+      window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: publicPayload }));
+    }
+
+    // 3. Attempt Firestore write (non-blocking fallback for unauthenticated/dummy admin sessions)
+    try {
+      const fsPayload = {
+        ...publicPayload,
+        submittedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      const savePromise = setDoc(propRef, fsPayload, { merge: true });
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 2000));
+      await Promise.race([savePromise, timeoutPromise]);
+    } catch (fsErr) {
+      console.warn('Firestore submit save fallback:', fsErr.message || fsErr);
+    }
 
     return { success: true };
   } catch (error) {
