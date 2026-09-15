@@ -46,7 +46,8 @@ import {
   Sliders,
   CheckSquare,
   Save,
-  Upload
+  Upload,
+  Video
 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
