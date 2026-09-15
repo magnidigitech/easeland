@@ -100,14 +100,6 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     setShowResumeModal(false);
   };
 
-  // Refresh media list from Firestore
-  const handleRefreshMedia = async () => {
-    if (!propertyId) return;
-    const res = await getPropertyById(propertyId, user?.uid);
-    if (res.success && res.property) {
-      setFormData(prev => ({ ...prev, media: res.property.media || [] }));
-    }
-  };
 
   // Helper: Calculate formatted display strings
   const getPriceDisplay = () => {
