@@ -65,24 +65,26 @@ export default function UserDashboard({
   const [fbLoading, setFbLoading] = useState(false);
 
   const refreshOwnerProperties = async () => {
-    if (!user || !user.uid) return;
-    const res = await getOwnerProperties(user.uid);
+    const userId = user?.uid || user?.id;
+    if (!user || !userId) return;
+    const res = await getOwnerProperties(userId);
     if (res.success) {
       setFbOwnerProperties(res.properties || []);
     }
   };
 
   useEffect(() => {
-    if (!user || !user.uid) return;
+    const userId = user?.uid || user?.id;
+    if (!user || !userId) return;
     let isMounted = true;
     setFbLoading(true);
 
     Promise.all([
-      getCustomerEnquiries(user.uid),
-      getOwnerEnquiries(user.uid),
-      getUserWishlistProperties(user.uid),
-      getDerivedEnquiryNotifications(user.uid),
-      getOwnerProperties(user.uid)
+      getCustomerEnquiries(userId),
+      getOwnerEnquiries(userId),
+      getUserWishlistProperties(userId),
+      getDerivedEnquiryNotifications(userId),
+      getOwnerProperties(userId)
     ]).then(([custRes, ownerRes, wishRes, notifRes, ownerPropRes]) => {
       if (!isMounted) return;
       if (custRes.success) setFbSentEnquiries(custRes.enquiries || []);
@@ -247,25 +249,42 @@ export default function UserDashboard({
 
   const [actionLoading, setActionLoading] = useState({});
 
-  const handleOwnerPropertyAction = async (actionType, propId) => {
-    if (!user || !user.uid || !propId || actionLoading[propId]) return;
+  const handleOwnerPropertyAction = async (actionType, targetProp) => {
+    const propId = typeof targetProp === 'object' && targetProp !== null
+      ? (targetProp.id || targetProp.propertyId || targetProp.referenceId)
+      : targetProp;
+
+    const uId = user?.uid || user?.id;
+
+    if (!user || !uId || !propId || actionLoading[propId]) return;
 
     setActionLoading(prev => ({ ...prev, [propId]: true }));
     try {
       let res = null;
       if (actionType === 'SOLD') {
-        res = await markPropertySold(propId, user.uid);
+        res = await markPropertySold(propId, uId);
       } else if (actionType === 'RENTED') {
-        res = await markPropertyRented(propId, user.uid);
+        res = await markPropertyRented(propId, uId);
       } else if (actionType === 'UNAVAILABLE') {
-        res = await markPropertyUnavailable(propId, user.uid);
+        res = await markPropertyUnavailable(propId, uId);
       } else if (actionType === 'LIVE') {
-        res = await markPropertyLive(propId, user.uid);
+        res = await markPropertyLive(propId, uId);
       } else if (actionType === 'ARCHIVE') {
-        res = await archiveProperty(propId, user.uid);
+        res = await archiveProperty(propId, uId);
       } else if (actionType === 'DELETE') {
         if (!window.confirm("Are you sure you want to PERMANENTLY delete this property listing? This action cannot be undone.")) return;
-        res = await deletePropertyListing(propId, user.uid, false);
+
+        // Immediately update UI state for 0ms deletion feedback
+        setFbOwnerProperties(prev => prev.filter(p => {
+          if (!p) return false;
+          const id1 = String(p.id || '');
+          const id2 = String(p.propertyId || '');
+          const id3 = String(p.referenceId || '');
+          const targetStr = String(propId);
+          return id1 !== targetStr && id2 !== targetStr && id3 !== targetStr;
+        }));
+
+        res = await deletePropertyListing(propId, uId, false);
       }
 
       if (res && res.success) {
@@ -925,28 +944,28 @@ export default function UserDashboard({
                             {(prop.status === 'LIVE' || prop.status === 'APPROVED') && (
                               <>
                                 <button
-                                  onClick={() => onPostProperty(prop.propertyId)}
+                                  onClick={() => onPostProperty(prop.id || prop.propertyId)}
                                   className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-brand-charcoal rounded-lg flex items-center gap-1"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                   <span>Edit</span>
                                 </button>
                                 <button
-                                  onClick={() => handleOwnerPropertyAction('UNAVAILABLE', prop.propertyId)}
+                                  onClick={() => handleOwnerPropertyAction('UNAVAILABLE', prop)}
                                   className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1"
                                 >
                                   <Clock className="w-3.5 h-3.5 text-orange-600" />
                                   <span>Pause</span>
                                 </button>
                                 <button
-                                  onClick={() => handleOwnerPropertyAction('SOLD', prop.propertyId)}
+                                  onClick={() => handleOwnerPropertyAction('SOLD', prop)}
                                   className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-lg flex items-center gap-1"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
                                   <span>Mark Sold</span>
                                 </button>
                                 <button
-                                  onClick={() => handleOwnerPropertyAction('RENTED', prop.propertyId)}
+                                  onClick={() => handleOwnerPropertyAction('RENTED', prop)}
                                   className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 rounded-lg flex items-center gap-1"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
@@ -958,7 +977,7 @@ export default function UserDashboard({
                             {/* UNAVAILABLE (PAUSED) */}
                             {prop.status === 'UNAVAILABLE' && (
                               <button
-                                onClick={() => handleOwnerPropertyAction('LIVE', prop.propertyId)}
+                                onClick={() => handleOwnerPropertyAction('LIVE', prop)}
                                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -980,7 +999,7 @@ export default function UserDashboard({
                             {/* ARCHIVE (If not already archived) */}
                             {prop.status !== 'ARCHIVED' && (
                               <button
-                                onClick={() => handleOwnerPropertyAction('ARCHIVE', prop.propertyId)}
+                                onClick={() => handleOwnerPropertyAction('ARCHIVE', prop)}
                                 className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg flex items-center gap-1 transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -990,7 +1009,7 @@ export default function UserDashboard({
 
                             {/* DELETE PROPERTY PERMANENTLY */}
                             <button
-                              onClick={() => handleOwnerPropertyAction('DELETE', prop.propertyId)}
+                              onClick={() => handleOwnerPropertyAction('DELETE', prop)}
                               className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg flex items-center gap-1 transition-colors font-bold shadow-sm"
                             >
                               <Trash2 className="w-3.5 h-3.5" />

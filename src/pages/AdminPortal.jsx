@@ -349,7 +349,8 @@ export default function AdminPortal() {
       let mockProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : (typeof mockApi.getVerificationQueueAdmin === 'function' ? mockApi.getVerificationQueueAdmin() : []);
 
       [...mockProps, ...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
-        const pId = p.id || p.propertyId;
+        if (!p) return;
+        const pId = String(p.id || p.propertyId || p.referenceId || '');
         if (pId) {
           const prev = queueMap.get(pId) || {};
           const mergedMedia = [
@@ -368,6 +369,8 @@ export default function AdminPortal() {
           queueMap.set(pId, {
             ...prev,
             ...p,
+            id: pId,
+            propertyId: pId,
             media: mergedMedia.length > 0 ? mergedMedia : (p.media || prev.media || []),
             photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (prev.photos || []),
             documents: mergedDocs.length > 0 ? mergedDocs : (p.documents || prev.documents || []),

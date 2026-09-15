@@ -26,6 +26,7 @@ export default function App() {
 
   // Merged active user context
   const currentUser = authUser ? {
+    uid: authUser.uid,
     id: authUser.uid,
     name: authProfile?.displayName || authUser.displayName || 'EaseLand User',
     email: authUser.email,
