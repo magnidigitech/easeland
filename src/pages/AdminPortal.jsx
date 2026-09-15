@@ -411,27 +411,30 @@ export default function AdminPortal() {
         (oEmail && u.email && u.email.toLowerCase().trim() === oEmail)
       );
 
+      // Check if owner matches currently authenticated session user
+      const isCurrentSessionUser = user && ((oId && (user.uid === oId || user.id === oId)) || (oEmail && user.email && user.email.toLowerCase().trim() === oEmail));
+
       let resolvedName = '';
       if (matchedUser?.displayName || matchedUser?.name) {
         resolvedName = matchedUser.displayName || matchedUser.name;
+      } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name)) {
+        resolvedName = user.displayName || user.name || profile?.name;
       } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
         resolvedName = p.ownerPublicName.trim();
       } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
         resolvedName = p.owner.name.trim();
-      } else if (matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email) {
-        resolvedName = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email;
-      } else if (oId) {
-        resolvedName = `Account (${String(oId).substring(0, 8)})`;
+      } else if (matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
+        resolvedName = matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
       } else {
         resolvedName = 'Registered Account Owner';
       }
 
-      const rawPhone = matchedUser?.phone || matchedUser?.phoneNumber || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone;
-      const resolvedPhone = (rawPhone && rawPhone.trim() && rawPhone !== '+91 98765 43210' && rawPhone !== '+91 N/A')
-        ? rawPhone.trim()
+      const rawPhone = matchedUser?.phone || matchedUser?.phoneNumber || (isCurrentSessionUser && (user.phoneNumber || profile?.phone)) || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone;
+      const resolvedPhone = (rawPhone && String(rawPhone).trim() && String(rawPhone).trim() !== '+91 98765 43210' && String(rawPhone).trim() !== '+91 N/A')
+        ? String(rawPhone).trim()
         : 'Number Not Updated';
 
-      const resolvedEmail = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email || '';
+      const resolvedEmail = matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || '';
 
       return {
         ...p,
