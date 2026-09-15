@@ -351,7 +351,37 @@ export default function AdminPortal() {
       [...mockProps, ...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
         const pId = p.id || p.propertyId;
         if (pId) {
-          queueMap.set(pId, { ...queueMap.get(pId), ...p });
+          const prev = queueMap.get(pId) || {};
+          const mergedMedia = [
+            ...(Array.isArray(prev.media) ? prev.media : []),
+            ...(Array.isArray(p.media) ? p.media : []),
+            ...(Array.isArray(p.photos) ? p.photos : []),
+            ...(Array.isArray(p.publicApprovedMedia) ? p.publicApprovedMedia : [])
+          ];
+          const mergedDocs = [
+            ...(Array.isArray(prev.documents) ? prev.documents : []),
+            ...(Array.isArray(p.documents) ? p.documents : []),
+            ...(Array.isArray(p.propertyDocuments) ? p.propertyDocuments : []),
+            ...(Array.isArray(p.confidentialDocuments) ? p.confidentialDocuments : [])
+          ];
+
+          queueMap.set(pId, {
+            ...prev,
+            ...p,
+            media: mergedMedia.length > 0 ? mergedMedia : (p.media || prev.media || []),
+            photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (prev.photos || []),
+            documents: mergedDocs.length > 0 ? mergedDocs : (p.documents || prev.documents || []),
+            videoUrl: p.videoUrl || prev.videoUrl || null,
+            videoLink: p.videoLink || prev.videoLink || null,
+            embeddedVideoUrl: p.embeddedVideoUrl || prev.embeddedVideoUrl || null,
+            owner: {
+              ...(prev.owner || {}),
+              ...(p.owner || {}),
+              name: p.ownerPublicName || p.owner?.name || prev.owner?.name,
+              phone: p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || prev.owner?.phone,
+              email: p.ownerPrivateEmail || p.owner?.email || prev.owner?.email
+            }
+          });
         }
       });
       queue = Array.from(queueMap.values());
@@ -704,17 +734,35 @@ export default function AdminPortal() {
       if (pgRes.ok) {
         const pgData = await pgRes.json();
         if (pgData.success && pgData.property) {
-          setSelectedProperty(prev => ({
-            ...prev,
-            ...pgData.property,
-            owner: {
-              ...(prev?.owner || {}),
-              ...(pgData.property?.owner || {}),
-              name: pgData.property?.ownerPublicName || pgData.property?.owner?.name || prev?.owner?.name,
-              phone: pgData.property?.ownerPrivatePhone || pgData.property?.ownerPublicPhone || pgData.property?.owner?.phone || prev?.owner?.phone,
-              email: pgData.property?.ownerPrivateEmail || pgData.property?.owner?.email || prev?.owner?.email
-            }
-          }));
+          const pgProp = pgData.property;
+          setSelectedProperty(prev => {
+            const mergedMedia = [
+              ...(Array.isArray(prev?.media) ? prev.media : []),
+              ...(Array.isArray(pgProp.media) ? pgProp.media : []),
+              ...(Array.isArray(pgProp.photos) ? pgProp.photos : [])
+            ];
+            const mergedDocs = [
+              ...(Array.isArray(prev?.documents) ? prev.documents : []),
+              ...(Array.isArray(pgProp.documents) ? pgProp.documents : []),
+              ...(Array.isArray(pgProp.propertyDocuments) ? pgProp.propertyDocuments : [])
+            ];
+            return {
+              ...prev,
+              ...pgProp,
+              media: mergedMedia.length > 0 ? mergedMedia : (pgProp.media || prev?.media || []),
+              photos: (Array.isArray(pgProp.photos) && pgProp.photos.length > 0) ? pgProp.photos : (prev?.photos || []),
+              documents: mergedDocs.length > 0 ? mergedDocs : (pgProp.documents || prev?.documents || []),
+              videoUrl: pgProp.videoUrl || prev?.videoUrl || null,
+              videoLink: pgProp.videoLink || prev?.videoLink || null,
+              owner: {
+                ...(prev?.owner || {}),
+                ...(pgProp.owner || {}),
+                name: pgProp.ownerPublicName || pgProp.owner?.name || prev?.owner?.name,
+                phone: pgProp.ownerPrivatePhone || pgProp.ownerPublicPhone || pgProp.owner?.phone || prev?.owner?.phone,
+                email: pgProp.ownerPrivateEmail || pgProp.owner?.email || prev?.owner?.email
+              }
+            };
+          });
         }
       }
     } catch (e) {}
@@ -727,17 +775,37 @@ export default function AdminPortal() {
         const wPrivate = workspaceRes.workspace.privateData || {};
         const wDocs = workspaceRes.workspace.documents || [];
 
-        setSelectedProperty(prev => ({
-          ...prev,
-          ...wProp,
-          owner: {
-            ...(prev?.owner || {}),
-            name: wProp.ownerPublicName || wProp.owner?.name || prev?.owner?.name,
-            phone: wPrivate.ownerPrivatePhone || wProp.ownerPublicPhone || prev?.owner?.phone,
-            email: wPrivate.ownerPrivateEmail || prev?.owner?.email
-          },
-          documents: (wDocs.length > 0) ? wDocs : (prev?.documents || [])
-        }));
+        setSelectedProperty(prev => {
+          const mergedMedia = [
+            ...(Array.isArray(prev?.media) ? prev.media : []),
+            ...(Array.isArray(wProp.media) ? wProp.media : []),
+            ...(Array.isArray(wProp.photos) ? wProp.photos : []),
+            ...(Array.isArray(wProp.publicApprovedMedia) ? wProp.publicApprovedMedia : [])
+          ];
+          const mergedDocs = [
+            ...(Array.isArray(prev?.documents) ? prev.documents : []),
+            ...(Array.isArray(wDocs) ? wDocs : []),
+            ...(Array.isArray(wProp.documents) ? wProp.documents : []),
+            ...(Array.isArray(wProp.propertyDocuments) ? wProp.propertyDocuments : []),
+            ...(Array.isArray(wProp.confidentialDocuments) ? wProp.confidentialDocuments : [])
+          ];
+          return {
+            ...prev,
+            ...wProp,
+            media: mergedMedia.length > 0 ? mergedMedia : (wProp.media || prev?.media || []),
+            photos: (Array.isArray(wProp.photos) && wProp.photos.length > 0) ? wProp.photos : (prev?.photos || []),
+            documents: mergedDocs.length > 0 ? mergedDocs : (wProp.documents || prev?.documents || []),
+            videoUrl: wProp.videoUrl || prev?.videoUrl || null,
+            videoLink: wProp.videoLink || prev?.videoLink || null,
+            embeddedVideoUrl: wProp.embeddedVideoUrl || prev?.embeddedVideoUrl || null,
+            owner: {
+              ...(prev?.owner || {}),
+              name: wProp.ownerPublicName || wProp.owner?.name || prev?.owner?.name,
+              phone: wPrivate.ownerPrivatePhone || wProp.ownerPublicPhone || prev?.owner?.phone,
+              email: wPrivate.ownerPrivateEmail || prev?.owner?.email
+            }
+          };
+        });
       }
     } catch (e) {}
 
@@ -2285,11 +2353,23 @@ export default function AdminPortal() {
                           }
                         } catch (e) {}
 
+                        let extraMedia = [];
+                        try {
+                          const storedMedia = localStorage.getItem(`easeland_media_${propId}`) || localStorage.getItem('easeland_user_media');
+                          if (storedMedia) {
+                            const parsedMedia = JSON.parse(storedMedia);
+                            if (Array.isArray(parsedMedia)) {
+                              extraMedia = parsedMedia.filter(m => (m.propertyId === propId || !m.propertyId));
+                            }
+                          }
+                        } catch (e) {}
+
                         const rawItems = [
                           ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
                           ...(Array.isArray(activeAuditProp.propertyDocuments) ? activeAuditProp.propertyDocuments : []),
                           ...(Array.isArray(activeAuditProp.confidentialDocuments) ? activeAuditProp.confidentialDocuments : []),
                           ...extraDocs,
+                          ...extraMedia,
                           ...(Array.isArray(activeAuditProp.media) ? activeAuditProp.media : []),
                           ...(Array.isArray(activeAuditProp.photos) ? activeAuditProp.photos : []),
                           ...(Array.isArray(activeAuditProp.images) ? activeAuditProp.images : []),
