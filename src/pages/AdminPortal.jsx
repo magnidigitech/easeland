@@ -417,37 +417,94 @@ export default function AdminPortal() {
 
     // Enrich verification queue properties with matching registered user account details
     queue = queue.map(p => {
-      const oId = p.ownerId || p.owner?.id;
-      const oEmail = (p.ownerPrivateEmail || p.owner?.email || '').toLowerCase().trim();
-      const matchedUser = users.find(u =>
-        (oId && (u.uid === oId || u.id === oId)) ||
-        (oEmail && u.email && u.email.toLowerCase().trim() === oEmail)
-      );
+      const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy;
+      const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
+      
+      let matchedUser = users.find(u => {
+        if (!u) return false;
+        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+        const uEmail = (u.email || '').toLowerCase().trim();
+        const matchesId = oId && uUid && (uUid === String(oId).toLowerCase().trim());
+        const matchesEmail = oEmail && uEmail && (uEmail === oEmail);
+        return matchesId || matchesEmail;
+      });
+
+      // Local storage fallback for user profile if not found in Firestore users array
+      let localUserProfile = null;
+      if (!matchedUser && typeof window !== 'undefined') {
+        try {
+          if (oId) {
+            const rawStored = localStorage.getItem('easeland_user_profile_' + oId);
+            if (rawStored) localUserProfile = JSON.parse(rawStored);
+          }
+          if (!localUserProfile && oEmail) {
+            const rawReg = localStorage.getItem('easeland_registered_users');
+            if (rawReg) {
+              const regArr = JSON.parse(rawReg);
+              if (Array.isArray(regArr)) {
+                localUserProfile = regArr.find(u => u && u.email && u.email.toLowerCase().trim() === oEmail);
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
+      const effectiveUser = matchedUser || localUserProfile;
 
       // Check if owner matches currently authenticated session user
-      const isCurrentSessionUser = user && ((oId && (user.uid === oId || user.id === oId)) || (oEmail && user.email && user.email.toLowerCase().trim() === oEmail));
+      const isCurrentSessionUser = user && (
+        (oId && (String(user.uid || user.id) === String(oId))) ||
+        (oEmail && user.email && user.email.toLowerCase().trim() === oEmail)
+      );
 
       let resolvedName = '';
-      if (matchedUser?.displayName || matchedUser?.name) {
-        resolvedName = matchedUser.displayName || matchedUser.name;
-      } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name)) {
-        resolvedName = user.displayName || user.name || profile?.name;
+      if (effectiveUser?.displayName || effectiveUser?.name || effectiveUser?.fullName) {
+        resolvedName = effectiveUser.displayName || effectiveUser.name || effectiveUser.fullName;
+      } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name || profile?.displayName)) {
+        resolvedName = user.displayName || user.name || profile?.name || profile?.displayName;
       } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
         resolvedName = p.ownerPublicName.trim();
       } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
         resolvedName = p.owner.name.trim();
-      } else if (matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
-        resolvedName = matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
+      } else if (effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
+        resolvedName = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
       } else {
         resolvedName = 'Registered Account Owner';
       }
 
-      const rawPhone = matchedUser?.phone || matchedUser?.phoneNumber || (isCurrentSessionUser && (user.phoneNumber || profile?.phone)) || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone;
-      const resolvedPhone = (rawPhone && String(rawPhone).trim() && String(rawPhone).trim() !== '+91 98765 43210' && String(rawPhone).trim() !== '+91 N/A')
-        ? String(rawPhone).trim()
-        : 'Number Not Updated';
+      const rawPhone =
+        effectiveUser?.phone ||
+        effectiveUser?.phoneNumber ||
+        effectiveUser?.mobile ||
+        effectiveUser?.contactNumber ||
+        effectiveUser?.contactPhone ||
+        effectiveUser?.phoneNo ||
+        effectiveUser?.contact ||
+        effectiveUser?.telePhone ||
+        effectiveUser?.profile?.phone ||
+        effectiveUser?.profile?.phoneNumber ||
+        (isCurrentSessionUser && (profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phoneNumber || user?.phone)) ||
+        p.ownerPrivatePhone ||
+        p.ownerPublicPhone ||
+        p.owner?.phone ||
+        p.owner?.phoneNumber ||
+        p.ownerContact ||
+        p.contactNumber ||
+        p.contactPhone ||
+        p.phone ||
+        p.mobile;
 
-      const resolvedEmail = matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || '';
+      const cleanedPhone = rawPhone ? String(rawPhone).trim() : '';
+      const isPlaceholder = !cleanedPhone ||
+        cleanedPhone === '+91 98765 43210' ||
+        (cleanedPhone === '9876543210' && !effectiveUser && !isCurrentSessionUser) ||
+        cleanedPhone === '+91 N/A' ||
+        cleanedPhone === 'N/A' ||
+        cleanedPhone === 'undefined' ||
+        cleanedPhone === 'null';
+
+      const resolvedPhone = !isPlaceholder ? cleanedPhone : 'Number Not Updated';
+      const resolvedEmail = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || '';
 
       return {
         ...p,

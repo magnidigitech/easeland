@@ -24,13 +24,12 @@ export default function App() {
   const { user: authUser, profile: authProfile, loading: authLoading, logoutUser } = useAuth();
   const [activePage, setActivePage] = useState('home');
 
-  // Merged active user context
   const currentUser = authUser ? {
     uid: authUser.uid,
     id: authUser.uid,
     name: authProfile?.displayName || authUser.displayName || 'EaseLand User',
     email: authUser.email,
-    phone: authProfile?.phone || '',
+    phone: authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || '',
     role: authProfile?.adminRole ? 'ADMIN' : 'USER',
     capabilities: authProfile?.capabilities || ['CUSTOMER', 'OWNER'],
     ownerVerificationState: authProfile?.ownerVerificationState || 'NOT_VERIFIED'

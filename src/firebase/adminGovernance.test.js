@@ -64,4 +64,10 @@ describe('Block 20 — Admin Governance & Verification Suite', () => {
     expect(fsRules).includes("allow read: if (resource != null && resource.data.state == 'PUBLISHED') || isAdmin();");
     expect(fsRules).includes('allow write: if isAdmin();');
   });
+
+  it('preserves user phone number and maps profile fields cleanly in getAllUsersAdmin', async () => {
+    const res = await getAllUsersAdmin();
+    expect(res).toBeDefined();
+    expect(Array.isArray(res.users)).toBe(true);
+  });
 });

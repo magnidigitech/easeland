@@ -76,13 +76,19 @@ export async function getCurrentUserProfile(uid) {
     const snap = await getDoc(userRef);
     if (snap.exists()) {
       const data = snap.data();
-      if (data.phoneNumber !== undefined || data.name !== undefined) {
-        updateDoc(userRef, {
-          phoneNumber: deleteField(),
-          name: deleteField()
-        }).catch(e => console.warn('Auto-cleanup warning:', e));
-      }
-      return { success: true, profile: { uid: snap.id, ...data } };
+      const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || '';
+      const extractedName = data.displayName || data.name || data.fullName || '';
+      return {
+        success: true,
+        profile: {
+          uid: snap.id,
+          ...data,
+          phone: extractedPhone,
+          phoneNumber: extractedPhone,
+          displayName: extractedName || data.displayName,
+          name: extractedName || data.displayName
+        }
+      };
     }
     return { success: false, error: 'Profile not found' };
   } catch (error) {
@@ -99,16 +105,23 @@ export async function updateOwnProfile(uid, updates) {
     if (!uid) return { success: false, error: 'UID required' };
     const userRef = doc(db, 'users', uid);
 
-    const cleanedUpdates = { ...updates };
-    delete cleanedUpdates.phoneNumber;
-    delete cleanedUpdates.name;
+    const phoneVal = updates.phone || updates.phoneNumber || updates.mobile || updates.contactNumber || '';
+    const nameVal = updates.displayName || updates.name || '';
 
-    await setDoc(userRef, {
-      ...cleanedUpdates,
-      phoneNumber: deleteField(),
-      name: deleteField(),
+    const safeUpdates = {
+      ...updates,
       updatedAt: serverTimestamp()
-    }, { merge: true });
+    };
+    if (phoneVal) {
+      safeUpdates.phone = phoneVal;
+      safeUpdates.phoneNumber = phoneVal;
+    }
+    if (nameVal) {
+      safeUpdates.displayName = nameVal;
+      safeUpdates.name = nameVal;
+    }
+
+    await setDoc(userRef, safeUpdates, { merge: true });
     return { success: true };
   } catch (error) {
     console.error(`Error updating profile for ${uid}:`, error);
@@ -150,14 +163,7 @@ export async function getAllUsersAdmin() {
     snapshot.forEach((docSnap) => {
       try {
         const data = docSnap.data();
-
-        // Auto cleanup legacy fields on fetch if any present
-        if (data.phoneNumber !== undefined || data.name !== undefined) {
-          updateDoc(doc(db, 'users', docSnap.id), {
-            phoneNumber: deleteField(),
-            name: deleteField()
-          }).catch(() => {});
-        }
+        const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || data.telePhone || '';
 
         let createdAtFormatted = null;
         if (data.createdAt) {
@@ -178,8 +184,10 @@ export async function getAllUsersAdmin() {
           id: docSnap.id,
           uid: docSnap.id,
           name: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
+          displayName: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
           email: data.email || '',
-          phone: data.phone || data.phoneNumber || '',
+          phone: extractedPhone,
+          phoneNumber: extractedPhone,
           role: data.adminRole ? 'ADMIN' : (data.role || 'USER'),
           status: data.accountStatus || 'ACTIVE',
           postedListingsCount: data.postedListingsCount || 0,
@@ -190,6 +198,37 @@ export async function getAllUsersAdmin() {
         console.error(`Error processing user document ${docSnap.id}:`, errDoc);
       }
     });
+
+    // Also check localStorage / mock user profiles for hybrid / local offline sessions
+    try {
+      if (typeof window !== 'undefined') {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const regUsers = JSON.parse(rawReg);
+          if (Array.isArray(regUsers)) {
+            regUsers.forEach(ru => {
+              if (ru && ru.email && !users.some(u => u.email.toLowerCase().trim() === ru.email.toLowerCase().trim())) {
+                const uPhone = ru.phone || ru.phoneNumber || ru.mobile || '';
+                users.push({
+                  id: ru.id || ru.uid || 'usr_' + Date.now(),
+                  uid: ru.uid || ru.id || 'usr_' + Date.now(),
+                  name: ru.name || ru.displayName || ru.email.split('@')[0],
+                  displayName: ru.displayName || ru.name || ru.email.split('@')[0],
+                  email: ru.email,
+                  phone: uPhone,
+                  phoneNumber: uPhone,
+                  role: ru.role || 'USER',
+                  status: ru.status || 'ACTIVE',
+                  postedListingsCount: ru.postedListingsCount || 0,
+                  createdAt: ru.joinedDate || new Date().toISOString(),
+                  suspension: ru.suspension || null
+                });
+              }
+            });
+          }
+        }
+      }
+    } catch (eLocal) {}
 
     return { success: true, users };
   } catch (error) {
