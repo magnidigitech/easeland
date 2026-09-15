@@ -740,9 +740,11 @@ export default function AdminPortal() {
       }
     } catch (e) {}
 
-    if (user?.uid) {
-      await startPropertyReview(pId, user.uid, user.displayName || 'EaseLand Auditor');
-    }
+    try {
+      if (user?.uid) {
+        await startPropertyReview(pId, user.uid, user?.displayName || 'EaseLand Auditor');
+      }
+    } catch (err) {}
   };
 
   // User Suspension & Removal Handlers
@@ -2228,28 +2230,38 @@ export default function AdminPortal() {
                       </div>
 
                       {/* FULL DESCRIPTION & AMENITIES */}
-                      {(activeAuditProp.description || (activeAuditProp.amenities && activeAuditProp.amenities.length > 0)) && (
-                        <div className="space-y-3 pt-4 border-t border-slate-200">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                            <FileText className="w-4 h-4 text-purple-600" />
-                            <span>Property Description & Key Amenities</span>
-                          </h4>
-                          {activeAuditProp.description && (
-                            <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 leading-relaxed">
-                              {activeAuditProp.description}
-                            </div>
-                          )}
-                          {activeAuditProp.amenities && activeAuditProp.amenities.length > 0 && (
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {activeAuditProp.amenities.map((amenity, idx) => (
-                                <span key={idx} className="bg-slate-200 text-slate-900 font-extrabold text-[11px] px-3 py-1 rounded-lg border border-slate-300">
-                                  ✓ {amenity}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {(() => {
+                        const amenitiesList = Array.isArray(activeAuditProp.amenities)
+                          ? activeAuditProp.amenities
+                          : (typeof activeAuditProp.amenities === 'string'
+                              ? activeAuditProp.amenities.split(',').map(s => s.trim()).filter(Boolean)
+                              : []);
+
+                        if (!activeAuditProp.description && amenitiesList.length === 0) return null;
+
+                        return (
+                          <div className="space-y-3 pt-4 border-t border-slate-200">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                              <FileText className="w-4 h-4 text-purple-600" />
+                              <span>Property Description & Key Amenities</span>
+                            </h4>
+                            {activeAuditProp.description && (
+                              <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 leading-relaxed">
+                                {activeAuditProp.description}
+                              </div>
+                            )}
+                            {amenitiesList.length > 0 && (
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {amenitiesList.map((amenity, idx) => (
+                                  <span key={idx} className="bg-slate-200 text-slate-900 font-extrabold text-[11px] px-3 py-1 rounded-lg border border-slate-300">
+                                    ✓ {amenity}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* SUBMITTED MEDIA, VIDEO PRESENTATION & UPLOADED DOCUMENTS */}
                       {(() => {
