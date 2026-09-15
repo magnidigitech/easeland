@@ -411,17 +411,19 @@ export default function AdminPortal() {
         (oEmail && u.email && u.email.toLowerCase().trim() === oEmail)
       );
 
-      let rawName = matchedUser?.displayName || matchedUser?.name || p.ownerPublicName || p.owner?.name;
       let resolvedName = '';
-      if (rawName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(rawName.trim()) && !rawName.startsWith('Account ID:')) {
-        resolvedName = rawName.trim();
+      if (matchedUser?.displayName || matchedUser?.name) {
+        resolvedName = matchedUser.displayName || matchedUser.name;
+      } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
+        resolvedName = p.ownerPublicName.trim();
+      } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
+        resolvedName = p.owner.name.trim();
+      } else if (matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email) {
+        resolvedName = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email;
+      } else if (oId) {
+        resolvedName = `Account (${String(oId).substring(0, 8)})`;
       } else {
-        const emailToUse = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email;
-        if (emailToUse) {
-          resolvedName = emailToUse;
-        } else {
-          resolvedName = 'Property Owner';
-        }
+        resolvedName = 'Registered Account Owner';
       }
 
       const rawPhone = matchedUser?.phone || matchedUser?.phoneNumber || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone;
@@ -2221,9 +2223,7 @@ export default function AdminPortal() {
                         {/* SEPARATE COLUMN: OWNER NAME */}
                         <div className="col-span-3">
                           <span className="font-extrabold text-slate-900 block line-clamp-1">
-                            {prop.owner?.name && !['Property Owner', 'Verified Property Owner'].includes(prop.owner.name) && !prop.owner.name.startsWith('Account ID:')
-                              ? prop.owner.name
-                              : (prop.owner?.email || prop.ownerPublicName || 'Property Owner')}
+                            {prop.owner?.name || 'Registered Account Owner'}
                           </span>
                           {prop.owner?.email && (
                             <span className="text-slate-500 text-[10px] block line-clamp-1 font-semibold">

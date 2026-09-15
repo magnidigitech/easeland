@@ -213,12 +213,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       const draftData = {
         ...formData,
         ownerId: user?.uid || user?.id,
-        ownerPublicName: user?.displayName || user?.name || 'Property Owner',
+        ownerPublicName: user?.displayName || user?.name || user?.email || '',
         ownerPrivateEmail: user?.email || '',
         ownerPrivatePhone: user?.phone || user?.phoneNumber || '',
         owner: {
           id: user?.uid || user?.id,
-          name: user?.displayName || user?.name || 'Property Owner',
+          name: user?.displayName || user?.name || user?.email || '',
           email: user?.email || '',
           phone: user?.phone || user?.phoneNumber || ''
         },
