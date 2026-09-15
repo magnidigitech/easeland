@@ -145,14 +145,13 @@ export async function uploadConfidentialPropertyDocument({
 
       const propRef = doc(db, 'properties', propertyId);
       const propSnap = await getDoc(propRef);
-      if (propSnap.exists()) {
-        const existingDocs = Array.isArray(propSnap.data().documents) ? propSnap.data().documents : [];
-        const updatedDocs = [...existingDocs.filter(d => d.docId !== docId), docItemObj];
+      const existingDocs = propSnap.exists() && Array.isArray(propSnap.data().documents) ? propSnap.data().documents : [];
+      const updatedDocs = [...existingDocs.filter(d => d.docId !== docId), docItemObj];
 
-        await updateDoc(propRef, {
-          documents: updatedDocs,
-          updatedAt: serverTimestamp()
-        });
+      await setDoc(propRef, {
+        documents: updatedDocs,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
         const updatedPropData = { ...propSnap.data(), documents: updatedDocs };
         const { syncPropertyToPostgres } = await import('./propertyService.js');
@@ -163,7 +162,6 @@ export async function uploadConfidentialPropertyDocument({
         if (pObj) {
           pObj.documents = updatedDocs;
         }
-      }
     } catch (syncErr) {}
 
     return { success: true, docId, document: docPayload };

@@ -83,7 +83,51 @@ function saveLocalProperty(p) {
   if (!p || (!p.propertyId && !p.id)) return;
   const pId = p.propertyId || p.id;
   const existing = localPropsMap.get(pId) || {};
-  const updated = { ...existing, ...p, propertyId: pId, id: pId, updatedAt: new Date().toISOString() };
+
+  const mergedMedia = [
+    ...(Array.isArray(existing.media) ? existing.media : []),
+    ...(Array.isArray(p.media) ? p.media : []),
+    ...(Array.isArray(p.photos) ? p.photos : [])
+  ];
+
+  const mergedDocs = [
+    ...(Array.isArray(existing.documents) ? existing.documents : []),
+    ...(Array.isArray(p.documents) ? p.documents : []),
+    ...(Array.isArray(p.propertyDocuments) ? p.propertyDocuments : [])
+  ];
+
+  const seenMedia = new Set();
+  const cleanMedia = mergedMedia.filter(m => {
+    if (!m) return false;
+    const key = typeof m === 'string' ? m : (m.publicUrl || m.url || m.mediaId);
+    if (!key || seenMedia.has(key)) return false;
+    seenMedia.add(key);
+    return true;
+  });
+
+  const seenDocs = new Set();
+  const cleanDocs = mergedDocs.filter(d => {
+    if (!d) return false;
+    const key = typeof d === 'string' ? d : (d.url || d.docId || d.name);
+    if (!key || seenDocs.has(key)) return false;
+    seenDocs.add(key);
+    return true;
+  });
+
+  const updated = {
+    ...existing,
+    ...p,
+    propertyId: pId,
+    id: pId,
+    media: cleanMedia.length > 0 ? cleanMedia : (p.media || existing.media || []),
+    photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (existing.photos || []),
+    documents: cleanDocs.length > 0 ? cleanDocs : (p.documents || existing.documents || []),
+    videoUrl: p.videoUrl || existing.videoUrl || null,
+    videoLink: p.videoLink || existing.videoLink || null,
+    embeddedVideoUrl: p.embeddedVideoUrl || existing.embeddedVideoUrl || null,
+    updatedAt: new Date().toISOString()
+  };
+
   localPropsMap.set(pId, updated);
 
   try {
@@ -226,6 +270,45 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         req.file.buffer
       ]).catch(pgErr => console.warn('PostgreSQL background media insert note:', pgErr.message));
     } catch (e) {}
+
+    // 3. Immediately attach uploaded file to property record in local store
+    try {
+      if (propertyId && propertyId !== 'common') {
+        const existingProp = localPropsMap.get(propertyId) || { propertyId, id: propertyId };
+        if (isDocument) {
+          const docObj = {
+            docId: mediaId,
+            name: req.file.originalname,
+            type: 'DOCUMENT',
+            url: publicUrl,
+            size: req.file.size,
+            isDocument: true
+          };
+          const existingDocs = Array.isArray(existingProp.documents) ? existingProp.documents : [];
+          existingProp.documents = [...existingDocs, docObj];
+        } else {
+          const mediaObj = {
+            mediaId,
+            publicUrl,
+            url: publicUrl,
+            fileName: req.file.originalname,
+            type: mediaType,
+            fileSize: req.file.size,
+            contentType: req.file.mimetype
+          };
+          const existingMedia = Array.isArray(existingProp.media) ? existingProp.media : [];
+          existingProp.media = [...existingMedia, mediaObj];
+          if (mediaType === 'WALKTHROUGH_VIDEO' || mediaType === 'DRONE_VIDEO' || mediaType === 'VIDEO') {
+            existingProp.videoUrl = publicUrl;
+            existingProp.videoLink = publicUrl;
+            existingProp.embeddedVideoUrl = publicUrl;
+          }
+        }
+        saveLocalProperty(existingProp);
+      }
+    } catch (attachErr) {
+      console.warn('Local property attach note:', attachErr.message);
+    }
 
     return res.json({
       success: true,

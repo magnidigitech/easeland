@@ -113,14 +113,14 @@ export async function addPropertyVideoLink(
     } catch (e) {}
 
     const vUrl = parsed.publicUrl || parsed.embedUrl || parsed.url;
-    await updateDoc(propRef, {
+    await setDoc(propRef, {
       media: masterMedia,
       videoUrl: vUrl,
       videoLink: vUrl,
       embeddedVideoUrl: parsed.embedUrl || vUrl,
       publicApprovedMedia,
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
 
     // Also sync to PostgreSQL & mockApi
     try {
@@ -421,7 +421,7 @@ export async function uploadPropertyMediaFile(
       updatePayload.embeddedVideoUrl = downloadUrl;
     }
 
-    await updateDoc(propRef, updatePayload);
+    await setDoc(propRef, updatePayload, { merge: true });
 
     // Sync to PostgreSQL & mockApi
     try {

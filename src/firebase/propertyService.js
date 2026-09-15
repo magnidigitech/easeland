@@ -743,7 +743,7 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
       updatedAt: serverTimestamp()
     };
 
-    const savePromise = updateDoc(propRef, payload);
+    const savePromise = setDoc(propRef, payload, { merge: true });
     const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 3500));
 
     await Promise.race([savePromise, timeoutPromise]);
