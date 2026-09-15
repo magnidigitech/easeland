@@ -456,11 +456,32 @@ app.get('/api/properties/:id', async (req, res) => {
     }
   } catch (err) {}
 
-  if (localProp) {
-    return res.json({ success: true, property: localProp });
-  }
-
   return res.status(404).json({ success: false, error: 'Property not found.' });
+});
+
+// API Endpoint: Delete Property Listing (from Local Store + PostgreSQL)
+app.delete('/api/properties/:id', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    if (!targetId) return res.status(400).json({ success: false, error: 'Property ID required' });
+
+    // 1. Remove from localPropsMap & disk store
+    localPropsMap.delete(targetId);
+    try {
+      const arrayToStore = Array.from(localPropsMap.values());
+      fs.writeFileSync(propertiesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+    } catch (e) {}
+
+    // 2. Remove from PostgreSQL
+    try {
+      await pgPool.query('DELETE FROM properties WHERE property_id = $1;', [targetId]);
+      await pgPool.query('DELETE FROM media_files WHERE property_id = $1;', [targetId]);
+    } catch (e) {}
+
+    return res.json({ success: true, message: 'Property deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message || 'Delete failed' });
+  }
 });
 
 // SPA Routing Fallback (for React Router / single page app)

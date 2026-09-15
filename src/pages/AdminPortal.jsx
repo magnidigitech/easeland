@@ -384,7 +384,11 @@ export default function AdminPortal() {
           });
         }
       });
-      queue = Array.from(queueMap.values());
+      queue = Array.from(queueMap.values()).filter(p => {
+        if (!p) return false;
+        const title = (p.title || '').trim();
+        return title.length > 0 && title !== '.' && title !== ',';
+      });
     } catch (e1) {
       console.warn('Error loading verification queue:', e1);
     }
@@ -707,6 +711,25 @@ export default function AdminPortal() {
       setIsWorkspaceOpen(false);
       setSelectedProperty(null);
       setActiveTab('verification');
+      await loadData();
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } finally {
+      setAdminActionProcessing(false);
+    }
+  };
+
+  const handleDeleteProperty = async (propId) => {
+    if (adminActionProcessing || !propId) return;
+    if (!window.confirm('Are you sure you want to PERMANENTLY delete this property listing from the platform? This cannot be undone.')) return;
+
+    setAdminActionProcessing(true);
+    try {
+      const { deletePropertyListing } = await import('../firebase/propertyService.js');
+      await deletePropertyListing(propId, user?.uid, true);
+
+      setPublishSuccessMessage('Property listing deleted successfully.');
+      setIsWorkspaceOpen(false);
+      setSelectedProperty(null);
       await loadData();
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
@@ -2159,7 +2182,7 @@ export default function AdminPortal() {
                         <div className="col-span-2 text-gray-500 font-semibold">
                           {prop.submittedDate || 'Recent'}
                         </div>
-                        <div className="col-span-2 text-right">
+                        <div className="col-span-2 text-right flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -2170,6 +2193,18 @@ export default function AdminPortal() {
                             className="bg-brand-charcoal text-white font-bold px-3 py-1.5 rounded-xl hover:bg-brand-yellow hover:text-brand-charcoal transition-all text-[11px]"
                           >
                             Audit Now
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteProperty(prop.id);
+                            }}
+                            className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white font-extrabold px-2.5 py-1.5 rounded-xl transition-all text-[11px] shadow-sm"
+                            title="Delete Property Listing"
+                          >
+                            Delete
                           </button>
                         </div>
                       </div>
@@ -2226,13 +2261,23 @@ export default function AdminPortal() {
                             </span>
                           </p>
                         </div>
-                        <div className="text-right">
-                          <span className="text-2xl font-black text-emerald-700 block">
-                            {activeAuditProp.priceDisplay || (activeAuditProp.price ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}` : 'Price on Request')}
-                          </span>
-                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                            Submitted: {activeAuditProp.submittedDate || 'Recent'}
-                          </span>
+                        <div className="text-right flex flex-col items-end gap-2">
+                          <div>
+                            <span className="text-2xl font-black text-emerald-700 block">
+                              {activeAuditProp.priceDisplay || (activeAuditProp.price ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}` : 'Price on Request')}
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block">
+                              Submitted: {activeAuditProp.submittedDate || 'Recent'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProperty(activeAuditProp.id || activeAuditProp.propertyId)}
+                            className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-extrabold px-3 py-1.5 rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete Property</span>
+                          </button>
                         </div>
                       </div>
 

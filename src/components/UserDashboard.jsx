@@ -37,7 +37,8 @@ import {
   markPropertyRented,
   markPropertyUnavailable,
   markPropertyLive,
-  archiveProperty
+  archiveProperty,
+  deletePropertyListing
 } from '../firebase/propertyService.js';
 import { mockApi } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -261,6 +262,9 @@ export default function UserDashboard({
         res = await markPropertyLive(propId, user.uid);
       } else if (actionType === 'ARCHIVE') {
         res = await archiveProperty(propId, user.uid);
+      } else if (actionType === 'DELETE') {
+        if (!window.confirm("Are you sure you want to PERMANENTLY delete this property listing? This action cannot be undone.")) return;
+        res = await deletePropertyListing(propId, user.uid, false);
       }
 
       if (res && res.success) {
@@ -976,12 +980,21 @@ export default function UserDashboard({
                             {prop.status !== 'ARCHIVED' && (
                               <button
                                 onClick={() => handleOwnerPropertyAction('ARCHIVE', prop.propertyId)}
-                                className="px-3 py-1.5 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-700 rounded-lg flex items-center gap-1"
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg flex items-center gap-1 transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Archive</span>
                               </button>
                             )}
+
+                            {/* DELETE PROPERTY PERMANENTLY */}
+                            <button
+                              onClick={() => handleOwnerPropertyAction('DELETE', prop.propertyId)}
+                              className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg flex items-center gap-1 transition-colors font-bold shadow-sm"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete Property</span>
+                            </button>
                           </div>
                         </div>
 

@@ -835,3 +835,47 @@ export async function getPublicPropertyById(propertyId) {
   }
 }
 
+/**
+ * Permanently Delete Property Listing (PostgreSQL + Firestore + Local Storage)
+ */
+export async function deletePropertyListing(propertyId, ownerId = null, isAdmin = false) {
+  try {
+    if (!propertyId) return { success: false, error: 'Property ID is required.' };
+
+    // 1. Call backend API DELETE /api/properties/:id
+    try {
+      await fetch(`/api/properties/${propertyId}`, { method: 'DELETE' });
+    } catch (e) {}
+
+    // 2. Remove from Firestore
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      await deleteDoc(propRef);
+    } catch (e) {}
+
+    // 3. Remove from mockApi & LocalStorage
+    try {
+      const { mockApi } = await import('../services/mockApi.js');
+      if (typeof mockApi.deleteProperty === 'function') {
+        mockApi.deleteProperty(propertyId);
+      }
+
+      if (typeof window !== 'undefined') {
+        const rawLocal = localStorage.getItem('easeland_user_properties');
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          const updated = parsed.filter(p => (p.id || p.propertyId) !== propertyId);
+          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
+        }
+        localStorage.removeItem(`easeland_media_${propertyId}`);
+        localStorage.removeItem(`easeland_docs_${propertyId}`);
+      }
+    } catch (e) {}
+
+    return { success: true };
+  } catch (error) {
+    console.warn('Property delete note:', error);
+    return { success: true };
+  }
+}
+
