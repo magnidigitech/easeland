@@ -35,6 +35,39 @@ export default function PropertyReviewStep({
   const [errorMsg, setErrorMsg] = useState(null);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
+  const [reviewMedia, setReviewMedia] = useState(() => {
+    if (Array.isArray(formData.media) && formData.media.length > 0) return formData.media;
+    if (Array.isArray(formData.photos) && formData.photos.length > 0) return formData.photos;
+    return [];
+  });
+
+  useEffect(() => {
+    if (Array.isArray(formData.media) && formData.media.length > 0) {
+      setReviewMedia(formData.media);
+    } else if (Array.isArray(formData.photos) && formData.photos.length > 0) {
+      setReviewMedia(formData.photos);
+    } else if (propertyId) {
+      try {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem(`easeland_media_${propertyId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setReviewMedia(parsed);
+              return;
+            }
+          }
+        }
+        import('../services/mockApi.js').then(({ mockApi }) => {
+          const pObj = mockApi.getPropertyById(propertyId);
+          if (pObj && Array.isArray(pObj.media) && pObj.media.length > 0) {
+            setReviewMedia(pObj.media);
+          }
+        });
+      } catch (e) {}
+    }
+  }, [propertyId, formData.media, formData.photos]);
+
   // Fetch confidential documents for this property
   useEffect(() => {
     if (propertyId && ownerId) {
@@ -340,7 +373,7 @@ export default function PropertyReviewStep({
         <div className="flex items-center justify-between pb-3 border-b border-gray-100">
           <h4 className="text-sm font-extrabold text-brand-charcoal flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-brand-yellow" />
-            <span>4. Photos & Videos ({formData.media?.length || 0})</span>
+            <span>4. Photos & Videos ({reviewMedia.length})</span>
           </h4>
           <button
             type="button"
@@ -352,15 +385,16 @@ export default function PropertyReviewStep({
           </button>
         </div>
 
-        {formData.media && formData.media.length > 0 ? (
+        {reviewMedia.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {formData.media.map((item, idx) => (
+            {reviewMedia.map((item, idx) => (
               <div key={item.mediaId || idx} className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
-                {item.type === 'PHOTO' ? (
-                  <img src={item.publicUrl} alt={item.fileName} className="w-full h-full object-cover" />
+                {item.type === 'PHOTO' || (!item.type && item.publicUrl) ? (
+                  <img src={item.publicUrl || item.thumbnailUrl} alt={item.fileName || `Photo ${idx + 1}`} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white font-extrabold text-[10px]">
-                    VIDEO
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white font-extrabold text-[10px] p-2 text-center">
+                    <span className="text-brand-yellow font-black text-xs">🎬 VIDEO</span>
+                    <span className="text-[9px] text-gray-300 font-semibold line-clamp-1 mt-1">{item.fileName || item.provider || 'Walkthrough Video'}</span>
                   </div>
                 )}
                 {item.isPrimary && (

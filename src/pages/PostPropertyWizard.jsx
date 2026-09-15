@@ -167,21 +167,47 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     return true;
   };
 
-  const handleRefreshMedia = async () => {
+  const handleRefreshMedia = async (directMedia = null) => {
+    if (Array.isArray(directMedia)) {
+      setFormData(prev => ({
+        ...prev,
+        media: directMedia,
+        photos: directMedia.filter(m => m.type === 'PHOTO'),
+        videoUrl: directMedia.find(m => m.type !== 'PHOTO')?.publicUrl || prev.videoUrl || null,
+        videoLink: directMedia.find(m => m.type !== 'PHOTO')?.publicUrl || prev.videoLink || null,
+        embeddedVideoUrl: directMedia.find(m => m.type !== 'PHOTO')?.embedUrl || prev.embeddedVideoUrl || null
+      }));
+      return;
+    }
+
     if (!propertyId) return;
     try {
       const { getPropertyById } = await import('../firebase/propertyService.js');
-      const pRes = await getPropertyById(propertyId);
+      const pRes = await getPropertyById(propertyId, user?.uid, true);
       if (pRes.success && pRes.property) {
         const prop = pRes.property;
+        const mList = Array.isArray(prop.media) && prop.media.length > 0 ? prop.media : (formData.media || []);
         setFormData(prev => ({
           ...prev,
-          media: prop.media || prev.media || [],
-          photos: prop.photos || prop.media || prev.photos || [],
+          media: mList,
+          photos: mList.filter(m => m.type === 'PHOTO'),
           videoUrl: prop.videoUrl || prop.videoLink || prev.videoUrl || null,
           videoLink: prop.videoLink || prop.videoUrl || prev.videoLink || null,
           embeddedVideoUrl: prop.embeddedVideoUrl || prev.embeddedVideoUrl || null
         }));
+      } else {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj && Array.isArray(pObj.media) && pObj.media.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            media: pObj.media,
+            photos: pObj.media.filter(m => m.type === 'PHOTO'),
+            videoUrl: pObj.videoUrl || prev.videoUrl || null,
+            videoLink: pObj.videoLink || prev.videoLink || null,
+            embeddedVideoUrl: pObj.embeddedVideoUrl || prev.embeddedVideoUrl || null
+          }));
+        }
       }
     } catch (e) {}
   };

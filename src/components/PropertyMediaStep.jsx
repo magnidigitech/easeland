@@ -58,10 +58,11 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
         }
       }
 
-      setInternalMedia(prev => [...prev, ...newlyAdded]);
+      const nextMedia = [...internalMedia, ...newlyAdded];
+      setInternalMedia(nextMedia);
       setSuccessMsg('Photo(s) uploaded successfully. Saved for listing preview.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      if (onUpdateMedia) onUpdateMedia();
+      if (onUpdateMedia) onUpdateMedia(nextMedia);
     } catch (err) {
       setErrorMsg(`Upload failed: ${err.message || 'Network error'}`);
     } finally {
@@ -101,10 +102,11 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
         }
       }
 
-      setInternalMedia(prev => [...prev, ...newlyAdded]);
+      const nextMedia = [...internalMedia, ...newlyAdded];
+      setInternalMedia(nextMedia);
       setSuccessMsg('Video uploaded successfully. Saved for listing preview.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      if (onUpdateMedia) onUpdateMedia();
+      if (onUpdateMedia) onUpdateMedia(nextMedia);
     } catch (err) {
       setErrorMsg(`Video upload failed: ${err.message || 'Network error'}`);
     } finally {
@@ -130,11 +132,12 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
       });
 
       if (result.success && result.mediaItem) {
-        setInternalMedia(prev => [...prev, result.mediaItem]);
+        const nextMedia = [...internalMedia, result.mediaItem];
+        setInternalMedia(nextMedia);
         setVideoLinkInput('');
         setSuccessMsg('Video link attached successfully.');
         setTimeout(() => setSuccessMsg(null), 3000);
-        if (onUpdateMedia) onUpdateMedia();
+        if (onUpdateMedia) onUpdateMedia(nextMedia);
       } else {
         setErrorMsg(result.error || 'Failed to attach video link.');
       }
@@ -149,12 +152,14 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
   const handleRemoveMedia = async (mediaId) => {
     if (!propertyId || !mediaId) return;
     setErrorMsg(null);
-    setInternalMedia(prev => prev.filter(m => m.mediaId !== mediaId));
+    const nextMedia = internalMedia.filter(m => m.mediaId !== mediaId);
+    setInternalMedia(nextMedia);
+    if (onUpdateMedia) onUpdateMedia(nextMedia);
+
     const res = await removePropertyMediaFile(propertyId, ownerId, mediaId);
     if (res.success) {
       setSuccessMsg('Media item removed.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      if (onUpdateMedia) onUpdateMedia();
     } else {
       setErrorMsg(res.error);
     }
@@ -164,15 +169,17 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
   const handleSetPrimary = async (mediaId) => {
     if (!propertyId || !mediaId) return;
     setErrorMsg(null);
-    setInternalMedia(prev => prev.map(m => ({
+    const nextMedia = internalMedia.map(m => ({
       ...m,
       isPrimary: m.type === MediaType.PHOTO ? m.mediaId === mediaId : m.isPrimary
-    })));
+    }));
+    setInternalMedia(nextMedia);
+    if (onUpdateMedia) onUpdateMedia(nextMedia);
+
     const res = await setPrimaryPropertyPhoto(propertyId, ownerId, mediaId);
     if (res.success) {
       setSuccessMsg('Cover photo updated.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      if (onUpdateMedia) onUpdateMedia();
     } else {
       setErrorMsg(res.error);
     }
@@ -191,11 +198,9 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
     const nonPhotos = internalMedia.filter(m => m.type !== MediaType.PHOTO);
     const combined = [...newPhotos, ...nonPhotos];
     setInternalMedia(combined);
+    if (onUpdateMedia) onUpdateMedia(combined);
 
     const res = await updatePropertyMediaOrder(propertyId, ownerId, combined);
-    if (res.success && onUpdateMedia) {
-      onUpdateMedia();
-    }
   };
 
   return (
