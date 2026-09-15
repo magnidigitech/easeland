@@ -297,10 +297,14 @@ export async function uploadPropertyMediaFile(
     const propRef = doc(db, 'properties', propertyId);
     let masterMedia = [];
 
-    const snap = await getDoc(propRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      masterMedia = sanitizeMediaArray(data.media);
+    try {
+      const snap = await getDoc(propRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        masterMedia = sanitizeMediaArray(data.media);
+      }
+    } catch (fsErr) {
+      console.warn('Firestore property read note prior to upload:', fsErr.message);
     }
 
     if (masterMedia.length >= 30) {
