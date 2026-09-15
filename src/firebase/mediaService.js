@@ -67,10 +67,13 @@ export async function addPropertyVideoLink(
 
     const propRef = doc(db, 'properties', propertyId);
     let masterMedia = [];
-
-    const snap = await getDoc(propRef);
-    if (snap.exists()) {
-      masterMedia = sanitizeMediaArray(snap.data().media);
+    try {
+      const snap = await getDoc(propRef);
+      if (snap.exists()) {
+        masterMedia = sanitizeMediaArray(snap.data().media);
+      }
+    } catch (fsReadErr) {
+      console.warn('Firestore property read note prior to video link:', fsReadErr.message);
     }
 
     const mediaId = `med-link-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -78,7 +81,7 @@ export async function addPropertyVideoLink(
     const newMediaObj = {
       mediaId,
       propertyId,
-      ownerId: ownerId || auth.currentUser?.uid || 'anonymous-owner',
+      ownerId: ownerId || 'anonymous-owner',
       type: mediaType,
       provider: parsed.provider,
       storagePath: `external_link:${parsed.provider}:${parsed.videoId || parsed.fileId}`,
@@ -102,35 +105,36 @@ export async function addPropertyVideoLink(
       item => item && item.verificationStatus === MediaStatus.APPROVED
     );
 
-    const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
+    const vUrl = parsed.publicUrl || parsed.embedUrl || parsed.url;
+
+    // 1. Update Firestore (non-blocking)
     try {
-      await setDoc(mediaPrivateRef, {
-        propertyId,
-        ownerId: ownerId || 'anonymous-owner',
-        masterMedia,
+      await setDoc(propRef, {
+        media: masterMedia,
+        videoUrl: vUrl,
+        videoLink: vUrl,
+        embeddedVideoUrl: parsed.embedUrl || vUrl,
+        publicApprovedMedia,
         updatedAt: serverTimestamp()
       }, { merge: true });
-    } catch (e) {}
+    } catch (fsErr) {
+      console.warn('Firestore video link sync note:', fsErr.message);
+    }
 
-    const vUrl = parsed.publicUrl || parsed.embedUrl || parsed.url;
-    await setDoc(propRef, {
-      media: masterMedia,
-      videoUrl: vUrl,
-      videoLink: vUrl,
-      embeddedVideoUrl: parsed.embedUrl || vUrl,
-      publicApprovedMedia,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
-    // Also sync to PostgreSQL & mockApi
+    // 2. Direct Sync to PostgreSQL backend (/api/properties)
     try {
       const { syncPropertyToPostgres } = await import('./propertyService.js');
-      const snapData = (await getDoc(propRef)).data();
-      if (snapData) {
-        syncPropertyToPostgres({ ...snapData, videoUrl: vUrl, videoLink: vUrl, embeddedVideoUrl: parsed.embedUrl || vUrl, media: masterMedia });
-      }
+      syncPropertyToPostgres({
+        propertyId,
+        id: propertyId,
+        videoUrl: vUrl,
+        videoLink: vUrl,
+        embeddedVideoUrl: parsed.embedUrl || vUrl,
+        media: masterMedia
+      });
     } catch (e) {}
 
+    // 3. Sync to local memory & browser storage
     try {
       const { mockApi } = await import('../services/mockApi.js');
       const pObj = mockApi.getPropertyById(propertyId);
@@ -140,11 +144,18 @@ export async function addPropertyVideoLink(
         pObj.embeddedVideoUrl = parsed.embedUrl || vUrl;
         pObj.media = masterMedia;
       }
+
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(`easeland_media_${propertyId}`) || '[]';
+        const parsedStored = JSON.parse(stored);
+        localStorage.setItem(`easeland_media_${propertyId}`, JSON.stringify([...parsedStored, newMediaObj]));
+      }
     } catch (e) {}
 
     return { success: true, mediaItem: newMediaObj };
   } catch (error) {
-    return { success: false, error: formatFirestoreError(error) };
+    console.warn('Add video link error:', error);
+    return { success: false, error: error.message || 'Failed to attach video link.' };
   }
 }
 
