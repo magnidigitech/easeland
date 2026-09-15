@@ -579,8 +579,8 @@ export const mockApi = {
       const pId = String(p.id || p.propertyId || '');
       if (deletedIds.includes(pId)) return false;
 
-      return ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.status) ||
-             ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING'].includes(p.listingStatus);
+      const st = (p.status || p.listingStatus || '').toUpperCase();
+      return ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING', 'SUBMITTED', 'DRAFT', 'CHANGES_REQUIRED', 'NOT_VERIFIED'].includes(st);
     });
   },
 

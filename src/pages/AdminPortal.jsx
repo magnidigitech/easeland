@@ -321,8 +321,9 @@ export default function AdminPortal() {
   };
 
   const loadData = async () => {
-    // 1. Verification Queue (Retrieved directly from Cloud Firestore & PostgreSQL Database)
+    // 1. Verification Queue (Retrieved directly from Cloud Firestore, Postgres & local storage)
     let queue = [];
+    let allMergedProps = [];
     try {
       const vRes = await getVerificationQueue();
       let firebaseProps = (vRes.success && Array.isArray(vRes.properties)) ? vRes.properties : [];
@@ -340,15 +341,24 @@ export default function AdminPortal() {
 
       let localProps = [];
       try {
-        const localRaw = localStorage.getItem('easeland_user_properties');
-        if (localRaw) localProps = JSON.parse(localRaw);
+        if (typeof window !== 'undefined') {
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+          keys.forEach(k => {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) localProps.push(...parsed);
+              else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+            }
+          });
+        }
       } catch (lErr) {}
 
       const queueMap = new Map();
-      // Order: mockProps -> localProps -> postgresProps -> firebaseProps (Real database properties overwrite mock)
-      let mockProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : (typeof mockApi.getVerificationQueueAdmin === 'function' ? mockApi.getVerificationQueueAdmin() : []);
+      let mockQueueProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : [];
+      let mockAllProps = typeof mockApi.getAllPropertiesAdmin === 'function' ? mockApi.getAllPropertiesAdmin() : [];
 
-      [...mockProps, ...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
+      [...mockQueueProps, ...mockAllProps, ...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
         if (!p) return;
         const pId = String(p.id || p.propertyId || p.referenceId || '');
         if (pId) {
@@ -395,13 +405,22 @@ export default function AdminPortal() {
         }
       } catch (e) {}
 
-      queue = Array.from(queueMap.values()).filter(p => {
+      allMergedProps = Array.from(queueMap.values()).filter(p => {
         if (!p) return false;
         const pId = String(p.id || p.propertyId || '');
         if (deletedIds.includes(pId)) return false;
         const title = (p.title || '').trim();
         return title.length > 0 && title !== '.' && title !== ',';
       });
+
+      queue = allMergedProps.filter(p => {
+        const st = (p.status || p.listingStatus || '').toUpperCase();
+        return st !== 'APPROVED_LIVE' && st !== 'LIVE' || ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING', 'SUBMITTED', 'DRAFT', 'CHANGES_REQUIRED', 'NOT_VERIFIED'].includes(st);
+      });
+
+      if (queue.length === 0 && allMergedProps.length > 0) {
+        queue = allMergedProps;
+      }
     } catch (e1) {
       console.warn('Error loading verification queue:', e1);
     }
@@ -548,29 +567,43 @@ export default function AdminPortal() {
     const fups = typeof mockApi.getFollowUpsAdmin === 'function' ? mockApi.getFollowUpsAdmin() : [];
     const props = typeof mockApi.getAllPropertiesAdmin === 'function' ? mockApi.getAllPropertiesAdmin() : [];
 
+    const finalAllProperties = allMergedProps.length > 0 ? allMergedProps : props;
+
     setVerificationQueue(queue);
     setDeals(dls);
     setFollowUps(fups);
     setEnquiries(enqs);
-    setAllProperties(props);
+    setAllProperties(finalAllProperties);
     setRegisteredUsersList(users);
     setSiteConfig(cfg);
 
     if (queue.length > 0) setSelectedProperty(queue[0]);
-    else if (props.length > 0) setSelectedProperty(props[0]);
+    else if (finalAllProperties.length > 0) setSelectedProperty(finalAllProperties[0]);
   };
 
   useEffect(() => {
     loadData();
-    const handleUsersUpdated = () => loadData();
+    const handleRefresh = () => loadData();
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
 
-    window.addEventListener('easeland-users-updated', handleUsersUpdated);
+    window.addEventListener('easeland-users-updated', handleRefresh);
+    window.addEventListener('easeland-property-created', handleRefresh);
+    window.addEventListener('easeland-property-submitted', handleRefresh);
+    window.addEventListener('easeland-property-approved', handleRefresh);
+    window.addEventListener('easeland-property-status-updated', handleRefresh);
+    window.addEventListener('easeland-property-deleted', handleRefresh);
     window.addEventListener('easeland-site-config-updated', handleConfigUpdated);
+    window.addEventListener('storage', handleRefresh);
 
     return () => {
-      window.removeEventListener('easeland-users-updated', handleUsersUpdated);
+      window.removeEventListener('easeland-users-updated', handleRefresh);
+      window.removeEventListener('easeland-property-created', handleRefresh);
+      window.removeEventListener('easeland-property-submitted', handleRefresh);
+      window.removeEventListener('easeland-property-approved', handleRefresh);
+      window.removeEventListener('easeland-property-status-updated', handleRefresh);
+      window.removeEventListener('easeland-property-deleted', handleRefresh);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
+      window.removeEventListener('storage', handleRefresh);
     };
   }, []);
 
