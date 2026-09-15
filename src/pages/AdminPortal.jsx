@@ -411,19 +411,27 @@ export default function AdminPortal() {
         (oEmail && u.email && u.email.toLowerCase().trim() === oEmail)
       );
 
-      let resolvedName = matchedUser?.displayName || matchedUser?.name || p.ownerPublicName || p.owner?.name;
-      if (!resolvedName || resolvedName === 'Property Owner') {
-        const emailToUse = matchedUser?.email || oEmail;
+      let rawName = matchedUser?.displayName || matchedUser?.name || p.ownerPublicName || p.owner?.name;
+      let resolvedName = '';
+      if (rawName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(rawName.trim())) {
+        resolvedName = rawName.trim();
+      } else {
+        const emailToUse = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email;
         if (emailToUse) {
-          const prefix = emailToUse.split('@')[0];
-          resolvedName = prefix ? prefix.split(/[._-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Verified Owner';
+          resolvedName = emailToUse;
+        } else if (oId) {
+          resolvedName = `Account ID: ${oId}`;
         } else {
-          resolvedName = 'Verified Property Owner';
+          resolvedName = 'Account Name Not Set';
         }
       }
 
-      let resolvedPhone = matchedUser?.phone || matchedUser?.phoneNumber || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || '+91 98765 43210';
-      let resolvedEmail = matchedUser?.email || oEmail || '';
+      const rawPhone = matchedUser?.phone || matchedUser?.phoneNumber || p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone;
+      const resolvedPhone = (rawPhone && rawPhone.trim() && rawPhone !== '+91 98765 43210' && rawPhone !== '+91 N/A')
+        ? rawPhone.trim()
+        : 'Number Not Updated';
+
+      const resolvedEmail = matchedUser?.email || oEmail || p.ownerPrivateEmail || p.owner?.email || '';
 
       return {
         ...p,
@@ -2211,10 +2219,16 @@ export default function AdminPortal() {
                         </div>
                         <div className="col-span-3">
                           <span className="font-extrabold text-slate-900 block line-clamp-1">
-                            {prop.owner?.name || prop.ownerPublicName || 'Property Owner'}
+                            {prop.owner?.name && !['Property Owner', 'Verified Property Owner'].includes(prop.owner.name)
+                              ? prop.owner.name
+                              : (prop.owner?.email || prop.ownerPublicName || 'Account Name Not Set')}
                           </span>
-                          <span className="text-slate-600 font-bold text-[11px] block line-clamp-1">
-                            {prop.owner?.phone || prop.owner?.email || '+91 98765 43210'}
+                          <span className={`font-extrabold text-[11px] block line-clamp-1 ${
+                            prop.owner?.phone && prop.owner.phone !== 'Number Not Updated'
+                              ? 'text-slate-800'
+                              : 'text-amber-700'
+                          }`}>
+                            {prop.owner?.phone || 'Number Not Updated'}
                           </span>
                         </div>
                         <div className="col-span-2 text-gray-500 font-semibold">
@@ -2331,11 +2345,19 @@ export default function AdminPortal() {
                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
                             <div className="flex justify-between border-b border-slate-200 pb-1.5">
                               <span className="text-slate-600 font-bold">Owner Name:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.name || activeAuditProp.userName || 'Property Owner'}</span>
+                              <span className="text-slate-900 font-extrabold">
+                                {activeAuditProp.owner?.name && !['Property Owner', 'Verified Property Owner'].includes(activeAuditProp.owner.name)
+                                  ? activeAuditProp.owner.name
+                                  : (activeAuditProp.owner?.email || activeAuditProp.ownerPublicName || 'Account Name Not Set')}
+                              </span>
                             </div>
                             <div className="flex justify-between border-b border-slate-200 pb-1.5">
                               <span className="text-slate-600 font-bold">Phone Number:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.phone || activeAuditProp.userPhone || 'N/A'}</span>
+                              <span className="text-slate-900 font-extrabold">
+                                {activeAuditProp.owner?.phone && activeAuditProp.owner.phone !== '+91 98765 43210' && activeAuditProp.owner.phone !== '+91 N/A'
+                                  ? activeAuditProp.owner.phone
+                                  : 'Number Not Updated'}
+                              </span>
                             </div>
                             <div className="flex justify-between border-b border-slate-200 pb-1.5">
                               <span className="text-slate-600 font-bold">Email Address:</span>
