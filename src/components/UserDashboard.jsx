@@ -132,6 +132,7 @@ export default function UserDashboard({
     const userIdToPass = user?.uid || user?.id;
     const rawList = mockApi.getMyProperties(userIdToPass, user?.email);
     setMyPropertiesList(rawList);
+    refreshOwnerProperties();
   };
 
   useEffect(() => {

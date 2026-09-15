@@ -501,9 +501,11 @@ export const mockApi = {
 
     return currentProps.filter(p => {
       if (!p) return false;
-      if (targetId && (p.ownerId === targetId || p.owner?.id === targetId)) return true;
-      if (targetEmail && ((p.ownerPrivateEmail && p.ownerPrivateEmail.toLowerCase() === targetEmail) || (p.owner?.email && p.owner.email.toLowerCase() === targetEmail))) return true;
-      if (p.isUserSubmitted) return true; // Include user-submitted property for current active user session
+      const pOwnerId = p.ownerId || p.owner?.id;
+      const pOwnerEmail = (p.ownerPrivateEmail || p.owner?.email || '').toLowerCase().trim();
+
+      if (targetId && pOwnerId && String(pOwnerId) === String(targetId)) return true;
+      if (targetEmail && pOwnerEmail && pOwnerEmail === targetEmail) return true;
       return false;
     });
   },
