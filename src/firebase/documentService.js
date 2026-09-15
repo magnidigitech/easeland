@@ -209,13 +209,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     const snap = await getDocs(q);
     const fsDocs = snap.docs.map(doc => doc.data());
     if (Array.isArray(fsDocs) && fsDocs.length > 0) {
-      const mergedMap = new Map();
-      [...docs, ...fsDocs].forEach(d => {
-        if (d && (d.docId || d.url || d.name)) {
-          mergedMap.set(d.docId || d.url || d.name, d);
-        }
-      });
-      docs = Array.from(mergedMap.values());
+      docs = [...docs, ...fsDocs];
     }
   } catch (fsErr) {
     console.warn('Firestore propertyDocuments query note:', fsErr.message);
@@ -228,19 +222,46 @@ export async function getPropertyDocuments(propertyId, ownerId) {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.property && Array.isArray(data.property.documents)) {
-          const mergedMap = new Map();
-          [...docs, ...data.property.documents].forEach(d => {
-            if (d && (d.docId || d.url || d.name)) {
-              mergedMap.set(d.docId || d.url || d.name, d);
-            }
-          });
-          docs = Array.from(mergedMap.values());
+          docs = [...docs, ...data.property.documents];
         }
       }
     }
   } catch (e) {}
 
-  return { success: true, documents: docs };
+  // Deduplicate docs by URL or Name to eliminate duplicates across data sources
+  const seenKeys = new Set();
+  const normalizedDocs = [];
+
+  docs.forEach(d => {
+    if (!d) return;
+    const urlStr = d.publicUrl || d.url || d.storagePath || '';
+    const nameStr = d.documentName || d.name || d.fileName || '';
+    const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (nameStr ? nameStr.toLowerCase() : (d.docId || d.mediaId));
+
+    if (!key || seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
+    const docType = d.documentType || d.type || 'TITLE_DEED';
+    const fileSizeNum = Number(d.fileSize || d.size) || 0;
+    const docUrl = urlStr || '#';
+
+    normalizedDocs.push({
+      ...d,
+      docId: d.docId || d.mediaId || `doc-${normalizedDocs.length + 1}`,
+      documentName: docName,
+      name: docName,
+      documentType: docType,
+      type: docType,
+      fileSize: fileSizeNum,
+      size: fileSizeNum,
+      publicUrl: docUrl,
+      url: docUrl,
+      verificationStatus: d.verificationStatus || 'PENDING'
+    });
+  });
+
+  return { success: true, documents: normalizedDocs };
 }
 
 /**

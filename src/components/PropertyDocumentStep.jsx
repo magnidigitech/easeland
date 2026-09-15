@@ -214,37 +214,44 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
           </div>
         ) : documents.length > 0 ? (
           <div className="space-y-2">
-            {documents.map((docItem) => (
-              <div key={docItem.docId} className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between gap-3 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5" />
+            {documents.map((docItem, idx) => {
+              const displayName = docItem.documentName || docItem.name || docItem.fileName || docItem.title || `Property Document ${idx + 1}`;
+              const displayType = docItem.documentType || docItem.type || 'TITLE_DEED';
+              const sizeNum = Number(docItem.fileSize || docItem.size) || 0;
+              const displaySize = sizeNum > 0 ? `${(sizeNum / (1024 * 1024)).toFixed(2)} MB` : '< 0.5 MB';
+
+              return (
+                <div key={docItem.docId || idx} className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between gap-3 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-extrabold text-brand-charcoal">
+                        {displayName}
+                      </span>
+                      <span className="block text-[10px] text-gray-500 font-semibold">
+                        Category: {displayType} • Size: {displaySize}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="block text-xs font-extrabold text-brand-charcoal">
-                      {docItem.documentName}
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
+                      {docItem.verificationStatus || 'PENDING'}
                     </span>
-                    <span className="block text-[10px] text-gray-500 font-semibold">
-                      Category: {docItem.documentType} • Size: {(docItem.fileSize / (1024 * 1024)).toFixed(2)} MB
-                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDocument(docItem.docId || docItem.mediaId)}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
-                    {docItem.verificationStatus || 'PENDING'}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveDocument(docItem.docId)}
-                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="p-6 bg-white rounded-xl border border-gray-200 text-xs text-gray-500 text-center font-medium">
