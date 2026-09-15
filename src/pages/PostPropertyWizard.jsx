@@ -12,7 +12,7 @@ import PropertyBoundaryStep from '../components/PropertyBoundaryStep.jsx';
 import PropertyReviewStep from '../components/PropertyReviewStep.jsx';
 
 export default function PostPropertyWizard({ onComplete, onCancel, resumePropertyId = null }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [step, setStep] = useState(1);
   const [propertyId, setPropertyId] = useState(null);
@@ -236,17 +236,21 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       const priceNum = Number(formData.price) || 0;
       const areaNum = Number(formData.area) || 0;
 
+      const ownerName = profile?.displayName || profile?.name || user?.displayName || user?.name || user?.email || 'EaseLand User';
+      const ownerPhone = profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phone || user?.phoneNumber || '';
+      const ownerEmail = user?.email || profile?.email || '';
+
       const draftData = {
         ...formData,
         ownerId: user?.uid || user?.id,
-        ownerPublicName: user?.displayName || user?.name || user?.email || '',
-        ownerPrivateEmail: user?.email || '',
-        ownerPrivatePhone: user?.phone || user?.phoneNumber || '',
+        ownerPublicName: ownerName,
+        ownerPrivateEmail: ownerEmail,
+        ownerPrivatePhone: ownerPhone,
         owner: {
           id: user?.uid || user?.id,
-          name: user?.displayName || user?.name || user?.email || '',
-          email: user?.email || '',
-          phone: user?.phone || user?.phoneNumber || ''
+          name: ownerName,
+          email: ownerEmail,
+          phone: ownerPhone
         },
         title: formData.title,
         propertyType: formData.propertyType,

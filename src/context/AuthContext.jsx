@@ -168,8 +168,10 @@ export function AuthProvider({ children }) {
     const userProfile = {
       uid: authResult.user.uid,
       displayName: displayName || 'EaseLand User',
+      name: displayName || 'EaseLand User',
       email: email,
       phone: phone || '',
+      phoneNumber: phone || '',
       role: 'USER',
       accountStatus: 'ACTIVE',
       capabilities: ['CUSTOMER', 'OWNER'],
@@ -180,6 +182,22 @@ export function AuthProvider({ children }) {
     try {
       await createUserProfile(authResult.user.uid, userProfile);
     } catch (e) {}
+
+    // Save to localStorage for instant offline / local availability across modules
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('easeland_user_profile_' + authResult.user.uid, JSON.stringify(userProfile));
+        const rawReg = localStorage.getItem('easeland_registered_users') || '[]';
+        const parsedReg = JSON.parse(rawReg);
+        const idx = parsedReg.findIndex(u => u && u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim());
+        if (idx !== -1) {
+          parsedReg[idx] = { ...parsedReg[idx], ...userProfile };
+        } else {
+          parsedReg.push(userProfile);
+        }
+        localStorage.setItem('easeland_registered_users', JSON.stringify(parsedReg));
+      }
+    } catch (eLoc) {}
 
     setUser(authResult.user);
     setProfile(userProfile);

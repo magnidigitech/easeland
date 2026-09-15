@@ -495,17 +495,52 @@ export const mockApi = {
 
   getMyProperties: (ownerId, ownerEmail) => {
     const targetEmail = (ownerEmail || '').toLowerCase().trim();
-    const targetId = ownerId || '';
+    const targetId = ownerId ? String(ownerId).toLowerCase().trim() : '';
 
-    const currentProps = getStoredData('easeland_properties', properties);
+    let localProps = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localProps.push(...parsed);
+            else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+          }
+        });
+      }
+    } catch (e) {}
 
-    return currentProps.filter(p => {
+    const allPropsMap = new Map();
+    [...properties, ...localProps].forEach(p => {
+      if (!p) return;
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
+      if (pId) {
+        allPropsMap.set(pId, { ...(allPropsMap.get(pId) || {}), ...p });
+      }
+    });
+
+    let deletedIds = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_properties');
+        if (rawDel) deletedIds = JSON.parse(rawDel);
+      }
+    } catch (e) {}
+
+    const mergedProps = Array.from(allPropsMap.values()).filter(p => p && !deletedIds.includes(String(p.id || p.propertyId)));
+
+    const isAdmin = targetEmail === 'admin@easeland.in' || targetEmail.includes('admin') || targetId === 'admin_uid_001' || targetId === 'admin-101';
+
+    return mergedProps.filter(p => {
       if (!p) return false;
-      const pOwnerId = p.ownerId || p.owner?.id;
-      const pOwnerEmail = (p.ownerPrivateEmail || p.owner?.email || '').toLowerCase().trim();
+      const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy || '').toLowerCase().trim();
+      const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
 
-      if (targetId && pOwnerId && String(pOwnerId) === String(targetId)) return true;
+      if (targetId && pOwnerId && pOwnerId === targetId) return true;
       if (targetEmail && pOwnerEmail && pOwnerEmail === targetEmail) return true;
+      if (isAdmin && (pOwnerEmail.includes('admin') || p.isUserSubmitted || p.ownerPublicName === 'EaseLand Admin')) return true;
       return false;
     });
   },
