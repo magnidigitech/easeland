@@ -217,48 +217,6 @@ export async function getAllUsersAdmin() {
       }
     });
 
-    // Also check localStorage / mock user profiles for hybrid / local offline sessions
-    try {
-      if (typeof window !== 'undefined') {
-        const rawReg = localStorage.getItem('easeland_registered_users');
-        if (rawReg) {
-          const regUsers = JSON.parse(rawReg);
-          if (Array.isArray(regUsers)) {
-            regUsers.forEach(ru => {
-              if (ru && ru.email) {
-                const ruId = String(ru.id || ru.uid || '').toLowerCase().trim();
-                const ruEmail = String(ru.email || '').toLowerCase().trim();
-                const ruStatus = String(ru.status || ru.accountStatus || '').toUpperCase();
-
-                if (ruStatus === 'REMOVED' || ruStatus === 'DELETED' || ruStatus === 'ACCOUNT_DELETED') return;
-                if (deletedUsers.includes(ruId) || deletedUsers.includes(ruEmail)) return;
-
-                if (!users.some(u => u.email.toLowerCase().trim() === ruEmail || u.id.toLowerCase().trim() === ruId)) {
-                  const uPhone = ru.phone || ru.phoneNumber || ru.mobile || '';
-                  users.push({
-                    id: ru.id || ru.uid || 'usr_' + Date.now(),
-                    uid: ru.uid || ru.id || 'usr_' + Date.now(),
-                    name: ru.name || ru.displayName || ru.email.split('@')[0],
-                    displayName: ru.displayName || ru.name || ru.email.split('@')[0],
-                    email: ru.email,
-                    emailVerified: ru.emailVerified ?? (ru.email?.endsWith('@gmail.com') ? true : false),
-                    authProvider: ru.authProvider || (ru.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
-                    phone: uPhone,
-                    phoneNumber: uPhone,
-                    role: ru.role || 'USER',
-                    status: ru.status || 'ACTIVE',
-                    postedListingsCount: ru.postedListingsCount || 0,
-                    createdAt: ru.joinedDate || new Date().toISOString(),
-                    suspension: ru.suspension || null
-                  });
-                }
-              }
-            });
-          }
-        }
-      }
-    } catch (eLocal) {}
-
     return { success: true, users };
   } catch (error) {
     console.error('Error fetching all users for admin:', error);
