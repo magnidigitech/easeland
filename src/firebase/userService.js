@@ -5,6 +5,7 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  deleteDoc,
   deleteField,
   serverTimestamp
 } from 'firebase/firestore';
@@ -158,11 +159,26 @@ export async function getAllUsersAdmin() {
     const usersRef = collection(db, 'users');
     const snapshot = await getDocs(usersRef);
 
+    let deletedUsers = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+      }
+    } catch (e) {}
+
     const users = [];
 
     snapshot.forEach((docSnap) => {
       try {
         const data = docSnap.data();
+        const docId = String(docSnap.id || '').toLowerCase().trim();
+        const userEmail = String(data.email || '').toLowerCase().trim();
+        const uStatus = String(data.accountStatus || data.status || '').toUpperCase();
+
+        if (uStatus === 'REMOVED' || uStatus === 'DELETED' || uStatus === 'ACCOUNT_DELETED') return;
+        if (deletedUsers.includes(docId) || deletedUsers.includes(userEmail)) return;
+
         const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || data.telePhone || '';
 
         let createdAtFormatted = null;
@@ -209,22 +225,33 @@ export async function getAllUsersAdmin() {
           const regUsers = JSON.parse(rawReg);
           if (Array.isArray(regUsers)) {
             regUsers.forEach(ru => {
-              if (ru && ru.email && !users.some(u => u.email.toLowerCase().trim() === ru.email.toLowerCase().trim())) {
-                const uPhone = ru.phone || ru.phoneNumber || ru.mobile || '';
-                users.push({
-                  id: ru.id || ru.uid || 'usr_' + Date.now(),
-                  uid: ru.uid || ru.id || 'usr_' + Date.now(),
-                  name: ru.name || ru.displayName || ru.email.split('@')[0],
-                  displayName: ru.displayName || ru.name || ru.email.split('@')[0],
-                  email: ru.email,
-                  phone: uPhone,
-                  phoneNumber: uPhone,
-                  role: ru.role || 'USER',
-                  status: ru.status || 'ACTIVE',
-                  postedListingsCount: ru.postedListingsCount || 0,
-                  createdAt: ru.joinedDate || new Date().toISOString(),
-                  suspension: ru.suspension || null
-                });
+              if (ru && ru.email) {
+                const ruId = String(ru.id || ru.uid || '').toLowerCase().trim();
+                const ruEmail = String(ru.email || '').toLowerCase().trim();
+                const ruStatus = String(ru.status || ru.accountStatus || '').toUpperCase();
+
+                if (ruStatus === 'REMOVED' || ruStatus === 'DELETED' || ruStatus === 'ACCOUNT_DELETED') return;
+                if (deletedUsers.includes(ruId) || deletedUsers.includes(ruEmail)) return;
+
+                if (!users.some(u => u.email.toLowerCase().trim() === ruEmail || u.id.toLowerCase().trim() === ruId)) {
+                  const uPhone = ru.phone || ru.phoneNumber || ru.mobile || '';
+                  users.push({
+                    id: ru.id || ru.uid || 'usr_' + Date.now(),
+                    uid: ru.uid || ru.id || 'usr_' + Date.now(),
+                    name: ru.name || ru.displayName || ru.email.split('@')[0],
+                    displayName: ru.displayName || ru.name || ru.email.split('@')[0],
+                    email: ru.email,
+                    emailVerified: ru.emailVerified ?? (ru.email?.endsWith('@gmail.com') ? true : false),
+                    authProvider: ru.authProvider || (ru.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
+                    phone: uPhone,
+                    phoneNumber: uPhone,
+                    role: ru.role || 'USER',
+                    status: ru.status || 'ACTIVE',
+                    postedListingsCount: ru.postedListingsCount || 0,
+                    createdAt: ru.joinedDate || new Date().toISOString(),
+                    suspension: ru.suspension || null
+                  });
+                }
               }
             });
           }
@@ -251,30 +278,30 @@ export async function suspendUserAccount(userId, adminUid, durationDays = 7, rea
 
     const userRef = doc(db, 'users', userId);
     const now = new Date();
-    const suspendedUntil = new Date(now.getTime() + (durationDays * 24 * 60 * 60 * 1000)).toISOString();
+    const suspendedUntil = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
-    const suspensionData = {
-      accountStatus: 'SUSPENDED',
-      suspension: {
-        suspendedAt: now.toISOString(),
-        suspendedUntil,
-        durationDays,
-        reason,
-        suspendedBy: adminUid
-      },
-      updatedAt: serverTimestamp()
+    const suspensionPayload = {
+      days: durationDays,
+      reason,
+      suspendedAt: now.toISOString(),
+      suspendedUntil,
+      suspendedBy: adminUid
     };
 
-    await updateDoc(userRef, suspensionData);
+    await updateDoc(userRef, {
+      accountStatus: 'SUSPENDED',
+      suspension: suspensionPayload,
+      updatedAt: serverTimestamp()
+    });
 
     // Audit log
     await logAdminActivity(
       'USER_SUSPENDED',
-      `User ${userId} suspended for ${durationDays} days. Reason: ${reason}`,
+      `User ${userId} account suspended for ${durationDays} days. Reason: ${reason}`,
       adminUid
     );
 
-    return { success: true, suspendedUntil };
+    return { success: true };
   } catch (error) {
     console.error(`Error suspending user ${userId}:`, error);
     return { success: false, error: error.message };
@@ -321,11 +348,35 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
     }
 
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      accountStatus: 'REMOVED',
-      removalReason: reason,
-      updatedAt: serverTimestamp()
-    });
+    try {
+      await deleteDoc(userRef);
+    } catch (dErr) {
+      await updateDoc(userRef, {
+        accountStatus: 'REMOVED',
+        status: 'REMOVED',
+        removalReason: reason,
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        let delArr = rawDel ? JSON.parse(rawDel) : [];
+        const targetStr = String(userId).toLowerCase().trim();
+        if (userId && !delArr.includes(targetStr)) delArr.push(targetStr);
+        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
+
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.filter(u => u && String(u.id || u.uid || '').toLowerCase().trim() !== targetStr && String(u.email || '').toLowerCase().trim() !== targetStr);
+            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+      }
+    } catch (e) {}
 
     await logAdminActivity(
       'USER_REMOVED',

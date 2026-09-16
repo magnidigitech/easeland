@@ -577,7 +577,25 @@ export default function AdminPortal() {
     setFollowUps(fups);
     setEnquiries(enqs);
     setAllProperties(finalAllProperties);
-    const enrichedUsers = users.map(u => {
+    let deletedUsers = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+      }
+    } catch (e) {}
+
+    const cleanUsers = users.filter(u => {
+      if (!u) return false;
+      const uId = String(u.id || u.uid || '').toLowerCase().trim();
+      const uEmail = String(u.email || '').toLowerCase().trim();
+      const st = String(u.status || u.accountStatus || '').toUpperCase();
+      if (st === 'REMOVED' || st === 'DELETED' || st === 'ACCOUNT_DELETED') return false;
+      if (deletedUsers.includes(uId) || deletedUsers.includes(uEmail)) return false;
+      return true;
+    });
+
+    const enrichedUsers = cleanUsers.map(u => {
       const uUid = String(u.uid || u.id || '').toLowerCase().trim();
       const uEmail = (u.email || '').toLowerCase().trim();
 
@@ -1122,13 +1140,48 @@ export default function AdminPortal() {
 
   const handleConfirmRemoveUser = async () => {
     if (!selectedUserForRemoval) return;
+    const targetId = String(selectedUserForRemoval.id || selectedUserForRemoval.uid || '').toLowerCase().trim();
+    const targetEmail = String(selectedUserForRemoval.email || '').toLowerCase().trim();
+
     try {
       await removeUserAccount(selectedUserForRemoval.id || selectedUserForRemoval.uid, user?.uid || 'admin_uid_001', removalReason);
     } catch(e) {}
+
     mockApi.removeUserAdmin(selectedUserForRemoval.id, removalReason);
-    setRegisteredUsersList(prev => prev.filter(u => u.id !== selectedUserForRemoval.id && u.email !== selectedUserForRemoval.email));
+
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        let delArr = rawDel ? JSON.parse(rawDel) : [];
+        if (targetId && !delArr.includes(targetId)) delArr.push(targetId);
+        if (targetEmail && !delArr.includes(targetEmail)) delArr.push(targetEmail);
+        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
+
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.filter(u => {
+              if (!u) return false;
+              const id1 = String(u.id || u.uid || '').toLowerCase().trim();
+              const em1 = String(u.email || '').toLowerCase().trim();
+              return id1 !== targetId && em1 !== targetEmail;
+            });
+            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+      }
+    } catch (e) {}
+
+    setRegisteredUsersList(prev => prev.filter(u => {
+      const id1 = String(u.id || u.uid || '').toLowerCase().trim();
+      const em1 = String(u.email || '').toLowerCase().trim();
+      return id1 !== targetId && em1 !== targetEmail;
+    }));
+
     setIsRemoveModalOpen(false);
     setSelectedUserForRemoval(null);
+    await loadData();
   };
 
   // FAQ management helpers
@@ -3218,7 +3271,7 @@ export default function AdminPortal() {
                   <div className="relative w-full sm:w-80">
                     <input
                       type="text"
-                      placeholder="Search users by name, email, or phone..."
+                      placeholder="Search users by name, email, phone, or UID..."
                       value={userSearchQuery}
                       onChange={(e) => setUserSearchQuery(e.target.value)}
                       className="w-full bg-gray-50 border border-gray-200 text-xs font-semibold px-3.5 py-2.5 pl-9 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-yellow"
@@ -3227,6 +3280,20 @@ export default function AdminPortal() {
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await loadData();
+                        setPublishSuccessMessage('User directory synced & refreshed from Firebase Auth!');
+                        setTimeout(() => setPublishSuccessMessage(''), 3000);
+                      }}
+                      className="flex items-center gap-1.5 bg-brand-charcoal text-brand-yellow hover:bg-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm transition-all shrink-0"
+                      title="Sync and Refresh User Directory from Firebase Auth & Firestore"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Sync & Refresh</span>
+                    </button>
+
                     {['ALL', 'ACTIVE', 'SUSPENDED', 'REMOVED'].map((st) => (
                       <button
                         key={st}
