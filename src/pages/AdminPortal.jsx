@@ -421,7 +421,8 @@ export default function AdminPortal() {
         const st = String(p.status || p.listingStatus || '').toUpperCase();
         const lst = String(p.listingStatus || '').toUpperCase();
         const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
-        return !isLive;
+        const isClosed = st === 'REJECTED' || st === 'DELETED' || st === 'REJECTED_CLOSED' || st === 'CLOSED' || st === 'ARCHIVED' || lst === 'REJECTED' || lst === 'DELETED' || lst === 'REJECTED_CLOSED' || lst === 'CLOSED' || lst === 'ARCHIVED';
+        return !isLive && !isClosed;
       });
     } catch (e1) {
       console.warn('Error loading verification queue:', e1);
@@ -579,8 +580,18 @@ export default function AdminPortal() {
     setRegisteredUsersList(users);
     setSiteConfig(cfg);
 
-    if (queue.length > 0) setSelectedProperty(queue[0]);
-    else if (finalAllProperties.length > 0) setSelectedProperty(finalAllProperties[0]);
+    if (queue.length > 0) {
+      setSelectedProperty(prev => {
+        if (prev) {
+          const prevId = String(prev.id || prev.propertyId || prev.referenceId || '');
+          const match = queue.find(q => String(q.id || q.propertyId || q.referenceId || '') === prevId);
+          if (match) return match;
+        }
+        return queue[0];
+      });
+    } else {
+      setSelectedProperty(null);
+    }
   };
 
   useEffect(() => {
@@ -2434,7 +2445,7 @@ export default function AdminPortal() {
 
             {/* TAB: VERIFICATION WORKSPACE */}
             {activeTab === 'workspace' && (
-              verificationQueue.length === 0 && !selectedProperty ? (
+              (verificationQueue.length === 0 || !selectedProperty || !verificationQueue.some(q => String(q.id || q.propertyId) === String(selectedProperty?.id || selectedProperty?.propertyId))) ? (
                 <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-3">
                   <div className="text-4xl">🎉</div>
                   <h3 className="font-black text-xl text-emerald-800 uppercase tracking-wide">
