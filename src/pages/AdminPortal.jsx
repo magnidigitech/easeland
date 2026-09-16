@@ -2824,19 +2824,33 @@ export default function AdminPortal() {
 
                             if (isVideo) {
                               const videoUrl = urlStr || (typeof item === 'object' && typeof item.embedUrl === 'string' ? item.embedUrl : '');
-                              if (videoUrl && !seenVideoUrls.has(videoUrl)) {
-                                seenVideoUrls.add(videoUrl);
-                                let videoTitle = 'Submitted Property Video';
-                                if (typeof item === 'object') {
-                                  const candidate = item.title || item.fileName || item.caption;
-                                  if (typeof candidate === 'string' && candidate) videoTitle = candidate;
+                              if (videoUrl) {
+                                let videoKey = videoUrl.trim();
+                                const ytMatch = videoKey.match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+                                const driveMatch = videoKey.match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+
+                                if (ytMatch && ytMatch[1]) {
+                                  videoKey = `youtube:${ytMatch[1]}`;
+                                } else if (driveMatch && (driveMatch[1] || driveMatch[2])) {
+                                  videoKey = `gdrive:${driveMatch[1] || driveMatch[2]}`;
+                                } else {
+                                  videoKey = videoKey.toLowerCase();
                                 }
-                                videos.push({
-                                  url: videoUrl,
-                                  embedUrl: (typeof item === 'object' && typeof item.embedUrl === 'string' ? item.embedUrl : videoUrl),
-                                  provider: (typeof item === 'object' && typeof item.provider === 'string' ? item.provider : (cleanUrl.includes('youtube') || cleanUrl.includes('youtu.be') ? 'youtube' : cleanUrl.includes('drive.google') ? 'gdrive' : 'direct')),
-                                  title: videoTitle
-                                });
+
+                                if (!seenVideoUrls.has(videoKey)) {
+                                  seenVideoUrls.add(videoKey);
+                                  let videoTitle = 'Submitted Property Video';
+                                  if (typeof item === 'object') {
+                                    const candidate = item.title || item.fileName || item.caption;
+                                    if (typeof candidate === 'string' && candidate) videoTitle = candidate;
+                                  }
+                                  videos.push({
+                                    url: videoUrl,
+                                    embedUrl: (typeof item === 'object' && typeof item.embedUrl === 'string' ? item.embedUrl : videoUrl),
+                                    provider: (typeof item === 'object' && typeof item.provider === 'string' ? item.provider : (cleanUrl.includes('youtube') || cleanUrl.includes('youtu.be') ? 'youtube' : cleanUrl.includes('drive.google') ? 'gdrive' : 'direct')),
+                                    title: videoTitle
+                                  });
+                                }
                               }
                               return;
                             }
