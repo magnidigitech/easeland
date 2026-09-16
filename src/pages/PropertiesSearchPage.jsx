@@ -112,16 +112,29 @@ export default function PropertiesSearchPage({
     executeSearch(searchState, null);
   }, [searchState, executeSearch]);
 
-  // Listen for browser Back/Forward navigation (PopState)
+  // Listen for browser Back/Forward navigation (PopState) and Admin Property Approvals
   useEffect(() => {
     const handlePopState = () => {
       const parsedState = urlParamsToSearchState(window.location.search);
       setSearchState(parsedState);
     };
 
+    const handlePropertyApproved = () => {
+      executeSearch(searchState, null);
+    };
+
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+    window.addEventListener('easeland-property-approved', handlePropertyApproved);
+    window.addEventListener('easeland-property-status-updated', handlePropertyApproved);
+    window.addEventListener('storage', handlePropertyApproved);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('easeland-property-approved', handlePropertyApproved);
+      window.removeEventListener('easeland-property-status-updated', handlePropertyApproved);
+      window.removeEventListener('storage', handlePropertyApproved);
+    };
+  }, [searchState, executeSearch]);
 
   // Pagination Next Page
   const handleNextPage = () => {

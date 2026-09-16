@@ -363,29 +363,60 @@ export default function UniversalMapEngine({
       bounds.push([lat, lng]);
 
       const { size, color, border } = getMarkerStyle(prop);
+      const priceVal = Number(prop.price) || 0;
+      const priceLabel = prop.priceDisplay || (priceVal >= 10000000 
+        ? `Rs. ${(priceVal / 10000000).toFixed(2)} Cr` 
+        : priceVal >= 100000 
+          ? `Rs. ${(priceVal / 100000).toFixed(1)} L` 
+          : `Rs. ${priceVal.toLocaleString()}`);
 
-      // Custom HTML Marker Icon
+      // Custom HTML Price Color Marker Pin with Price Pill Badge
       const customIcon = L.divIcon({
         className: 'custom-map-marker-container',
         html: `
           <div style="
-            width: ${size}px;
-            height: ${size}px;
-            background-color: ${color};
-            border: 2px solid ${border};
-            border-radius: 50%;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
             cursor: pointer;
-            transition: transform 0.2s ease;
-          " class="custom-map-marker">
-            <div style="width: 6px; height: 6px; background-color: #ffffff; border-radius: 50%;"></div>
+            transform: translate(-50%, -100%);
+          ">
+            <div style="
+              background-color: ${color};
+              color: ${priceVal > 6000000 && priceVal <= 15000000 ? '#0B2545' : '#ffffff'};
+              border: 2px solid ${border};
+              font-family: 'Plus Jakarta Sans', sans-serif;
+              font-size: 11px;
+              font-weight: 800;
+              padding: 2.5px 8px;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+              white-space: nowrap;
+              letter-spacing: 0.2px;
+              margin-bottom: 2px;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+            ">
+              <span>${priceLabel}</span>
+            </div>
+            <div style="
+              width: ${size}px;
+              height: ${size}px;
+              background-color: ${color};
+              border: 2.5px solid #ffffff;
+              border-radius: 50%;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            " class="custom-map-marker">
+              <div style="width: 5px; height: 5px; background-color: #ffffff; border-radius: 50%;"></div>
+            </div>
           </div>
         `,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2]
+        iconSize: [80, 45],
+        iconAnchor: [40, 45]
       });
 
       const marker = L.marker([lat, lng], { icon: customIcon });
@@ -394,13 +425,13 @@ export default function UniversalMapEngine({
       const popupContent = `
         <div style="font-family: 'Plus Jakarta Sans', sans-serif;">
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #F4C542; background: #0B2545; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">
-            ${prop.verificationStatus || 'Verified'}
+            ${prop.verificationStatus || 'Platform Verified'}
           </div>
           <div style="font-size: 13px; font-weight: 700; color: #0B2545; margin-bottom: 2px;">
             ${prop.title || 'Property'}
           </div>
           <div style="font-size: 12px; font-weight: 800; color: #15803d;">
-            ${prop.priceDisplay || ('Rs. ' + (prop.price || 0))}
+            ${priceLabel}
           </div>
           <div style="font-size: 11px; font-weight: 600; color: #6b7280;">
             Area: ${prop.areaDisplay || (prop.area ? prop.area + ' sq ft' : '')}
@@ -408,7 +439,7 @@ export default function UniversalMapEngine({
         </div>
       `;
 
-      marker.bindPopup(popupContent, { offset: [0, -size / 2] });
+      marker.bindPopup(popupContent, { offset: [0, -45] });
 
       // Marker Click -> Ultra-Deep MAX Zoom (Level 22) + Open Preview Card Modal
       marker.on('click', () => {
@@ -420,8 +451,20 @@ export default function UniversalMapEngine({
 
       markersLayerRef.current.addLayer(marker);
 
-      // Render Approved GeoJSON Boundary Polygon if present (for open plots/land)
-      const rawPoly = Array.isArray(prop.boundary) ? prop.boundary : (prop.boundary?.coordinates || prop.boundary?.points || prop.boundary?.polygon);
+      // Extract raw polygon array from all possible boundary data structures
+      const rawPoly = Array.isArray(prop.boundary) 
+        ? prop.boundary 
+        : (
+          prop.boundary?.vertices || 
+          prop.boundary?.approvedPolygon || 
+          prop.boundary?.coordinates || 
+          prop.boundary?.points || 
+          prop.boundary?.polygon ||
+          prop.ownerSubmittedBoundary?.vertices ||
+          prop.ownerSubmittedBoundary?.polygon ||
+          (Array.isArray(prop.ownerSubmittedBoundary) ? prop.ownerSubmittedBoundary : null)
+        );
+
       if (rawPoly && Array.isArray(rawPoly) && rawPoly.length >= 3) {
         const formattedPoly = rawPoly.map(pt => {
           if (Array.isArray(pt) && pt.length >= 2) return [Number(pt[0]), Number(pt[1])];
@@ -433,8 +476,9 @@ export default function UniversalMapEngine({
           const polygon = L.polygon(formattedPoly, {
             color: '#D4A017',
             fillColor: '#F4C542',
-            fillOpacity: 0.35,
-            weight: 2.5,
+            fillOpacity: 0.45,
+            weight: 3,
+            dashArray: '6, 6',
             lineJoin: 'round'
           });
           polygon.bindTooltip(`Approved Plot Boundary (${prop.title || 'Plot'})`, { sticky: true });

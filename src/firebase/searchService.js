@@ -482,7 +482,9 @@ export async function searchPublicProperties({
       const d = docSnap.data();
       const mediaList = Array.isArray(d.publicApprovedMedia) ? d.publicApprovedMedia : d.media || [];
       return {
-        propertyId: d.propertyId || docSnap.id,
+        ...d,
+        id: d.id || d.propertyId || docSnap.id,
+        propertyId: d.propertyId || d.id || docSnap.id,
         referenceId: d.referenceId || '',
         title: d.title || '',
         propertyType: d.propertyType || '',
@@ -495,7 +497,13 @@ export async function searchPublicProperties({
         bedroomsNum: Number(d.bedroomsNum) || 0,
         bathroomsNum: Number(d.bathroomsNum) || 0,
         location: d.location || null,
+        boundary: d.boundary || d.ownerSubmittedBoundary || null,
+        ownerSubmittedBoundary: d.ownerSubmittedBoundary || null,
+        status: d.status || d.listingStatus || 'LIVE',
+        listingStatus: d.listingStatus || d.status || 'LIVE',
         isPlatformVerified: Boolean(d.isPlatformVerified),
+        verificationStatus: d.verificationStatus || 'Platform Verified',
+        photos: Array.isArray(d.photos) && d.photos.length > 0 ? d.photos : (Array.isArray(d.media) ? d.media.map(m => typeof m === 'string' ? m : (m.publicUrl || m.url)).filter(Boolean) : []),
         approvedThumbnail: getApprovedPrimaryThumbnail(mediaList),
         createdAt: d.createdAt
       };
