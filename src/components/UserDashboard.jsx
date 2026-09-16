@@ -478,6 +478,19 @@ export default function UserDashboard({
           <div className="lg:col-span-3 space-y-2">
             <div className="bg-metallic-card rounded-2xl shadow-lg border border-slate-700/60 p-3 space-y-1">
 
+              {(user?.role === 'ADMIN' || user?.email === 'admin@easeland.in' || user?.email?.includes('admin')) && (
+                <button
+                  onClick={() => onNavigate('admin')}
+                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 shadow-xl border border-amber-300 mb-2 transform hover:scale-[1.02]"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="w-4 h-4 text-slate-950" />
+                    <span>ADMIN CONTROL STUDIO</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-950" />
+                </button>
+              )}
+
               <button
                 onClick={() => setActiveTab('overview')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'overview'

@@ -24,15 +24,24 @@ export default function App() {
   const { user: authUser, profile: authProfile, loading: authLoading, logoutUser } = useAuth();
   const [activePage, setActivePage] = useState('home');
 
+  const isAdminSession = Boolean(
+    authUser?.email === 'admin@easeland.in' ||
+    authUser?.email?.includes('admin') ||
+    authProfile?.role === 'ADMIN' ||
+    authProfile?.adminRole ||
+    (typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true')
+  );
+
   const currentUser = authUser ? {
     uid: authUser.uid,
     id: authUser.uid,
-    name: authProfile?.displayName || authUser.displayName || 'EaseLand User',
+    name: authProfile?.displayName || authUser.displayName || (isAdminSession ? 'EaseLand Admin' : 'EaseLand User'),
     email: authUser.email,
     phone: authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || '',
-    role: authProfile?.adminRole ? 'ADMIN' : 'USER',
-    capabilities: authProfile?.capabilities || ['CUSTOMER', 'OWNER'],
-    ownerVerificationState: authProfile?.ownerVerificationState || 'NOT_VERIFIED'
+    role: isAdminSession ? 'ADMIN' : (authProfile?.role || 'USER'),
+    adminRole: isAdminSession,
+    capabilities: isAdminSession ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (authProfile?.capabilities || ['CUSTOMER', 'OWNER']),
+    ownerVerificationState: isAdminSession ? 'VERIFIED' : (authProfile?.ownerVerificationState || 'NOT_VERIFIED')
   } : null;
 
   // Auth & Profile Modal State

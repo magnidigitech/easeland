@@ -99,19 +99,34 @@ export function AuthProvider({ children }) {
     // Listen for Firebase Auth state changes and restore session
     const unsubscribe = subscribeToAuthState(async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
+        const isAdmin = currentUser.email === 'admin@easeland.in' ||
+                        currentUser.email?.includes('admin') ||
+                        localStorage.getItem('easeland_admin_authenticated') === 'true';
+
+        setUser({
+          ...currentUser,
+          role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
+        });
+
         const res = await getCurrentUserProfile(currentUser.uid);
         if (res.success) {
-          setProfile(res.profile);
+          const profRole = (isAdmin || res.profile?.role === 'ADMIN' || res.profile?.adminRole) ? 'ADMIN' : (res.profile?.role || 'USER');
+          setProfile({
+            ...res.profile,
+            role: profRole,
+            adminRole: profRole === 'ADMIN',
+            capabilities: profRole === 'ADMIN' ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (res.profile?.capabilities || ['CUSTOMER', 'OWNER'])
+          });
         } else {
           const newProfileData = {
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'EaseLand User',
+            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || (isAdmin ? 'EaseLand Admin' : 'EaseLand User'),
             email: currentUser.email || '',
             phone: currentUser.phoneNumber || '',
-            role: 'USER',
+            role: isAdmin ? 'ADMIN' : 'USER',
+            adminRole: isAdmin,
             accountStatus: 'ACTIVE',
-            capabilities: ['CUSTOMER', 'OWNER'],
-            ownerVerificationState: 'NOT_VERIFIED'
+            capabilities: isAdmin ? ['ADMIN', 'CUSTOMER', 'OWNER'] : ['CUSTOMER', 'OWNER'],
+            ownerVerificationState: isAdmin ? 'VERIFIED' : 'NOT_VERIFIED'
           };
           try {
             await createUserProfile(currentUser.uid, newProfileData);
