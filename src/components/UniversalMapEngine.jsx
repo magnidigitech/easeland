@@ -406,16 +406,25 @@ export default function UniversalMapEngine({
           ? `Rs. ${(priceVal / 100000).toFixed(1)} L` 
           : `Rs. ${priceVal.toLocaleString()}`);
 
-      // Custom HTML Price Color Marker Pin with Price Pill Badge
+      // Custom HTML Price Color Marker Pin with Price Pill Badge (100% Fixed Icon Anchor, Zero Drift on Zoom)
+      const totalWidth = 140;
+      const dotSize = size;
+      const badgeHeight = 24;
+      const gap = 2;
+      const totalHeight = badgeHeight + gap + dotSize;
+
       const customIcon = L.divIcon({
         className: 'custom-map-marker-container',
         html: `
           <div style="
+            width: ${totalWidth}px;
+            height: ${totalHeight}px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: flex-end;
             cursor: pointer;
-            transform: translate(-50%, -100%);
+            pointer-events: auto;
           ">
             <div style="
               background-color: ${color};
@@ -429,16 +438,13 @@ export default function UniversalMapEngine({
               box-shadow: 0 4px 12px rgba(0,0,0,0.35);
               white-space: nowrap;
               letter-spacing: 0.2px;
-              margin-bottom: 2px;
-              display: flex;
-              align-items: center;
-              gap: 4px;
+              margin-bottom: ${gap}px;
             ">
               <span>${priceLabel}</span>
             </div>
             <div style="
-              width: ${size}px;
-              height: ${size}px;
+              width: ${dotSize}px;
+              height: ${dotSize}px;
               background-color: ${color};
               border: 2.5px solid #ffffff;
               border-radius: 50%;
@@ -446,13 +452,15 @@ export default function UniversalMapEngine({
               display: flex;
               align-items: center;
               justify-content: center;
+              flex-shrink: 0;
             " class="custom-map-marker">
               <div style="width: 5px; height: 5px; background-color: #ffffff; border-radius: 50%;"></div>
             </div>
           </div>
         `,
-        iconSize: [80, 45],
-        iconAnchor: [40, 45]
+        iconSize: [totalWidth, totalHeight],
+        iconAnchor: [totalWidth / 2, totalHeight - (dotSize / 2)],
+        popupAnchor: [0, -totalHeight]
       });
 
       const marker = L.marker([lat, lng], { icon: customIcon });
