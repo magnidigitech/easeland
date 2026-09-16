@@ -354,9 +354,45 @@ export default function UniversalMapEngine({
 
     displayProperties.forEach((prop) => {
       if (!prop) return;
+
+      // 1. Extract raw polygon array from all possible boundary data structures FIRST
+      const rawPoly = Array.isArray(prop.boundary) 
+        ? prop.boundary 
+        : (
+          prop.boundary?.vertices || 
+          prop.boundary?.approvedPolygon || 
+          prop.boundary?.coordinates || 
+          prop.boundary?.points || 
+          prop.boundary?.polygon ||
+          prop.ownerSubmittedBoundary?.vertices ||
+          prop.ownerSubmittedBoundary?.polygon ||
+          (Array.isArray(prop.ownerSubmittedBoundary) ? prop.ownerSubmittedBoundary : null)
+        );
+
+      let formattedPoly = [];
+      if (rawPoly && Array.isArray(rawPoly) && rawPoly.length >= 3) {
+        formattedPoly = rawPoly.map(pt => {
+          if (Array.isArray(pt) && pt.length >= 2) return [Number(pt[0]), Number(pt[1])];
+          if (pt && typeof pt === 'object') return [Number(pt.lat ?? pt.latitude), Number(pt.lng ?? pt.longitude)];
+          return null;
+        }).filter(pt => pt && !isNaN(pt[0]) && !isNaN(pt[1]));
+      }
+
+      // 2. Compute exact marker pin coordinates (If boundary polygon exists, use polygon centroid for 100% perfect alignment)
       const loc = prop.location || {};
-      const lat = Number(loc.lat ?? loc.latitude ?? loc.geoPoint?.latitude ?? prop.lat ?? prop.latitude);
-      const lng = Number(loc.lng ?? loc.longitude ?? loc.geoPoint?.longitude ?? prop.lng ?? prop.longitude);
+      let lat = Number(loc.lat ?? loc.latitude ?? loc.geoPoint?.latitude ?? prop.lat ?? prop.latitude);
+      let lng = Number(loc.lng ?? loc.longitude ?? loc.geoPoint?.longitude ?? prop.lng ?? prop.longitude);
+
+      if (formattedPoly.length >= 3) {
+        let sumLat = 0;
+        let sumLng = 0;
+        formattedPoly.forEach(pt => {
+          sumLat += pt[0];
+          sumLng += pt[1];
+        });
+        lat = sumLat / formattedPoly.length;
+        lng = sumLng / formattedPoly.length;
+      }
 
       if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 
@@ -451,46 +487,25 @@ export default function UniversalMapEngine({
 
       markersLayerRef.current.addLayer(marker);
 
-      // Extract raw polygon array from all possible boundary data structures
-      const rawPoly = Array.isArray(prop.boundary) 
-        ? prop.boundary 
-        : (
-          prop.boundary?.vertices || 
-          prop.boundary?.approvedPolygon || 
-          prop.boundary?.coordinates || 
-          prop.boundary?.points || 
-          prop.boundary?.polygon ||
-          prop.ownerSubmittedBoundary?.vertices ||
-          prop.ownerSubmittedBoundary?.polygon ||
-          (Array.isArray(prop.ownerSubmittedBoundary) ? prop.ownerSubmittedBoundary : null)
-        );
-
-      if (rawPoly && Array.isArray(rawPoly) && rawPoly.length >= 3) {
-        const formattedPoly = rawPoly.map(pt => {
-          if (Array.isArray(pt) && pt.length >= 2) return [Number(pt[0]), Number(pt[1])];
-          if (pt && typeof pt === 'object') return [Number(pt.lat ?? pt.latitude), Number(pt.lng ?? pt.longitude)];
-          return null;
-        }).filter(pt => pt && !isNaN(pt[0]) && !isNaN(pt[1]));
-
-        if (formattedPoly.length >= 3) {
-          const polygon = L.polygon(formattedPoly, {
-            color: '#D4A017',
-            fillColor: '#F4C542',
-            fillOpacity: 0.45,
-            weight: 3,
-            dashArray: '6, 6',
-            lineJoin: 'round'
-          });
-          polygon.bindTooltip(`Approved Plot Boundary (${prop.title || 'Plot'})`, { sticky: true });
-          polygon.on('click', () => {
-            if (mapInstanceRef.current) {
-              mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
-            }
-            setSelectedPropertyPreview(prop);
-          });
-          if (polygonLayerRef.current) {
-            polygonLayerRef.current.addLayer(polygon);
+      // Render Approved GeoJSON Boundary Polygon
+      if (formattedPoly.length >= 3) {
+        const polygon = L.polygon(formattedPoly, {
+          color: '#D4A017',
+          fillColor: '#F4C542',
+          fillOpacity: 0.45,
+          weight: 3,
+          dashArray: '6, 6',
+          lineJoin: 'round'
+        });
+        polygon.bindTooltip(`Approved Plot Boundary (${prop.title || 'Plot'})`, { sticky: true });
+        polygon.on('click', () => {
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
           }
+          setSelectedPropertyPreview(prop);
+        });
+        if (polygonLayerRef.current) {
+          polygonLayerRef.current.addLayer(polygon);
         }
       }
     });

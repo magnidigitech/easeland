@@ -84,9 +84,27 @@ export async function saveOwnerBoundarySubmission(propertyId, ownerId, {
       submittedAt: new Date().toISOString()
     };
 
+    let centroidLocation = null;
+    if (Array.isArray(vertices) && vertices.length >= 3) {
+      let sumLat = 0;
+      let sumLng = 0;
+      vertices.forEach(v => {
+        sumLat += Number(v.lat);
+        sumLng += Number(v.lng);
+      });
+      const cLat = sumLat / vertices.length;
+      const cLng = sumLng / vertices.length;
+      centroidLocation = {
+        lat: cLat,
+        lng: cLng,
+        geoPoint: { latitude: cLat, longitude: cLng }
+      };
+    }
+
     const payload = {
       boundary: boundaryData,
-      ownerSubmittedBoundary: boundaryData
+      ownerSubmittedBoundary: boundaryData,
+      ...(centroidLocation ? { location: centroidLocation } : {})
     };
 
     // 1. Sync boundary to PostgreSQL API (/api/properties) & mockApi
