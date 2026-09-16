@@ -330,7 +330,44 @@ export const mockApi = {
       return [];
     }
 
-    let result = properties.filter(p => p.status === 'APPROVED_LIVE');
+    let localProps = [];
+    let deletedIds = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localProps.push(...parsed);
+            else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+          }
+        });
+        const delRaw = localStorage.getItem('easeland_deleted_properties');
+        if (delRaw) deletedIds = JSON.parse(delRaw).map(String);
+      }
+    } catch (e) {}
+
+    const combined = [...properties, ...localProps];
+    const candidateMap = new Map();
+    combined.forEach(p => {
+      if (!p) return;
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
+      if (pId && !deletedIds.includes(pId)) {
+        const existing = candidateMap.get(pId) || {};
+        candidateMap.set(pId, { ...existing, ...p });
+      }
+    });
+
+    let allProps = Array.from(candidateMap.values());
+    let result = allProps.filter(p => {
+      if (!p) return false;
+      const st = String(p.status || p.listingStatus || '').toUpperCase();
+      const isLiveStatus = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED';
+      const isVerifiedPublished = (p.isPublished === true || p.isPublished === undefined) && (p.isPlatformVerified === true || (st !== 'DRAFT' && st !== 'PENDING_VERIFICATION'));
+      const isNotRejected = st !== 'REJECTED' && st !== 'DRAFT' && st !== 'PENDING_VERIFICATION' && st !== 'UNDER_REVIEW' && st !== 'CHANGES_REQUIRED';
+      return (isLiveStatus || isVerifiedPublished) && isNotRejected;
+    });
     result = deduplicateProperties(result);
 
     // Category Filter
@@ -427,7 +464,23 @@ export const mockApi = {
   },
 
   getPropertyById: (id) => {
-    return properties.find(p => p.id === id) || null;
+    if (!id) return null;
+    const targetIdStr = String(id);
+    let localProps = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localProps.push(...parsed);
+            else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+          }
+        });
+      }
+    } catch (e) {}
+    return [...properties, ...localProps].find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) || null;
   },
 
   // -------------------------------------------------------------
@@ -620,18 +673,57 @@ export const mockApi = {
   },
 
   getAllPropertiesAdmin: () => {
+    let localProps = [];
     let deletedIds = [];
     try {
       if (typeof window !== 'undefined') {
-        const raw = localStorage.getItem('easeland_deleted_properties');
-        if (raw) deletedIds = JSON.parse(raw);
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localProps.push(...parsed);
+            else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+          }
+        });
+        const delRaw = localStorage.getItem('easeland_deleted_properties');
+        if (delRaw) deletedIds = JSON.parse(delRaw).map(String);
       }
     } catch (e) {}
-    return properties.filter(p => p && !deletedIds.includes(String(p.id || p.propertyId)));
+    const combined = [...properties, ...localProps];
+    const candidateMap = new Map();
+    combined.forEach(p => {
+      if (!p) return;
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
+      if (pId && !deletedIds.includes(pId)) {
+        const existing = candidateMap.get(pId) || {};
+        candidateMap.set(pId, { ...existing, ...p });
+      }
+    });
+    return Array.from(candidateMap.values());
   },
 
   approvePropertyAdmin: (propertyId, notes = 'Approved by Admin') => {
-    const prop = properties.find(p => p.id === propertyId || p.propertyId === propertyId);
+    if (!propertyId) return null;
+    const targetIdStr = String(propertyId);
+    let localProps = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localProps.push(...parsed);
+            else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+          }
+        });
+      }
+    } catch (e) {}
+
+    const all = [...properties, ...localProps];
+    const prop = all.find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr));
+
     if (prop) {
       prop.status = 'LIVE';
       prop.listingStatus = 'LIVE';
@@ -640,8 +732,43 @@ export const mockApi = {
       prop.verificationStatus = 'Platform Verified';
       prop.verifiedDate = new Date().toISOString().split('T')[0];
       prop.verificationNotes = notes;
+
+      const idx = properties.findIndex(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr));
+      if (idx !== -1) {
+        properties[idx] = { ...properties[idx], ...prop };
+      } else {
+        properties.unshift(prop);
+      }
       setStoredData('easeland_properties', properties);
+
       if (typeof window !== 'undefined') {
+        try {
+          const keys = ['easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+          keys.forEach(k => {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                const updated = parsed.map(p => {
+                  if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
+                    return {
+                      ...p,
+                      status: 'LIVE',
+                      listingStatus: 'LIVE',
+                      isPlatformVerified: true,
+                      isPublished: true,
+                      verificationStatus: 'Platform Verified',
+                      verificationNotes: notes
+                    };
+                  }
+                  return p;
+                });
+                localStorage.setItem(k, JSON.stringify(updated));
+              }
+            }
+          });
+        } catch (e) {}
+
         window.dispatchEvent(new CustomEvent('easeland-property-approved', { detail: prop }));
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: prop }));
       }
