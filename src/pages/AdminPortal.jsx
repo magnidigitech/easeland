@@ -577,7 +577,33 @@ export default function AdminPortal() {
     setFollowUps(fups);
     setEnquiries(enqs);
     setAllProperties(finalAllProperties);
-    setRegisteredUsersList(users);
+    const enrichedUsers = users.map(u => {
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      const uEmail = (u.email || '').toLowerCase().trim();
+
+      const userListings = finalAllProperties.filter(p => {
+        if (!p) return false;
+        const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
+        const pEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
+        return (uUid && pOwnerId && uUid === pOwnerId) || (uEmail && pEmail && uEmail === pEmail);
+      });
+
+      const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in';
+      let derivedRole = u.role;
+      if (!isUserAdmin) {
+        derivedRole = userListings.length > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : 'USER';
+      }
+
+      return {
+        ...u,
+        role: derivedRole,
+        postedListingsCount: userListings.length,
+        authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
+        emailVerified: u.emailVerified ?? (u.email ? true : false)
+      };
+    });
+
+    setRegisteredUsersList(enrichedUsers);
     setSiteConfig(cfg);
 
     if (queue.length > 0) {
@@ -3223,7 +3249,8 @@ export default function AdminPortal() {
                     <table className="w-full text-left border-collapse table-auto">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                          <th className="py-3 px-3">User Info</th>
+                          <th className="py-3 px-3">User & Auth Details</th>
+                          <th className="py-3 px-3">Auth Method</th>
                           <th className="py-3 px-3">Platform Role</th>
                           <th className="py-3 px-3">Contact Phone</th>
                           <th className="py-3 px-3 text-center">Listings</th>
@@ -3240,7 +3267,8 @@ export default function AdminPortal() {
                               const q = userSearchQuery.toLowerCase();
                               return (u.name || '').toLowerCase().includes(q) ||
                                      (u.email || '').toLowerCase().includes(q) ||
-                                     (u.phone || '').includes(q);
+                                     (u.phone || '').includes(q) ||
+                                     (u.uid || '').toLowerCase().includes(q);
                             }
                             return true;
                           })
@@ -3252,27 +3280,59 @@ export default function AdminPortal() {
                             return 0;
                           })
                           .map((u) => (
-                            <tr key={u.id || u.email} className="hover:bg-gray-50/80 transition-colors">
+                            <tr key={u.id || u.email || u.uid} className="hover:bg-gray-50/80 transition-colors">
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2.5">
                                   <div className="w-8 h-8 rounded-xl bg-brand-charcoal text-brand-yellow font-black text-xs flex items-center justify-center shadow-sm shrink-0">
                                     {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
                                   </div>
                                   <div className="min-w-0">
-                                    <span className="font-extrabold text-brand-charcoal block truncate text-xs">{u.name}</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-extrabold text-brand-charcoal block truncate text-xs">{u.name}</span>
+                                      {u.emailVerified && (
+                                        <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center gap-0.5" title="Firebase Email Verified">
+                                          ✓ Verified
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-[10px] text-gray-500 font-medium block truncate">{u.email}</span>
+                                    {(u.uid || u.id) && (
+                                      <span className="text-[9px] text-slate-400 font-mono block truncate" title={`Firebase Auth UID: ${u.uid || u.id}`}>
+                                        UID: {String(u.uid || u.id).length > 18 ? `${String(u.uid || u.id).substring(0, 16)}...` : String(u.uid || u.id)}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </td>
 
                               <td className="py-3 px-3">
-                                <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block">
-                                  {u.role}
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${
+                                  u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                }`}>
+                                  {u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password')}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${
+                                  u.role === 'ADMIN' || u.email === 'admin@easeland.in'
+                                    ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                                    : u.role?.includes('VERIFIED') || u.postedListingsCount > 0
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {u.role === 'ADMIN' || u.email === 'admin@easeland.in' ? 'ADMINISTRATOR' : (u.postedListingsCount > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : u.role)}
                                 </span>
                               </td>
 
                               <td className="py-3 px-3 font-semibold text-gray-700 text-xs">
-                                {u.phone}
+                                {u.phone ? (
+                                  <span>{u.phone}</span>
+                                ) : (
+                                  <span className="text-gray-400 italic text-[10px]">Not Provided</span>
+                                )}
                               </td>
 
                               <td className="py-3 px-3 text-center font-extrabold text-brand-charcoal text-xs">
@@ -3310,7 +3370,7 @@ export default function AdminPortal() {
                               </td>
 
                               <td className="py-3 px-3 text-right">
-                                {u.status !== 'ADMIN' && (
+                                {u.status !== 'ADMIN' && u.role !== 'ADMIN' && u.email !== 'admin@easeland.in' && (
                                   <div className="flex items-center justify-end gap-1.5">
                                     {u.status === 'SUSPENDED' ? (
                                       <button

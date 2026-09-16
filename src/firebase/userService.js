@@ -186,6 +186,8 @@ export async function getAllUsersAdmin() {
           name: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
           displayName: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
           email: data.email || '',
+          emailVerified: data.emailVerified ?? (data.email?.endsWith('@gmail.com') ? true : false),
+          authProvider: data.authProvider || data.providerId || (data.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
           phone: extractedPhone,
           phoneNumber: extractedPhone,
           role: data.adminRole ? 'ADMIN' : (data.role || 'USER'),
