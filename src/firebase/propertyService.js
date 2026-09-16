@@ -581,6 +581,33 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
     } catch (e) {}
 
     if (typeof window !== 'undefined') {
+      try {
+        const pIdStr = String(propertyId);
+        const rawSub = localStorage.getItem('easeland_submitted_properties') || '[]';
+        const parsedSub = JSON.parse(rawSub);
+        if (!parsedSub.includes(pIdStr)) {
+          parsedSub.push(pIdStr);
+          localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub));
+        }
+
+        const rawUserProps = localStorage.getItem('easeland_user_properties');
+        if (rawUserProps) {
+          const parsed = JSON.parse(rawUserProps);
+          const updated = parsed.map(p => {
+            if (p && String(p.id || p.propertyId) === pIdStr) {
+              return {
+                ...p,
+                listingStatus: ListingStatus.PENDING_VERIFICATION,
+                status: ListingStatus.PENDING_VERIFICATION,
+                isPublished: false
+              };
+            }
+            return p;
+          });
+          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
+        }
+      } catch (lErr) {}
+
       window.dispatchEvent(new CustomEvent('easeland-property-submitted', { detail: publicPayload }));
       window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: publicPayload }));
     }
@@ -917,12 +944,36 @@ export async function getOwnerDrafts(ownerId) {
     if (!ownerId) return { success: false, error: 'Owner ID is required.' };
     let drafts = [];
 
+    let submittedIdsSet = new Set();
+    let deletedIdsSet = new Set();
+    try {
+      if (typeof window !== 'undefined') {
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) JSON.parse(rawSub).forEach(id => submittedIdsSet.add(String(id)));
+        const rawDel = localStorage.getItem('easeland_deleted_properties');
+        if (rawDel) JSON.parse(rawDel).forEach(id => deletedIdsSet.add(String(id)));
+      }
+    } catch (e) {}
+
+    const isTrueDraft = (p) => {
+      if (!p) return false;
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
+      if (!pId || submittedIdsSet.has(pId) || deletedIdsSet.has(pId)) return false;
+
+      const sVal = String(p.listingStatus || p.status || '').toUpperCase();
+      if (['PENDING_VERIFICATION', 'LIVE', 'APPROVED_LIVE', 'REJECTED', 'CHANGES_REQUIRED', 'SUBMITTED', 'DELETED'].includes(sVal)) {
+        return false;
+      }
+      if (p.isPublished || p.isPlatformVerified) return false;
+      return sVal === 'DRAFT' || p.isDraft === true || !sVal;
+    };
+
     // 1. Try local store & mockApi
     try {
       const { mockApi } = await import('../services/mockApi.js');
       const myProps = mockApi.getMyProperties(ownerId, '');
       if (Array.isArray(myProps)) {
-        drafts = myProps.filter(p => p && (p.listingStatus === 'DRAFT' || p.status === 'DRAFT'));
+        drafts = myProps.filter(isTrueDraft);
       }
     } catch (e) {}
 
@@ -932,7 +983,7 @@ export async function getOwnerDrafts(ownerId) {
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.properties)) {
-          const pgDrafts = data.properties.filter(p => p && (p.ownerId === ownerId || ownerId === 'admin_uid_001') && (p.listingStatus === 'DRAFT' || p.status === 'DRAFT'));
+          const pgDrafts = data.properties.filter(p => p && (p.ownerId === ownerId || ownerId === 'admin_uid_001') && isTrueDraft(p));
           drafts = [...drafts, ...pgDrafts];
         }
       }
@@ -947,21 +998,22 @@ export async function getOwnerDrafts(ownerId) {
         orderBy('updatedAt', 'desc')
       );
       const snap = await getDocs(q);
-      const fsDrafts = snap.docs.map(doc => doc.data());
+      const fsDrafts = snap.docs.map(doc => doc.data()).filter(isTrueDraft);
       drafts = [...drafts, ...fsDrafts];
     } catch (error) {
       console.warn('Firestore getOwnerDrafts note:', error);
     }
 
-    // Deduplicate
+    // Deduplicate & strictly filter out submitted items
     const draftMap = new Map();
     drafts.forEach(d => {
-      if (!d) return;
+      if (!d || !isTrueDraft(d)) return;
       const dId = String(d.id || d.propertyId || '');
       if (dId) draftMap.set(dId, { ...(draftMap.get(dId) || {}), ...d });
     });
 
-    return { success: true, drafts: Array.from(draftMap.values()) };
+    const finalDrafts = Array.from(draftMap.values()).filter(isTrueDraft);
+    return { success: true, drafts: finalDrafts };
   } catch (error) {
     return { success: true, drafts: [] };
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
 import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById } from '../firebase/propertyService.js';
@@ -25,6 +25,17 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Close modal on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showResumeModal) {
+        setShowResumeModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showResumeModal]);
 
   // Form State (Clean initialized state with 0 defaults)
   const [formData, setFormData] = useState({
@@ -317,10 +328,24 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       
       {/* RESUME DRAFT MODAL */}
       {showResumeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowResumeModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-sm animate-in fade-in"
+        >
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 p-6 space-y-4 relative">
+            <button
+              type="button"
+              onClick={() => setShowResumeModal(false)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+              title="Close Modal (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 pr-8">
+              <div className="w-10 h-10 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center shrink-0">
                 <RotateCcw className="w-5 h-5 text-brand-charcoal" />
               </div>
               <div>
@@ -331,7 +356,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
             <div className="space-y-2 max-h-60 overflow-y-auto pt-2">
               {draftsList.map((d) => (
-                <div key={d.propertyId} className="p-3 bg-gray-50 hover:bg-brand-yellow/10 border border-gray-200 rounded-xl flex items-center justify-between transition-colors">
+                <div key={d.propertyId || d.id} className="p-3 bg-gray-50 hover:bg-brand-yellow/10 border border-gray-200 rounded-xl flex items-center justify-between transition-colors">
                   <div>
                     <span className="block text-xs font-bold text-brand-charcoal">{d.title || 'Untitled Draft'}</span>
                     <span className="block text-[10px] text-gray-500 font-semibold">{d.propertyType} • {d.purpose} • Step {d.lastStep || 1}</span>
