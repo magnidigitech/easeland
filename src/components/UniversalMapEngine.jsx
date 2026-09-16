@@ -353,9 +353,13 @@ export default function UniversalMapEngine({
     const bounds = [];
 
     displayProperties.forEach((prop) => {
-      if (!prop.location || !prop.location.lat || !prop.location.lng) return;
+      if (!prop) return;
+      const loc = prop.location || {};
+      const lat = Number(loc.lat ?? loc.latitude ?? loc.geoPoint?.latitude ?? prop.lat ?? prop.latitude);
+      const lng = Number(loc.lng ?? loc.longitude ?? loc.geoPoint?.longitude ?? prop.lng ?? prop.longitude);
 
-      const { lat, lng } = prop.location;
+      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+
       bounds.push([lat, lng]);
 
       const { size, color, border } = getMarkerStyle(prop);
@@ -393,13 +397,13 @@ export default function UniversalMapEngine({
             ${prop.verificationStatus || 'Verified'}
           </div>
           <div style="font-size: 13px; font-weight: 700; color: #0B2545; margin-bottom: 2px;">
-            ${prop.title}
+            ${prop.title || 'Property'}
           </div>
           <div style="font-size: 12px; font-weight: 800; color: #15803d;">
-            ${prop.priceDisplay}
+            ${prop.priceDisplay || ('Rs. ' + (prop.price || 0))}
           </div>
           <div style="font-size: 11px; font-weight: 600; color: #6b7280;">
-            Area: ${prop.areaDisplay || prop.area + ' sq ft'}
+            Area: ${prop.areaDisplay || (prop.area ? prop.area + ' sq ft' : '')}
           </div>
         </div>
       `;
@@ -408,8 +412,8 @@ export default function UniversalMapEngine({
 
       // Marker Click -> Ultra-Deep MAX Zoom (Level 22) + Open Preview Card Modal
       marker.on('click', () => {
-        if (mapInstanceRef.current && prop.location?.lat) {
-          mapInstanceRef.current.setView([prop.location.lat, prop.location.lng], 22, { animate: true });
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
         }
         setSelectedPropertyPreview(prop);
       });
@@ -417,23 +421,32 @@ export default function UniversalMapEngine({
       markersLayerRef.current.addLayer(marker);
 
       // Render Approved GeoJSON Boundary Polygon if present (for open plots/land)
-      if (prop.boundary && Array.isArray(prop.boundary) && prop.boundary.length >= 3) {
-        const polygon = L.polygon(prop.boundary, {
-          color: '#D4A017',
-          fillColor: '#F4C542',
-          fillOpacity: 0.35,
-          weight: 2.5,
-          lineJoin: 'round'
-        });
-        polygon.bindTooltip(`Approved Plot Boundary (${prop.title})`, { sticky: true });
-        polygon.on('click', () => {
-          if (mapInstanceRef.current && prop.location?.lat) {
-            mapInstanceRef.current.setView([prop.location.lat, prop.location.lng], 22, { animate: true });
+      const rawPoly = Array.isArray(prop.boundary) ? prop.boundary : (prop.boundary?.coordinates || prop.boundary?.points || prop.boundary?.polygon);
+      if (rawPoly && Array.isArray(rawPoly) && rawPoly.length >= 3) {
+        const formattedPoly = rawPoly.map(pt => {
+          if (Array.isArray(pt) && pt.length >= 2) return [Number(pt[0]), Number(pt[1])];
+          if (pt && typeof pt === 'object') return [Number(pt.lat ?? pt.latitude), Number(pt.lng ?? pt.longitude)];
+          return null;
+        }).filter(pt => pt && !isNaN(pt[0]) && !isNaN(pt[1]));
+
+        if (formattedPoly.length >= 3) {
+          const polygon = L.polygon(formattedPoly, {
+            color: '#D4A017',
+            fillColor: '#F4C542',
+            fillOpacity: 0.35,
+            weight: 2.5,
+            lineJoin: 'round'
+          });
+          polygon.bindTooltip(`Approved Plot Boundary (${prop.title || 'Plot'})`, { sticky: true });
+          polygon.on('click', () => {
+            if (mapInstanceRef.current) {
+              mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
+            }
+            setSelectedPropertyPreview(prop);
+          });
+          if (polygonLayerRef.current) {
+            polygonLayerRef.current.addLayer(polygon);
           }
-          setSelectedPropertyPreview(prop);
-        });
-        if (polygonLayerRef.current) {
-          polygonLayerRef.current.addLayer(polygon);
         }
       }
     });

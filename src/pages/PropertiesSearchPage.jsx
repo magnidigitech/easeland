@@ -4,7 +4,7 @@ import PropertyCard from '../components/PropertyCard';
 import UniversalMapEngine from '../components/UniversalMapEngine';
 import DynamicFilterPanel from '../components/DynamicFilterPanel';
 import HeroSearch from '../components/HeroSearch';
-import { mockApi } from '../services/mockApi';
+import { mockApi, deduplicateProperties } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext';
 import { searchPublicProperties, validateSortCompatibility } from '../firebase/searchService.js';
 import { searchStateToUrlParams, urlParamsToSearchState } from '../firebase/searchUrl.js';
@@ -75,16 +75,18 @@ export default function PropertiesSearchPage({
         lastDoc: cursorDoc
       });
 
-      if (result.success && Array.isArray(result.properties) && result.properties.length > 0) {
-        setProperties(result.properties);
+      const fallbackData = mockApi.getPublicProperties(stateToUse) || [];
+
+      if (result.success && Array.isArray(result.properties)) {
+        const combined = deduplicateProperties([...result.properties, ...fallbackData]);
+        setProperties(combined);
         setHasMore(Boolean(result.hasMore));
         setCurrentLastDoc(result.lastDoc || null);
         setDisclosureMsg(result.disclosureMessage || null);
         setCandidateLimitReached(Boolean(result.candidateLimitReached));
         setSortCheck(result.sortCompatibility || { compatible: true });
       } else {
-        const fallbackData = mockApi.getPublicProperties(stateToUse);
-        setProperties(fallbackData || []);
+        setProperties(fallbackData);
         setHasMore(false);
       }
     } catch (err) {

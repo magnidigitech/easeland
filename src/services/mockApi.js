@@ -354,8 +354,25 @@ export const mockApi = {
       if (!p) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
       if (pId && !deletedIds.includes(pId)) {
-        const existing = candidateMap.get(pId) || {};
-        candidateMap.set(pId, { ...existing, ...p });
+        const existing = candidateMap.get(pId);
+        if (!existing) {
+          candidateMap.set(pId, { ...p });
+        } else {
+          const exSt = String(existing.status || existing.listingStatus || '').toUpperCase();
+          const newSt = String(p.status || p.listingStatus || '').toUpperCase();
+          const isNewLive = newSt === 'LIVE' || newSt === 'APPROVED_LIVE' || newSt === 'APPROVED' || p.isPlatformVerified === true || p.isPublished === true;
+          const isExLive = exSt === 'LIVE' || exSt === 'APPROVED_LIVE' || exSt === 'APPROVED' || existing.isPlatformVerified === true || existing.isPublished === true;
+
+          const merged = { ...existing, ...p };
+          if (isExLive || isNewLive) {
+            merged.status = 'LIVE';
+            merged.listingStatus = 'LIVE';
+            merged.isPlatformVerified = true;
+            merged.isPublished = true;
+            merged.verificationStatus = 'Platform Verified';
+          }
+          candidateMap.set(pId, merged);
+        }
       }
     });
 
@@ -363,10 +380,10 @@ export const mockApi = {
     let result = allProps.filter(p => {
       if (!p) return false;
       const st = String(p.status || p.listingStatus || '').toUpperCase();
-      const isLiveStatus = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED';
-      const isVerifiedPublished = (p.isPublished === true || p.isPublished === undefined) && (p.isPlatformVerified === true || (st !== 'DRAFT' && st !== 'PENDING_VERIFICATION'));
-      const isNotRejected = st !== 'REJECTED' && st !== 'DRAFT' && st !== 'PENDING_VERIFICATION' && st !== 'UNDER_REVIEW' && st !== 'CHANGES_REQUIRED';
-      return (isLiveStatus || isVerifiedPublished) && isNotRejected;
+      const lst = String(p.listingStatus || '').toUpperCase();
+      const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished !== false);
+      const isExplicitlyBlocked = st === 'REJECTED' || st === 'DRAFT' || (st === 'PENDING_VERIFICATION' && !p.isPlatformVerified && lst !== 'LIVE') || st === 'CHANGES_REQUIRED';
+      return isLive && !isExplicitlyBlocked;
     });
     result = deduplicateProperties(result);
 
