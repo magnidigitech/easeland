@@ -2438,518 +2438,639 @@ export default function AdminPortal() {
                 </div>
               ) : (
                 (() => {
-                  const activeAuditProp = selectedProperty || verificationQueue[0];
+                  try {
+                    const activeAuditProp = selectedProperty || verificationQueue[0];
 
-                  if (!activeAuditProp) return null;
-
-                  return (
-                    <div className="bg-white rounded-2xl p-6 border border-slate-300 shadow-lg space-y-6 text-slate-900">
-                      
-                      {/* HEADER BAR */}
-                      <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-black text-amber-900 bg-amber-200 px-3 py-1 rounded-md tracking-wider">
-                              AUDIT IN PROGRESS
-                            </span>
-                            <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-md">
-                              ID: {activeAuditProp.id || activeAuditProp.propertyId}
-                            </span>
-                          </div>
-                          <h3 className="text-2xl font-black text-slate-900 mt-1">{activeAuditProp.title}</h3>
-                          <p className="text-xs font-extrabold text-slate-700 mt-0.5 flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>
-                              {[
-                                activeAuditProp.location?.address || activeAuditProp.address,
-                                activeAuditProp.location?.locality || activeAuditProp.locality,
-                                activeAuditProp.location?.city || activeAuditProp.city,
-                                activeAuditProp.location?.district || activeAuditProp.district,
-                                activeAuditProp.location?.state || activeAuditProp.state
-                              ].filter(Boolean).join(', ')}
-                              {(activeAuditProp.location?.pincode || activeAuditProp.pincode) ? ` - ${activeAuditProp.location?.pincode || activeAuditProp.pincode}` : ''}
-                            </span>
+                    if (!activeAuditProp) {
+                      return (
+                        <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-3">
+                          <div className="text-4xl">📋</div>
+                          <h3 className="font-black text-xl text-slate-800 uppercase tracking-wide">
+                            NO PROPERTY SELECTED FOR AUDIT
+                          </h3>
+                          <p className="text-xs text-slate-600 font-semibold max-w-md mx-auto">
+                            Select a property from the Verification Queue to begin document and field audit.
                           </p>
-                        </div>
-                        <div className="text-right flex flex-col items-end gap-2">
-                          <div>
-                            <span className="text-2xl font-black text-emerald-700 block">
-                              {activeAuditProp.priceDisplay || (activeAuditProp.price ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}` : 'Price on Request')}
-                            </span>
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block">
-                              Submitted: {activeAuditProp.submittedDate || 'Recent'}
-                            </span>
-                          </div>
                           <button
                             type="button"
-                            onClick={() => handleDeleteProperty(activeAuditProp)}
-                            className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-extrabold px-3 py-1.5 rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                            onClick={() => setActiveTab('verification')}
+                            className="mt-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete Property</span>
+                            Go to Verification Queue
                           </button>
                         </div>
-                      </div>
+                      );
+                    }
 
-                      {/* 2-COLUMN DATA CARDS */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    // Format property location cleanly without empty leading commas
+                    const rawLocParts = [
+                      activeAuditProp.location?.address || activeAuditProp.address,
+                      activeAuditProp.location?.locality || activeAuditProp.locality,
+                      activeAuditProp.location?.city || activeAuditProp.city,
+                      activeAuditProp.location?.district || activeAuditProp.district,
+                      activeAuditProp.location?.state || activeAuditProp.state
+                    ];
+                    const locParts = rawLocParts.map(val => {
+                      if (!val) return '';
+                      if (typeof val === 'string') return val.trim();
+                      if (typeof val === 'object') return val.name || val.locality || val.city || val.address || '';
+                      return String(val).trim();
+                    }).filter(Boolean);
+
+                    const locationStr = locParts.length > 0 ? locParts.join(', ') : 'Location details pending';
+                    const pincodeVal = activeAuditProp.location?.pincode || activeAuditProp.pincode;
+                    const pincodeStr = pincodeVal && typeof pincodeVal !== 'object' ? ` - ${String(pincodeVal).trim()}` : '';
+
+                    const propTitle = typeof activeAuditProp.title === 'string' && activeAuditProp.title.trim()
+                      ? activeAuditProp.title.trim()
+                      : (activeAuditProp.title?.name || activeAuditProp.title?.title || String(activeAuditProp.title || 'Untitled Property'));
+
+                    const propIdStr = String(activeAuditProp.id || activeAuditProp.propertyId || 'N/A');
+
+                    const priceStr = typeof activeAuditProp.priceDisplay === 'string' && activeAuditProp.priceDisplay
+                      ? activeAuditProp.priceDisplay
+                      : (activeAuditProp.price && !isNaN(Number(activeAuditProp.price))
+                          ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}`
+                          : 'Price on Request');
+
+                    const ownerNameRaw = activeAuditProp.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(String(activeAuditProp.owner.name).trim())
+                      ? activeAuditProp.owner.name
+                      : (activeAuditProp.owner?.email || activeAuditProp.ownerPublicName || 'Account Name Not Set');
+                    const ownerNameStr = typeof ownerNameRaw === 'string'
+                      ? ownerNameRaw
+                      : (typeof ownerNameRaw === 'object' && ownerNameRaw ? (ownerNameRaw.name || ownerNameRaw.displayName || ownerNameRaw.email || 'Account Name Not Set') : String(ownerNameRaw));
+
+                    const ownerPhoneRaw = activeAuditProp.owner?.phone && activeAuditProp.owner.phone !== '+91 98765 43210' && activeAuditProp.owner.phone !== '+91 N/A'
+                      ? activeAuditProp.owner.phone
+                      : 'Number Not Updated';
+                    const ownerPhoneStr = typeof ownerPhoneRaw === 'string' ? ownerPhoneRaw : String(ownerPhoneRaw || 'Number Not Updated');
+
+                    const ownerEmailRaw = activeAuditProp.owner?.email || activeAuditProp.userEmail || 'N/A';
+                    const ownerEmailStr = typeof ownerEmailRaw === 'string' ? ownerEmailRaw : String(ownerEmailRaw || 'N/A');
+
+                    const ownerRoleRaw = activeAuditProp.owner?.role || 'Property Owner';
+                    const ownerRoleStr = typeof ownerRoleRaw === 'string' ? ownerRoleRaw : String(ownerRoleRaw || 'Property Owner');
+
+                    const catStr = typeof activeAuditProp.category === 'string' ? activeAuditProp.category : (activeAuditProp.category?.name || 'Real Estate');
+                    const propTypeStr = typeof activeAuditProp.propertyType === 'string' ? activeAuditProp.propertyType : (activeAuditProp.propertyType?.name || 'Plot/Property');
+                    const txTypeStr = typeof activeAuditProp.transactionType === 'string' ? activeAuditProp.transactionType : (activeAuditProp.intent || 'FOR SALE');
+                    const areaStr = typeof activeAuditProp.areaDisplay === 'string' ? activeAuditProp.areaDisplay : `${activeAuditProp.area || 0} ${activeAuditProp.areaUnit || 'sq ft'}`;
+                    const facingStr = typeof activeAuditProp.facing === 'string' ? activeAuditProp.facing : 'East';
+                    const dimStr = typeof activeAuditProp.dimensions === 'string' ? activeAuditProp.dimensions : 'Standard Plot';
+
+                    const surveyVal = activeAuditProp.location?.surveyNo || activeAuditProp.surveyNo || 'N/A';
+                    const surveyStr = typeof surveyVal === 'string' || typeof surveyVal === 'number' ? String(surveyVal) : 'N/A';
+
+                    const lpVal = activeAuditProp.location?.lpNo || activeAuditProp.lpNo || 'N/A';
+                    const lpStr = typeof lpVal === 'string' || typeof lpVal === 'number' ? String(lpVal) : 'N/A';
+
+                    return (
+                      <div className="bg-white rounded-2xl p-6 border border-slate-300 shadow-lg space-y-6 text-slate-900">
                         
-                        {/* OWNER & CONTACT INFORMATION CARD */}
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                            <User className="w-4 h-4 text-blue-600" />
-                            <span>Owner & Contact Verification</span>
-                          </h4>
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Owner Name:</span>
-                              <span className="text-slate-900 font-extrabold">
-                                {activeAuditProp.owner?.name && !['Property Owner', 'Verified Property Owner'].includes(activeAuditProp.owner.name)
-                                  ? activeAuditProp.owner.name
-                                  : (activeAuditProp.owner?.email || activeAuditProp.ownerPublicName || 'Account Name Not Set')}
+                        {/* HEADER BAR */}
+                        <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-black text-amber-900 bg-amber-200 px-3 py-1 rounded-md tracking-wider">
+                                AUDIT IN PROGRESS
+                              </span>
+                              <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-md">
+                                ID: {propIdStr}
                               </span>
                             </div>
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Phone Number:</span>
-                              <span className="text-slate-900 font-extrabold">
-                                {activeAuditProp.owner?.phone && activeAuditProp.owner.phone !== '+91 98765 43210' && activeAuditProp.owner.phone !== '+91 N/A'
-                                  ? activeAuditProp.owner.phone
-                                  : 'Number Not Updated'}
+                            <h3 className="text-2xl font-black text-slate-900 mt-1">{propTitle}</h3>
+                            <p className="text-xs font-extrabold text-slate-700 mt-0.5 flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>
+                                {locationStr}{pincodeStr}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="text-right flex flex-col items-end gap-2">
+                            <div>
+                              <span className="text-2xl font-black text-emerald-700 block">
+                                {priceStr}
+                              </span>
+                              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block">
+                                Submitted: {activeAuditProp.submittedDate || 'Recent'}
                               </span>
                             </div>
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Email Address:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.email || activeAuditProp.userEmail || 'N/A'}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Listing Role:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.owner?.role || 'Property Owner'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-600 font-bold">KYC / Identity Status:</span>
-                              <span className="text-emerald-700 font-black bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
-                                VERIFIED OWNER
-                              </span>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProperty(activeAuditProp)}
+                              className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-extrabold px-3 py-1.5 rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete Property</span>
+                            </button>
                           </div>
                         </div>
 
-                        {/* SPECIFICATIONS & FINANCIAL DETAILS */}
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                            <Building2 className="w-4 h-4 text-emerald-600" />
-                            <span>Property Specifications & Financials</span>
-                          </h4>
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Category & Type:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.category || 'Real Estate'} • {activeAuditProp.propertyType || 'Plot/Property'}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Listing Intent:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.transactionType || activeAuditProp.intent || 'FOR SALE'}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Total Area:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.areaDisplay || `${activeAuditProp.area || 0} ${activeAuditProp.areaUnit || 'sq ft'}`}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                              <span className="text-slate-600 font-bold">Facing & Dimensions:</span>
-                              <span className="text-slate-900 font-extrabold">{activeAuditProp.facing || 'East'} • {activeAuditProp.dimensions || 'Standard Plot'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-600 font-bold">Survey / LP Identifiers:</span>
-                              <span className="text-slate-900 font-extrabold">Sy. No: {activeAuditProp.location?.surveyNo || activeAuditProp.surveyNo || 'N/A'} • LP: {activeAuditProp.location?.lpNo || activeAuditProp.lpNo || 'N/A'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* FULL DESCRIPTION & AMENITIES */}
-                      {(() => {
-                        const amenitiesList = Array.isArray(activeAuditProp.amenities)
-                          ? activeAuditProp.amenities
-                          : (typeof activeAuditProp.amenities === 'string'
-                              ? activeAuditProp.amenities.split(',').map(s => s.trim()).filter(Boolean)
-                              : []);
-
-                        if (!activeAuditProp.description && amenitiesList.length === 0) return null;
-
-                        return (
-                          <div className="space-y-3 pt-4 border-t border-slate-200">
+                        {/* 2-COLUMN DATA CARDS */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          
+                          {/* OWNER & CONTACT INFORMATION CARD */}
+                          <div className="space-y-3">
                             <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                              <FileText className="w-4 h-4 text-purple-600" />
-                              <span>Property Description & Key Amenities</span>
+                              <User className="w-4 h-4 text-blue-600" />
+                              <span>Owner & Contact Verification</span>
                             </h4>
-                            {activeAuditProp.description && (
-                              <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 leading-relaxed">
-                                {activeAuditProp.description}
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Owner Name:</span>
+                                <span className="text-slate-900 font-extrabold">{ownerNameStr}</span>
                               </div>
-                            )}
-                            {amenitiesList.length > 0 && (
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                {amenitiesList.map((amenity, idx) => (
-                                  <span key={idx} className="bg-slate-200 text-slate-900 font-extrabold text-[11px] px-3 py-1 rounded-lg border border-slate-300">
-                                    ✓ {amenity}
-                                  </span>
-                                ))}
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Phone Number:</span>
+                                <span className="text-slate-900 font-extrabold">{ownerPhoneStr}</span>
                               </div>
-                            )}
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Email Address:</span>
+                                <span className="text-slate-900 font-extrabold">{ownerEmailStr}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Listing Role:</span>
+                                <span className="text-slate-900 font-extrabold">{ownerRoleStr}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-600 font-bold">KYC / Identity Status:</span>
+                                <span className="text-emerald-700 font-black bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
+                                  VERIFIED OWNER
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        );
-                      })()}
 
-                      {/* SUBMITTED MEDIA, VIDEO PRESENTATION & UPLOADED DOCUMENTS */}
-                      {(() => {
-                        const propId = activeAuditProp.id || activeAuditProp.propertyId;
+                          {/* SPECIFICATIONS & FINANCIAL DETAILS */}
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                              <Building2 className="w-4 h-4 text-emerald-600" />
+                              <span>Property Specifications & Financials</span>
+                            </h4>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Category & Type:</span>
+                                <span className="text-slate-900 font-extrabold">{catStr} • {propTypeStr}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Listing Intent:</span>
+                                <span className="text-slate-900 font-extrabold">{txTypeStr}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Total Area:</span>
+                                <span className="text-slate-900 font-extrabold">{areaStr}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                <span className="text-slate-600 font-bold">Facing & Dimensions:</span>
+                                <span className="text-slate-900 font-extrabold">{facingStr} • {dimStr}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-600 font-bold">Survey / LP Identifiers:</span>
+                                <span className="text-slate-900 font-extrabold">Sy. No: {surveyStr} • LP: {lpStr}</span>
+                              </div>
+                            </div>
+                          </div>
 
-                        // Local & session document fallbacks
-                        let extraDocs = [];
-                        try {
-                          const storedDocs = localStorage.getItem(`easeland_docs_${propId}`) || localStorage.getItem('easeland_user_documents');
-                          if (storedDocs) {
-                            const parsedDocs = JSON.parse(storedDocs);
-                            if (Array.isArray(parsedDocs)) {
-                              extraDocs = parsedDocs.filter(d => (d.propertyId === propId || !d.propertyId));
-                            }
-                          }
-                        } catch (e) {}
+                        </div>
 
-                        let extraMedia = [];
-                        try {
-                          const storedMedia = localStorage.getItem(`easeland_media_${propId}`) || localStorage.getItem('easeland_user_media');
-                          if (storedMedia) {
-                            const parsedMedia = JSON.parse(storedMedia);
-                            if (Array.isArray(parsedMedia)) {
-                              extraMedia = parsedMedia.filter(m => (m.propertyId === propId || !m.propertyId));
-                            }
-                          }
-                        } catch (e) {}
+                        {/* FULL DESCRIPTION & AMENITIES */}
+                        {(() => {
+                          const descVal = typeof activeAuditProp.description === 'string' ? activeAuditProp.description : '';
+                          const amenitiesList = Array.isArray(activeAuditProp.amenities)
+                            ? activeAuditProp.amenities.map(a => typeof a === 'string' ? a : (a?.name || a?.label || String(a || ''))).filter(Boolean)
+                            : (typeof activeAuditProp.amenities === 'string'
+                                ? activeAuditProp.amenities.split(',').map(s => s.trim()).filter(Boolean)
+                                : []);
 
-                        const rawItems = [
-                          ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
-                          ...(Array.isArray(activeAuditProp.propertyDocuments) ? activeAuditProp.propertyDocuments : []),
-                          ...(Array.isArray(activeAuditProp.confidentialDocuments) ? activeAuditProp.confidentialDocuments : []),
-                          ...extraDocs,
-                          ...extraMedia,
-                          ...(Array.isArray(activeAuditProp.media) ? activeAuditProp.media : []),
-                          ...(Array.isArray(activeAuditProp.photos) ? activeAuditProp.photos : []),
-                          ...(Array.isArray(activeAuditProp.images) ? activeAuditProp.images : []),
-                          ...(Array.isArray(activeAuditProp.publicApprovedMedia) ? activeAuditProp.publicApprovedMedia : [])
-                        ];
+                          if (!descVal && amenitiesList.length === 0) return null;
 
-                        if (activeAuditProp.videoUrl) rawItems.push(activeAuditProp.videoUrl);
-                        if (activeAuditProp.videoLink) rawItems.push(activeAuditProp.videoLink);
-                        if (activeAuditProp.embeddedVideoUrl) rawItems.push(activeAuditProp.embeddedVideoUrl);
-                        if (activeAuditProp.droneVideoUrl) rawItems.push(activeAuditProp.droneVideoUrl);
-
-                        const photos = [];
-                        const videos = [];
-                        const documents = [];
-
-                        const seenPhotoUrls = new Set();
-                        const seenVideoUrls = new Set();
-                        const seenDocKeys = new Set();
-
-                        const isValidPhotoUrl = (u) => {
-                          if (!u || typeof u !== 'string') return false;
-                          const s = u.trim().toLowerCase();
-                          if (s.length < 5) return false;
-                          if (s.includes('placeholder') || s.includes('dummy') || s.includes('submitted photo') || s === '[object object]') return false;
-                          if (s.includes('youtube.com') || s.includes('youtu.be') || s.includes('drive.google.com')) return false;
-                          if (s.endsWith('.mp4') || s.endsWith('.webm') || s.endsWith('.mov') || s.endsWith('.avi') || s.endsWith('.pdf') || s.endsWith('.doc')) return false;
-                          return s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:image/') || s.startsWith('blob:') || s.startsWith('/');
-                        };
-
-                        rawItems.forEach(item => {
-                          if (!item) return;
-
-                          let urlStr = '';
-                          if (typeof item === 'string') {
-                            urlStr = item.trim();
-                          } else if (typeof item === 'object') {
-                            urlStr = item.url || item.publicUrl || item.mediaUrl || item.embedUrl || item.storagePath || '';
-                          }
-
-                          const cleanUrl = urlStr.toLowerCase();
-
-                          // 1. CHECK IF DOCUMENT
-                          let isDocument = false;
-                          if (typeof item === 'object') {
-                            if (item.isDocument === true || item.docId || item.documentType) isDocument = true;
-                            const typeUpper = String(item.documentType || item.type || item.documentName || '').toUpperCase();
-                            if (['DOCUMENT', 'TITLE_DEED', 'LAYOUT_APPROVAL', 'TAX_RECEIPT', 'ENCUMBRANCE_CERTIFICATE', 'FIELD_MEASUREMENT', 'OTHER', 'LEGAL_DEED', 'MUTATION', 'KHATA', 'PASSPORT', 'AADHAAR', 'PAN'].includes(typeUpper)) {
-                              isDocument = true;
-                            }
-                            if (typeUpper.includes('DOC') || typeUpper.includes('DEED') || typeUpper.includes('TAX') || typeUpper.includes('APPROVAL') || typeUpper.includes('CERTIFICATE') || typeUpper.includes('RECEIPT')) {
-                              isDocument = true;
-                            }
-                            if (item.contentType && (item.contentType.startsWith('application/') || item.contentType.includes('pdf') || item.contentType.includes('word'))) {
-                              isDocument = true;
-                            }
-                          }
-                          if (cleanUrl) {
-                            if (cleanUrl.includes('/uploads/documents/') || cleanUrl.includes('private_docs') || cleanUrl.includes('document')) {
-                              isDocument = true;
-                            }
-                            if (cleanUrl.endsWith('.pdf') || cleanUrl.endsWith('.doc') || cleanUrl.endsWith('.docx') || cleanUrl.endsWith('.txt') || cleanUrl.endsWith('.xls') || cleanUrl.endsWith('.xlsx')) {
-                              isDocument = true;
-                            }
-                          }
-
-                          if (isDocument) {
-                            const docName = (typeof item === 'object' && (item.name || item.documentName || item.fileName || item.title)) || 'Confidential Property Document';
-                            const docType = (typeof item === 'object' && (item.type || item.documentType)) || 'Verification Document';
-                            const docUrl = urlStr || (typeof item === 'object' && (item.url || item.publicUrl || item.storagePath)) || '#';
-                            const key = docUrl !== '#' ? docUrl : (typeof item === 'object' && item.docId) || docName;
-
-                            if (key && !seenDocKeys.has(key)) {
-                              seenDocKeys.add(key);
-                              documents.push({
-                                docId: (typeof item === 'object' && item.docId) || `doc-${documents.length + 1}`,
-                                name: docName,
-                                type: docType,
-                                url: docUrl,
-                                size: (typeof item === 'object' && item.fileSize) || null
-                              });
-                            }
-                            return;
-                          }
-
-                          // 2. CHECK IF VIDEO
-                          let isVideo = false;
-                          if (typeof item === 'object') {
-                            const typeUpper = String(item.type || item.mediaType || '').toUpperCase();
-                            if (['WALKTHROUGH_VIDEO', 'DRONE_VIDEO', 'VIDEO'].includes(typeUpper)) isVideo = true;
-                            if (item.provider === 'youtube' || item.provider === 'gdrive' || item.videoId || item.fileId || item.embedUrl) isVideo = true;
-                            if (item.contentType && item.contentType.startsWith('video/')) isVideo = true;
-                          }
-                          if (cleanUrl) {
-                            if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be') || cleanUrl.includes('drive.google.com') || cleanUrl.includes('/uploads/videos/')) {
-                              isVideo = true;
-                            }
-                            if (cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.endsWith('.mov') || cleanUrl.endsWith('.avi') || cleanUrl.endsWith('.mkv')) {
-                              isVideo = true;
-                            }
-                          }
-
-                          if (isVideo) {
-                            const videoUrl = urlStr || (typeof item === 'object' && item.embedUrl);
-                            if (videoUrl && !seenVideoUrls.has(videoUrl)) {
-                              seenVideoUrls.add(videoUrl);
-                              videos.push({
-                                url: videoUrl,
-                                embedUrl: (typeof item === 'object' && item.embedUrl) || videoUrl,
-                                provider: (typeof item === 'object' && item.provider) || (cleanUrl.includes('youtube') || cleanUrl.includes('youtu.be') ? 'youtube' : cleanUrl.includes('drive.google') ? 'gdrive' : 'direct'),
-                                title: (typeof item === 'object' && (item.title || item.fileName || item.caption)) || 'Submitted Property Video'
-                              });
-                            }
-                            return;
-                          }
-
-                          // 3. IF NOT DOCUMENT AND NOT VIDEO -> EVALUATE AS USER UPLOADED PHOTO
-                          if (urlStr && isValidPhotoUrl(urlStr) && !seenPhotoUrls.has(urlStr)) {
-                            seenPhotoUrls.add(urlStr);
-                            photos.push(urlStr);
-                          }
-                        });
-
-                        return (
-                          <div className="space-y-6">
-                            
-                            {/* SUBMITTED MEDIA PHOTO GALLERY */}
+                          return (
                             <div className="space-y-3 pt-4 border-t border-slate-200">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                <ImageIcon className="w-4 h-4 text-blue-600" />
-                                <span>Submitted Property Photos ({photos.length})</span>
+                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                <FileText className="w-4 h-4 text-purple-600" />
+                                <span>Property Description & Key Amenities</span>
                               </h4>
-                              {photos.length === 0 ? (
-                                <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic">
-                                  No property photos uploaded by user.
+                              {descVal && (
+                                <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 leading-relaxed">
+                                  {descVal}
                                 </div>
-                              ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                  {photos.map((imgUrl, idx) => (
-                                    <div
-                                      key={idx}
-                                      onClick={() => setEnlargedMediaUrl(imgUrl)}
-                                      className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                                    >
-                                      <img
-                                        src={imgUrl}
-                                        alt={`User property photo ${idx + 1}`}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                        onError={(e) => {
-                                          if (e.currentTarget && e.currentTarget.parentElement) {
-                                            e.currentTarget.parentElement.style.display = 'none';
-                                          }
-                                        }}
-                                      />
-                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                                        <Eye className="w-4 h-4" />
-                                        <span>Enlarge</span>
-                                      </div>
-                                    </div>
+                              )}
+                              {amenitiesList.length > 0 && (
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                  {amenitiesList.map((amenity, idx) => (
+                                    <span key={idx} className="bg-slate-200 text-slate-900 font-extrabold text-[11px] px-3 py-1 rounded-lg border border-slate-300">
+                                      ✓ {String(amenity)}
+                                    </span>
                                   ))}
                                 </div>
                               )}
                             </div>
+                          );
+                        })()}
 
-                            {/* SUBMITTED VIDEO PRESENTATION & REVIEW SECTION */}
-                            <div className="space-y-4 pt-4 border-t border-slate-200">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                <Video className="w-4 h-4 text-amber-600" />
-                                <span>Submitted Property Videos & Walkthroughs ({videos.length})</span>
-                              </h4>
-                              {videos.length === 0 ? (
-                                <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic flex items-center gap-2">
-                                  <Video className="w-4 h-4 text-amber-500 shrink-0" />
-                                  <span>No video walkthrough attached. (Owners can attach YouTube/Google Drive video links or upload MP4/WebM files).</span>
-                                </div>
-                              ) : (
-                                <div className="space-y-4">
-                                  {videos.map((vObj, vIdx) => {
-                                    const vItem = vObj.url || vObj.embedUrl;
-                                    const isYoutube = vItem.includes('youtube.com') || vItem.includes('youtu.be');
-                                    const isDrive = vItem.includes('drive.google.com');
+                        {/* SUBMITTED MEDIA, VIDEO PRESENTATION & UPLOADED DOCUMENTS */}
+                        {(() => {
+                          const propId = activeAuditProp.id || activeAuditProp.propertyId;
 
-                                    let embedSrc = vItem;
-                                    if (isYoutube) {
-                                      if (vItem.includes('watch?v=')) {
-                                        embedSrc = vItem.replace('watch?v=', 'embed/').split('&')[0];
-                                      } else if (vItem.includes('youtu.be/')) {
-                                        const id = vItem.split('youtu.be/')[1]?.split('?')[0];
-                                        embedSrc = `https://www.youtube.com/embed/${id}`;
-                                      }
-                                    } else if (isDrive) {
-                                      if (vItem.includes('/view')) {
-                                        embedSrc = vItem.replace('/view', '/preview');
-                                      } else if (!vItem.includes('/preview')) {
-                                        const match = vItem.match(/d\/([a-zA-Z0-9_-]+)/);
-                                        if (match && match[1]) embedSrc = `https://drive.google.com/file/d/${match[1]}/preview`;
-                                      }
-                                    }
+                          // Local & session document fallbacks
+                          let extraDocs = [];
+                          try {
+                            const storedDocs = localStorage.getItem(`easeland_docs_${propId}`) || localStorage.getItem('easeland_user_documents');
+                            if (storedDocs) {
+                              const parsedDocs = JSON.parse(storedDocs);
+                              if (Array.isArray(parsedDocs)) {
+                                extraDocs = parsedDocs.filter(d => (d && (d.propertyId === propId || !d.propertyId)));
+                              }
+                            }
+                          } catch (e) {}
 
-                                    return (
-                                      <div key={vIdx} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-md max-w-3xl mx-auto p-2">
-                                        {isYoutube || isDrive ? (
-                                          <iframe
-                                            src={embedSrc}
-                                            className="w-full aspect-video rounded-xl border-0"
-                                            allowFullScreen
-                                            title={`Property Video ${vIdx + 1}`}
-                                          />
-                                        ) : (
-                                          <video
-                                            src={vItem}
-                                            controls
-                                            className="w-full aspect-video rounded-xl max-h-96"
-                                          />
-                                        )}
-                                        <div className="p-2 flex items-center justify-between text-xs text-slate-300 border-t border-slate-800 mt-2">
-                                          <span className="font-bold flex items-center gap-1.5 text-amber-400">
-                                            🎬 {isYoutube ? 'YouTube Video' : isDrive ? 'Google Drive Video' : 'Direct Upload Video'}
-                                          </span>
-                                          <a
-                                            href={vItem}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-amber-400 hover:text-amber-300 font-extrabold underline flex items-center gap-1"
-                                          >
-                                            <span>Open External Video Link ↗</span>
-                                          </a>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
+                          let extraMedia = [];
+                          try {
+                            const storedMedia = localStorage.getItem(`easeland_media_${propId}`) || localStorage.getItem('easeland_user_media');
+                            if (storedMedia) {
+                              const parsedMedia = JSON.parse(storedMedia);
+                              if (Array.isArray(parsedMedia)) {
+                                extraMedia = parsedMedia.filter(m => (m && (m.propertyId === propId || !m.propertyId)));
+                              }
+                            }
+                          } catch (e) {}
 
-                            {/* UPLOADED VERIFICATION DOCUMENTS (ALWAYS VISIBLE SECTION) */}
-                            <div className="space-y-3 pt-4 border-t border-slate-200">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-indigo-600" />
-                                <span>Uploaded Verification Documents ({documents.length})</span>
-                              </h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {documents.length === 0 ? (
-                                  <div className="col-span-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 italic font-semibold">
-                                    No physical documents attached. Property subject to basic title and field verification.
+                          const rawItems = [
+                            ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
+                            ...(Array.isArray(activeAuditProp.propertyDocuments) ? activeAuditProp.propertyDocuments : []),
+                            ...(Array.isArray(activeAuditProp.confidentialDocuments) ? activeAuditProp.confidentialDocuments : []),
+                            ...extraDocs,
+                            ...extraMedia,
+                            ...(Array.isArray(activeAuditProp.media) ? activeAuditProp.media : []),
+                            ...(Array.isArray(activeAuditProp.photos) ? activeAuditProp.photos : []),
+                            ...(Array.isArray(activeAuditProp.images) ? activeAuditProp.images : []),
+                            ...(Array.isArray(activeAuditProp.publicApprovedMedia) ? activeAuditProp.publicApprovedMedia : [])
+                          ];
+
+                          if (activeAuditProp.videoUrl) rawItems.push(activeAuditProp.videoUrl);
+                          if (activeAuditProp.videoLink) rawItems.push(activeAuditProp.videoLink);
+                          if (activeAuditProp.embeddedVideoUrl) rawItems.push(activeAuditProp.embeddedVideoUrl);
+                          if (activeAuditProp.droneVideoUrl) rawItems.push(activeAuditProp.droneVideoUrl);
+
+                          const photos = [];
+                          const videos = [];
+                          const documents = [];
+
+                          const seenPhotoUrls = new Set();
+                          const seenVideoUrls = new Set();
+                          const seenDocKeys = new Set();
+
+                          const isValidPhotoUrl = (u) => {
+                            if (!u || typeof u !== 'string') return false;
+                            const s = u.trim().toLowerCase();
+                            if (s.length < 5) return false;
+                            if (s.includes('placeholder') || s.includes('dummy') || s.includes('submitted photo') || s === '[object object]') return false;
+                            if (s.includes('youtube.com') || s.includes('youtu.be') || s.includes('drive.google.com')) return false;
+                            if (s.endsWith('.mp4') || s.endsWith('.webm') || s.endsWith('.mov') || s.endsWith('.avi') || s.endsWith('.pdf') || s.endsWith('.doc')) return false;
+                            return s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:image/') || s.startsWith('blob:') || s.startsWith('/');
+                          };
+
+                          rawItems.forEach(item => {
+                            if (!item) return;
+
+                            let urlStr = '';
+                            if (typeof item === 'string') {
+                              urlStr = item.trim();
+                            } else if (typeof item === 'object') {
+                              const candidate = item.url || item.publicUrl || item.mediaUrl || item.embedUrl || item.storagePath || item.path || '';
+                              if (typeof candidate === 'string') {
+                                urlStr = candidate.trim();
+                              } else if (typeof candidate === 'object' && candidate) {
+                                urlStr = String(candidate.url || candidate.publicUrl || candidate.link || candidate.path || '').trim();
+                              } else {
+                                urlStr = String(candidate || '').trim();
+                              }
+                            }
+
+                            const cleanUrl = typeof urlStr === 'string' ? urlStr.toLowerCase() : '';
+
+                            // 1. CHECK IF DOCUMENT
+                            let isDocument = false;
+                            if (typeof item === 'object') {
+                              if (item.isDocument === true || item.docId || item.documentType) isDocument = true;
+                              const typeUpper = String(item.documentType || item.type || item.documentName || '').toUpperCase();
+                              if (['DOCUMENT', 'TITLE_DEED', 'LAYOUT_APPROVAL', 'TAX_RECEIPT', 'ENCUMBRANCE_CERTIFICATE', 'FIELD_MEASUREMENT', 'OTHER', 'LEGAL_DEED', 'MUTATION', 'KHATA', 'PASSPORT', 'AADHAAR', 'PAN'].includes(typeUpper)) {
+                                isDocument = true;
+                              }
+                              if (typeUpper.includes('DOC') || typeUpper.includes('DEED') || typeUpper.includes('TAX') || typeUpper.includes('APPROVAL') || typeUpper.includes('CERTIFICATE') || typeUpper.includes('RECEIPT')) {
+                                isDocument = true;
+                              }
+                              if (item.contentType && typeof item.contentType === 'string' && (item.contentType.startsWith('application/') || item.contentType.includes('pdf') || item.contentType.includes('word'))) {
+                                isDocument = true;
+                              }
+                            }
+                            if (cleanUrl) {
+                              if (cleanUrl.includes('/uploads/documents/') || cleanUrl.includes('private_docs') || cleanUrl.includes('document')) {
+                                isDocument = true;
+                              }
+                              if (cleanUrl.endsWith('.pdf') || cleanUrl.endsWith('.doc') || cleanUrl.endsWith('.docx') || cleanUrl.endsWith('.txt') || cleanUrl.endsWith('.xls') || cleanUrl.endsWith('.xlsx')) {
+                                isDocument = true;
+                              }
+                            }
+
+                            if (isDocument) {
+                              let docName = 'Confidential Property Document';
+                              if (typeof item === 'object') {
+                                const candidate = item.name || item.documentName || item.fileName || item.title;
+                                if (typeof candidate === 'string' && candidate.trim()) docName = candidate.trim();
+                                else if (typeof candidate === 'object' && candidate) docName = String(candidate.name || candidate.title || candidate.fileName || 'Confidential Property Document');
+                              }
+
+                              let docType = 'Verification Document';
+                              if (typeof item === 'object') {
+                                const candidate = item.type || item.documentType;
+                                if (typeof candidate === 'string' && candidate.trim()) docType = candidate.trim();
+                                else if (typeof candidate === 'object' && candidate) docType = String(candidate.type || candidate.name || 'Verification Document');
+                              }
+
+                              const docUrl = urlStr || '#';
+                              const key = docUrl !== '#' ? docUrl : ((typeof item === 'object' && item.docId) || docName);
+
+                              if (key && !seenDocKeys.has(key)) {
+                                seenDocKeys.add(key);
+                                documents.push({
+                                  docId: (typeof item === 'object' && item.docId) || `doc-${documents.length + 1}`,
+                                  name: docName,
+                                  type: docType,
+                                  url: docUrl,
+                                  size: (typeof item === 'object' && item.fileSize) || null
+                                });
+                              }
+                              return;
+                            }
+
+                            // 2. CHECK IF VIDEO
+                            let isVideo = false;
+                            if (typeof item === 'object') {
+                              const typeUpper = String(item.type || item.mediaType || '').toUpperCase();
+                              if (['WALKTHROUGH_VIDEO', 'DRONE_VIDEO', 'VIDEO'].includes(typeUpper)) isVideo = true;
+                              if (item.provider === 'youtube' || item.provider === 'gdrive' || item.videoId || item.fileId || item.embedUrl) isVideo = true;
+                              if (item.contentType && typeof item.contentType === 'string' && item.contentType.startsWith('video/')) isVideo = true;
+                            }
+                            if (cleanUrl) {
+                              if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be') || cleanUrl.includes('drive.google.com') || cleanUrl.includes('/uploads/videos/')) {
+                                isVideo = true;
+                              }
+                              if (cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.endsWith('.mov') || cleanUrl.endsWith('.avi') || cleanUrl.endsWith('.mkv')) {
+                                isVideo = true;
+                              }
+                            }
+
+                            if (isVideo) {
+                              const videoUrl = urlStr || (typeof item === 'object' && typeof item.embedUrl === 'string' ? item.embedUrl : '');
+                              if (videoUrl && !seenVideoUrls.has(videoUrl)) {
+                                seenVideoUrls.add(videoUrl);
+                                let videoTitle = 'Submitted Property Video';
+                                if (typeof item === 'object') {
+                                  const candidate = item.title || item.fileName || item.caption;
+                                  if (typeof candidate === 'string' && candidate) videoTitle = candidate;
+                                }
+                                videos.push({
+                                  url: videoUrl,
+                                  embedUrl: (typeof item === 'object' && typeof item.embedUrl === 'string' ? item.embedUrl : videoUrl),
+                                  provider: (typeof item === 'object' && typeof item.provider === 'string' ? item.provider : (cleanUrl.includes('youtube') || cleanUrl.includes('youtu.be') ? 'youtube' : cleanUrl.includes('drive.google') ? 'gdrive' : 'direct')),
+                                  title: videoTitle
+                                });
+                              }
+                              return;
+                            }
+
+                            // 3. IF NOT DOCUMENT AND NOT VIDEO -> EVALUATE AS USER UPLOADED PHOTO
+                            if (urlStr && isValidPhotoUrl(urlStr) && !seenPhotoUrls.has(urlStr)) {
+                              seenPhotoUrls.add(urlStr);
+                              photos.push(urlStr);
+                            }
+                          });
+
+                          return (
+                            <div className="space-y-6">
+                              
+                              {/* SUBMITTED MEDIA PHOTO GALLERY */}
+                              <div className="space-y-3 pt-4 border-t border-slate-200">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                  <ImageIcon className="w-4 h-4 text-blue-600" />
+                                  <span>Submitted Property Photos ({photos.length})</span>
+                                </h4>
+                                {photos.length === 0 ? (
+                                  <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic">
+                                    No property photos uploaded by user.
                                   </div>
                                 ) : (
-                                  documents.map((docItem, idx) => (
-                                    <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-slate-900">
-                                      <div className="flex items-center gap-2.5">
-                                        <FileText className="w-5 h-5 text-blue-600 shrink-0" />
-                                        <div>
-                                          <span className="font-extrabold text-blue-950 block">{docItem.name || `Document ${idx + 1}`}</span>
-                                          <span className="text-[10px] text-blue-700 font-bold">{docItem.type || 'Verification Document'}</span>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                    {photos.map((imgUrl, idx) => (
+                                      <div
+                                        key={idx}
+                                        onClick={() => setEnlargedMediaUrl(imgUrl)}
+                                        className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                                      >
+                                        <img
+                                          src={imgUrl}
+                                          alt={`User property photo ${idx + 1}`}
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                          onError={(e) => {
+                                            if (e.currentTarget && e.currentTarget.parentElement) {
+                                              e.currentTarget.parentElement.style.display = 'none';
+                                            }
+                                          }}
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                                          <Eye className="w-4 h-4" />
+                                          <span>Enlarge</span>
                                         </div>
                                       </div>
-                                      {docItem.url && docItem.url !== '#' && (
-                                        <a
-                                          href={docItem.url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0"
-                                        >
-                                          View / Download PDF ↗
-                                        </a>
-                                      )}
-                                    </div>
-                                  ))
+                                    ))}
+                                  </div>
                                 )}
                               </div>
+
+                              {/* SUBMITTED VIDEO PRESENTATION & REVIEW SECTION */}
+                              <div className="space-y-4 pt-4 border-t border-slate-200">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                  <Video className="w-4 h-4 text-amber-600" />
+                                  <span>Submitted Property Videos & Walkthroughs ({videos.length})</span>
+                                </h4>
+                                {videos.length === 0 ? (
+                                  <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic flex items-center gap-2">
+                                    <Video className="w-4 h-4 text-amber-500 shrink-0" />
+                                    <span>No video walkthrough attached. (Owners can attach YouTube/Google Drive video links or upload MP4/WebM files).</span>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    {videos.map((vObj, vIdx) => {
+                                      const vItem = typeof vObj.url === 'string' ? vObj.url : (typeof vObj.embedUrl === 'string' ? vObj.embedUrl : String(vObj.url || vObj.embedUrl || ''));
+                                      if (!vItem) return null;
+
+                                      const isYoutube = vItem.includes('youtube.com') || vItem.includes('youtu.be');
+                                      const isDrive = vItem.includes('drive.google.com');
+
+                                      let embedSrc = vItem;
+                                      if (isYoutube) {
+                                        if (vItem.includes('watch?v=')) {
+                                          embedSrc = vItem.replace('watch?v=', 'embed/').split('&')[0];
+                                        } else if (vItem.includes('youtu.be/')) {
+                                          const id = vItem.split('youtu.be/')[1]?.split('?')[0];
+                                          embedSrc = `https://www.youtube.com/embed/${id}`;
+                                        }
+                                      } else if (isDrive) {
+                                        if (vItem.includes('/view')) {
+                                          embedSrc = vItem.replace('/view', '/preview');
+                                        } else if (!vItem.includes('/preview')) {
+                                          const match = vItem.match(/d\/([a-zA-Z0-9_-]+)/);
+                                          if (match && match[1]) embedSrc = `https://drive.google.com/file/d/${match[1]}/preview`;
+                                        }
+                                      }
+
+                                      return (
+                                        <div key={vIdx} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-md max-w-3xl mx-auto p-2">
+                                          {isYoutube || isDrive ? (
+                                            <iframe
+                                              src={embedSrc}
+                                              className="w-full aspect-video rounded-xl border-0"
+                                              allowFullScreen
+                                              title={`Property Video ${vIdx + 1}`}
+                                            />
+                                          ) : (
+                                            <video
+                                              src={vItem}
+                                              controls
+                                              className="w-full aspect-video rounded-xl max-h-96"
+                                            />
+                                          )}
+                                          <div className="p-2 flex items-center justify-between text-xs text-slate-300 border-t border-slate-800 mt-2">
+                                            <span className="font-bold flex items-center gap-1.5 text-amber-400">
+                                              🎬 {isYoutube ? 'YouTube Video' : isDrive ? 'Google Drive Video' : 'Direct Upload Video'}
+                                            </span>
+                                            <a
+                                              href={vItem}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="text-amber-400 hover:text-amber-300 font-extrabold underline flex items-center gap-1"
+                                            >
+                                              <span>Open External Video Link ↗</span>
+                                            </a>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* UPLOADED VERIFICATION DOCUMENTS (ALWAYS VISIBLE SECTION) */}
+                              <div className="space-y-3 pt-4 border-t border-slate-200">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-indigo-600" />
+                                  <span>Uploaded Verification Documents ({documents.length})</span>
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {documents.length === 0 ? (
+                                    <div className="col-span-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 italic font-semibold">
+                                      No physical documents attached. Property subject to basic title and field verification.
+                                    </div>
+                                  ) : (
+                                    documents.map((docItem, idx) => {
+                                      const docNameStr = typeof docItem.name === 'string' ? docItem.name : String(docItem.name || `Document ${idx + 1}`);
+                                      const docTypeStr = typeof docItem.type === 'string' ? docItem.type : String(docItem.type || 'Verification Document');
+                                      const docUrlStr = typeof docItem.url === 'string' ? docItem.url : String(docItem.url || '#');
+
+                                      return (
+                                        <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-slate-900">
+                                          <div className="flex items-center gap-2.5">
+                                            <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                                            <div>
+                                              <span className="font-extrabold text-blue-950 block">{docNameStr}</span>
+                                              <span className="text-[10px] text-blue-700 font-bold">{docTypeStr}</span>
+                                            </div>
+                                          </div>
+                                          {docUrlStr && docUrlStr !== '#' && (
+                                            <a
+                                              href={docUrlStr}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0"
+                                            >
+                                              View / Download PDF ↗
+                                            </a>
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+
                             </div>
+                          );
+                        })()}
 
-                          </div>
-                        );
-                      })()}
+                        {/* AUDITOR NOTES & FEEDBACK TEXTAREA */}
+                        <div className="space-y-3 pt-4 border-t border-slate-200">
+                          <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                            Auditor Notes / Reason for Feedback
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder="Enter official legal audit notes, boundary verification remarks, or document rejection details..."
+                            value={feedbackNote}
+                            onChange={(e) => setFeedbackNote(e.target.value)}
+                            className="w-full bg-white text-slate-900 border-2 border-slate-300 rounded-xl p-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400 shadow-inner"
+                          />
+                        </div>
 
-                      {/* AUDITOR NOTES & FEEDBACK TEXTAREA */}
-                      <div className="space-y-3 pt-4 border-t border-slate-200">
-                        <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
-                          Auditor Notes / Reason for Feedback
-                        </label>
-                        <textarea
-                          rows={3}
-                          placeholder="Enter official legal audit notes, boundary verification remarks, or document rejection details..."
-                          value={feedbackNote}
-                          onChange={(e) => setFeedbackNote(e.target.value)}
-                          className="w-full bg-white text-slate-900 border-2 border-slate-300 rounded-xl p-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400 shadow-inner"
-                        />
+                        {/* ACTION BUTTONS */}
+                        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                          <button
+                            onClick={() => handleReject(activeAuditProp.id || activeAuditProp.propertyId)}
+                            disabled={adminActionProcessing}
+                            className="px-5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300"
+                          >
+                            Reject Listing
+                          </button>
+                          <button
+                            onClick={() => handleRequestChanges(activeAuditProp.id || activeAuditProp.propertyId)}
+                            disabled={adminActionProcessing}
+                            className="px-5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs transition-colors cursor-pointer border border-amber-300"
+                          >
+                            Request Document Changes
+                          </button>
+                          <button
+                            onClick={() => handleApprove(activeAuditProp.id || activeAuditProp.propertyId)}
+                            disabled={adminActionProcessing}
+                            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-100" />
+                            <span>Approve & Publish Live</span>
+                          </button>
+                        </div>
+
                       </div>
-
-                      {/* ACTION BUTTONS */}
-                      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                    );
+                  } catch (err) {
+                    console.error("Error rendering Verification Workspace:", err);
+                    return (
+                      <div className="bg-white rounded-2xl p-8 border border-red-200 shadow-lg space-y-4 text-slate-900">
+                        <div className="flex items-center gap-3 text-red-600 font-extrabold text-base">
+                          <AlertCircle className="w-6 h-6 shrink-0" />
+                          <span>Verification Workspace Render Warning</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-semibold">
+                          An unexpected formatting issue occurred while rendering property verification details.
+                        </p>
                         <button
-                          onClick={() => handleReject(activeAuditProp.id || activeAuditProp.propertyId)}
-                          disabled={adminActionProcessing}
-                          className="px-5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300"
+                          type="button"
+                          onClick={() => setActiveTab('verification')}
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all"
                         >
-                          Reject Listing
-                        </button>
-                        <button
-                          onClick={() => handleRequestChanges(activeAuditProp.id || activeAuditProp.propertyId)}
-                          disabled={adminActionProcessing}
-                          className="px-5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs transition-colors cursor-pointer border border-amber-300"
-                        >
-                          Request Document Changes
-                        </button>
-                        <button
-                          onClick={() => handleApprove(activeAuditProp.id || activeAuditProp.propertyId)}
-                          disabled={adminActionProcessing}
-                          className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-emerald-100" />
-                          <span>Approve & Publish Live</span>
+                          Return to Verification Queue
                         </button>
                       </div>
-
-                    </div>
-                  );
+                    );
+                  }
                 })()
               )
             )}
