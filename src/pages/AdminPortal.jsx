@@ -2356,7 +2356,9 @@ export default function AdminPortal() {
                         {/* TITLE & LOCATION */}
                         <div className="col-span-4">
                           <span className="font-bold text-brand-charcoal block line-clamp-1">{prop.title}</span>
-                          <span className="text-gray-500 text-[11px]">{prop.location?.locality}, {prop.location?.city}</span>
+                          <span className="text-gray-500 text-[11px]">
+                            {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || (typeof prop.location === 'string' ? prop.location : 'India')}
+                          </span>
                         </div>
 
                         {/* SEPARATE COLUMN: OWNER NAME */}

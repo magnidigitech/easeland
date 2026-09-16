@@ -855,7 +855,7 @@ export default function UniversalMapEngine({
             </h4>
 
             <p className="text-xs text-gray-500 font-medium mb-3">
-              {selectedPropertyPreview.location?.locality}, {selectedPropertyPreview.location?.city}
+              {[selectedPropertyPreview.location?.locality, selectedPropertyPreview.location?.city, selectedPropertyPreview.location?.state].filter(Boolean).join(', ') || 'India'}
             </p>
 
             <div className="flex items-center justify-between pt-2 border-t border-gray-100 mb-3">
