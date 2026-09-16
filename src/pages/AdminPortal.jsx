@@ -2400,7 +2400,7 @@ export default function AdminPortal() {
                               e.stopPropagation();
                               openWorkspace(prop);
                             }}
-                            className="bg-brand-charcoal text-white font-bold px-3 py-1.5 rounded-xl hover:bg-brand-yellow hover:text-brand-charcoal transition-all text-[11px]"
+                            className="bg-slate-900 text-white font-extrabold px-3 py-1.5 rounded-xl hover:bg-amber-400 hover:text-slate-950 transition-all text-[11px] shadow-sm border border-transparent hover:border-amber-300 cursor-pointer"
                           >
                             Audit Now
                           </button>
