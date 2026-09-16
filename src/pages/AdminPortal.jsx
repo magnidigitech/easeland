@@ -591,6 +591,7 @@ export default function AdminPortal() {
     window.addEventListener('easeland-property-submitted', handleRefresh);
     window.addEventListener('easeland-property-approved', handleRefresh);
     window.addEventListener('easeland-property-status-updated', handleRefresh);
+    window.addEventListener('easeland-property-updated', handleRefresh);
     window.addEventListener('easeland-property-deleted', handleRefresh);
     window.addEventListener('easeland-site-config-updated', handleConfigUpdated);
     window.addEventListener('storage', handleRefresh);
@@ -601,6 +602,7 @@ export default function AdminPortal() {
       window.removeEventListener('easeland-property-submitted', handleRefresh);
       window.removeEventListener('easeland-property-approved', handleRefresh);
       window.removeEventListener('easeland-property-status-updated', handleRefresh);
+      window.removeEventListener('easeland-property-updated', handleRefresh);
       window.removeEventListener('easeland-property-deleted', handleRefresh);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
       window.removeEventListener('storage', handleRefresh);

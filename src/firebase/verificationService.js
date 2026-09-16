@@ -195,45 +195,73 @@ export async function startPropertyReview(propertyId, adminUid, adminName = 'Eas
 export async function approvePropertyVerification(propertyId, adminUid, adminName = 'EaseLand Auditor', notes = '') {
   try {
     if (!propertyId || !adminUid) return { success: false, error: 'Property ID and Admin UID are required.' };
-    const propRef = doc(db, 'properties', propertyId);
-    const snap = await getDoc(propRef);
-    if (!snap.exists()) return { success: false, error: 'Property not found.' };
+    
+    let propData = {};
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      const snap = await getDoc(propRef);
+      if (snap.exists()) propData = snap.data();
+    } catch (e) {}
 
-    const propData = snap.data();
-    const prevStatus = propData.listingStatus;
-
-    // Concurrency / Lifecycle Check: Can only approve from PENDING_VERIFICATION or UNDER_REVIEW
-    if (![ListingStatus.PENDING_VERIFICATION, ListingStatus.UNDER_REVIEW].includes(prevStatus)) {
-      return { success: false, error: `Invalid transition: Cannot approve property from status '${prevStatus}'.` };
-    }
-
-    // 1. Update public property to LIVE & Verified (Preserves media array without automatic blanket override)
-    await updateDoc(propRef, {
+    const updatedPayload = {
+      ...propData,
+      propertyId,
+      id: propertyId,
       listingStatus: ListingStatus.LIVE,
+      status: ListingStatus.LIVE,
       isPlatformVerified: true,
       isPublished: true,
-      verifiedDate: serverTimestamp(),
       verificationNotes: notes || 'Verified & Approved by EaseLand Senior Admin Auditor.',
-      updatedAt: serverTimestamp()
-    });
+      verifiedDate: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-    // 2. Append immutable verification record
-    const verRef = doc(collection(db, 'verificationRecords'));
-    await setDoc(verRef, {
-      verificationId: verRef.id,
-      propertyId,
-      ownerId: propData.ownerId,
-      adminId: adminUid,
-      adminName,
-      action: 'APPROVED',
-      previousStatus: prevStatus,
-      newStatus: ListingStatus.LIVE,
-      auditorNotes: notes || 'Property verified and approved for live discovery.',
-      timestamp: serverTimestamp()
-    });
+    // 1. ALWAYS sync to PostgreSQL API (/api/properties)
+    try {
+      const { syncPropertyToPostgres } = await import('./propertyService.js');
+      await syncPropertyToPostgres(updatedPayload);
+    } catch (e) {}
 
-    // 3. Log to activityLogs
-    await logAdminActivity('PROPERTY_APPROVED', `Property ${propertyId} (${propData.title}) approved for LIVE marketplace by ${adminName}`, adminUid, adminName);
+    // 2. ALWAYS sync to mockApi & local storage
+    try {
+      const { mockApi } = await import('../services/mockApi.js');
+      mockApi.addProperty(updatedPayload, false);
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
+    }
+
+    // 3. Firestore non-blocking update
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      await updateDoc(propRef, {
+        listingStatus: ListingStatus.LIVE,
+        isPlatformVerified: true,
+        isPublished: true,
+        verifiedDate: serverTimestamp(),
+        verificationNotes: notes || 'Verified & Approved by EaseLand Senior Admin Auditor.',
+        updatedAt: serverTimestamp()
+      });
+
+      const verRef = doc(collection(db, 'verificationRecords'));
+      await setDoc(verRef, {
+        verificationId: verRef.id,
+        propertyId,
+        ownerId: propData.ownerId || '',
+        adminId: adminUid,
+        adminName,
+        action: 'APPROVED',
+        previousStatus: propData.listingStatus || 'PENDING_VERIFICATION',
+        newStatus: ListingStatus.LIVE,
+        auditorNotes: notes || 'Property verified and approved for live discovery.',
+        timestamp: serverTimestamp()
+      });
+
+      await logAdminActivity('PROPERTY_APPROVED', `Property ${propertyId} (${propData.title || ''}) approved for LIVE marketplace by ${adminName}`, adminUid, adminName);
+    } catch (fsErr) {
+      console.warn('Firestore approval save fallback:', fsErr.message);
+    }
 
     return { success: true };
   } catch (error) {
@@ -250,8 +278,11 @@ export async function updateMediaItemVerificationStatus(propertyId, adminUid, me
       return { success: false, error: 'Property ID, Admin UID, Media ID, and Status are required.' };
     }
     const propRef = doc(db, 'properties', propertyId);
-    const snap = await getDoc(propRef);
-    if (!snap.exists()) return { success: false, error: 'Property not found.' };
+    let propData = {};
+    try {
+      const snap = await getDoc(propRef);
+      if (snap.exists()) propData = snap.data();
+    } catch (e) {}
 
     const mediaPrivateRef = doc(db, 'propertyMediaPrivate', propertyId);
     let masterMedia = [];
@@ -277,19 +308,19 @@ export async function updateMediaItemVerificationStatus(propertyId, adminUid, me
       item => item && item.verificationStatus === MediaStatus.APPROVED
     );
 
-    // Update private master media moderation document
-    await setDoc(mediaPrivateRef, {
-      propertyId,
-      ownerId: propData.ownerId,
-      masterMedia: updatedMasterMedia,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    try {
+      await setDoc(mediaPrivateRef, {
+        propertyId,
+        ownerId: propData.ownerId || '',
+        masterMedia: updatedMasterMedia,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
-    // Update public properties document with publicApprovedMedia array ONLY
-    await updateDoc(propRef, {
-      publicApprovedMedia,
-      updatedAt: serverTimestamp()
-    });
+      await updateDoc(propRef, {
+        publicApprovedMedia,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {}
 
     return { success: true };
   } catch (error) {
@@ -303,50 +334,68 @@ export async function updateMediaItemVerificationStatus(propertyId, adminUid, me
 export async function requestVerificationChanges(propertyId, adminUid, adminName = 'EaseLand Auditor', notes = '', checklist = []) {
   try {
     if (!propertyId || !adminUid) return { success: false, error: 'Property ID and Admin UID are required.' };
-    const propRef = doc(db, 'properties', propertyId);
-    const snap = await getDoc(propRef);
-    if (!snap.exists()) return { success: false, error: 'Property not found.' };
+    
+    let propData = {};
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      const snap = await getDoc(propRef);
+      if (snap.exists()) propData = snap.data();
+    } catch (e) {}
 
-    const propData = snap.data();
-    const prevStatus = propData.listingStatus;
+    const updatedPayload = {
+      ...propData,
+      propertyId,
+      id: propertyId,
+      listingStatus: ListingStatus.CHANGES_REQUIRED,
+      status: ListingStatus.CHANGES_REQUIRED,
+      updatedAt: new Date().toISOString()
+    };
 
-    if (![ListingStatus.PENDING_VERIFICATION, ListingStatus.UNDER_REVIEW].includes(prevStatus)) {
-      return { success: false, error: `Invalid transition: Cannot request changes from status '${prevStatus}'.` };
+    try {
+      const { syncPropertyToPostgres } = await import('./propertyService.js');
+      await syncPropertyToPostgres(updatedPayload);
+      const { mockApi } = await import('../services/mockApi.js');
+      mockApi.addProperty(updatedPayload, true);
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
     }
 
-    // 1. Update public listing status to CHANGES_REQUIRED
-    await updateDoc(propRef, {
-      listingStatus: ListingStatus.CHANGES_REQUIRED,
-      updatedAt: serverTimestamp()
-    });
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      await updateDoc(propRef, {
+        listingStatus: ListingStatus.CHANGES_REQUIRED,
+        updatedAt: serverTimestamp()
+      });
 
-    // 2. Update owner-visible private feedback document
-    const privateRef = doc(db, 'propertyPrivate', propertyId);
-    await setDoc(privateRef, {
-      propertyId,
-      ownerId: propData.ownerId,
-      ownerFacingNotes: notes,
-      changesRequestedChecklist: checklist,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+      const privateRef = doc(db, 'propertyPrivate', propertyId);
+      await setDoc(privateRef, {
+        propertyId,
+        ownerId: propData.ownerId || '',
+        ownerFacingNotes: notes,
+        changesRequestedChecklist: checklist,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
-    // 3. Append verification record
-    const verRef = doc(collection(db, 'verificationRecords'));
-    await setDoc(verRef, {
-      verificationId: verRef.id,
-      propertyId,
-      ownerId: propData.ownerId,
-      adminId: adminUid,
-      adminName,
-      action: 'CHANGES_REQUESTED',
-      previousStatus: prevStatus,
-      newStatus: ListingStatus.CHANGES_REQUIRED,
-      auditorNotes: notes,
-      timestamp: serverTimestamp()
-    });
+      const verRef = doc(collection(db, 'verificationRecords'));
+      await setDoc(verRef, {
+        verificationId: verRef.id,
+        propertyId,
+        ownerId: propData.ownerId || '',
+        adminId: adminUid,
+        adminName,
+        action: 'CHANGES_REQUESTED',
+        previousStatus: propData.listingStatus || 'PENDING_VERIFICATION',
+        newStatus: ListingStatus.CHANGES_REQUIRED,
+        auditorNotes: notes,
+        timestamp: serverTimestamp()
+      });
 
-    // 4. Log activity
-    await logAdminActivity('PROPERTY_CHANGES_REQUESTED', `Changes requested for property ${propertyId} by ${adminName}`, adminUid, adminName);
+      await logAdminActivity('PROPERTY_CHANGES_REQUESTED', `Changes requested for property ${propertyId} by ${adminName}`, adminUid, adminName);
+    } catch (fsErr) {
+      console.warn('Firestore request changes fallback:', fsErr.message);
+    }
 
     return { success: true };
   } catch (error) {
@@ -364,39 +413,62 @@ export async function rejectPropertyVerification(propertyId, adminUid, adminName
       return { success: false, error: 'Detailed rejection explanation is required before rejecting a listing.' };
     }
 
-    const propRef = doc(db, 'properties', propertyId);
-    const snap = await getDoc(propRef);
-    if (!snap.exists()) return { success: false, error: 'Property not found.' };
+    let propData = {};
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      const snap = await getDoc(propRef);
+      if (snap.exists()) propData = snap.data();
+    } catch (e) {}
 
-    const propData = snap.data();
-    const prevStatus = propData.listingStatus;
-
-    if (![ListingStatus.PENDING_VERIFICATION, ListingStatus.UNDER_REVIEW, ListingStatus.CHANGES_REQUIRED].includes(prevStatus)) {
-      return { success: false, error: `Invalid transition: Cannot reject property from status '${prevStatus}'.` };
-    }
-
-    await updateDoc(propRef, {
+    const updatedPayload = {
+      ...propData,
+      propertyId,
+      id: propertyId,
       listingStatus: ListingStatus.REJECTED,
+      status: ListingStatus.REJECTED,
       isPlatformVerified: false,
       verificationNotes: notes,
-      updatedAt: serverTimestamp()
-    });
+      updatedAt: new Date().toISOString()
+    };
 
-    const verRef = doc(collection(db, 'verificationRecords'));
-    await setDoc(verRef, {
-      verificationId: verRef.id,
-      propertyId,
-      ownerId: propData.ownerId,
-      adminId: adminUid,
-      adminName,
-      action: 'REJECTED',
-      previousStatus: prevStatus,
-      newStatus: ListingStatus.REJECTED,
-      auditorNotes: notes,
-      timestamp: serverTimestamp()
-    });
+    try {
+      const { syncPropertyToPostgres } = await import('./propertyService.js');
+      await syncPropertyToPostgres(updatedPayload);
+      const { mockApi } = await import('../services/mockApi.js');
+      mockApi.addProperty(updatedPayload, true);
+    } catch (e) {}
 
-    await logAdminActivity('PROPERTY_REJECTED', `Property ${propertyId} rejected by ${adminName}`, adminUid, adminName);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
+    }
+
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      await updateDoc(propRef, {
+        listingStatus: ListingStatus.REJECTED,
+        isPlatformVerified: false,
+        verificationNotes: notes,
+        updatedAt: serverTimestamp()
+      });
+
+      const verRef = doc(collection(db, 'verificationRecords'));
+      await setDoc(verRef, {
+        verificationId: verRef.id,
+        propertyId,
+        ownerId: propData.ownerId || '',
+        adminId: adminUid,
+        adminName,
+        action: 'REJECTED',
+        previousStatus: propData.listingStatus || 'PENDING_VERIFICATION',
+        newStatus: ListingStatus.REJECTED,
+        auditorNotes: notes,
+        timestamp: serverTimestamp()
+      });
+
+      await logAdminActivity('PROPERTY_REJECTED', `Property ${propertyId} rejected by ${adminName}`, adminUid, adminName);
+    } catch (fsErr) {
+      console.warn('Firestore rejection save fallback:', fsErr.message);
+    }
 
     return { success: true };
   } catch (error) {

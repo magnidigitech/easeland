@@ -139,28 +139,41 @@ export default function UserDashboard({
 
   useEffect(() => {
     refreshUserProperties();
-    const handleCreated = () => refreshUserProperties();
-    const handleApproved = () => refreshUserProperties();
-    const handleStatusUpdated = () => refreshUserProperties();
+    const handleSync = () => refreshUserProperties();
 
-    window.addEventListener('easeland-property-created', handleCreated);
-    window.addEventListener('easeland-property-approved', handleApproved);
-    window.addEventListener('easeland-property-status-updated', handleStatusUpdated);
-    window.addEventListener('storage', handleStatusUpdated);
+    window.addEventListener('easeland-property-created', handleSync);
+    window.addEventListener('easeland-property-submitted', handleSync);
+    window.addEventListener('easeland-property-approved', handleSync);
+    window.addEventListener('easeland-property-status-updated', handleSync);
+    window.addEventListener('easeland-property-updated', handleSync);
+    window.addEventListener('easeland-property-deleted', handleSync);
+    window.addEventListener('storage', handleSync);
 
     return () => {
-      window.removeEventListener('easeland-property-created', handleCreated);
-      window.removeEventListener('easeland-property-approved', handleApproved);
-      window.removeEventListener('easeland-property-status-updated', handleStatusUpdated);
-      window.removeEventListener('storage', handleStatusUpdated);
+      window.removeEventListener('easeland-property-created', handleSync);
+      window.removeEventListener('easeland-property-submitted', handleSync);
+      window.removeEventListener('easeland-property-approved', handleSync);
+      window.removeEventListener('easeland-property-status-updated', handleSync);
+      window.removeEventListener('easeland-property-updated', handleSync);
+      window.removeEventListener('easeland-property-deleted', handleSync);
+      window.removeEventListener('storage', handleSync);
     };
   }, [user]);
 
   // Combine Firestore and local/database properties cleanly so user always sees live status updates
+  let deletedIdsSet = new Set();
+  try {
+    if (typeof window !== 'undefined') {
+      const rawDel = localStorage.getItem('easeland_deleted_properties');
+      if (rawDel) JSON.parse(rawDel).forEach(id => deletedIdsSet.add(String(id)));
+    }
+  } catch (e) {}
+
   const combinedPropsMap = new Map();
   [...myPropertiesList, ...fbOwnerProperties].forEach(p => {
-    const pId = p.propertyId || p.id;
-    if (pId) {
+    if (!p) return;
+    const pId = String(p.propertyId || p.id || p.referenceId || '');
+    if (pId && !deletedIdsSet.has(pId) && !p.isDeleted && p.listingStatus !== 'DELETED' && p.status !== 'DELETED') {
       const existing = combinedPropsMap.get(pId) || {};
       const statusResolved = (p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.isPublished || p.isPlatformVerified || existing.status === 'LIVE' || existing.listingStatus === 'LIVE')
         ? 'LIVE'
