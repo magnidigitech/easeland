@@ -63,32 +63,53 @@ export default function PropertiesSearchPage({
     return () => { isMounted = false; };
   }, [uid]);
 
-  // Execute Native Search Query from searchService
+  // Execute Search Query: Query PostgreSQL Database API (/api/properties) + LocalStorage
   const executeSearch = useCallback(async (stateToUse, cursorDoc = null) => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const result = await searchPublicProperties({
-        searchState: stateToUse,
-        pageSize: PAGE_SIZE,
-        lastDoc: cursorDoc
+      // 1. Primary DB Source: Fetch from PostgreSQL database endpoint (/api/properties)
+      let pgProperties = [];
+      try {
+        const res = await fetch('/api/properties');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.properties)) {
+            pgProperties = json.properties;
+          }
+        }
+      } catch (pgErr) {}
+
+      // 2. Secondary Source: Fetch from searchService & mockApi / LocalStorage
+      let fsProperties = [];
+      try {
+        const result = await searchPublicProperties({
+          searchState: stateToUse,
+          pageSize: PAGE_SIZE,
+          lastDoc: cursorDoc
+        });
+        if (result.success && Array.isArray(result.properties)) {
+          fsProperties = result.properties;
+        }
+      } catch (fsErr) {}
+
+      const localData = mockApi.getPublicProperties(stateToUse) || [];
+
+      // 3. Merge PostgreSQL + Firestore + LocalStorage properties
+      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData];
+      const liveProperties = allCandidateProps.filter(p => {
+        if (!p) return false;
+        const st = String(p.status || p.listingStatus || '').toUpperCase();
+        const lst = String(p.listingStatus || '').toUpperCase();
+        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished !== false);
+        const isBlocked = st === 'REJECTED' || st === 'DRAFT' || st === 'CHANGES_REQUIRED';
+        return isLive && !isBlocked;
       });
 
-      const fallbackData = mockApi.getPublicProperties(stateToUse) || [];
-
-      if (result.success && Array.isArray(result.properties)) {
-        const combined = deduplicateProperties([...result.properties, ...fallbackData]);
-        setProperties(combined);
-        setHasMore(Boolean(result.hasMore));
-        setCurrentLastDoc(result.lastDoc || null);
-        setDisclosureMsg(result.disclosureMessage || null);
-        setCandidateLimitReached(Boolean(result.candidateLimitReached));
-        setSortCheck(result.sortCompatibility || { compatible: true });
-      } else {
-        setProperties(fallbackData);
-        setHasMore(false);
-      }
+      const combined = deduplicateProperties(liveProperties);
+      setProperties(combined);
+      setHasMore(false);
     } catch (err) {
       const fallbackData = mockApi.getPublicProperties(stateToUse);
       setProperties(fallbackData || []);
