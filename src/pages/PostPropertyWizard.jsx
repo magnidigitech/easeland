@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
-import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById } from '../firebase/propertyService.js';
+import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById, deletePropertyListing } from '../firebase/propertyService.js';
 import { saveOwnerBoundarySubmission } from '../firebase/boundaryService.js';
 import PropertyLocationStep from '../components/PropertyLocationStep.jsx';
 import PropertySpecificationsStep from '../components/PropertySpecificationsStep.jsx';
@@ -109,6 +109,38 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     });
     setStep(draft.lastStep || 1);
     setShowResumeModal(false);
+  };
+
+  // Delete single draft
+  const handleDeleteSingleDraft = async (draftId, e) => {
+    e.stopPropagation();
+    if (!draftId) return;
+    try {
+      await deletePropertyListing(draftId, user?.uid, false);
+      const updated = draftsList.filter(d => String(d.propertyId || d.id) !== String(draftId));
+      setDraftsList(updated);
+      if (updated.length === 0) {
+        setShowResumeModal(false);
+      }
+    } catch (err) {
+      console.error('Error deleting draft:', err);
+    }
+  };
+
+  // Clear all drafts
+  const handleClearAllDrafts = async () => {
+    try {
+      for (const d of draftsList) {
+        const dId = d.propertyId || d.id;
+        if (dId) {
+          await deletePropertyListing(dId, user?.uid, false);
+        }
+      }
+      setDraftsList([]);
+      setShowResumeModal(false);
+    } catch (err) {
+      console.error('Error clearing all drafts:', err);
+    }
   };
 
 
@@ -361,18 +393,40 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                     <span className="block text-xs font-bold text-brand-charcoal">{d.title || 'Untitled Draft'}</span>
                     <span className="block text-[10px] text-gray-500 font-semibold">{d.propertyType} • {d.purpose} • Step {d.lastStep || 1}</span>
                   </div>
-                  <button
-                    onClick={() => handleResumeDraft(d)}
-                    className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-3 py-1.5 rounded-lg shadow-sm"
-                  >
-                    Resume
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteSingleDraft(d.propertyId || d.id, e)}
+                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                      title="Clear Draft"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Clear</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResumeDraft(d)}
+                      className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-3.5 py-1.5 rounded-lg shadow-sm"
+                    >
+                      Resume
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="pt-2 flex justify-end gap-3">
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
               <button
+                type="button"
+                onClick={handleClearAllDrafts}
+                className="text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 flex items-center gap-1.5 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear All Drafts</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowResumeModal(false)}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100"
               >
