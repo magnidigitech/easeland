@@ -47,7 +47,8 @@ import {
   CheckSquare,
   Save,
   Upload,
-  Video
+  Video,
+  Trash2
 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
