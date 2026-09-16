@@ -300,259 +300,150 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         </div>
       )}
 
-      {/* METHOD SELECTOR */}
-      <div className="grid grid-cols-3 gap-3">
-        <button
-          type="button"
-          onClick={() => { setMethod('DRAW'); setErrorMsg(null); }}
-          className={`p-3 rounded-xl border text-xs font-bold transition-all ${
-            method === 'DRAW'
-              ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow-sm'
-              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          A. Draw on Interactive Map
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setMethod('GPS'); setErrorMsg(null); }}
-          className={`p-3 rounded-xl border text-xs font-bold transition-all ${
-            method === 'GPS'
-              ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow-sm'
-              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          B. GPS-Assisted
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setMethod('MAP_DOC'); setErrorMsg(null); }}
-          className={`p-3 rounded-xl border text-xs font-bold transition-all ${
-            method === 'MAP_DOC'
-              ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow-sm'
-              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          C. Confidential Plot Map
-        </button>
-      </div>
-
-      {/* METHOD A: INTERACTIVE MAP POLYGON DRAWER */}
-      {method === 'DRAW' && (
-        <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-brand-yellow" />
-                <span>Interactive Visual Map Drawer</span>
-              </h4>
-              <span className="text-[11px] text-gray-500 font-medium block mt-0.5">
-                Click anywhere on the map tiles below to drop plot boundary points & draw land polygon.
-              </span>
-            </div>
-
-            {/* MAP TILE LAYER SWITCHER */}
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
-              <button
-                type="button"
-                onClick={() => setMapType('satellite')}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
-                  mapType === 'satellite' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Satellite
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapType('street')}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
-                  mapType === 'street' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Street Map
-              </button>
-            </div>
+      {/* METHOD A: INTERACTIVE MAP POLYGON DRAWER (ONLY ACTIVE METHOD) */}
+      <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-brand-yellow" />
+              <span>Draw on Interactive Map</span>
+            </h4>
+            <span className="text-[11px] text-gray-500 font-medium block mt-0.5">
+              Click anywhere on the map tiles below to drop plot boundary points & draw land polygon.
+            </span>
           </div>
 
-          {/* INTERACTIVE LEAFLET MAP CANVAS */}
-          <div className="relative rounded-2xl border-2 border-brand-charcoal/20 overflow-hidden shadow-lg">
-            <div ref={mapContainerRef} className="h-96 w-full z-10 bg-slate-900" />
-
-            {/* MAP FLOATING INSTRUCTION BADGE */}
-            <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10">
-              <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce" />
-              <span>Click on map to drop boundary points</span>
-            </div>
-
-            {/* MAP ACTION CONTROLS FLOATING BAR */}
-            <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-gray-200">
-              {vertices.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleUndoVertex}
-                    title="Undo Last Point"
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors"
-                  >
-                    <Undo className="w-3.5 h-3.5" />
-                    <span>Undo</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleClearPolygon}
-                    title="Clear Polygon"
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Clear</span>
-                  </button>
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={handleRecenterMap}
-                title="Recenter Map Bounds"
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-brand-charcoal text-brand-yellow text-xs font-bold rounded-lg hover:bg-black transition-colors"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-                <span>Fit Bounds</span>
-              </button>
-            </div>
+          {/* MAP TILE LAYER SWITCHER */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
+            <button
+              type="button"
+              onClick={() => setMapType('satellite')}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                mapType === 'satellite' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Satellite
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapType('street')}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                mapType === 'street' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Street Map
+            </button>
           </div>
-
-          {/* POLYGON SUMMARY BAR */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white border border-gray-200 rounded-xl">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-brand-charcoal">
-                Polygon Status:
-              </span>
-              <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
-                vertices.length >= 3 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {vertices.length === 0 ? 'No Points Marked' : vertices.length < 3 ? `${vertices.length} / 3 Points (Min 3 required)` : `${vertices.length} Points Closed Polygon ✓`}
-              </span>
-            </div>
-
-            {estimatedAreaSqFt > 0 && (
-              <span className="text-xs font-extrabold text-emerald-700 font-mono">
-                Map Area (approx): {estimatedAreaSqFt.toLocaleString()} sq ft
-              </span>
-            )}
-          </div>
-
-          {/* OPTIONAL MANUAL LAT/LNG COORDINATE INPUT ACCORDION */}
-          <details className="bg-white rounded-xl border border-gray-200 p-3 space-y-3">
-            <summary className="text-xs font-extrabold text-gray-700 cursor-pointer select-none flex items-center justify-between">
-              <span>+ Advanced Option: Enter Lat / Lng Coordinates Manually</span>
-            </summary>
-            
-            <div className="pt-2 flex items-center gap-2">
-              <input
-                type="number"
-                step="any"
-                id="vLatInput"
-                placeholder="Latitude (e.g. 17.3850)"
-                className="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
-              />
-              <input
-                type="number"
-                step="any"
-                id="vLngInput"
-                placeholder="Longitude (e.g. 78.4867)"
-                className="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const latEl = document.getElementById('vLatInput');
-                  const lngEl = document.getElementById('vLngInput');
-                  handleAddVertex(latEl.value, lngEl.value);
-                  latEl.value = '';
-                  lngEl.value = '';
-                }}
-                className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1 shadow-sm shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add</span>
-              </button>
-            </div>
-          </details>
-
         </div>
-      )}
 
-      {/* METHOD B: GPS-ASSISTED CAPTURE */}
-      {method === 'GPS' && (
-        <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
-          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-medium space-y-1">
-            <span className="font-extrabold block">GPS Accuracy Warning:</span>
-            <span>GPS-assisted boundary is an approximate owner-provided boundary. Walk around your property boundary to log GPS vertices automatically.</span>
+        {/* INTERACTIVE LEAFLET MAP CANVAS */}
+        <div className="relative rounded-2xl border-2 border-brand-charcoal/20 overflow-hidden shadow-lg">
+          <div ref={mapContainerRef} className="h-96 w-full z-10 bg-slate-900" />
+
+          {/* MAP FLOATING INSTRUCTION BADGE */}
+          <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10">
+            <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce" />
+            <span>Click on map to drop boundary points</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {!gpsActive ? (
-              <button
-                type="button"
-                onClick={startGpsSession}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Start GPS Boundary Session</span>
-              </button>
-            ) : (
+          {/* MAP ACTION CONTROLS FLOATING BAR */}
+          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-gray-200">
+            {vertices.length > 0 && (
               <>
                 <button
                   type="button"
-                  onClick={gpsPaused ? startGpsSession : pauseGpsSession}
-                  className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm"
+                  onClick={handleUndoVertex}
+                  title="Undo Last Point"
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors"
                 >
-                  <Pause className="w-4 h-4 fill-current" />
-                  <span>{gpsPaused ? 'Resume Session' : 'Pause Session'}</span>
+                  <Undo className="w-3.5 h-3.5" />
+                  <span>Undo</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={stopGpsSession}
-                  className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm"
+                  onClick={handleClearPolygon}
+                  title="Clear Polygon"
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg transition-colors"
                 >
-                  <Square className="w-4 h-4 fill-current" />
-                  <span>Stop GPS Session</span>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear</span>
                 </button>
               </>
             )}
+
+            <button
+              type="button"
+              onClick={handleRecenterMap}
+              title="Recenter Map Bounds"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-brand-charcoal text-brand-yellow text-xs font-bold rounded-lg hover:bg-black transition-colors"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Fit Bounds</span>
+            </button>
+          </div>
+        </div>
+
+        {/* POLYGON SUMMARY BAR */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white border border-gray-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-brand-charcoal">
+              Polygon Status:
+            </span>
+            <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
+              vertices.length >= 3 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+            }`}>
+              {vertices.length === 0 ? 'No Points Marked' : vertices.length < 3 ? `${vertices.length} / 3 Points (Min 3 required)` : `${vertices.length} Points Closed Polygon ✓`}
+            </span>
           </div>
 
-          {gpsLog.length > 0 && (
-            <div className="text-xs font-mono font-semibold text-gray-600">
-              Captured GPS Vertices: {gpsLog.length} points
-            </div>
+          {estimatedAreaSqFt > 0 && (
+            <span className="text-xs font-extrabold text-emerald-700 font-mono">
+              Map Area (approx): {estimatedAreaSqFt.toLocaleString()} sq ft
+            </span>
           )}
         </div>
-      )}
 
-      {/* METHOD C: CONFIDENTIAL PLOT MAP REFERENCE */}
-      {method === 'MAP_DOC' && (
-        <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-3">
-          <label className="block text-xs font-extrabold uppercase tracking-wider text-gray-700">
-            Confidential Plot Map Document Reference
-          </label>
-          <input
-            type="text"
-            placeholder="e.g. Approved Layout Map / FMB Sketch Document Name"
-            value={docRefName}
-            onChange={(e) => setDocRefName(e.target.value)}
-            className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
-          />
-          <span className="text-[11px] text-gray-500 block font-medium">
-            Original plot map documents are confidential and accessible ONLY by Authorized EaseLand Admins.
-          </span>
-        </div>
-      )}
+        {/* OPTIONAL MANUAL LAT/LNG COORDINATE INPUT ACCORDION */}
+        <details className="bg-white rounded-xl border border-gray-200 p-3 space-y-3">
+          <summary className="text-xs font-extrabold text-gray-700 cursor-pointer select-none flex items-center justify-between">
+            <span>+ Advanced Option: Enter Lat / Lng Coordinates Manually</span>
+          </summary>
+          
+          <div className="pt-2 flex items-center gap-2">
+            <input
+              type="number"
+              step="any"
+              id="vLatInput"
+              placeholder="Latitude (e.g. 17.3850)"
+              className="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+            />
+            <input
+              type="number"
+              step="any"
+              id="vLngInput"
+              placeholder="Longitude (e.g. 78.4867)"
+              className="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const latEl = document.getElementById('vLatInput');
+                const lngEl = document.getElementById('vLngInput');
+                handleAddVertex(latEl.value, lngEl.value);
+                latEl.value = '';
+                lngEl.value = '';
+              }}
+              className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1 shadow-sm shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add</span>
+            </button>
+          </div>
+        </details>
+
+      </div>
 
       {/* CONFIRMATION BUTTON */}
       <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
