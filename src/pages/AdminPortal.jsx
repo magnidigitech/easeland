@@ -2980,12 +2980,16 @@ export default function AdminPortal() {
                                       const docUrlStr = typeof docItem.url === 'string' ? docItem.url : String(docItem.url || '#');
 
                                       return (
-                                        <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-slate-900">
-                                          <div className="flex items-center gap-2.5">
+                                        <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs text-slate-900 min-w-0 overflow-hidden shadow-sm">
+                                          <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
                                             <FileText className="w-5 h-5 text-blue-600 shrink-0" />
-                                            <div>
-                                              <span className="font-extrabold text-blue-950 block">{docNameStr}</span>
-                                              <span className="text-[10px] text-blue-700 font-bold">{docTypeStr}</span>
+                                            <div className="min-w-0 overflow-hidden">
+                                              <span className="font-extrabold text-blue-950 block truncate" title={docNameStr}>
+                                                {docNameStr}
+                                              </span>
+                                              <span className="text-[10px] text-blue-700 font-bold block truncate">
+                                                {docTypeStr}
+                                              </span>
                                             </div>
                                           </div>
                                           {docUrlStr && docUrlStr !== '#' && (
@@ -2993,7 +2997,7 @@ export default function AdminPortal() {
                                               href={docUrlStr}
                                               target="_blank"
                                               rel="noreferrer"
-                                              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0"
+                                              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0 whitespace-nowrap"
                                             >
                                               View / Download PDF ↗
                                             </a>
