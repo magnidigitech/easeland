@@ -274,13 +274,26 @@ export default function UserDashboard({
       } else if (actionType === 'DELETE') {
         if (!window.confirm("Are you sure you want to PERMANENTLY delete this property listing? This action cannot be undone.")) return;
 
-        // Immediately update UI state for 0ms deletion feedback
+        const targetStr = String(propId);
+
+        // 1. Immediately record in easeland_deleted_properties to prevent re-hydration
+        try {
+          if (typeof window !== 'undefined') {
+            const rawDel = localStorage.getItem('easeland_deleted_properties') || '[]';
+            const parsedDel = JSON.parse(rawDel);
+            if (!parsedDel.includes(targetStr)) {
+              parsedDel.push(targetStr);
+              localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDel));
+            }
+          }
+        } catch (e) {}
+
+        // 2. Immediately update UI state for 0ms deletion feedback
         setFbOwnerProperties(prev => prev.filter(p => {
           if (!p) return false;
           const id1 = String(p.id || '');
           const id2 = String(p.propertyId || '');
           const id3 = String(p.referenceId || '');
-          const targetStr = String(propId);
           return id1 !== targetStr && id2 !== targetStr && id3 !== targetStr;
         }));
 

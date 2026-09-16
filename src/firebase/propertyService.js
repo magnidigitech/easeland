@@ -302,6 +302,19 @@ export async function createPropertyDraft(ownerId, propertyData) {
 export async function getPropertyById(propertyId, currentUserId = null, isAdminUser = false) {
   try {
     if (!propertyId) return { success: false, error: 'Property ID is required.' };
+
+    let deletedIds = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_properties');
+        if (rawDel) deletedIds = JSON.parse(rawDel);
+      }
+    } catch (e) {}
+
+    if (deletedIds.includes(String(propertyId))) {
+      return { success: false, error: 'Property not found.' };
+    }
+
     let data = null;
 
     // 1. Try Firestore
@@ -335,7 +348,7 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
       } catch (e) {}
     }
 
-    if (!data) {
+    if (!data || data.status === 'DELETED' || data.listingStatus === 'DELETED') {
       return { success: false, error: 'Property not found.' };
     }
 
@@ -364,6 +377,14 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
   try {
     if (!ownerId) return { success: false, error: 'Owner ID is required.' };
     let propertiesList = [];
+
+    let deletedIds = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_properties');
+        if (rawDel) deletedIds = JSON.parse(rawDel);
+      }
+    } catch (e) {}
 
     // 1. Try local store & mockApi
     try {
@@ -399,12 +420,15 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       console.warn('Firestore getOwnerProperties note:', error);
     }
 
-    // Deduplicate
+    // Deduplicate and filter out deleted property IDs
     const propMap = new Map();
     propertiesList.forEach(p => {
       if (!p) return;
       const pId = String(p.id || p.propertyId || '');
-      if (pId) propMap.set(pId, { ...(propMap.get(pId) || {}), ...p });
+      const pStatus = String(p.status || p.listingStatus || '').toUpperCase();
+      if (pId && !deletedIds.includes(pId) && pStatus !== 'DELETED') {
+        propMap.set(pId, { ...(propMap.get(pId) || {}), ...p });
+      }
     });
 
     const resultList = Array.from(propMap.values());
