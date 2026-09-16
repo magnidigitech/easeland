@@ -84,11 +84,11 @@ export default function PropertyReviewStep({
   }, [propertyId, ownerId]);
 
   // Validation checks for submission
-  const isTitleValid = Boolean(formData.title && formData.title.trim().length >= 3);
+  const isTitleValid = Boolean(formData.title && formData.title.trim().length >= 2);
   const isPriceValid = Boolean(Number(formData.price) > 0);
   const isAreaValid = Boolean(Number(formData.area) > 0);
-  const isDescriptionValid = Boolean(formData.description && formData.description.trim().length >= 10);
-  const isLocationValid = Boolean(formData.location && formData.location.confirmed && formData.location.geoPoint);
+  const isDescriptionValid = Boolean(formData.description && formData.description.trim().length >= 2);
+  const isLocationValid = Boolean(formData.location && (formData.location.confirmed || formData.location.geoPoint || formData.location.city || formData.location.address || formData.location.locality));
 
   const isFormValid = isTitleValid && isPriceValid && isAreaValid && isDescriptionValid && isLocationValid;
 
