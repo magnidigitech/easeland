@@ -65,16 +65,34 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
   };
 
   // Handle Document Removal
-  const handleRemoveDocument = async (docId) => {
-    if (!docId || !ownerId) return;
+  const handleRemoveDocument = async (docTarget) => {
+    const targetId = typeof docTarget === 'object'
+      ? (docTarget.docId || docTarget.mediaId || docTarget.id || docTarget.publicUrl || docTarget.url || docTarget.documentName || docTarget.name)
+      : docTarget;
+
+    if (!targetId) {
+      console.warn('Cannot delete document: target document ID is missing');
+      return;
+    }
+
     setErrorMsg(null);
-    const res = await removeConfidentialPropertyDocument(docId, propertyId, ownerId);
+
+    // 0ms immediate UI state update
+    const targetIdStr = String(targetId).toLowerCase();
+    setDocuments(prev => prev.filter(d => {
+      if (!d) return false;
+      const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
+      return dId !== targetIdStr;
+    }));
+
+    const res = await removeConfidentialPropertyDocument(targetId, propertyId, ownerId);
     if (res.success) {
-      setSuccessMsg('Document removed.');
+      setSuccessMsg('Document removed successfully.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      fetchDocuments();
+      await fetchDocuments();
     } else {
-      setErrorMsg(res.error);
+      setErrorMsg(res.error || 'Failed to remove document.');
+      await fetchDocuments();
     }
   };
 
@@ -243,8 +261,9 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
 
                     <button
                       type="button"
-                      onClick={() => handleRemoveDocument(docItem.docId || docItem.mediaId)}
+                      onClick={() => handleRemoveDocument(docItem)}
                       className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete Document"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

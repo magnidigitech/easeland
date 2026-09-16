@@ -187,6 +187,14 @@ export async function uploadConfidentialPropertyDocument({
 export async function getPropertyDocuments(propertyId, ownerId) {
   let docs = [];
 
+  let deletedDocKeysSet = new Set();
+  try {
+    if (typeof window !== 'undefined') {
+      const rawDel = localStorage.getItem('easeland_deleted_documents');
+      if (rawDel) JSON.parse(rawDel).forEach(k => deletedDocKeysSet.add(String(k).toLowerCase()));
+    }
+  } catch (e) {}
+
   // 1. Try local storage backup
   try {
     if (typeof window !== 'undefined') {
@@ -236,9 +244,13 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     if (!d) return;
     const urlStr = d.publicUrl || d.url || d.storagePath || '';
     const nameStr = d.documentName || d.name || d.fileName || '';
-    const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (nameStr ? nameStr.toLowerCase() : (d.docId || d.mediaId));
+    const docIdStr = String(d.docId || d.mediaId || d.id || '');
+    const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (nameStr ? nameStr.toLowerCase() : docIdStr.toLowerCase());
 
     if (!key || seenKeys.has(key)) return;
+    if (deletedDocKeysSet.has(key) || deletedDocKeysSet.has(docIdStr.toLowerCase()) || deletedDocKeysSet.has(urlStr.toLowerCase()) || deletedDocKeysSet.has(nameStr.toLowerCase())) {
+      return;
+    }
     seenKeys.add(key);
 
     const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
@@ -248,7 +260,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
 
     normalizedDocs.push({
       ...d,
-      docId: d.docId || d.mediaId || `doc-${normalizedDocs.length + 1}`,
+      docId: d.docId || d.mediaId || d.id || `doc-${normalizedDocs.length + 1}`,
       documentName: docName,
       name: docName,
       documentType: docType,
@@ -273,21 +285,84 @@ export async function removeConfidentialPropertyDocument(docId, propertyId, owne
       return { success: false, error: 'Document ID is required.' };
     }
 
+    const docIdStr = String(docId).trim();
+
+    // 1. Record deleted document key in local storage to prevent re-hydration
     try {
-      const docRef = doc(db, 'propertyDocuments', docId);
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_documents') || '[]';
+        const parsedDel = JSON.parse(rawDel);
+        if (!parsedDel.includes(docIdStr.toLowerCase())) {
+          parsedDel.push(docIdStr.toLowerCase());
+          localStorage.setItem('easeland_deleted_documents', JSON.stringify(parsedDel));
+        }
+      }
+    } catch (e) {}
+
+    // 2. Remove from local storage keys
+    try {
+      if (typeof window !== 'undefined') {
+        const keysToClean = ['easeland_user_documents'];
+        if (propertyId) keysToClean.push(`easeland_docs_${propertyId}`);
+
+        keysToClean.forEach(key => {
+          const stored = localStorage.getItem(key);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.filter(d => {
+                if (!d) return false;
+                const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
+                return dId !== docIdStr.toLowerCase() && d.docId !== docId;
+              });
+              localStorage.setItem(key, JSON.stringify(updated));
+            }
+          }
+        });
+      }
+    } catch (e) {}
+
+    // 3. Remove from Firestore propertyDocuments collection
+    try {
+      const docRef = doc(db, 'propertyDocuments', docIdStr);
       await deleteDoc(docRef);
     } catch (fsErr) {
       console.warn('Firestore document delete note:', fsErr.message);
     }
 
-    // Remove from local storage
-    try {
-      if (typeof window !== 'undefined' && propertyId) {
-        const stored = localStorage.getItem(`easeland_docs_${propertyId}`) || '[]';
-        const parsed = JSON.parse(stored);
-        localStorage.setItem(`easeland_docs_${propertyId}`, JSON.stringify(parsed.filter(d => d.docId !== docId)));
-      }
-    } catch (e) {}
+    // 4. Remove from target property's documents array in memory, mockApi, PostgreSQL, and Firestore
+    if (propertyId) {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj && Array.isArray(pObj.documents)) {
+          pObj.documents = pObj.documents.filter(d => {
+            if (!d) return false;
+            const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
+            return dId !== docIdStr.toLowerCase();
+          });
+        }
+      } catch (mErr) {}
+
+      try {
+        const propRef = doc(db, 'properties', propertyId);
+        const propSnap = await getDoc(propRef);
+        if (propSnap.exists()) {
+          const currentDocs = propSnap.data().documents || [];
+          const updatedDocs = currentDocs.filter(d => {
+            if (!d) return false;
+            const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
+            return dId !== docIdStr.toLowerCase();
+          });
+          await setDoc(propRef, { documents: updatedDocs, updatedAt: serverTimestamp() }, { merge: true });
+        }
+      } catch (pFsErr) {}
+
+      try {
+        const { syncPropertyToPostgres } = await import('./propertyService.js');
+        syncPropertyToPostgres({ propertyId, id: propertyId, documents: [] });
+      } catch (pgErr) {}
+    }
 
     return { success: true };
   } catch (error) {
