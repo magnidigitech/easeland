@@ -402,26 +402,27 @@ export default function AdminPortal() {
       try {
         if (typeof window !== 'undefined') {
           const rawDeleted = localStorage.getItem('easeland_deleted_properties');
-          if (rawDeleted) deletedIds = JSON.parse(rawDeleted);
+          if (rawDeleted) deletedIds = JSON.parse(rawDeleted).map(String);
         }
       } catch (e) {}
 
       allMergedProps = Array.from(queueMap.values()).filter(p => {
         if (!p) return false;
-        const pId = String(p.id || p.propertyId || '');
-        if (deletedIds.includes(pId)) return false;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        if (deletedIds.includes(id1) || deletedIds.includes(id2) || deletedIds.includes(id3)) return false;
         const title = (p.title || '').trim();
         return title.length > 0 && title !== '.' && title !== ',';
       });
 
       queue = allMergedProps.filter(p => {
-        const st = (p.status || p.listingStatus || '').toUpperCase();
-        return st !== 'APPROVED_LIVE' && st !== 'LIVE' || ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING', 'SUBMITTED', 'DRAFT', 'CHANGES_REQUIRED', 'NOT_VERIFIED'].includes(st);
+        if (!p) return false;
+        const st = String(p.status || p.listingStatus || '').toUpperCase();
+        const lst = String(p.listingStatus || '').toUpperCase();
+        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
+        return !isLive;
       });
-
-      if (queue.length === 0 && allMergedProps.length > 0) {
-        queue = allMergedProps;
-      }
     } catch (e1) {
       console.warn('Error loading verification queue:', e1);
     }
@@ -884,10 +885,16 @@ export default function AdminPortal() {
       try {
         const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
         const parsedDeleted = JSON.parse(rawDeleted);
-        if (!parsedDeleted.includes(pIdStr)) {
-          parsedDeleted.push(pIdStr);
-          localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+        const idsToAdd = [pIdStr];
+        if (selectedProperty) {
+          if (selectedProperty.id) idsToAdd.push(String(selectedProperty.id));
+          if (selectedProperty.propertyId) idsToAdd.push(String(selectedProperty.propertyId));
+          if (selectedProperty.referenceId) idsToAdd.push(String(selectedProperty.referenceId));
         }
+        idsToAdd.forEach(idVal => {
+          if (idVal && !parsedDeleted.includes(idVal)) parsedDeleted.push(idVal);
+        });
+        localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
       } catch (e) {}
 
       // Immediately remove from UI state for 0ms lag
