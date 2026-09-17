@@ -268,7 +268,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             {/* Search Submit Button */}
             <button
               type="submit"
-              className="w-full sm:w-auto bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-amber-300/40"
+              className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-slate-950 font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(234,179,8,0.25)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-yellow-400/40"
             >
               <Search className="w-4 h-4 stroke-[2.5]" />
               Search

@@ -3,19 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --brand-yellow: #d4af37;
-  --brand-yellow-hover: #b8860b;
-  --brand-charcoal: #0f172a;
-  --brand-charcoal-light: #1e293b;
+  --brand-yellow: #eab308;
+  --brand-yellow-hover: #ca8a04;
+  --brand-charcoal: #0b132b;
+  --brand-charcoal-light: #1c2541;
   --brand-blue: #38bdf8;
   --brand-font: 'Plus Jakarta Sans', sans-serif;
   
-  --metallic-dark: #090d16;
-  --metallic-steel: #0f172a;
-  --metallic-titanium: #1e293b;
-  --metallic-slate: #334155;
+  --metallic-dark: #070d1e;
+  --metallic-steel: #0b132b;
+  --metallic-titanium: #1c2541;
+  --metallic-slate: #2b3a55;
   --metallic-chrome: #cbd5e1;
-  --metallic-gold: #d4af37;
+  --metallic-gold: #eab308;
   --metallic-gold-light: #fef08a;
 }
 
@@ -23,113 +23,93 @@
   body {
     background-color: var(--metallic-dark);
     background-image: 
-      radial-gradient(at 0% 0%, rgba(212, 175, 55, 0.05) 0px, transparent 50%),
+      radial-gradient(at 0% 0%, rgba(234, 179, 8, 0.06) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.05) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(30, 41, 59, 0.5) 0px, transparent 100%);
+      radial-gradient(at 50% 50%, rgba(28, 37, 65, 0.6) 0px, transparent 100%);
     background-attachment: fixed;
     color: #f1f5f9;
     font-family: var(--brand-font);
   }
 }
 
-/* METALLIC THEME UTILITY CLASSES */
+/* NAVY BLUE & NORMAL YELLOW THEME UTILITY CLASSES */
 .bg-metallic-dark {
-  background: linear-gradient(135deg, #060911 0%, #0f172a 40%, #1e293b 80%, #0f172a 100%) !important;
+  background: linear-gradient(135deg, #070d1e 0%, #0b132b 50%, #1c2541 100%) !important;
 }
 
 .bg-metallic-steel {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  background: linear-gradient(135deg, #0b132b 0%, #1c2541 100%) !important;
 }
 
 .bg-metallic-card {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+  background: linear-gradient(145deg, rgba(28, 37, 65, 0.95) 0%, rgba(11, 19, 43, 0.98) 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-.bg-metallic-gold {
-  background: linear-gradient(135deg, #b8860b 0%, #d4af37 35%, #fef08a 50%, #d4af37 65%, #92400e 100%) !important;
-  color: #0f172a;
+.bg-metallic-gold,
+.bg-brand-yellow {
+  background: #eab308 !important;
+  color: #0b132b !important;
   font-weight: 800 !important;
 }
 
-.bg-metallic-gold-hover:hover {
-  background: linear-gradient(135deg, #92400e 0%, #b8860b 35%, #fef08a 50%, #b8860b 70%, #78350f 100%) !important;
+.bg-metallic-gold-hover:hover,
+.hover\:bg-brand-yellowHover:hover {
+  background: #ca8a04 !important;
+  color: #0b132b !important;
 }
 
 .bg-metallic-silver {
-  background: linear-gradient(135deg, #475569 0%, #94a3b8 30%, #f8fafc 50%, #cbd5e1 70%, #334155 100%) !important;
-  color: #0f172a !important;
+  background: #2b3a55 !important;
+  color: #ffffff !important;
 }
 
-.text-metallic-gold {
-  background: linear-gradient(135deg, #fef08a 0%, #d4af37 50%, #b8860b 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+.text-metallic-gold,
+.text-brand-yellow {
+  color: #eab308 !important;
+  background: none !important;
+  -webkit-text-fill-color: #eab308 !important;
 }
 
 .text-metallic-silver {
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #cbd5e1 !important;
+  background: none !important;
+  -webkit-text-fill-color: #cbd5e1 !important;
 }
 
-.border-metallic-gold {
-  border-color: #d4af37 !important;
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+.border-metallic-gold,
+.border-brand-yellow {
+  border-color: #eab308 !important;
+  box-shadow: none !important;
 }
 
 .border-metallic-slate {
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
-/* METALLIC SHINE / SHIMMER ANIMATION */
+/* NORMAL YELLOW (NO METALLIC SHIMMER) */
 @keyframes metallicShimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
 .metallic-shimmer {
-  background: linear-gradient(
-    90deg, 
-    rgba(255,255,255,0) 0%, 
-    rgba(255,255,255,0.2) 50%, 
-    rgba(255,255,255,0) 100%
-  );
-  background-size: 200% 100%;
-  animation: metallicShimmer 3s infinite linear;
+  background: none !important;
+  animation: none !important;
 }
 
 /* DYNAMIC BRAND COLOR THEME ENGINE OVERRIDES */
-.bg-brand-yellow {
-  background: linear-gradient(135deg, #b8860b 0%, #d4af37 40%, #fef08a 55%, #d4af37 80%, #92400e 100%) !important;
-  color: #0f172a !important;
-}
-
-.hover\:bg-brand-yellowHover:hover {
-  background: linear-gradient(135deg, #92400e 0%, #b8860b 40%, #fef08a 55%, #b8860b 80%, #78350f 100%) !important;
-}
-
-.text-brand-yellow {
-  color: #d4af37 !important;
-}
-
-.border-brand-yellow {
-  border-color: #d4af37 !important;
-}
-
 .bg-brand-charcoal {
-  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%) !important;
+  background: linear-gradient(145deg, #1c2541 0%, #0b132b 100%) !important;
 }
 
 .hover\:bg-brand-charcoalLight:hover {
-  background: linear-gradient(145deg, #334155 0%, #1e293b 100%) !important;
+  background: linear-gradient(145deg, #2b3a55 0%, #1c2541 100%) !important;
 }
 
 .text-brand-charcoal {
-  color: #0f172a !important;
+  color: #0b132b !important;
 }
 
 .border-brand-charcoal {
@@ -138,7 +118,7 @@
 
 /* FORM ELEMENTS & DROPDOWN ACCESSIBILITY - High Contrast Legible Text */
 input, select, textarea {
-  color: #0f172a !important;
+  color: #0b132b !important;
 }
 
 input::placeholder,
@@ -149,7 +129,7 @@ textarea::placeholder {
 /* Ensure options in select dropdowns have crystal clear white background & dark text */
 select option {
   background-color: #ffffff !important;
-  color: #0f172a !important;
+  color: #0b132b !important;
 }
 
 /* Dark mode inputs override when explicitly on dark containers */
@@ -181,7 +161,7 @@ select.bg-slate-950 option,
 select.bg-slate-900 option,
 select.bg-slate-800 option,
 select.bg-gray-800 option {
-  background-color: #0f172a !important;
+  background-color: #0b132b !important;
   color: #f8fafc !important;
 }
 
@@ -224,27 +204,27 @@ select.bg-gray-800 option {
 
 .ring-brand-yellow:focus,
 .focus\:ring-brand-yellow:focus {
-  --tw-ring-color: #d4af37 !important;
+  --tw-ring-color: #eab308 !important;
 }
 
-/* Custom Metallic Scrollbar */
+/* Custom Navy Scrollbar */
 ::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #070d1e;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  background: linear-gradient(180deg, #2b3a55 0%, #1c2541 100%);
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #d4af37 0%, #b8860b 100%);
+  background: #eab308;
 }
 
 /* Glassmorphism Metallic utility */
