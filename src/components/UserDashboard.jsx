@@ -1236,10 +1236,10 @@ export default function UserDashboard({
             {activeTab === 'wishlist' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-extrabold text-lg text-brand-charcoal">My Saved Properties ({wishlist.length})</h2>
+                  <h2 className="font-extrabold text-lg text-brand-charcoal">My Saved Properties ({wishlistProperties.length})</h2>
                 </div>
 
-                {wishlist.length === 0 ? (
+                {wishlistProperties.length === 0 ? (
                   <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-4">
                     <div className="w-16 h-16 rounded-2xl bg-pink-50 text-pink-500 flex items-center justify-center mx-auto">
                       <Heart className="w-8 h-8" />
@@ -1257,26 +1257,73 @@ export default function UserDashboard({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {userProperties.map((prop) => (
-                      <div key={prop.id} className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-                        <img src={prop.image} alt={prop.title} className="w-full h-40 object-cover" />
-                        <div className="p-4 space-y-2">
-                          <h4 className="font-extrabold text-sm text-brand-charcoal">{prop.title}</h4>
-                          <p className="text-xs font-extrabold text-emerald-700">{prop.price}</p>
-                          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full">
-                              Available
+                    {wishlistProperties.map((prop) => {
+                      const pId = prop.id || prop.propertyId;
+                      const thumb = (Array.isArray(prop.publicApprovedMedia) && prop.publicApprovedMedia.length > 0)
+                        ? prop.publicApprovedMedia[0].url
+                        : (Array.isArray(prop.media) && prop.media.length > 0)
+                          ? (typeof prop.media[0] === 'string' ? prop.media[0] : (prop.media[0].url || prop.media[0].mediaUrl))
+                          : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+
+                      let displayPrice = prop.priceDisplay;
+                      if (!displayPrice && prop.price) {
+                        if (prop.price >= 10000000) displayPrice = `Rs. ${(prop.price / 10000000).toFixed(2)} Crores`;
+                        else if (prop.price >= 100000) displayPrice = `Rs. ${(prop.price / 100000).toFixed(2)} Lakhs`;
+                        else displayPrice = `Rs. ${Number(prop.price).toLocaleString('en-IN')}`;
+                      }
+
+                      const locObj = prop.location || {};
+                      const locParts = typeof locObj === 'object' ? [locObj.locality, locObj.city, locObj.state].filter(Boolean) : [];
+                      const locString = locParts.length > 0 ? locParts.join(', ') : (typeof prop.location === 'string' ? prop.location : 'India');
+
+                      return (
+                        <div key={pId} className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm flex flex-col justify-between">
+                          <div className="relative">
+                            <img
+                              src={thumb}
+                              alt={prop.title || 'Saved Property'}
+                              className="w-full h-44 object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+                              }}
+                            />
+                            <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider text-brand-yellow bg-brand-charcoal/90 backdrop-blur px-2.5 py-1 rounded-md">
+                              {prop.propertyType || prop.type || 'OPEN_PLOT'}
                             </span>
-                            <button
-                              onClick={() => onWishlistToggle(prop.id)}
-                              className="text-xs font-bold text-red-600 hover:underline"
-                            >
-                              Remove
-                            </button>
+                          </div>
+                          <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                            <div>
+                              <h4 className="font-extrabold text-sm text-brand-charcoal">{prop.title || 'Untitled Listing'}</h4>
+                              <p className="text-xs text-gray-500 font-medium flex items-center gap-1.5 mt-1">
+                                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                                <span>{locString}</span>
+                              </p>
+                              <p className="text-sm font-black text-emerald-700 mt-1">{displayPrice || 'Price on Request'}</p>
+                            </div>
+                            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                                {prop.isAvailable === false ? 'Unavailable' : 'Saved'}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => onNavigate(`property/${pId}`)}
+                                  className="text-xs font-bold bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal px-3 py-1.5 rounded-lg shadow-sm"
+                                >
+                                  View Details
+                                </button>
+                                <button
+                                  onClick={() => onWishlistToggle(pId)}
+                                  className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
