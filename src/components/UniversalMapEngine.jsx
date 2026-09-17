@@ -411,24 +411,14 @@ export default function UniversalMapEngine({
             ">
               <span>${priceLabel}</span>
             </div>
-            <div style="
-              width: ${dotSize}px;
-              height: ${dotSize}px;
-              background-color: ${color};
-              border: 2.5px solid #ffffff;
-              border-radius: 50%;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              flex-shrink: 0;
-            " class="custom-map-marker">
-              <div style="width: 5px; height: 5px; background-color: #ffffff; border-radius: 50%;"></div>
-            </div>
+            <svg width="28" height="34" viewBox="0 0 40 48" style="filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.35)); flex-shrink: 0;" class="custom-map-marker">
+              <path d="M 20 2 C 11.16 2 4 9.16 4 18 C 4 29 20 46 20 46 C 20 46 36 29 36 18 C 36 9.16 28.84 2 20 2 Z" fill="${color}" stroke="${border}" stroke-width="1.8"/>
+              <circle cx="20" cy="17.5" r="7" fill="#ffffff"/>
+            </svg>
           </div>
         `,
         iconSize: [totalWidth, totalHeight],
-        iconAnchor: [totalWidth / 2, totalHeight - (dotSize / 2)],
+        iconAnchor: [totalWidth / 2, totalHeight],
         popupAnchor: [0, -totalHeight]
       });
 

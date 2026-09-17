@@ -157,15 +157,15 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           strokeColor = '#5b21b6';
         }
 
-        // Add Property Location Marker Pin (High-Definition Drop-Shadowed Teardrop Location Marker Pin)
+        // Add Property Location Marker Pin matching user's exact teardrop pin specification
         const pinSvgDataUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="56" viewBox="0 0 48 56">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48">
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.45"/>
+              <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.4"/>
             </filter>
             <g filter="url(#shadow)">
-              <path d="M 24 4 C 14.06 4 6 12.06 6 22 C 6 34.5 24 52 24 52 C 24 52 42 34.5 42 22 C 42 12.06 33.94 4 24 4 Z" fill="${markerColor}" stroke="${strokeColor}" stroke-width="2.5"/>
-              <circle cx="24" cy="22" r="7" fill="#ffffff"/>
+              <path d="M 20 2 C 11.16 2 4 9.16 4 18 C 4 29 20 46 20 46 C 20 46 36 29 36 18 C 36 9.16 28.84 2 20 2 Z" fill="${markerColor}" stroke="${strokeColor}" stroke-width="1.8"/>
+              <circle cx="20" cy="17.5" r="7" fill="#ffffff"/>
             </g>
           </svg>
         `);
@@ -176,8 +176,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           title: property.title,
           icon: {
             url: pinSvgDataUrl,
-            scaledSize: new gMaps.Size(44, 52),
-            anchor: new gMaps.Point(22, 50)
+            scaledSize: new gMaps.Size(38, 45.6),
+            anchor: new gMaps.Point(19, 44)
           }
         });
 
