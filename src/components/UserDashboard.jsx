@@ -458,6 +458,30 @@ export default function UserDashboard({
     );
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-metallic-dark text-slate-100 py-16 px-4 flex items-center justify-center">
+        <div className="max-w-md w-full bg-metallic-card rounded-3xl p-8 shadow-2xl border border-slate-700/60 text-center space-y-6">
+          <div className="w-16 h-16 bg-amber-400/10 text-brand-yellow rounded-2xl mx-auto flex items-center justify-center border border-brand-yellow/30">
+            <User className="w-8 h-8" />
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-100">Sign In to Access Your Dashboard</h2>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              Manage your property listings, track buyer inquiries, view saved wishlist items, and update account settings.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate && onNavigate('home')}
+            className="w-full bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs py-3.5 rounded-xl shadow-lg transition-transform hover:scale-105 border border-amber-300/40"
+          >
+            Return to Homepage & Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-metallic-dark text-slate-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -466,7 +490,7 @@ export default function UserDashboard({
         <div className="bg-metallic-card text-white rounded-3xl p-6 sm:p-8 shadow-2xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-700/60 backdrop-blur-xl">
           <div className="flex items-center gap-5">
             <div className="w-16 h-16 rounded-2xl bg-metallic-gold text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg border-2 border-amber-300/40">
-              {profileForm.name.charAt(0).toLowerCase()}
+              {(profileForm?.name || user?.name || user?.displayName || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
