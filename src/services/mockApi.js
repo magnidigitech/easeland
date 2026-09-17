@@ -1,6 +1,22 @@
 import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData';
 import { extractCoordinates } from './locationProvider';
 
+export const safeArray = (val) => {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === 'object') {
+    if (Array.isArray(val.items)) return val.items;
+    if (Array.isArray(val.list)) return val.list;
+    if (Array.isArray(val.faqs)) return val.faqs;
+    if (Array.isArray(val.categories)) return val.categories;
+    const values = Object.keys(val)
+      .filter(k => !['state', 'publishedAt', 'publishedBy', 'updatedAt', 'updatedBy'].includes(k))
+      .map(k => val[k])
+      .filter(item => item && (typeof item === 'object' || typeof item === 'string'));
+    return values;
+  }
+  return [];
+};
+
 // Helper to initialize local storage
 const getStoredData = (key, initial) => {
   try {

@@ -15,7 +15,7 @@ import AdminPortal from './pages/AdminPortal';
 import UserDashboard from './components/UserDashboard';
 import PropertiesSearchPage from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import { mockApi, applySiteTheme } from './services/mockApi';
+import { mockApi, applySiteTheme, safeArray } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
@@ -359,9 +359,9 @@ export default function App() {
     }, 600);
   };
 
-  const faqs = (siteConfig?.faqs || []).map(f => ({
-    q: f?.question || '',
-    a: f?.answer || ''
+  const faqs = safeArray(siteConfig?.faqs || siteConfig?.faq).map(f => ({
+    q: f?.question || f?.q || f?.title || '',
+    a: f?.answer || f?.a || f?.desc || ''
   }));
 
   return (

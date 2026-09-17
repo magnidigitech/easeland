@@ -50,7 +50,7 @@ import {
   Video,
   Trash2
 } from 'lucide-react';
-import { mockApi } from '../services/mockApi';
+import { mockApi, safeArray } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   getVerificationQueue,
@@ -1977,20 +1977,20 @@ export default function AdminPortal() {
                     </div>
 
                     <div className="space-y-4">
-                      {(siteConfig.categories || []).map((cat, idx) => (
-                        <div key={cat.id || idx} className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                      {safeArray(siteConfig?.categories).map((cat, idx) => (
+                        <div key={cat?.id || idx} className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-extrabold text-brand-charcoal uppercase">Category {idx + 1}: {cat.title}</span>
-                            <span className="text-[10px] font-bold text-gray-400">ID: {cat.id}</span>
+                            <span className="text-xs font-extrabold text-brand-charcoal uppercase">Category {idx + 1}: {cat?.title}</span>
+                            <span className="text-[10px] font-bold text-gray-400">ID: {cat?.id}</span>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                               <label className="block text-[11px] font-bold text-gray-600 mb-1">Title</label>
                               <input
                                 type="text"
-                                value={cat.title || ''}
+                                value={cat?.title || ''}
                                 onChange={(e) => {
-                                  const updatedCats = [...siteConfig.categories];
+                                  const updatedCats = [...safeArray(siteConfig?.categories)];
                                   updatedCats[idx] = { ...cat, title: e.target.value };
                                   setSiteConfig(prev => ({ ...prev, categories: updatedCats }));
                                 }}
@@ -2001,9 +2001,9 @@ export default function AdminPortal() {
                               <label className="block text-[11px] font-bold text-gray-600 mb-1">Count Subtext</label>
                               <input
                                 type="text"
-                                value={cat.countText || ''}
+                                value={cat?.countText || ''}
                                 onChange={(e) => {
-                                  const updatedCats = [...siteConfig.categories];
+                                  const updatedCats = [...safeArray(siteConfig?.categories)];
                                   updatedCats[idx] = { ...cat, countText: e.target.value };
                                   setSiteConfig(prev => ({ ...prev, categories: updatedCats }));
                                 }}
@@ -2013,9 +2013,9 @@ export default function AdminPortal() {
                             <div className="md:col-span-3">
                               <MediaUploadInput
                                 label="Cover Image Asset"
-                                value={cat.imageUrl || ''}
+                                value={cat?.imageUrl || ''}
                                 onChange={(val) => {
-                                  const updatedCats = [...siteConfig.categories];
+                                  const updatedCats = [...safeArray(siteConfig?.categories)];
                                   updatedCats[idx] = { ...cat, imageUrl: val };
                                   setSiteConfig(prev => ({ ...prev, categories: updatedCats }));
                                 }}
@@ -2046,7 +2046,7 @@ export default function AdminPortal() {
                     </div>
 
                     <div className="space-y-4">
-                      {(siteConfig.faqs || []).map((faq, idx) => (
+                      {safeArray(siteConfig?.faqs || siteConfig?.faq).map((faq, idx) => (
                         <div key={faq.id || idx} className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 relative">
                           <button
                             onClick={() => handleRemoveFaq(faq.id)}
