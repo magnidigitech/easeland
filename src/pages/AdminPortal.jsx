@@ -895,18 +895,22 @@ export default function AdminPortal() {
         mockApi.rejectPropertyAdmin(propId, note);
       }
 
+      const payload = {
+        ...(selectedProperty || {}),
+        propertyId: propId,
+        id: propId,
+        listingStatus: 'REJECTED',
+        status: 'REJECTED',
+        isPlatformVerified: false,
+        isPublished: false,
+        verificationNotes: note,
+        ownerFacingNotes: note,
+        adminNotes: note,
+        adminFeedback: note,
+        rejectionReason: note
+      };
+
       try {
-        const payload = {
-          ...(selectedProperty || {}),
-          propertyId: propId,
-          id: propId,
-          listingStatus: 'REJECTED',
-          status: 'REJECTED',
-          isPlatformVerified: false,
-          isPublished: false,
-          verificationNotes: note,
-          rejectionReason: note
-        };
         await fetch('/api/properties', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -915,28 +919,39 @@ export default function AdminPortal() {
       } catch (pgErr) {}
 
       try {
-        const rawLocal = localStorage.getItem('easeland_user_properties');
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          const updated = parsed.map(p => {
-            if ((p.id || p.propertyId) === propId) {
-              return {
-                ...p,
-                listingStatus: 'REJECTED',
-                status: 'REJECTED',
-                isPlatformVerified: false,
-                isPublished: false,
-                verificationNotes: note
-              };
+        const targetIdStr = String(propId);
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const rawLocal = localStorage.getItem(k);
+          if (rawLocal) {
+            const parsed = JSON.parse(rawLocal);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map(p => {
+                if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
+                  return {
+                    ...p,
+                    listingStatus: 'REJECTED',
+                    status: 'REJECTED',
+                    isPlatformVerified: false,
+                    isPublished: false,
+                    verificationNotes: note,
+                    ownerFacingNotes: note,
+                    adminNotes: note,
+                    adminFeedback: note,
+                    rejectionReason: note
+                  };
+                }
+                return p;
+              });
+              localStorage.setItem(k, JSON.stringify(updated));
             }
-            return p;
-          });
-          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
-        }
+          }
+        });
       } catch (lErr) {}
 
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: { propertyId: propId, status: 'REJECTED' } }));
+        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
+        window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: payload }));
       }
 
       setPublishSuccessMessage('Property listing has been rejected.');
@@ -971,17 +986,20 @@ export default function AdminPortal() {
         mockApi.requestChangesAdmin(propId, note);
       }
 
+      const payload = {
+        ...(selectedProperty || {}),
+        propertyId: propId,
+        id: propId,
+        listingStatus: 'CHANGES_REQUIRED',
+        status: 'CHANGES_REQUIRED',
+        isPublished: false,
+        ownerFacingNotes: note,
+        verificationNotes: note,
+        adminNotes: note,
+        adminFeedback: note
+      };
+
       try {
-        const payload = {
-          ...(selectedProperty || {}),
-          propertyId: propId,
-          id: propId,
-          listingStatus: 'CHANGES_REQUIRED',
-          status: 'CHANGES_REQUIRED',
-          isPublished: false,
-          ownerFacingNotes: note,
-          verificationNotes: note
-        };
         await fetch('/api/properties', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -990,28 +1008,37 @@ export default function AdminPortal() {
       } catch (pgErr) {}
 
       try {
-        const rawLocal = localStorage.getItem('easeland_user_properties');
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          const updated = parsed.map(p => {
-            if ((p.id || p.propertyId) === propId) {
-              return {
-                ...p,
-                listingStatus: 'CHANGES_REQUIRED',
-                status: 'CHANGES_REQUIRED',
-                isPublished: false,
-                verificationNotes: note,
-                ownerFacingNotes: note
-              };
+        const targetIdStr = String(propId);
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const rawLocal = localStorage.getItem(k);
+          if (rawLocal) {
+            const parsed = JSON.parse(rawLocal);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map(p => {
+                if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
+                  return {
+                    ...p,
+                    listingStatus: 'CHANGES_REQUIRED',
+                    status: 'CHANGES_REQUIRED',
+                    isPublished: false,
+                    verificationNotes: note,
+                    ownerFacingNotes: note,
+                    adminNotes: note,
+                    adminFeedback: note
+                  };
+                }
+                return p;
+              });
+              localStorage.setItem(k, JSON.stringify(updated));
             }
-            return p;
-          });
-          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
-        }
+          }
+        });
       } catch (lErr) {}
 
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: { propertyId: propId, status: 'CHANGES_REQUIRED' } }));
+        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
+        window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: payload }));
       }
 
       setPublishSuccessMessage('Document changes requested from property owner.');

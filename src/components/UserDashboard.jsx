@@ -191,6 +191,8 @@ export default function UserDashboard({
         ? 'CHANGES_REQUIRED'
         : (p.listingStatus || existing.listingStatus || p.status || existing.status || 'DRAFT');
 
+      const noteCandidate = p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || existing.verificationNotes || existing.ownerFacingNotes || existing.adminNotes || existing.adminFeedback;
+
       combinedPropsMap.set(pId, {
         ...existing,
         ...p,
@@ -198,7 +200,11 @@ export default function UserDashboard({
         status: statusResolved,
         isPlatformVerified: Boolean(p.isPlatformVerified || existing.isPlatformVerified || statusResolved === 'LIVE'),
         isPublished: Boolean(p.isPublished || existing.isPublished || statusResolved === 'LIVE'),
-        verificationNotes: p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || existing.verificationNotes || existing.ownerFacingNotes || existing.adminNotes || existing.adminFeedback
+        verificationNotes: noteCandidate,
+        ownerFacingNotes: noteCandidate,
+        adminNotes: noteCandidate,
+        adminFeedback: noteCandidate,
+        auditorNotes: noteCandidate
       });
     }
   });
