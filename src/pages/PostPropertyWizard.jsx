@@ -539,7 +539,6 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   { label: 'Apartment', value: PropertyType.APARTMENT },
                   { label: 'Villa', value: PropertyType.VILLA },
                   { label: 'Commercial', value: PropertyType.COMMERCIAL },
-                  { label: 'Rental', value: PropertyType.RENTAL },
                   { label: 'Land', value: PropertyType.LAND },
                   { label: 'Other', value: PropertyType.OTHER }
                 ].map((item) => (

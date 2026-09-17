@@ -144,7 +144,6 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           <option value="Houses">Houses & Villas</option>
           <option value="Apartments">Apartments</option>
           <option value="Commercial">Commercial</option>
-          <option value="Rentals">Rentals</option>
         </select>
 
         <button
@@ -263,7 +262,6 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 <option value="Houses">Houses & Villas</option>
                 <option value="Apartments">Apartments</option>
                 <option value="Commercial">Commercial</option>
-                <option value="Rentals">Rentals</option>
               </select>
             </div>
 

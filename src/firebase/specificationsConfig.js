@@ -77,9 +77,9 @@ export const CANONICAL_AMENITIES = [
  */
 export function getApplicableSpecificationFields(propertyType, purpose) {
   const isLandOrPlot = propertyType === 'OPEN_PLOT' || propertyType === 'LAND';
-  const isResidentialStructure = propertyType === 'HOUSE' || propertyType === 'APARTMENT' || propertyType === 'VILLA' || propertyType === 'RENTAL';
+  const isResidentialStructure = propertyType === 'HOUSE' || propertyType === 'APARTMENT' || propertyType === 'VILLA';
   const isCommercial = propertyType === 'COMMERCIAL';
-  const isRental = purpose === 'RENT' || purpose === 'LEASE' || propertyType === 'RENTAL';
+  const isRental = purpose === 'RENT' || purpose === 'LEASE';
 
   return {
     showFacing: true,

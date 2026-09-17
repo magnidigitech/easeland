@@ -222,7 +222,6 @@ export default function DynamicFilterPanel({
             <option value={PropertyType.APARTMENT}>Apartment / Flat</option>
             <option value={PropertyType.VILLA}>Villa</option>
             <option value={PropertyType.COMMERCIAL}>Commercial Property</option>
-            <option value={PropertyType.RENTAL}>Rental House / Apartment</option>
             <option value={PropertyType.LAND}>Agricultural Land</option>
             <option value={PropertyType.OTHER}>Other</option>
           </select>
