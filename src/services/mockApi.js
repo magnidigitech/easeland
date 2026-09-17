@@ -1,4 +1,5 @@
 import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData';
+import { extractCoordinates } from './locationProvider';
 
 // Helper to initialize local storage
 const getStoredData = (key, initial) => {
@@ -72,9 +73,11 @@ export const deduplicateProperties = (items) => {
 
       // 3. Exact Geospatial proximity match (within ~10m / 0.0001 deg)
       let exactGeoMatch = false;
-      if (item.location?.lat && existing.location?.lat) {
-        const latDiff = Math.abs(item.location.lat - existing.location.lat);
-        const lngDiff = Math.abs(item.location.lng - existing.location.lng);
+      const locA = extractCoordinates(item);
+      const locB = extractCoordinates(existing);
+      if (!isNaN(locA.lat) && !isNaN(locB.lat)) {
+        const latDiff = Math.abs(locA.lat - locB.lat);
+        const lngDiff = Math.abs(locA.lng - locB.lng);
         exactGeoMatch = latDiff < 0.0001 && lngDiff < 0.0001;
       }
 
@@ -360,8 +363,10 @@ export const mockApi = {
         } else {
           const exSt = String(existing.status || existing.listingStatus || '').toUpperCase();
           const newSt = String(p.status || p.listingStatus || '').toUpperCase();
-          const isNewLive = newSt === 'LIVE' || newSt === 'APPROVED_LIVE' || newSt === 'APPROVED' || p.isPlatformVerified === true || p.isPublished === true;
-          const isExLive = exSt === 'LIVE' || exSt === 'APPROVED_LIVE' || exSt === 'APPROVED' || existing.isPlatformVerified === true || existing.isPublished === true;
+          const exVst = String(existing.verificationStatus || '').toUpperCase();
+          const newVst = String(p.verificationStatus || '').toUpperCase();
+          const isNewLive = newSt === 'LIVE' || newSt === 'APPROVED_LIVE' || newSt === 'APPROVED' || newSt === 'PLATFORM VERIFIED' || newVst === 'PLATFORM VERIFIED' || newVst === 'VERIFIED' || p.isPlatformVerified === true || p.isPublished === true;
+          const isExLive = exSt === 'LIVE' || exSt === 'APPROVED_LIVE' || exSt === 'APPROVED' || exSt === 'PLATFORM VERIFIED' || exVst === 'PLATFORM VERIFIED' || exVst === 'VERIFIED' || existing.isPlatformVerified === true || existing.isPublished === true;
 
           const merged = { ...existing, ...p };
           if (isExLive || isNewLive) {
@@ -381,8 +386,13 @@ export const mockApi = {
       if (!p) return false;
       const st = String(p.status || p.listingStatus || '').toUpperCase();
       const lst = String(p.listingStatus || '').toUpperCase();
-      const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished !== false);
-      const isExplicitlyBlocked = st === 'REJECTED' || st === 'DRAFT' || (st === 'PENDING_VERIFICATION' && !p.isPlatformVerified && lst !== 'LIVE') || st === 'CHANGES_REQUIRED';
+      const vst = String(p.verificationStatus || '').toUpperCase();
+      const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || st === 'PLATFORM VERIFIED' || st === 'VERIFIED' ||
+                     lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || lst === 'PLATFORM VERIFIED' || lst === 'VERIFIED' ||
+                     vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED' ||
+                     p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
+                     (!p.status && !p.listingStatus && p.title);
+      const isExplicitlyBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || (st === 'PENDING_VERIFICATION' && !p.isPlatformVerified && lst !== 'LIVE') || st === 'CHANGES_REQUIRED';
       return isLive && !isExplicitlyBlocked;
     });
     result = deduplicateProperties(result);

@@ -225,3 +225,104 @@ export async function searchLocationQuery(queryStr) {
 
   return [];
 }
+
+/**
+ * Extract canonical boundary polygon array [[lat, lng], ...] from any property format
+ */
+export function extractBoundaryPolygon(item) {
+  if (!item) return [];
+
+  let boundObj = item.boundary || item.ownerSubmittedBoundary;
+  if (typeof boundObj === 'string') {
+    try { boundObj = JSON.parse(boundObj); } catch (e) { boundObj = null; }
+  }
+
+  let rawPoly = Array.isArray(boundObj)
+    ? boundObj
+    : (
+      boundObj?.vertices ||
+      boundObj?.approvedPolygon ||
+      boundObj?.coordinates ||
+      boundObj?.points ||
+      boundObj?.polygon ||
+      (Array.isArray(item.boundary) ? item.boundary : null) ||
+      (Array.isArray(item.ownerSubmittedBoundary) ? item.ownerSubmittedBoundary : null)
+    );
+
+  if (typeof rawPoly === 'string') {
+    try { rawPoly = JSON.parse(rawPoly); } catch (e) { rawPoly = null; }
+  }
+
+  if (rawPoly && typeof rawPoly === 'object' && !Array.isArray(rawPoly)) {
+    rawPoly = rawPoly.vertices || rawPoly.approvedPolygon || rawPoly.coordinates || rawPoly.points || rawPoly.polygon || null;
+  }
+
+  if (!rawPoly || !Array.isArray(rawPoly) || rawPoly.length < 3) return [];
+
+  return rawPoly.map(pt => {
+    if (Array.isArray(pt) && pt.length >= 2) return [Number(pt[0]), Number(pt[1])];
+    if (pt && typeof pt === 'object') return [Number(pt.lat ?? pt.latitude), Number(pt.lng ?? pt.longitude)];
+    return null;
+  }).filter(pt => pt && !isNaN(pt[0]) && !isNaN(pt[1]));
+}
+
+/**
+ * Extract canonical lat and lng numbers from any property format (object, stringified JSON, GeoPoint, centroid)
+ */
+export function extractCoordinates(item) {
+  if (!item) return { lat: NaN, lng: NaN };
+
+  let loc = item.location;
+  if (typeof loc === 'string') {
+    try { loc = JSON.parse(loc); } catch (e) { loc = null; }
+  }
+
+  let centroid = item.centroid;
+  if (typeof centroid === 'string') {
+    try { centroid = JSON.parse(centroid); } catch (e) { centroid = null; }
+  }
+
+  // 1. Check centroid
+  let lat = Number(centroid?.lat ?? centroid?.latitude);
+  let lng = Number(centroid?.lng ?? centroid?.longitude);
+
+  // 2. Check location
+  if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+    lat = Number(
+      loc?.lat ??
+      loc?.latitude ??
+      loc?.geoPoint?.latitude ??
+      (Array.isArray(loc?.coordinates) ? loc.coordinates[1] : undefined)
+    );
+    lng = Number(
+      loc?.lng ??
+      loc?.longitude ??
+      loc?.geoPoint?.longitude ??
+      (Array.isArray(loc?.coordinates) ? loc.coordinates[0] : undefined)
+    );
+  }
+
+  // 3. Check direct item properties
+  if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+    lat = Number(item.lat ?? item.latitude ?? item.centroidLat);
+    lng = Number(item.lng ?? item.longitude ?? item.centroidLng);
+  }
+
+  // 4. Check boundary centroid if polygon exists
+  if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+    const formattedPoly = extractBoundaryPolygon(item);
+    if (formattedPoly && formattedPoly.length >= 3) {
+      let sumLat = 0;
+      let sumLng = 0;
+      formattedPoly.forEach(pt => {
+        sumLat += pt[0];
+        sumLng += pt[1];
+      });
+      lat = sumLat / formattedPoly.length;
+      lng = sumLng / formattedPoly.length;
+    }
+  }
+
+  return { lat, lng };
+}
+

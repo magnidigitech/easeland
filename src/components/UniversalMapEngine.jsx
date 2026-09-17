@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Navigation, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
 import DynamicFilterPanel from './DynamicFilterPanel';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
+import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -168,19 +169,21 @@ export default function UniversalMapEngine({
 
   // Center & 200% deep zoom in directly onto focusedProperty if redirected from PropertyDetailsView
   useEffect(() => {
-    if (focusedProperty && mapInstanceRef.current && focusedProperty.location?.lat) {
-      const lat = focusedProperty.location.lat;
-      const lng = focusedProperty.location.lng;
+    if (focusedProperty && mapInstanceRef.current) {
+      const coords = extractCoordinates(focusedProperty);
+      const formattedPoly = extractBoundaryPolygon(focusedProperty);
 
-      if (focusedProperty.boundary && Array.isArray(focusedProperty.boundary) && focusedProperty.boundary.length >= 3) {
-        const polyBounds = L.latLngBounds(focusedProperty.boundary);
-        mapInstanceRef.current.fitBounds(polyBounds, { padding: [40, 40], maxZoom: 20, animate: true });
-      } else {
-        mapInstanceRef.current.setView([lat, lng], 19, { animate: true });
+      if (!isNaN(coords.lat) && !isNaN(coords.lng)) {
+        if (formattedPoly.length >= 3) {
+          const polyBounds = L.latLngBounds(formattedPoly);
+          mapInstanceRef.current.fitBounds(polyBounds, { padding: [40, 40], maxZoom: 20, animate: true });
+        } else {
+          mapInstanceRef.current.setView([coords.lat, coords.lng], 19, { animate: true });
+        }
+
+        setSelectedPropertyPreview(focusedProperty);
+        setIsSidePanelOpen(true);
       }
-
-      setSelectedPropertyPreview(focusedProperty);
-      setIsSidePanelOpen(true);
     }
   }, [focusedProperty]);
 
@@ -355,44 +358,10 @@ export default function UniversalMapEngine({
     displayProperties.forEach((prop) => {
       if (!prop) return;
 
-      // 1. Extract raw polygon array from all possible boundary data structures FIRST
-      const rawPoly = Array.isArray(prop.boundary) 
-        ? prop.boundary 
-        : (
-          prop.boundary?.vertices || 
-          prop.boundary?.approvedPolygon || 
-          prop.boundary?.coordinates || 
-          prop.boundary?.points || 
-          prop.boundary?.polygon ||
-          prop.ownerSubmittedBoundary?.vertices ||
-          prop.ownerSubmittedBoundary?.polygon ||
-          (Array.isArray(prop.ownerSubmittedBoundary) ? prop.ownerSubmittedBoundary : null)
-        );
-
-      let formattedPoly = [];
-      if (rawPoly && Array.isArray(rawPoly) && rawPoly.length >= 3) {
-        formattedPoly = rawPoly.map(pt => {
-          if (Array.isArray(pt) && pt.length >= 2) return [Number(pt[0]), Number(pt[1])];
-          if (pt && typeof pt === 'object') return [Number(pt.lat ?? pt.latitude), Number(pt.lng ?? pt.longitude)];
-          return null;
-        }).filter(pt => pt && !isNaN(pt[0]) && !isNaN(pt[1]));
-      }
-
-      // 2. Compute exact marker pin coordinates (If boundary polygon exists, use polygon centroid for 100% perfect alignment)
-      const loc = prop.location || {};
-      let lat = Number(loc.lat ?? loc.latitude ?? loc.geoPoint?.latitude ?? prop.lat ?? prop.latitude);
-      let lng = Number(loc.lng ?? loc.longitude ?? loc.geoPoint?.longitude ?? prop.lng ?? prop.longitude);
-
-      if (formattedPoly.length >= 3) {
-        let sumLat = 0;
-        let sumLng = 0;
-        formattedPoly.forEach(pt => {
-          sumLat += pt[0];
-          sumLng += pt[1];
-        });
-        lat = sumLat / formattedPoly.length;
-        lng = sumLng / formattedPoly.length;
-      }
+      const formattedPoly = extractBoundaryPolygon(prop);
+      const coords = extractCoordinates(prop);
+      let lat = coords.lat;
+      let lng = coords.lng;
 
       if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 

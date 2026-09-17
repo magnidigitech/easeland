@@ -102,8 +102,13 @@ export default function PropertiesSearchPage({
         if (!p) return false;
         const st = String(p.status || p.listingStatus || '').toUpperCase();
         const lst = String(p.listingStatus || '').toUpperCase();
-        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished !== false);
-        const isBlocked = st === 'REJECTED' || st === 'DRAFT' || st === 'CHANGES_REQUIRED';
+        const vst = String(p.verificationStatus || '').toUpperCase();
+        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || st === 'PLATFORM VERIFIED' || st === 'VERIFIED' ||
+                       lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || lst === 'PLATFORM VERIFIED' || lst === 'VERIFIED' ||
+                       vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED' ||
+                       p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
+                       (!p.status && !p.listingStatus && p.title);
+        const isBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || st === 'CHANGES_REQUIRED';
         return isLive && !isBlocked;
       });
 

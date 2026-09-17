@@ -165,7 +165,7 @@ export async function getAllUsersAdmin() {
         const rawDel = localStorage.getItem('easeland_deleted_users');
         if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const users = [];
 
@@ -334,7 +334,7 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     await logAdminActivity(
       'USER_REMOVED',
