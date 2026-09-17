@@ -29,6 +29,10 @@ const getInitialPageState = () => {
   const urlParams = new URLSearchParams(search);
   const modeParam = urlParams.get('mode');
 
+  if (cleanPath === '/' || cleanPath === '') {
+    return { page: 'home', propId: null };
+  }
+
   const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
   if (propertyMatch && propertyMatch[1]) {
     return { page: 'property-detail', propId: propertyMatch[1] };
@@ -44,10 +48,6 @@ const getInitialPageState = () => {
   if (cleanPath === '/wishlist') return { page: 'wishlist', propId: null };
   if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') return { page: 'privacy-policy', propId: null };
 
-  const savedPage = localStorage.getItem('easeland_active_page');
-  if (savedPage && ['buy', 'rent', 'sell', 'post-property', 'dashboard', 'wishlist', 'map', 'admin', 'privacy-policy'].includes(savedPage)) {
-    return { page: savedPage, propId: null };
-  }
   return { page: 'home', propId: null };
 };
 
@@ -166,6 +166,12 @@ export default function App() {
     const urlParams = new URLSearchParams(search);
     const modeParam = urlParams.get('mode');
 
+    if (cleanPath === '/' || cleanPath === '') {
+      setActivePage('home');
+      try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
+      return;
+    }
+
     const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
     if (propertyMatch && propertyMatch[1]) {
       setActivePropertyId(propertyMatch[1]);
@@ -230,19 +236,8 @@ export default function App() {
       return;
     }
 
-    // Default '/' path or unmapped route: check savedPage
-    const savedPage = localStorage.getItem('easeland_active_page');
-    if (savedPage && ['buy', 'rent', 'sell', 'post-property', 'dashboard', 'wishlist', 'map', 'admin', 'privacy-policy'].includes(savedPage)) {
-      setActivePage(savedPage);
-      let syncUrl = '/';
-      if (savedPage === 'map') syncUrl = '/properties';
-      else if (savedPage === 'admin') syncUrl = '/admin';
-      else syncUrl = `/${savedPage}`;
-      try { window.history.replaceState(null, '', syncUrl); } catch(e){}
-    } else {
-      setActivePage('home');
-      try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
-    }
+    setActivePage('home');
+    try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
   };
 
   useEffect(() => {
