@@ -51,6 +51,7 @@
 .bg-brand-yellow {
   background: #eab308 !important;
   color: #0b132b !important;
+  -webkit-text-fill-color: #0b132b !important;
   font-weight: 800 !important;
 }
 
@@ -58,24 +59,24 @@
 .hover\:bg-brand-yellowHover:hover {
   background: #ca8a04 !important;
   color: #0b132b !important;
+  -webkit-text-fill-color: #0b132b !important;
 }
 
 .bg-metallic-silver {
   background: #2b3a55 !important;
   color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 .text-metallic-gold,
 .text-brand-yellow {
   color: #eab308 !important;
   background: none !important;
-  -webkit-text-fill-color: #eab308 !important;
 }
 
 .text-metallic-silver {
   color: #cbd5e1 !important;
   background: none !important;
-  -webkit-text-fill-color: #cbd5e1 !important;
 }
 
 .border-metallic-gold,

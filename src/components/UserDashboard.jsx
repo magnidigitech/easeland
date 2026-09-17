@@ -835,7 +835,7 @@ export default function UserDashboard({
                     <h2 className="font-extrabold text-base text-brand-charcoal">Recent Posted Properties</h2>
                     <button
                       onClick={() => setActiveTab('properties')}
-                      className="text-xs font-extrabold text-brand-charcoal hover:text-brand-yellow flex items-center gap-1"
+                      className="text-xs font-extrabold text-brand-charcoal hover:text-amber-700 flex items-center gap-1"
                     >
                       <span>View All ({userProperties.length})</span>
                       <ChevronRight className="w-4 h-4" />
@@ -1462,7 +1462,7 @@ export default function UserDashboard({
                   <h2 className="font-extrabold text-lg text-brand-charcoal">Notification Center</h2>
                   <button
                     onClick={markAllNotificationsRead}
-                    className="text-xs font-extrabold text-brand-charcoal hover:text-brand-yellow"
+                    className="text-xs font-extrabold text-brand-charcoal hover:text-amber-700"
                   >
                     Mark All as Read
                   </button>
