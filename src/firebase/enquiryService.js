@@ -200,12 +200,30 @@ export async function getCustomerEnquiries(customerId, userEmail = '') {
       } catch (e) {}
     }
 
-    // Deduplicate by ID & sort by newest first
+    // Deduplicate by ID & merge message threads smartly
     const map = new Map();
     enquiries.forEach(e => {
       const id = String(e.enquiryId || e.id || '');
-      if (id && !map.has(id)) {
-        map.set(id, e);
+      if (id) {
+        const existing = map.get(id);
+        if (!existing) {
+          map.set(id, e);
+        } else {
+          const existingMsgs = Array.isArray(existing.messages) ? existing.messages : [];
+          const newMsgs = Array.isArray(e.messages) ? e.messages : [];
+          const mergedMsgsMap = new Map();
+          [...existingMsgs, ...newMsgs].forEach(m => {
+            if (!m) return;
+            const mKey = String(m.id || (m.senderId + '_' + m.text + '_' + m.createdAt));
+            if (!mergedMsgsMap.has(mKey)) mergedMsgsMap.set(mKey, m);
+          });
+          map.set(id, {
+            ...existing,
+            ...e,
+            messages: Array.from(mergedMsgsMap.values()),
+            updatedAt: e.updatedAt || existing.updatedAt
+          });
+        }
       }
     });
 
@@ -281,12 +299,30 @@ export async function getOwnerEnquiries(ownerId, userEmail = '') {
       } catch (e) {}
     }
 
-    // Deduplicate by ID & sort by newest first
+    // Deduplicate by ID & merge message threads smartly
     const map = new Map();
     enquiries.forEach(e => {
       const id = String(e.enquiryId || e.id || '');
-      if (id && !map.has(id)) {
-        map.set(id, e);
+      if (id) {
+        const existing = map.get(id);
+        if (!existing) {
+          map.set(id, e);
+        } else {
+          const existingMsgs = Array.isArray(existing.messages) ? existing.messages : [];
+          const newMsgs = Array.isArray(e.messages) ? e.messages : [];
+          const mergedMsgsMap = new Map();
+          [...existingMsgs, ...newMsgs].forEach(m => {
+            if (!m) return;
+            const mKey = String(m.id || (m.senderId + '_' + m.text + '_' + m.createdAt));
+            if (!mergedMsgsMap.has(mKey)) mergedMsgsMap.set(mKey, m);
+          });
+          map.set(id, {
+            ...existing,
+            ...e,
+            messages: Array.from(mergedMsgsMap.values()),
+            updatedAt: e.updatedAt || existing.updatedAt
+          });
+        }
       }
     });
 

@@ -138,6 +138,15 @@ export default function UserDashboard({
     };
   }, [user]);
 
+  // Auto-poll enquiries every 3 seconds when enquiries tab is active for real-time messaging without refresh
+  useEffect(() => {
+    if (activeTab !== 'enquiries' || !user) return;
+    const intervalId = setInterval(() => {
+      refreshEnquiriesAndData();
+    }, 3000);
+    return () => clearInterval(intervalId);
+  }, [activeTab, user]);
+
 
   // Use real Firebase derived notifications & wishlist items
   const notifications = fbNotifications;
@@ -381,28 +390,52 @@ export default function UserDashboard({
     }
   };
 
-  // Send live chat message handler
+  // Send live chat message handler with 0ms optimistic UI update
   const handleSendMessage = async (enq) => {
     const text = (chatInputText[enq.id] || '').trim();
     if (!text || chatSending[enq.id]) return;
 
+    const isOwner = enquiryType === 'RECEIVED';
+    const senderRole = isOwner ? 'OWNER' : 'BUYER';
+    const senderName = isOwner
+      ? (user?.name || user?.displayName || 'Property Owner')
+      : (user?.name || user?.displayName || 'Interested Buyer');
+
+    const newMsgObj = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      senderId: user?.uid || user?.id,
+      senderName: senderName,
+      senderRole: senderRole,
+      text: text,
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Clear input text box immediately for instant responsiveness
+    setChatInputText(prev => ({ ...prev, [enq.id]: '' }));
+
+    // 2. Optimistically update local React state so sender sees message immediately
+    if (isOwner) {
+      setFbReceivedEnquiries(prev => prev.map(item => {
+        if ((item.enquiryId || item.id) === enq.id) {
+          const msgs = Array.isArray(item.messages) ? item.messages : [];
+          return { ...item, messages: [...msgs, newMsgObj], updatedAt: new Date().toISOString() };
+        }
+        return item;
+      }));
+    } else {
+      setFbSentEnquiries(prev => prev.map(item => {
+        if ((item.enquiryId || item.id) === enq.id) {
+          const msgs = Array.isArray(item.messages) ? item.messages : [];
+          return { ...item, messages: [...msgs, newMsgObj], updatedAt: new Date().toISOString() };
+        }
+        return item;
+      }));
+    }
+
     setChatSending(prev => ({ ...prev, [enq.id]: true }));
     try {
-      const isOwner = enquiryType === 'RECEIVED';
-      const senderRole = isOwner ? 'OWNER' : 'BUYER';
-      const senderName = isOwner
-        ? (user?.name || user?.displayName || 'Property Owner')
-        : (user?.name || user?.displayName || 'Interested Buyer');
-
-      const res = await sendEnquiryMessage(enq.id, {
-        senderId: user?.uid || user?.id,
-        senderName: senderName,
-        senderRole: senderRole,
-        text: text
-      });
-
+      const res = await sendEnquiryMessage(enq.id, newMsgObj);
       if (res && res.success) {
-        setChatInputText(prev => ({ ...prev, [enq.id]: '' }));
         refreshEnquiriesAndData();
       } else if (res && res.error) {
         alert(`Failed to send message: ${res.error}`);
@@ -433,15 +466,19 @@ export default function UserDashboard({
   // Enquiries received / sent for this specific user
   const enquiriesReceived = fbReceivedEnquiries.map(e => {
     const eId = e.enquiryId || e.id;
-    const initialMsg = e.message ? [{
-      id: 'msg-initial',
+    const initialMsgText = e.message || 'I am interested in this property. Please contact me.';
+    const initialMsgObj = {
+      id: `msg-initial-${eId}`,
       senderId: e.customerId || e.buyerId || 'buyer',
       senderName: e.customerName || e.buyerName || 'Interested Customer',
       senderRole: 'BUYER',
-      text: e.message,
-      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : e.createdAt) : new Date().toISOString()
-    }] : [];
-    const msgList = Array.isArray(e.messages) && e.messages.length > 0 ? e.messages : initialMsg;
+      text: initialMsgText,
+      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : (typeof e.createdAt === 'string' ? e.createdAt : new Date().toISOString())) : new Date().toISOString()
+    };
+
+    const rawMsgs = Array.isArray(e.messages) ? e.messages : [];
+    const hasInitial = rawMsgs.some(m => m && (m.id === initialMsgObj.id || (m.senderRole === 'BUYER' && m.text === initialMsgText)));
+    const msgList = hasInitial ? rawMsgs : [initialMsgObj, ...rawMsgs];
 
     return {
       id: eId,
@@ -451,7 +488,7 @@ export default function UserDashboard({
       buyerName: e.customerName || e.buyerName || 'Interested Customer',
       buyerPhone: e.customerPhone || e.buyerPhone || '+91 N/A',
       buyerEmail: e.customerEmail || e.buyerEmail || '',
-      message: e.message,
+      message: initialMsgText,
       messages: msgList,
       status: e.status || 'SUBMITTED',
       date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : (typeof e.createdAt === 'string' ? e.createdAt.split('T')[0] : 'Recent')) : 'Recent',
@@ -461,15 +498,19 @@ export default function UserDashboard({
 
   const enquiriesSent = fbSentEnquiries.map(e => {
     const eId = e.enquiryId || e.id;
-    const initialMsg = e.message ? [{
-      id: 'msg-initial',
+    const initialMsgText = e.message || 'I am interested in this property. Please contact me.';
+    const initialMsgObj = {
+      id: `msg-initial-${eId}`,
       senderId: e.customerId || e.buyerId || 'buyer',
       senderName: e.customerName || e.buyerName || 'Interested Customer',
       senderRole: 'BUYER',
-      text: e.message,
-      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : e.createdAt) : new Date().toISOString()
-    }] : [];
-    const msgList = Array.isArray(e.messages) && e.messages.length > 0 ? e.messages : initialMsg;
+      text: initialMsgText,
+      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : (typeof e.createdAt === 'string' ? e.createdAt : new Date().toISOString())) : new Date().toISOString()
+    };
+
+    const rawMsgs = Array.isArray(e.messages) ? e.messages : [];
+    const hasInitial = rawMsgs.some(m => m && (m.id === initialMsgObj.id || (m.senderRole === 'BUYER' && m.text === initialMsgText)));
+    const msgList = hasInitial ? rawMsgs : [initialMsgObj, ...rawMsgs];
 
     return {
       id: eId,
@@ -478,7 +519,7 @@ export default function UserDashboard({
       propertyName: e.propertyTitle || 'Property Listing',
       ownerName: e.ownerName || 'Property Owner',
       ownerPhone: 'Direct Owner',
-      message: e.message,
+      message: initialMsgText,
       messages: msgList,
       status: e.status || 'SUBMITTED',
       date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : (typeof e.createdAt === 'string' ? e.createdAt.split('T')[0] : 'Recent')) : 'Recent',
