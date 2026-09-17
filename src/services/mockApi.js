@@ -620,7 +620,7 @@ export const mockApi = {
 
       if (targetId && pOwnerId && pOwnerId === targetId) return true;
       if (targetEmail && pOwnerEmail && pOwnerEmail === targetEmail) return true;
-      if (isAdmin && (pOwnerEmail.includes('admin') || p.isUserSubmitted || p.ownerPublicName === 'EaseLand Admin')) return true;
+      if (isAdmin && (pOwnerEmail.includes('admin') || p.ownerPublicName === 'EaseLand Admin')) return true;
       return false;
     });
   },

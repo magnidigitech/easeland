@@ -169,9 +169,18 @@ export default function UserDashboard({
     }
   } catch (e) {}
 
+  const currentUserId = String(user?.uid || user?.id || '').toLowerCase().trim();
+  const currentUserEmail = (user?.email || '').toLowerCase().trim();
+
   const combinedPropsMap = new Map();
   [...myPropertiesList, ...fbOwnerProperties].forEach(p => {
     if (!p) return;
+    const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy || '').toLowerCase().trim();
+    const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
+
+    const isOwned = (currentUserId && pOwnerId === currentUserId) || (currentUserEmail && pOwnerEmail === currentUserEmail);
+    if (!isOwned) return;
+
     const pId = String(p.propertyId || p.id || p.referenceId || '');
     if (pId && !deletedIdsSet.has(pId) && !p.isDeleted && p.listingStatus !== 'DELETED' && p.status !== 'DELETED') {
       const existing = combinedPropsMap.get(pId) || {};

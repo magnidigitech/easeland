@@ -401,7 +401,12 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.properties)) {
-          const pgProps = data.properties.filter(p => p && (p.ownerId === ownerId || ownerId === 'admin_uid_001'));
+          const pgProps = data.properties.filter(p => {
+            if (!p) return false;
+            const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || '').toLowerCase().trim();
+            const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || '').toLowerCase().trim();
+            return pOwnerId === String(ownerId).toLowerCase().trim() || (userEmail && pOwnerEmail === userEmail.toLowerCase().trim());
+          });
           propertiesList = [...propertiesList, ...pgProps];
         }
       }
