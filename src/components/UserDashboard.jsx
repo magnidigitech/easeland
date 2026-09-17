@@ -102,7 +102,12 @@ export default function UserDashboard({
 
   // Use real Firebase derived notifications & wishlist items
   const notifications = fbNotifications;
-  const wishlistProperties = fbWishlistProps.length > 0 ? fbWishlistProps : (wishlist || []);
+  const mockWishlistProps = typeof mockApi.getWishlist === 'function' ? mockApi.getWishlist() : [];
+  const wishlistProperties = (fbWishlistProps && fbWishlistProps.length > 0)
+    ? fbWishlistProps
+    : (Array.isArray(wishlist) && wishlist.length > 0)
+      ? wishlist
+      : mockWishlistProps;
   const unreadNotificationsCount = (notifications || []).filter(n => !n.read).length;
 
 
@@ -689,7 +694,7 @@ export default function UserDashboard({
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Verified Live</span>
                       <span className="text-2xl font-black text-emerald-600 mt-1 block">
-                        {userProperties.filter(p => p.status === 'APPROVED').length}
+                        {userProperties.filter(p => p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished).length}
                       </span>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
@@ -710,7 +715,7 @@ export default function UserDashboard({
                   <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Saved Wishlist</span>
-                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{wishlist.length}</span>
+                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{wishlistProperties.length}</span>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-black">
                       <Heart className="w-6 h-6" />

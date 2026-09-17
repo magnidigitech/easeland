@@ -994,7 +994,34 @@ export const mockApi = {
   // 6. WISHLIST APIS
   // -------------------------------------------------------------
   getWishlist: () => {
-    return properties.filter(p => wishlist.includes(p.id));
+    let storedWishlistIds = getStoredData('easeland_wishlist', wishlist);
+    if (!Array.isArray(storedWishlistIds)) storedWishlistIds = [];
+
+    let allP = [...properties];
+    try {
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) allP.push(...parsed);
+            else if (parsed && typeof parsed === 'object') allP.push(parsed);
+          }
+        });
+      }
+    } catch (e) {}
+
+    const map = new Map();
+    allP.forEach(p => {
+      if (!p) return;
+      const id = String(p.id || p.propertyId || p.referenceId || '');
+      if (id) map.set(id, { ...(map.get(id) || {}), ...p });
+    });
+
+    return storedWishlistIds
+      .map(wId => map.get(String(wId)))
+      .filter(Boolean);
   },
 
   toggleWishlist: (propertyId) => {
