@@ -814,6 +814,8 @@ export const mockApi = {
       prop.verificationStatus = 'Changes Requested by Admin';
       prop.adminFeedback = feedback;
       prop.ownerFacingNotes = feedback;
+      prop.verificationNotes = feedback;
+      prop.adminNotes = feedback;
       setStoredData('easeland_properties', properties);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: prop }));

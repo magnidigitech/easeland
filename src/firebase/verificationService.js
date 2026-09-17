@@ -348,6 +348,10 @@ export async function requestVerificationChanges(propertyId, adminUid, adminName
       id: propertyId,
       listingStatus: ListingStatus.CHANGES_REQUIRED,
       status: ListingStatus.CHANGES_REQUIRED,
+      verificationNotes: notes,
+      ownerFacingNotes: notes,
+      adminNotes: notes,
+      adminFeedback: notes,
       updatedAt: new Date().toISOString()
     };
 
@@ -366,6 +370,10 @@ export async function requestVerificationChanges(propertyId, adminUid, adminName
       const propRef = doc(db, 'properties', propertyId);
       await updateDoc(propRef, {
         listingStatus: ListingStatus.CHANGES_REQUIRED,
+        verificationNotes: notes,
+        ownerFacingNotes: notes,
+        adminNotes: notes,
+        adminFeedback: notes,
         updatedAt: serverTimestamp()
       });
 
@@ -428,6 +436,9 @@ export async function rejectPropertyVerification(propertyId, adminUid, adminName
       status: ListingStatus.REJECTED,
       isPlatformVerified: false,
       verificationNotes: notes,
+      ownerFacingNotes: notes,
+      adminNotes: notes,
+      adminFeedback: notes,
       updatedAt: new Date().toISOString()
     };
 
@@ -448,6 +459,9 @@ export async function rejectPropertyVerification(propertyId, adminUid, adminName
         listingStatus: ListingStatus.REJECTED,
         isPlatformVerified: false,
         verificationNotes: notes,
+        ownerFacingNotes: notes,
+        adminNotes: notes,
+        adminFeedback: notes,
         updatedAt: serverTimestamp()
       });
 

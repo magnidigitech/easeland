@@ -198,7 +198,7 @@ export default function UserDashboard({
         status: statusResolved,
         isPlatformVerified: Boolean(p.isPlatformVerified || existing.isPlatformVerified || statusResolved === 'LIVE'),
         isPublished: Boolean(p.isPublished || existing.isPublished || statusResolved === 'LIVE'),
-        verificationNotes: p.verificationNotes || existing.verificationNotes || p.ownerFacingNotes || existing.ownerFacingNotes
+        verificationNotes: p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || existing.verificationNotes || existing.ownerFacingNotes || existing.adminNotes || existing.adminFeedback
       });
     }
   });
@@ -237,7 +237,7 @@ export default function UserDashboard({
       ? 'PENDING_VERIFICATION'
       : (p.status || p.listingStatus || 'DRAFT');
 
-    let adminNoteVal = p.verificationNotes || p.ownerFacingNotes || p.adminFeedback;
+    let adminNoteVal = p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || p.rawProperty?.verificationNotes || p.rawProperty?.ownerFacingNotes || p.rawProperty?.adminNotes || p.rawProperty?.adminFeedback;
     if (!adminNoteVal) {
       if (statusVal === 'LIVE') adminNoteVal = 'Platform Verified: Title and survey documents verified.';
       else if (statusVal === 'REJECTED') adminNoteVal = 'Listing rejected by platform auditor.';
@@ -718,7 +718,7 @@ export default function UserDashboard({
                     <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                       <AlertTriangle className="w-5 h-5" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h3 className="font-extrabold text-amber-900 text-sm">Verification Action Required</h3>
                         <button
@@ -728,9 +728,11 @@ export default function UserDashboard({
                           View Details
                         </button>
                       </div>
-                      <p className="text-xs text-amber-800 mt-1 font-medium">
-                        Admin feedback received for <strong>Corner Open Plot near Inner Ring Road</strong>. Please re-upload clearer land title deed document (Pahani / Adangal extract).
-                      </p>
+                      {userProperties.filter(p => p.status === 'CHANGES_REQUIRED').map(p => (
+                        <p key={p.id} className="text-xs text-amber-800 font-medium">
+                          Admin feedback received for <strong>{p.title}</strong>: {p.adminNote}
+                        </p>
+                      ))}
                     </div>
                   </div>
                 )}
