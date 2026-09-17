@@ -424,19 +424,19 @@ export default function UniversalMapEngine({
 
       const marker = L.marker([lat, lng], { icon: customIcon });
 
-      // Clean Hover Popup showing Property Size & Price
+      // Clean High-Contrast Hover/Click Popup Card
       const popupContent = `
-        <div style="font-family: 'Plus Jakarta Sans', sans-serif;">
-          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #F4C542; background: #0B2545; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">
-            ${prop.verificationStatus || 'Platform Verified'}
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 2px;">
+          <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #F4C542; background: rgba(244, 197, 66, 0.15); border: 1px solid rgba(244, 197, 66, 0.4); padding: 2.5px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; letter-spacing: 0.5px;">
+            ${prop.verificationStatus || 'PLATFORM VERIFIED'}
           </div>
-          <div style="font-size: 13px; font-weight: 700; color: #0B2545; margin-bottom: 2px;">
+          <div style="font-size: 14px; font-weight: 800; color: #ffffff; margin-bottom: 4px; line-height: 1.2;">
             ${prop.title || 'Property'}
           </div>
-          <div style="font-size: 12px; font-weight: 800; color: #15803d;">
+          <div style="font-size: 14px; font-weight: 900; color: #34d399; margin-bottom: 2px;">
             ${priceLabel}
           </div>
-          <div style="font-size: 11px; font-weight: 600; color: #6b7280;">
+          <div style="font-size: 11px; font-weight: 600; color: #cbd5e1;">
             Area: ${prop.areaDisplay || (prop.area ? prop.area + ' sq ft' : '')}
           </div>
         </div>
