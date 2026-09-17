@@ -100,7 +100,6 @@ export default function UserDashboard({
   }, [user]);
 
 
-  const isRyuu = (user?.email || '').toLowerCase() === 'ryuu@easeland.in';
   // Use real Firebase derived notifications & wishlist items
   const notifications = fbNotifications;
   const wishlistProperties = fbWishlistProps.length > 0 ? fbWishlistProps : (wishlist || []);

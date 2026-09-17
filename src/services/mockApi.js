@@ -134,21 +134,8 @@ let wishlist = getStoredData('easeland_wishlist', []);
 
 const INITIAL_USERS = [
   {
-    id: 'usr-1',
-    name: 'Ryuu',
-    email: 'ryuu@easeland.in',
-    phone: '9876543210',
-    password: 'Ryuu@2026',
-    role: 'Verified Property Owner & Buyer',
-    status: 'ACTIVE',
-    joinedDate: '2026-08-10',
-    postedListingsCount: 3,
-    enquiriesCount: 5,
-    suspension: null
-  },
-  {
     id: 'admin-101',
-    name: 'Scarlett (Admin)',
+    name: 'EaseLand Admin',
     email: 'admin@easeland.in',
     phone: '9876500000',
     password: 'Admin@12345',
@@ -278,19 +265,17 @@ const DEFAULT_SITE_CONFIG = {
 };
 
 let rawUsers = getStoredData('easeland_registered_users', INITIAL_USERS);
-// Clean stale dummy users & guarantee core accounts exist
+// Clean stale dummy users & guarantee core admin account exists
 let registeredUsers = rawUsers.filter(u =>
   u && u.status !== 'DELETED' &&
-  (u.email === 'ryuu@easeland.in' ||
-    u.email === 'admin@easeland.in' ||
-    u.isCustomRegistered)
+  (u.email === 'admin@easeland.in' || u.isCustomRegistered)
 );
 
 // Guarantee admin@easeland.in exists
 if (!registeredUsers.some(u => u.email === 'admin@easeland.in')) {
   registeredUsers.push({
     id: 'admin-101',
-    name: 'Scarlett (Admin)',
+    name: 'EaseLand Admin',
     email: 'admin@easeland.in',
     phone: '9876500000',
     password: 'Admin@12345',
@@ -299,23 +284,6 @@ if (!registeredUsers.some(u => u.email === 'admin@easeland.in')) {
     joinedDate: '2026-01-01',
     postedListingsCount: 0,
     enquiriesCount: 0,
-    suspension: null
-  });
-}
-
-// Guarantee ryuu@easeland.in exists
-if (!registeredUsers.some(u => u.email === 'ryuu@easeland.in')) {
-  registeredUsers.push({
-    id: 'usr-1',
-    name: 'Ryuu',
-    email: 'ryuu@easeland.in',
-    phone: '9876543210',
-    password: 'Ryuu@2026',
-    role: 'Verified Property Owner & Buyer',
-    status: 'ACTIVE',
-    joinedDate: '2026-08-10',
-    postedListingsCount: 3,
-    enquiriesCount: 5,
     suspension: null
   });
 }
