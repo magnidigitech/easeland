@@ -157,18 +157,21 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           strokeColor = '#5b21b6';
         }
 
-        // Add Property Location Marker Pin
+        // Add Property Location Marker Pin (Authentic Teardrop Location Marker Pin)
+        const teardropPinPath = 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z';
+
         new gMaps.Marker({
           position: mapPos,
           map: map,
           title: property.title,
           icon: {
-            path: gMaps.SymbolPath.CIRCLE,
-            scale: 12,
+            path: teardropPinPath,
             fillColor: markerColor,
             fillOpacity: 1,
             strokeColor: strokeColor,
-            strokeWeight: 3.5
+            strokeWeight: 2,
+            scale: 1.8,
+            anchor: new gMaps.Point(12, 22)
           }
         });
 
