@@ -440,12 +440,17 @@ export default function AdminPortal() {
         }
       } catch (e) {}
 
+      const FAKE_DEMO_IDS = ['prop-102', 'prop-104', 'prop-105'];
       allMergedProps = Array.from(queueMap.values()).filter(p => {
         if (!p) return false;
         const id1 = String(p.id || '');
         const id2 = String(p.propertyId || '');
         const id3 = String(p.referenceId || '');
         if (deletedIds.includes(id1) || deletedIds.includes(id2) || deletedIds.includes(id3)) return false;
+        if (FAKE_DEMO_IDS.includes(id1) || FAKE_DEMO_IDS.includes(id2) || FAKE_DEMO_IDS.includes(id3)) return false;
+        const ownerName = String(p.owner?.name || p.ownerPublicName || '').toLowerCase();
+        const ownerEmail = String(p.owner?.email || p.ownerPrivateEmail || '').toLowerCase();
+        if (ownerName.includes('demo owner') || ownerEmail.includes('testowner@easeland.in')) return false;
         const title = (p.title || '').trim();
         return title.length > 0 && title !== '.' && title !== ',';
       });
@@ -2592,15 +2597,9 @@ export default function AdminPortal() {
                       const isRejected = st === 'REJECTED' || lst === 'REJECTED';
                       const isChanges = st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED';
 
-                      const rawName = prop.owner?.name || prop.ownerPublicName || 'Registered User';
-                      const ownerName = rawName.toLowerCase().includes('demo owner') ? 'Registered User' : rawName;
-
-                      const rawEmail = prop.owner?.email || prop.ownerPrivateEmail || '';
-                      const ownerEmail = rawEmail.includes('testowner@easeland.in') ? 'user@easeland.in' : rawEmail;
-
-                      const rawPhone = prop.owner?.phone || prop.ownerPrivatePhone || 'Number Not Updated';
-                      const ownerPhone = rawPhone.includes('99999') ? '+91 98765 43210' : rawPhone;
-
+                      const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered User';
+                      const ownerEmail = prop.owner?.email || prop.ownerPrivateEmail || '';
+                      const ownerPhone = prop.owner?.phone || prop.ownerPrivatePhone || 'Number Not Updated';
                       const isAdminPoster = ownerEmail.includes('admin') || ownerName.toLowerCase().includes('admin');
 
                       const priceVal = Number(prop.price) || 0;
