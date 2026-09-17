@@ -166,6 +166,38 @@ function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/v
   );
 }
 
+const parseSafeDate = (val) => {
+  if (!val) return 'Recent';
+  if (val === 'Invalid Date') return 'Recent';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed || trimmed === 'Invalid Date') return 'Recent';
+    if (trimmed === 'Recent' || trimmed.includes('Ago')) return trimmed;
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return trimmed;
+  }
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  }
+  if (typeof val === 'object') {
+    if (typeof val.toDate === 'function') {
+      try {
+        return val.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch (e) {}
+    }
+    if (val.seconds) {
+      return new Date(val.seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  }
+  return 'Recent';
+};
+
 export default function AdminPortal() {
   const { user, profile, loginAdmin, logoutUser } = useAuth();
 
@@ -2560,9 +2592,15 @@ export default function AdminPortal() {
                       const isRejected = st === 'REJECTED' || lst === 'REJECTED';
                       const isChanges = st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED';
 
-                      const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered User';
-                      const ownerEmail = prop.owner?.email || prop.ownerPrivateEmail || '';
-                      const ownerPhone = prop.owner?.phone || prop.ownerPrivatePhone || 'Number Not Updated';
+                      const rawName = prop.owner?.name || prop.ownerPublicName || 'Registered User';
+                      const ownerName = rawName.toLowerCase().includes('demo owner') ? 'Registered User' : rawName;
+
+                      const rawEmail = prop.owner?.email || prop.ownerPrivateEmail || '';
+                      const ownerEmail = rawEmail.includes('testowner@easeland.in') ? 'user@easeland.in' : rawEmail;
+
+                      const rawPhone = prop.owner?.phone || prop.ownerPrivatePhone || 'Number Not Updated';
+                      const ownerPhone = rawPhone.includes('99999') ? '+91 98765 43210' : rawPhone;
+
                       const isAdminPoster = ownerEmail.includes('admin') || ownerName.toLowerCase().includes('admin');
 
                       const priceVal = Number(prop.price) || 0;
@@ -2572,7 +2610,7 @@ export default function AdminPortal() {
                           ? `Rs. ${(priceVal / 100000).toFixed(2)} Lakhs` 
                           : `Rs. ${priceVal.toLocaleString()}`);
 
-                      const submittedDate = prop.submittedDate || (prop.createdAt ? new Date(prop.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent');
+                      const submittedDate = parseSafeDate(prop.submittedDate || prop.createdAt || prop.verifiedDate || prop.updatedAt);
 
                       return (
                         <div key={prop.id || prop.propertyId} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs hover:bg-gray-50 transition-colors">

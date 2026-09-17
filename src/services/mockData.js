@@ -99,10 +99,10 @@ export const INITIAL_PROPERTIES = [
     verifiedDate: '2026-08-20',
     verificationNotes: 'Encumbrance Certificate and physical layout boundary verified.',
     owner: {
-      id: 'usr-2',
-      name: 'Demo Owner',
-      phone: '+91 98765 99999',
-      email: 'testowner@easeland.in',
+      id: 'usr-3',
+      name: 'Krishna Sai',
+      phone: '+91 63006 91560',
+      email: 'krishnasai4222@gmail.com',
       verified: true
     },
     location: {
@@ -235,10 +235,10 @@ export const INITIAL_PROPERTIES = [
     verifiedDate: '2026-08-22',
     verificationNotes: 'BBMP Khata A certified property documents checked.',
     owner: {
-      id: 'usr-2',
-      name: 'Demo Owner',
-      phone: '+91 98765 99999',
-      email: 'testowner@easeland.in',
+      id: 'usr-4',
+      name: 'KrishnaSai Kannasani',
+      phone: '+91 95022 64269',
+      email: 'krishnasai8999@gmail.com',
       verified: true
     },
     location: {
@@ -299,10 +299,10 @@ export const INITIAL_PROPERTIES = [
     verifiedDate: '2026-08-25',
     verificationNotes: 'Property ownership verified directly with owner.',
     owner: {
-      id: 'usr-2',
-      name: 'Demo Owner',
-      phone: '+91 98765 99999',
-      email: 'testowner@easeland.in',
+      id: 'usr-1',
+      name: 'Ryuu',
+      phone: '+91 98765 43210',
+      email: 'ryuu@easeland.in',
       verified: true
     },
     location: {
