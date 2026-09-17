@@ -359,9 +359,9 @@ export default function App() {
     }, 600);
   };
 
-  const faqs = (siteConfig.faqs || []).map(f => ({
-    q: f.question,
-    a: f.answer
+  const faqs = (siteConfig?.faqs || []).map(f => ({
+    q: f?.question || '',
+    a: f?.answer || ''
   }));
 
   return (
@@ -683,7 +683,7 @@ export default function App() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {mockApi.getWishlist().map((prop) => (
-                  <div key={prop.id} onClick={() => handlePropertyClick(prop)} className="bg-white rounded-2xl border p-4 cursor-pointer shadow-sm">
+                  <div key={prop.id} onClick={() => handleSelectProperty(prop)} className="bg-white rounded-2xl border p-4 cursor-pointer shadow-sm">
                     <img src={prop.photos?.[0]} alt="" className="w-full h-40 object-cover rounded-xl mb-3" />
                     <h3 className="text-sm font-bold line-clamp-1">{prop.title}</h3>
                     <span className="text-sm font-extrabold text-emerald-700 block mt-1">{prop.priceDisplay}</span>
@@ -726,7 +726,7 @@ export default function App() {
                 </div>
               </div>
               <p className="text-gray-400 leading-relaxed font-medium">
-                {siteConfig.footer?.tagline || 'EaseLand is India\'s premier direct property discovery and verification marketplace. Zero brokerage, 100% verified land titles and plot boundaries.'}
+                {siteConfig?.footer?.tagline || 'EaseLand is India\'s premier direct property discovery and verification marketplace. Zero brokerage, 100% verified land titles and plot boundaries.'}
               </p>
             </div>
 
@@ -752,15 +752,15 @@ export default function App() {
               <h4 className="font-extrabold text-brand-yellow uppercase tracking-wider mb-3">Legal & Support</h4>
               <ul className="space-y-2 text-gray-400 text-xs">
                 <li><button onClick={() => changeActivePage('privacy-policy')} className="hover:text-white font-bold text-brand-yellow underline">Privacy Policy</button></li>
-                <li><span>{siteConfig.footer?.officeAddress}</span></li>
-                <li><span>Phone: {siteConfig.footer?.supportPhone}</span></li>
-                <li><span>Email: {siteConfig.footer?.supportEmail}</span></li>
+                <li><span>{siteConfig?.footer?.officeAddress}</span></li>
+                <li><span>Phone: {siteConfig?.footer?.supportPhone}</span></li>
+                <li><span>Email: {siteConfig?.footer?.supportEmail}</span></li>
               </ul>
             </div>
           </div>
 
           <div className="text-center text-[11px] text-gray-500 font-semibold">
-            {siteConfig.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}
+            {siteConfig?.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}
           </div>
         </div>
       </footer>
