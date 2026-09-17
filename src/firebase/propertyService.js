@@ -165,7 +165,32 @@ export function computeDerivedPropertyFields(propertyData = {}) {
  */
 export function filterApprovedPublicMedia(mediaArray = []) {
   if (!Array.isArray(mediaArray)) return [];
-  return mediaArray.filter(item => item && item.verificationStatus === MediaStatus.APPROVED);
+  return mediaArray
+    .filter(item => {
+      if (!item) return false;
+      if (typeof item === 'string') return item.trim().length > 0;
+      if (item.verificationStatus === MediaStatus.REJECTED || item.status === 'REJECTED') return false;
+      return true;
+    })
+    .map(item => {
+      if (typeof item === 'string') {
+        return {
+          url: item,
+          publicUrl: item,
+          mediaType: 'PHOTO',
+          verificationStatus: MediaStatus.APPROVED
+        };
+      }
+      const rawUrl = item.url || item.publicUrl || item.mediaUrl || item.photoUrl || item.src || null;
+      return {
+        ...item,
+        url: rawUrl || item.embedUrl || item.url,
+        publicUrl: item.publicUrl || rawUrl,
+        mediaType: item.mediaType || item.type || (item.embedUrl ? 'WALKTHROUGH_VIDEO' : 'PHOTO'),
+        verificationStatus: item.verificationStatus || MediaStatus.APPROVED
+      };
+    })
+    .filter(item => Boolean(item.url || item.embedUrl || item.publicUrl));
 }
 
 /**
@@ -1046,8 +1071,18 @@ export async function getPublicPropertyById(propertyId) {
       return { success: false, error: 'Property listing is no longer available on EaseLand.' };
     }
 
-    // Expose ONLY APPROVED public media items from publicApprovedMedia array
-    const approvedMedia = Array.isArray(data.publicApprovedMedia) ? data.publicApprovedMedia : filterApprovedPublicMedia(data.media);
+    // Expose APPROVED public media items from publicApprovedMedia, media, photos, images, or single URLs
+    const rawMedia = (Array.isArray(data.publicApprovedMedia) && data.publicApprovedMedia.length > 0)
+      ? data.publicApprovedMedia
+      : ((Array.isArray(data.media) && data.media.length > 0)
+          ? data.media
+          : ((Array.isArray(data.photos) && data.photos.length > 0)
+              ? data.photos
+              : ((Array.isArray(data.images) && data.images.length > 0)
+                  ? data.images
+                  : (data.imageUrl || data.coverImage || data.photoUrl ? [data.imageUrl || data.coverImage || data.photoUrl] : []))));
+
+    const approvedMedia = filterApprovedPublicMedia(rawMedia);
 
     // Only expose boundary polygon if explicitly APPROVED by platform audit
     const approvedBoundary = (data.boundary && data.boundary.boundaryStatus === BoundaryStatus.APPROVED) ? data.boundary : null;

@@ -353,9 +353,63 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     );
   }
 
-  // Media items (strictly APPROVED public media returned by service)
-  const mediaList = Array.isArray(property.media) && property.media.length > 0 ? property.media : [];
-  const activeMedia = mediaList[activeMediaIndex] || null;
+  // Helper to extract media URL string from string or media object
+  const getMediaUrl = (item) => {
+    if (!item) return null;
+    if (typeof item === 'string') return item.trim() || null;
+    return item.url || item.publicUrl || item.mediaUrl || item.photoUrl || item.src || null;
+  };
+
+  // Helper for category-based curated architectural fallback images
+  const getCategoryFallbackImage = (type) => {
+    const t = String(type || '').toUpperCase();
+    if (t.includes('PLOT') || t.includes('LAND')) {
+      return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (t.includes('COMMERCIAL')) {
+      return 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (t.includes('APARTMENT') || t.includes('FLAT')) {
+      return 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
+  };
+
+  const defaultCategoryFallback = getCategoryFallbackImage(property?.propertyType);
+
+  // Extract raw media from all possible property fields
+  const rawMediaList = (Array.isArray(property.media) && property.media.length > 0)
+    ? property.media
+    : ((Array.isArray(property.publicApprovedMedia) && property.publicApprovedMedia.length > 0)
+      ? property.publicApprovedMedia
+      : ((Array.isArray(property.photos) && property.photos.length > 0)
+        ? property.photos
+        : ((Array.isArray(property.images) && property.images.length > 0)
+          ? property.images
+          : (property.imageUrl || property.coverImage || property.photoUrl ? [property.imageUrl || property.coverImage || property.photoUrl] : []))));
+
+  // Normalize raw media objects
+  const parsedMediaList = rawMediaList.map(item => {
+    if (typeof item === 'string') {
+      return { url: item, publicUrl: item, mediaType: 'PHOTO', caption: property.title };
+    }
+    const url = getMediaUrl(item);
+    return {
+      ...item,
+      url: url || item.embedUrl || item.url || defaultCategoryFallback,
+      publicUrl: item.publicUrl || url || defaultCategoryFallback,
+      embedUrl: item.embedUrl || (url && (url.includes('youtube.com') || url.includes('youtu.be')) ? url : null),
+      mediaType: item.mediaType || item.type || (item.embedUrl ? 'WALKTHROUGH_VIDEO' : 'PHOTO'),
+      caption: item.caption || item.name || property.title
+    };
+  }).filter(item => Boolean(item.url || item.embedUrl || item.publicUrl));
+
+  // Fallback if zero photos exist in payload
+  const mediaList = parsedMediaList.length > 0
+    ? parsedMediaList
+    : [{ url: defaultCategoryFallback, publicUrl: defaultCategoryFallback, mediaType: 'PHOTO', caption: `${property.title} - Overview` }];
+
+  const activeMedia = mediaList[activeMediaIndex] || mediaList[0] || null;
 
   // Applicable specs
   const specFlags = getApplicableSpecificationFields(property.propertyType, property.purpose);
@@ -494,16 +548,21 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                 )
               ) : (
                 <img
-                  src={activeMedia.url}
+                  src={activeMedia.url || activeMedia.publicUrl || defaultCategoryFallback}
                   alt={activeMedia.caption || property.title}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = defaultCategoryFallback;
+                  }}
                   className="w-full h-full object-cover"
                 />
               )
             ) : (
-              <div className="text-center text-gray-400 space-y-2 p-8">
-                <Building2 className="w-12 h-12 mx-auto stroke-1" />
-                <p className="text-xs font-bold">No public photos available for this listing.</p>
-              </div>
+              <img
+                src={defaultCategoryFallback}
+                alt={property.title}
+                className="w-full h-full object-cover"
+              />
             )}
 
             {/* MEDIA COUNTER BADGE */}
@@ -550,7 +609,15 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                       </span>
                     </div>
                   ) : (
-                    <img src={item.url} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={item.url || item.publicUrl || defaultCategoryFallback}
+                      alt=""
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = defaultCategoryFallback;
+                      }}
+                      className="w-full h-full object-cover"
+                    />
                   )}
                 </button>
               ))}
