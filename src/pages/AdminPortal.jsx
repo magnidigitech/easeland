@@ -2669,11 +2669,12 @@ export default function AdminPortal() {
 
                             <div className="flex items-center gap-1.5 mt-1">
                               <button
-                                onClick={() => openWorkspace(prop)}
-                                className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow-sm"
-                                title="Audit Property in Workspace"
+                                onClick={() => window.open('/property/' + (prop.propertyId || prop.id), '_blank')}
+                                className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1.5"
+                                title="View Property on Map"
                               >
-                                Audit
+                                <MapPin className="w-3 h-3 text-amber-400" />
+                                <span>View on Map</span>
                               </button>
 
                               <button
