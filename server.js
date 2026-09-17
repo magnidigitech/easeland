@@ -784,6 +784,55 @@ app.patch('/api/enquiries/:id', async (req, res) => {
   }
 });
 
+// API Endpoint: Append Message to Enquiry Chat Thread in PostgreSQL DB
+app.post('/api/enquiries/:id/messages', async (req, res) => {
+  try {
+    const eId = req.params.id;
+    const messageData = req.body || {};
+    if (!eId || !messageData.text) {
+      return res.status(400).json({ success: false, error: 'Enquiry ID and message text are required.' });
+    }
+
+    const newMsg = {
+      id: messageData.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      senderId: messageData.senderId || 'user',
+      senderName: messageData.senderName || 'User',
+      senderRole: messageData.senderRole || 'USER',
+      text: String(messageData.text).trim(),
+      createdAt: messageData.createdAt || new Date().toISOString()
+    };
+
+    // 1. Update in-memory / local disk store
+    const localEnq = localEnquiriesMap.get(eId);
+    if (localEnq) {
+      if (!Array.isArray(localEnq.messages)) localEnq.messages = [];
+      localEnq.messages.push(newMsg);
+      localEnq.updatedAt = new Date().toISOString();
+      saveLocalEnquiry(localEnq);
+    }
+
+    // 2. Update in PostgreSQL DB
+    try {
+      await pgPool.query(`
+        UPDATE enquiries 
+        SET raw_data = jsonb_set(
+          COALESCE(raw_data, '{}'::jsonb),
+          '{messages}',
+          (COALESCE(raw_data->'messages', '[]'::jsonb) || $1::jsonb)
+        ),
+        updated_at = NOW()
+        WHERE enquiry_id = $2;
+      `, [JSON.stringify(newMsg), eId]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL message append note:', pgErr.message);
+    }
+
+    return res.json({ success: true, message: newMsg });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // SPA Routing Fallback (for React Router / single page app)
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));

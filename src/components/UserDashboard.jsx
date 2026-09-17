@@ -26,9 +26,10 @@ import {
   Lock,
   Save,
   Check,
-  Filter
+  Filter,
+  Send
 } from 'lucide-react';
-import { getCustomerEnquiries, getOwnerEnquiries, updateEnquiryStatus } from '../firebase/enquiryService.js';
+import { getCustomerEnquiries, getOwnerEnquiries, updateEnquiryStatus, sendEnquiryMessage } from '../firebase/enquiryService.js';
 import { getUserWishlistProperties } from '../firebase/wishlistService.js';
 import { getDerivedEnquiryNotifications } from '../firebase/notificationService.js';
 import {
@@ -56,7 +57,12 @@ export default function UserDashboard({
   const [propertyFilter, setPropertyFilter] = useState('ALL'); // 'ALL', 'LIVE', 'PENDING_VERIFICATION', 'CHANGES_REQUIRED', 'REJECTED', 'DRAFT', 'UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'
   const [enquiryType, setEnquiryType] = useState('RECEIVED'); // 'RECEIVED', 'SENT'
 
-  // Real Firebase interaction state
+  // Chat / Messaging State
+  const [openChatEnquiryId, setOpenChatEnquiryId] = useState(null);
+  const [chatInputText, setChatInputText] = useState({});
+  const [chatSending, setChatSending] = useState({});
+
+  // Real Firebase & PostgreSQL interaction state
   const [fbSentEnquiries, setFbSentEnquiries] = useState([]);
   const [fbReceivedEnquiries, setFbReceivedEnquiries] = useState([]);
   const [fbWishlistProps, setFbWishlistProps] = useState([]);
@@ -119,11 +125,15 @@ export default function UserDashboard({
 
     const handleEnqSync = () => refreshEnquiriesAndData();
     window.addEventListener('easeland-enquiry-created', handleEnqSync);
+    window.addEventListener('easeland-enquiry-updated', handleEnqSync);
+    window.addEventListener('easeland-enquiry-message-added', handleEnqSync);
     window.addEventListener('storage', handleEnqSync);
 
     return () => {
       isMounted = false;
       window.removeEventListener('easeland-enquiry-created', handleEnqSync);
+      window.removeEventListener('easeland-enquiry-updated', handleEnqSync);
+      window.removeEventListener('easeland-enquiry-message-added', handleEnqSync);
       window.removeEventListener('storage', handleEnqSync);
     };
   }, [user]);
@@ -371,31 +381,185 @@ export default function UserDashboard({
     }
   };
 
-  // Enquiries received / sent for this specific user from Firebase
-  const enquiriesReceived = fbReceivedEnquiries.map(e => ({
-    id: e.enquiryId,
-    propertyId: e.propertyId,
-    propertyName: e.propertyTitle || 'Property Listing',
-    buyerName: e.customerName || e.buyerName || 'Interested Customer',
-    buyerPhone: e.customerPhone || e.buyerPhone || '+91 N/A',
-    buyerEmail: e.customerEmail || e.buyerEmail || '',
-    message: e.message,
-    status: e.status || 'SUBMITTED',
-    date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : 'Recent') : 'Recent',
-    rawEnquiry: e
-  }));
+  // Send live chat message handler
+  const handleSendMessage = async (enq) => {
+    const text = (chatInputText[enq.id] || '').trim();
+    if (!text || chatSending[enq.id]) return;
 
-  const enquiriesSent = fbSentEnquiries.map(e => ({
-    id: e.enquiryId,
-    propertyId: e.propertyId,
-    propertyName: e.propertyTitle || 'Property Listing',
-    ownerName: e.ownerName || 'Property Owner',
-    ownerPhone: 'Direct Owner',
-    message: e.message,
-    status: e.status || 'SUBMITTED',
-    date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : 'Recent') : 'Recent',
-    rawEnquiry: e
-  }));
+    setChatSending(prev => ({ ...prev, [enq.id]: true }));
+    try {
+      const isOwner = enquiryType === 'RECEIVED';
+      const senderRole = isOwner ? 'OWNER' : 'BUYER';
+      const senderName = isOwner
+        ? (user?.name || user?.displayName || 'Property Owner')
+        : (user?.name || user?.displayName || 'Interested Buyer');
+
+      const res = await sendEnquiryMessage(enq.id, {
+        senderId: user?.uid || user?.id,
+        senderName: senderName,
+        senderRole: senderRole,
+        text: text
+      });
+
+      if (res && res.success) {
+        setChatInputText(prev => ({ ...prev, [enq.id]: '' }));
+        refreshEnquiriesAndData();
+      } else if (res && res.error) {
+        alert(`Failed to send message: ${res.error}`);
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+    } finally {
+      setChatSending(prev => ({ ...prev, [enq.id]: false }));
+    }
+  };
+
+  const getEnquiryStatusBadge = (status) => {
+    const s = (status || 'SUBMITTED').toUpperCase();
+    if (s === 'SUBMITTED' || s === 'NEW') {
+      return <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-3 py-1 rounded-full uppercase">Submitted</span>;
+    } else if (s === 'CONTACTED') {
+      return <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-3 py-1 rounded-full uppercase">Contacted</span>;
+    } else if (s === 'IN_PROGRESS') {
+      return <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-3 py-1 rounded-full uppercase">In Progress</span>;
+    } else if (s === 'COMPLETED') {
+      return <span className="bg-green-100 text-green-800 text-[10px] font-black px-3 py-1 rounded-full uppercase">Completed</span>;
+    } else if (s === 'CLOSED') {
+      return <span className="bg-slate-100 text-slate-700 text-[10px] font-black px-3 py-1 rounded-full uppercase">Closed</span>;
+    }
+    return <span className="bg-gray-100 text-gray-700 text-[10px] font-black px-3 py-1 rounded-full uppercase">{s}</span>;
+  };
+
+  // Enquiries received / sent for this specific user
+  const enquiriesReceived = fbReceivedEnquiries.map(e => {
+    const eId = e.enquiryId || e.id;
+    const initialMsg = e.message ? [{
+      id: 'msg-initial',
+      senderId: e.customerId || e.buyerId || 'buyer',
+      senderName: e.customerName || e.buyerName || 'Interested Customer',
+      senderRole: 'BUYER',
+      text: e.message,
+      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : e.createdAt) : new Date().toISOString()
+    }] : [];
+    const msgList = Array.isArray(e.messages) && e.messages.length > 0 ? e.messages : initialMsg;
+
+    return {
+      id: eId,
+      enquiryId: eId,
+      propertyId: e.propertyId,
+      propertyName: e.propertyTitle || 'Property Listing',
+      buyerName: e.customerName || e.buyerName || 'Interested Customer',
+      buyerPhone: e.customerPhone || e.buyerPhone || '+91 N/A',
+      buyerEmail: e.customerEmail || e.buyerEmail || '',
+      message: e.message,
+      messages: msgList,
+      status: e.status || 'SUBMITTED',
+      date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : (typeof e.createdAt === 'string' ? e.createdAt.split('T')[0] : 'Recent')) : 'Recent',
+      rawEnquiry: e
+    };
+  });
+
+  const enquiriesSent = fbSentEnquiries.map(e => {
+    const eId = e.enquiryId || e.id;
+    const initialMsg = e.message ? [{
+      id: 'msg-initial',
+      senderId: e.customerId || e.buyerId || 'buyer',
+      senderName: e.customerName || e.buyerName || 'Interested Customer',
+      senderRole: 'BUYER',
+      text: e.message,
+      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : e.createdAt) : new Date().toISOString()
+    }] : [];
+    const msgList = Array.isArray(e.messages) && e.messages.length > 0 ? e.messages : initialMsg;
+
+    return {
+      id: eId,
+      enquiryId: eId,
+      propertyId: e.propertyId,
+      propertyName: e.propertyTitle || 'Property Listing',
+      ownerName: e.ownerName || 'Property Owner',
+      ownerPhone: 'Direct Owner',
+      message: e.message,
+      messages: msgList,
+      status: e.status || 'SUBMITTED',
+      date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : (typeof e.createdAt === 'string' ? e.createdAt.split('T')[0] : 'Recent')) : 'Recent',
+      rawEnquiry: e
+    };
+  });
+
+  const renderChatBox = (enq, msgList, myRole) => {
+    const currentUserId = user?.uid || user?.id;
+
+    return (
+      <div className="mt-4 pt-4 border-t border-gray-200 bg-slate-50/90 rounded-2xl p-4 space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+          <h4 className="text-xs font-extrabold text-brand-charcoal uppercase tracking-wider flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-brand-yellow" />
+            Direct Messages ({enq.propertyName})
+          </h4>
+          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+            In-App Messaging
+          </span>
+        </div>
+
+        {/* Message Thread */}
+        <div className="max-h-64 overflow-y-auto space-y-3 p-2">
+          {msgList.length === 0 ? (
+            <p className="text-xs text-gray-400 italic text-center py-4">No messages yet. Send a message below to start chatting!</p>
+          ) : (
+            msgList.map((msg, idx) => {
+              const isMe = String(msg.senderId) === String(currentUserId) || (myRole === msg.senderRole);
+              return (
+                <div key={msg.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-extrabold text-gray-600">{msg.senderName}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${msg.senderRole === 'OWNER' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'}`}>
+                      {msg.senderRole}
+                    </span>
+                    <span className="text-[9px] text-gray-400">
+                      {msg.createdAt ? (typeof msg.createdAt === 'string' ? msg.createdAt.split('T')[0] : 'Just now') : ''}
+                    </span>
+                  </div>
+                  <div className={`max-w-md p-3.5 rounded-2xl text-xs font-semibold leading-relaxed shadow-sm ${
+                    isMe
+                      ? 'bg-brand-charcoal text-white rounded-tr-none'
+                      : 'bg-white text-gray-900 border border-gray-200 rounded-tl-none'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Send Input Box */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage(enq);
+          }}
+          className="flex items-center gap-2 pt-2 border-t border-gray-200"
+        >
+          <input
+            type="text"
+            required
+            placeholder={myRole === 'OWNER' ? "Reply to buyer..." : "Message property owner..."}
+            value={chatInputText[enq.id] || ''}
+            onChange={(e) => setChatInputText({ ...chatInputText, [enq.id]: e.target.value })}
+            className="flex-1 p-3 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-900 focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={chatSending[enq.id] || !chatInputText[enq.id]?.trim()}
+            className="bg-brand-yellow hover:bg-brand-yellowHover disabled:opacity-50 text-brand-charcoal font-extrabold text-xs px-4 py-3 rounded-xl shadow flex items-center gap-1.5 transition-all shrink-0"
+          >
+            <Send className="w-4 h-4 text-brand-charcoal" />
+            <span>{chatSending[enq.id] ? 'Sending...' : 'Send'}</span>
+          </button>
+        </form>
+      </div>
+    );
+  };
 
   // Filter properties
   const filteredUserProperties = userProperties.filter(p => {
@@ -1179,47 +1343,66 @@ export default function UserDashboard({
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {enquiriesReceived.map((enq) => (
-                        <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-extrabold text-brand-yellow bg-brand-charcoal px-3 py-1 rounded-full">
-                              Property: {enq.propertyName}
-                            </span>
-                            <span className="text-xs text-gray-400 font-semibold">{enq.date}</span>
-                          </div>
-
-                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      {enquiriesReceived.map((enq) => {
+                        const isChatOpen = openChatEnquiryId === enq.id;
+                        const msgCount = (enq.messages || []).length;
+                        return (
+                          <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-extrabold text-sm text-brand-charcoal">{enq.buyerName}</h4>
-                              <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
-                                {enq.status}
+                              <span className="text-xs font-extrabold text-brand-yellow bg-brand-charcoal px-3 py-1 rounded-full">
+                                Property: {enq.propertyName}
                               </span>
-                            </div>
-                            <p className="text-xs text-gray-600 mt-2 leading-relaxed font-medium">"{enq.message}"</p>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2">
-                            <div className="flex items-center gap-4 text-xs font-bold text-gray-600">
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                                {enq.buyerPhone}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Mail className="w-3.5 h-3.5 text-blue-600" />
-                                {enq.buyerEmail}
-                              </span>
+                              <span className="text-xs text-gray-400 font-semibold">{enq.date}</span>
                             </div>
 
-                            <a
-                              href={`tel:${enq.buyerPhone}`}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5"
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                              <span>Call Buyer</span>
-                            </a>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-extrabold text-sm text-brand-charcoal">{enq.buyerName}</h4>
+                                {getEnquiryStatusBadge(enq.status)}
+                              </div>
+                              <p className="text-xs text-gray-600 mt-2 leading-relaxed font-medium">"{enq.message}"</p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                              <div className="flex items-center gap-4 text-xs font-bold text-gray-600">
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                                  {enq.buyerPhone}
+                                </span>
+                                {enq.buyerEmail && (
+                                  <span className="flex items-center gap-1">
+                                    <Mail className="w-3.5 h-3.5 text-blue-600" />
+                                    {enq.buyerEmail}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setOpenChatEnquiryId(isChatOpen ? null : enq.id)}
+                                  className={`font-extrabold text-xs px-4 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 ${
+                                    isChatOpen
+                                      ? 'bg-brand-charcoal text-white'
+                                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                                  }`}
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>{isChatOpen ? 'Close Messages' : `Message Buyer (${msgCount})`}</span>
+                                </button>
+                                <a
+                                  href={`tel:${enq.buyerPhone}`}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5"
+                                >
+                                  <Phone className="w-3.5 h-3.5" />
+                                  <span>Call Buyer</span>
+                                </a>
+                              </div>
+                            </div>
+
+                            {isChatOpen && renderChatBox(enq, enq.messages || [], 'OWNER')}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )
                 ) : (
@@ -1241,19 +1424,48 @@ export default function UserDashboard({
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {enquiriesSent.map((enq) => (
-                        <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex items-center justify-between">
-                          <div>
-                            <h4 className="font-extrabold text-sm text-brand-charcoal">{enq.propertyName}</h4>
-                            <p className="text-xs text-gray-500 mt-1 font-medium">
-                              Owner: <strong className="text-brand-charcoal">{enq.ownerName}</strong> ({enq.ownerPhone})
-                            </p>
+                      {enquiriesSent.map((enq) => {
+                        const isChatOpen = openChatEnquiryId === enq.id;
+                        const msgCount = (enq.messages || []).length;
+                        return (
+                          <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-extrabold text-sm text-brand-charcoal">{enq.propertyName}</h4>
+                              <span className="text-xs text-gray-400 font-semibold">{enq.date}</span>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
+                              <div>
+                                <p className="text-xs text-gray-500 font-medium">
+                                  Owner: <strong className="text-brand-charcoal">{enq.ownerName}</strong> ({enq.ownerPhone})
+                                </p>
+                                {enq.message && (
+                                  <p className="text-xs text-gray-600 mt-2 leading-relaxed font-medium">"{enq.message}"</p>
+                                )}
+                              </div>
+                              <div>
+                                {getEnquiryStatusBadge(enq.status)}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                onClick={() => setOpenChatEnquiryId(isChatOpen ? null : enq.id)}
+                                className={`font-extrabold text-xs px-4 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 ${
+                                  isChatOpen
+                                    ? 'bg-brand-charcoal text-white'
+                                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                                }`}
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
+                                <span>{isChatOpen ? 'Close Messages' : `Message Owner (${msgCount})`}</span>
+                              </button>
+                            </div>
+
+                            {isChatOpen && renderChatBox(enq, enq.messages || [], 'BUYER')}
                           </div>
-                          <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">
-                            Visit Scheduled
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )
                 )}

@@ -421,3 +421,75 @@ export async function updateEnquiryStatusAdmin(enquiryId, newStatus) {
   }
 }
 
+/**
+ * Send interactive in-app message on an enquiry thread
+ */
+export async function sendEnquiryMessage(enquiryId, messagePayload) {
+  try {
+    if (!enquiryId || !messagePayload?.text) {
+      return { success: false, error: 'Enquiry ID and message text are required.' };
+    }
+
+    const newMsg = {
+      id: messagePayload.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      senderId: messagePayload.senderId || '',
+      senderName: messagePayload.senderName || 'User',
+      senderRole: messagePayload.senderRole || 'USER',
+      text: String(messagePayload.text).trim(),
+      createdAt: messagePayload.createdAt || new Date().toISOString()
+    };
+
+    // 1. Post to PostgreSQL Backend Server API (/api/enquiries/:id/messages)
+    try {
+      await fetch(`/api/enquiries/${enquiryId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMsg)
+      });
+    } catch (e) {}
+
+    // 2. Update LocalStorage
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_enquiries');
+        if (raw) {
+          let list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            list = list.map(e => {
+              if (e && (e.enquiryId === enquiryId || e.id === enquiryId)) {
+                const existingMsgs = Array.isArray(e.messages) ? e.messages : [];
+                return {
+                  ...e,
+                  messages: [...existingMsgs, newMsg],
+                  updatedAt: new Date().toISOString()
+                };
+              }
+              return e;
+            });
+            localStorage.setItem('easeland_enquiries', JSON.stringify(list));
+            window.dispatchEvent(new CustomEvent('easeland-enquiry-message-added', { detail: { enquiryId, newMsg } }));
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 3. Update Firestore (non-blocking)
+    try {
+      const enqRef = doc(db, 'enquiries', enquiryId);
+      const snap = await getDoc(enqRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const existingMsgs = Array.isArray(data.messages) ? data.messages : [];
+        await updateDoc(enqRef, {
+          messages: [...existingMsgs, newMsg],
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (e) {}
+
+    return { success: true, message: newMsg };
+  } catch (error) {
+    return { success: false, error: formatFirestoreError(error) };
+  }
+}
+
