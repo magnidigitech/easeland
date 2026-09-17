@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLeft, Send, Sparkles } from 'lucide-react';
+import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLeft, Send, Sparkles, Phone, MessageCircle } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
@@ -18,6 +18,19 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
   });
 
   const [enquirySubmitted, setEnquirySubmitted] = useState(false);
+
+  const getOwnerPhone = () => {
+    return property?.ownerPublicPhone || property?.ownerPrivatePhone || property?.ownerPhone || property?.ownerContact || property?.owner?.phone || property?.phone || '';
+  };
+
+  const getOwnerWhatsAppUrl = () => {
+    const rawPhone = getOwnerPhone();
+    const cleanDigits = String(rawPhone).replace(/\D/g, '');
+    const fullPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const ownerName = property?.owner?.name || property?.ownerPublicName || property?.ownerName || 'Owner';
+    const msg = `Hi ${ownerName}, I am interested in your property "${property?.title || 'Listing'}" listed on EaseLand.`;
+    return fullPhone ? `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}` : '#';
+  };
 
   // Fetch real nearby places using Google Places Service if available
   useEffect(() => {
@@ -388,79 +401,48 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                 </div>
               </div>
 
-              {enquirySubmitted ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center text-emerald-900 space-y-2">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-                  <h4 className="text-base font-bold">Enquiry Sent to Owner!</h4>
-                  <p className="text-xs text-emerald-800">
-                    Your interest has been logged directly with {property.owner?.name}. EaseLand Admin has also updated your lead CRM record.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleEnquirySubmit} className="space-y-4">
-                  <h4 className="text-sm font-bold text-brand-charcoal">
-                    Interested in this Property? Contact Owner
-                  </h4>
+              {/* DIRECT OWNER CONTACT OPTIONS */}
+              <div className="space-y-4 pt-2">
+                <h4 className="text-sm font-extrabold text-brand-charcoal">
+                  Interested in this Property? Contact Owner
+                </h4>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Your Full Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Suresh Kumar"
-                      value={enquiryForm.name}
-                      onChange={(e) => setEnquiryForm({ ...enquiryForm, name: e.target.value })}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Phone Number</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+91 98765 43210"
-                      value={enquiryForm.phone}
-                      onChange={(e) => setEnquiryForm({ ...enquiryForm, phone: e.target.value })}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="suresh@example.com"
-                      value={enquiryForm.email}
-                      onChange={(e) => setEnquiryForm({ ...enquiryForm, email: e.target.value })}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Message to Owner</label>
-                    <textarea
-                      rows={3}
-                      value={enquiryForm.message}
-                      onChange={(e) => setEnquiryForm({ ...enquiryForm, message: e.target.value })}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none resize-none"
-                    ></textarea>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-sm py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+                <div className="space-y-3">
+                  <a
+                    href={getOwnerWhatsAppUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
-                    <Send className="w-4 h-4 stroke-[2.5]" />
-                    Send Direct Enquiry
-                  </button>
+                    <MessageCircle className="w-5 h-5 fill-current" />
+                    <span>WhatsApp Owner</span>
+                  </a>
 
-                  <p className="text-[10px] text-gray-400 text-center font-medium">
-                    No agents or brokers. Your inquiry is delivered directly to the property owner.
-                  </p>
-                </form>
-              )}
+                  {getOwnerPhone() ? (
+                    <a
+                      href={`tel:${getOwnerPhone()}`}
+                      className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
+                    >
+                      <Phone className="w-5 h-5 text-brand-yellow" />
+                      <span>Call Owner ({getOwnerPhone()})</span>
+                    </a>
+                  ) : (
+                    <a
+                      href={getOwnerWhatsAppUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
+                    >
+                      <Phone className="w-5 h-5 text-brand-yellow" />
+                      <span>Call Owner</span>
+                    </a>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-gray-400 text-center font-medium">
+                  No agents or brokers. Direct contact with verified property owner.
+                </p>
+              </div>
 
             </div>
 
