@@ -17,6 +17,8 @@ export class ErrorBoundary extends React.Component {
   handleReset = () => {
     try {
       localStorage.setItem('easeland_active_page', 'home');
+      // If site config was corrupted, remove cached version to force default re-hydration
+      localStorage.removeItem('easeland_site_config');
     } catch (e) {}
     window.location.href = '/';
   };
@@ -35,11 +37,19 @@ export class ErrorBoundary extends React.Component {
                 Click below to reset your active session and return to the live homepage.
               </p>
             </div>
+
+            {this.state.error && (
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-left text-[11px] font-mono text-red-300 break-words max-h-32 overflow-y-auto">
+                <span className="font-bold text-red-400 block mb-1">Diagnostic Log:</span>
+                {this.state.error.toString()}
+              </div>
+            )}
+
             <button
               onClick={this.handleReset}
               className="w-full bg-brand-yellow hover:bg-amber-400 text-brand-charcoal font-extrabold text-xs py-3.5 rounded-xl shadow-lg transition-all"
             >
-              Return to Homepage
+              Return to Homepage & Reset Cache
             </button>
           </div>
         </div>

@@ -169,17 +169,17 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         {/* Verification Tagline */}
         <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-6 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
           <ShieldCheck className="w-4 h-4 text-amber-400" />
-          <span>{siteConfig.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
+          <span>{siteConfig?.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
         </div>
 
         {/* Hero Title */}
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-100 leading-tight mb-4">
-          {siteConfig.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
-          <span className="text-metallic-gold">{siteConfig.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
+          {siteConfig?.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
+          <span className="text-metallic-gold">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
         </h1>
         
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-8 font-medium">
-          {siteConfig.homepage?.heroSubtitle || 'Zero agents. Zero commission. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'}
+          {siteConfig?.homepage?.heroSubtitle || 'Zero agents. Zero commission. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'}
         </p>
 
         {/* DEEP SEARCH CARD */}

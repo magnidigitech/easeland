@@ -23,16 +23,16 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             className="flex items-center gap-3 cursor-pointer group select-none"
           >
             <img
-              src={siteConfig.navbar?.logoEmblemUrl || "/easeland_emblem_transparent.png"}
+              src={siteConfig?.navbar?.logoEmblemUrl || "/easeland_emblem_transparent.png"}
               alt="EaseLand Logo"
               className="h-11 w-auto object-contain group-hover:scale-105 transition-transform drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]"
             />
             <div>
               <span className="text-2xl font-extrabold tracking-tight text-slate-100 font-sans">
-                {siteConfig.navbar?.logoTextPrefix || 'Ease'}<span className="text-metallic-gold">{siteConfig.navbar?.logoTextSuffix || 'Land'}</span>
+                {siteConfig?.navbar?.logoTextPrefix || 'Ease'}<span className="text-metallic-gold">{siteConfig?.navbar?.logoTextSuffix || 'Land'}</span>
               </span>
               <span className="block text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-                {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig.navbar?.logoSubtext || 'Direct Property Platform')}
+                {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig?.navbar?.logoSubtext || 'Direct Property Platform')}
               </span>
             </div>
           </div>
@@ -45,7 +45,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 activePage === 'buy' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
               }`}
             >
-              {siteConfig.navbar?.buyLabel || 'BUY'}
+              {siteConfig?.navbar?.buyLabel || 'BUY'}
             </button>
             
             <button
@@ -54,7 +54,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 activePage === 'rent' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
               }`}
             >
-              {siteConfig.navbar?.rentLabel || 'RENT'}
+              {siteConfig?.navbar?.rentLabel || 'RENT'}
             </button>
             
             <button
@@ -63,7 +63,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 activePage === 'sell' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
               }`}
             >
-              {siteConfig.navbar?.sellLabel || 'SELL'}
+              {siteConfig?.navbar?.sellLabel || 'SELL'}
             </button>
           </nav>
 

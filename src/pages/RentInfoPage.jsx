@@ -18,15 +18,15 @@ export default function RentInfoPage({ onExploreClick }) {
       <div className="bg-brand-charcoal text-white py-20 px-4 sm:px-6 lg:px-8 text-center">
         <div className="max-w-4xl mx-auto">
           <span className="text-xs font-extrabold uppercase tracking-widest text-brand-yellow bg-white/10 px-3 py-1 rounded-full border border-white/15">
-            {siteConfig.rentPage?.badgeText || 'DIRECT TENANT CONNECT'}
+            {siteConfig?.rentPage?.badgeText || 'DIRECT TENANT CONNECT'}
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mt-4 mb-6">
-            {siteConfig.rentPage?.title || 'Rent Verified Apartments & Independent Houses'}
+            {siteConfig?.rentPage?.title || 'Rent Verified Apartments & Independent Houses'}
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto mb-8 font-medium">
-            {siteConfig.rentPage?.subtitle || 'Save on high brokerage fees. EaseLand connects tenants directly with verified house owners and landlords across India.'}
+            {siteConfig?.rentPage?.subtitle || 'Save on high brokerage fees. EaseLand connects tenants directly with verified house owners and landlords across India.'}
           </p>
 
           <button

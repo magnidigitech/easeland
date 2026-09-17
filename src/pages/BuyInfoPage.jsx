@@ -18,15 +18,15 @@ export default function BuyInfoPage({ onExploreClick }) {
       <div className="bg-brand-charcoal text-white py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <span className="text-xs font-extrabold uppercase tracking-widest text-brand-yellow bg-white/10 px-3 py-1 rounded-full border border-white/15">
-            {siteConfig.buyPage?.badgeText || 'DIRECT OWNER LISTINGS'}
+            {siteConfig?.buyPage?.badgeText || 'DIRECT OWNER LISTINGS'}
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mt-4 mb-6">
-            {siteConfig.buyPage?.title || 'Buy Verified Land Plots & Properties Across India'}
+            {siteConfig?.buyPage?.title || 'Buy Verified Land Plots & Properties Across India'}
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto mb-8 font-medium">
-            {siteConfig.buyPage?.subtitle || 'Discover verified open plots, independent houses, villas, and apartments directly from owners. Zero real-estate agents or brokers involved.'}
+            {siteConfig?.buyPage?.subtitle || 'Discover verified open plots, independent houses, villas, and apartments directly from owners. Zero real-estate agents or brokers involved.'}
           </p>
 
           <button

@@ -18,15 +18,15 @@ export default function SellInfoPage({ onPostPropertyClick }) {
       <div className="bg-brand-charcoal text-white py-20 px-4 sm:px-6 lg:px-8 text-center">
         <div className="max-w-4xl mx-auto">
           <span className="text-xs font-extrabold uppercase tracking-widest text-brand-yellow bg-white/10 px-3 py-1 rounded-full border border-white/15">
-            {siteConfig.sellPage?.badgeText || 'POST PROPERTY FOR FREE'}
+            {siteConfig?.sellPage?.badgeText || 'POST PROPERTY FOR FREE'}
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mt-4 mb-6">
-            {siteConfig.sellPage?.title || 'List Your Property Directly — Zero Brokerage Commission'}
+            {siteConfig?.sellPage?.title || 'List Your Property Directly — Zero Brokerage Commission'}
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto mb-8 font-medium">
-            {siteConfig.sellPage?.subtitle || 'Post your property once. Upload location, plot boundary, photos, and drone footage. Receive direct customer enquiries with zero broker commission.'}
+            {siteConfig?.sellPage?.subtitle || 'Post your property once. Upload location, plot boundary, photos, and drone footage. Receive direct customer enquiries with zero broker commission.'}
           </p>
 
           <button
