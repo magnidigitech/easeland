@@ -121,33 +121,49 @@ export default function App() {
   };
 
   const changeActivePage = (pageName, propId = null) => {
-    setActivePage(pageName);
+    let resolvedPage = pageName;
+    let resolvedPropId = propId;
+
+    if (typeof pageName === 'string') {
+      if (pageName.startsWith('property/')) {
+        resolvedPage = 'property-detail';
+        resolvedPropId = pageName.replace('property/', '');
+      } else if (pageName.startsWith('property-detail/')) {
+        resolvedPage = 'property-detail';
+        resolvedPropId = pageName.replace('property-detail/', '');
+      }
+    }
+
+    setActivePage(resolvedPage);
+    if (resolvedPropId) {
+      setActivePropertyId(resolvedPropId);
+    }
+
     try {
-      localStorage.setItem('easeland_active_page', pageName);
+      localStorage.setItem('easeland_active_page', resolvedPage);
 
       let targetPath = '/';
-      if (pageName === 'property-detail' && propId) {
-        setActivePropertyId(propId);
-        targetPath = `/property/${propId}`;
-      } else if (pageName === 'map' || pageName === 'properties') {
+      if (resolvedPage === 'property-detail' && resolvedPropId) {
+        targetPath = `/property/${resolvedPropId}`;
+      } else if (resolvedPage === 'map' || resolvedPage === 'properties') {
         const queryParams = searchStateToUrlParams(filters);
         const searchString = queryParams.toString();
         targetPath = searchString ? `/properties?${searchString}` : '/properties';
-      } else if (pageName === 'admin') {
+      } else if (resolvedPage === 'admin') {
         targetPath = '/admin';
-      } else if (pageName === 'buy') {
+      } else if (resolvedPage === 'buy') {
         targetPath = '/buy';
-      } else if (pageName === 'rent') {
+      } else if (resolvedPage === 'rent') {
         targetPath = '/rent';
-      } else if (pageName === 'sell') {
+      } else if (resolvedPage === 'sell') {
         targetPath = '/sell';
-      } else if (pageName === 'post-property') {
+      } else if (resolvedPage === 'post-property') {
         targetPath = '/post-property';
-      } else if (pageName === 'dashboard') {
+      } else if (resolvedPage === 'dashboard') {
         targetPath = '/dashboard';
-      } else if (pageName === 'wishlist') {
+      } else if (resolvedPage === 'wishlist') {
         targetPath = '/wishlist';
-      } else if (pageName === 'privacy-policy' || pageName === 'privacy') {
+      } else if (resolvedPage === 'privacy-policy' || resolvedPage === 'privacy') {
         targetPath = '/privacy-policy';
       } else {
         targetPath = '/';
@@ -663,7 +679,7 @@ export default function App() {
             properties={properties}
             wishlist={mockApi.getWishlist()}
             onWishlistToggle={handleWishlistToggle}
-            onNavigate={(page) => changeActivePage(page)}
+            onNavigate={(page, propId) => changeActivePage(page, propId)}
             onPostProperty={handlePostPropertyClick}
           />
         )}
