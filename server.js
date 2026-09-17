@@ -211,8 +211,17 @@ async function initPgDb() {
       );
     `);
 
+    // 3. Site Config CMS Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS site_config (
+        module_id VARCHAR(100) PRIMARY KEY,
+        config_data JSONB,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     client.release();
-    console.log('PostgreSQL tables (properties & media_files) initialized successfully.');
+    console.log('PostgreSQL tables (properties, media_files, site_config) initialized successfully.');
   } catch (err) {
     console.warn('PostgreSQL connection/init note (Local disk store active):', err.message);
   }
@@ -483,7 +492,71 @@ app.delete('/api/properties/:id', async (req, res) => {
 
     return res.json({ success: true, message: 'Property deleted successfully.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message || 'Delete failed' });
+// API Endpoint: Get Site Configuration from PostgreSQL DB (with disk fallback)
+const siteConfigStoreFile = path.join(uploadsDir, 'site_config_store.json');
+let localSiteConfigMap = new Map();
+
+try {
+  if (fs.existsSync(siteConfigStoreFile)) {
+    const rawDisk = fs.readFileSync(siteConfigStoreFile, 'utf8');
+    const parsedDisk = JSON.parse(rawDisk);
+    if (typeof parsedDisk === 'object' && parsedDisk !== null) {
+      Object.keys(parsedDisk).forEach(key => localSiteConfigMap.set(key, parsedDisk[key]));
+    }
+  }
+} catch (e) {}
+
+app.get('/api/site-config', async (req, res) => {
+  try {
+    const config = {};
+    localSiteConfigMap.forEach((val, key) => { config[key] = val; });
+
+    try {
+      const result = await pgPool.query('SELECT module_id, config_data FROM site_config;');
+      result.rows.forEach(row => {
+        if (row.module_id && row.config_data) {
+          config[row.module_id] = row.config_data;
+        }
+      });
+    } catch (pgErr) {}
+
+    return res.json({ success: true, config });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message, config: {} });
+  }
+});
+
+// API Endpoint: Save/Publish Site Configuration to PostgreSQL DB
+app.post('/api/site-config', async (req, res) => {
+  try {
+    const fullConfig = req.body || {};
+    Object.keys(fullConfig).forEach(modId => {
+      localSiteConfigMap.set(modId, fullConfig[modId]);
+    });
+
+    try {
+      const objToStore = {};
+      localSiteConfigMap.forEach((val, key) => { objToStore[key] = val; });
+      fs.writeFileSync(siteConfigStoreFile, JSON.stringify(objToStore, null, 2), 'utf8');
+    } catch (e) {}
+
+    try {
+      const promises = Object.keys(fullConfig).map(modId => {
+        const queryText = `
+          INSERT INTO site_config (module_id, config_data, updated_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (module_id) DO UPDATE SET
+            config_data = EXCLUDED.config_data,
+            updated_at = NOW();
+        `;
+        return pgPool.query(queryText, [modId, JSON.stringify(fullConfig[modId])]);
+      });
+      await Promise.all(promises);
+    } catch (pgErr) {}
+
+    return res.json({ success: true, message: 'Site configuration saved to PostgreSQL.', config: fullConfig });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
