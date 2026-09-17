@@ -351,7 +351,7 @@ export const mockApi = {
       }
     } catch (e) {}
 
-    const combined = [...properties, ...localProps];
+    const combined = [...INITIAL_PROPERTIES, ...properties, ...localProps];
     const candidateMap = new Map();
     combined.forEach(p => {
       if (!p) return;

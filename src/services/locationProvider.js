@@ -272,6 +272,21 @@ export function extractBoundaryPolygon(item) {
 export function extractCoordinates(item) {
   if (!item) return { lat: NaN, lng: NaN };
 
+  // 1. Priority 1: If property has a boundary polygon, ALWAYS use polygon centroid for 100% exact plot alignment
+  const formattedPoly = extractBoundaryPolygon(item);
+  if (formattedPoly && formattedPoly.length >= 3) {
+    let sumLat = 0;
+    let sumLng = 0;
+    formattedPoly.forEach(pt => {
+      sumLat += pt[0];
+      sumLng += pt[1];
+    });
+    return {
+      lat: sumLat / formattedPoly.length,
+      lng: sumLng / formattedPoly.length
+    };
+  }
+
   let loc = item.location;
   if (typeof loc === 'string') {
     try { loc = JSON.parse(loc); } catch (e) { loc = null; }
@@ -282,11 +297,11 @@ export function extractCoordinates(item) {
     try { centroid = JSON.parse(centroid); } catch (e) { centroid = null; }
   }
 
-  // 1. Check centroid
+  // 2. Check centroid
   let lat = Number(centroid?.lat ?? centroid?.latitude);
   let lng = Number(centroid?.lng ?? centroid?.longitude);
 
-  // 2. Check location
+  // 3. Check location
   if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
     lat = Number(
       loc?.lat ??
@@ -302,25 +317,10 @@ export function extractCoordinates(item) {
     );
   }
 
-  // 3. Check direct item properties
+  // 4. Check direct item properties
   if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
     lat = Number(item.lat ?? item.latitude ?? item.centroidLat);
     lng = Number(item.lng ?? item.longitude ?? item.centroidLng);
-  }
-
-  // 4. Check boundary centroid if polygon exists
-  if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
-    const formattedPoly = extractBoundaryPolygon(item);
-    if (formattedPoly && formattedPoly.length >= 3) {
-      let sumLat = 0;
-      let sumLng = 0;
-      formattedPoly.forEach(pt => {
-        sumLat += pt[0];
-        sumLng += pt[1];
-      });
-      lat = sumLat / formattedPoly.length;
-      lng = sumLng / formattedPoly.length;
-    }
   }
 
   return { lat, lng };
