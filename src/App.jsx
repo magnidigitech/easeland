@@ -21,9 +21,40 @@ import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searc
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown } from 'lucide-react';
 
+const getInitialPageState = () => {
+  if (typeof window === 'undefined') return { page: 'home', propId: null };
+  const rawPath = window.location.pathname || '/';
+  const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
+  const search = window.location.search || '';
+  const urlParams = new URLSearchParams(search);
+  const modeParam = urlParams.get('mode');
+
+  const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
+  if (propertyMatch && propertyMatch[1]) {
+    return { page: 'property-detail', propId: propertyMatch[1] };
+  }
+
+  if (cleanPath.startsWith('/properties')) return { page: 'map', propId: null };
+  if (cleanPath === '/admin' || modeParam === 'admin') return { page: 'admin', propId: null };
+  if (cleanPath === '/buy') return { page: 'buy', propId: null };
+  if (cleanPath === '/rent') return { page: 'rent', propId: null };
+  if (cleanPath === '/sell') return { page: 'sell', propId: null };
+  if (cleanPath === '/post-property') return { page: 'post-property', propId: null };
+  if (cleanPath === '/dashboard') return { page: 'dashboard', propId: null };
+  if (cleanPath === '/wishlist') return { page: 'wishlist', propId: null };
+  if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') return { page: 'privacy-policy', propId: null };
+
+  const savedPage = localStorage.getItem('easeland_active_page');
+  if (savedPage && ['buy', 'rent', 'sell', 'post-property', 'dashboard', 'wishlist', 'map', 'admin', 'privacy-policy'].includes(savedPage)) {
+    return { page: savedPage, propId: null };
+  }
+  return { page: 'home', propId: null };
+};
+
 export default function App() {
   const { user: authUser, profile: authProfile, loading: authLoading, logoutUser } = useAuth();
-  const [activePage, setActivePage] = useState('home');
+  const [initialPageState] = useState(getInitialPageState);
+  const [activePage, setActivePage] = useState(initialPageState.page);
 
   const isAdminSession = Boolean(
     authUser?.email === 'admin@easeland.in' ||
@@ -72,7 +103,7 @@ export default function App() {
 
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
-  const [activePropertyId, setActivePropertyId] = useState(null);
+  const [activePropertyId, setActivePropertyId] = useState(initialPageState.propId);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [faqOpenIndex, setFaqOpenIndex] = useState(null);
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
@@ -376,7 +407,7 @@ export default function App() {
       <main className="flex-1">
 
         {/* PAGE 1: HOME */}
-        {activePage === 'home' && (
+        {(activePage === 'home' || !['map', 'properties', 'property-detail', 'buy', 'rent', 'sell', 'post-property', 'admin', 'dashboard', 'wishlist', 'privacy-policy', 'privacy'].includes(activePage)) && (
           <div>
             <HeroSearch onSearch={handleHeroSearch} />
             
