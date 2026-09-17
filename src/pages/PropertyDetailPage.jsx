@@ -157,21 +157,27 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           strokeColor = '#5b21b6';
         }
 
-        // Add Property Location Marker Pin (Authentic Teardrop Location Marker Pin)
-        const teardropPinPath = 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z';
+        // Add Property Location Marker Pin (High-Definition Drop-Shadowed Teardrop Location Marker Pin)
+        const pinSvgDataUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="56" viewBox="0 0 48 56">
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.45"/>
+            </filter>
+            <g filter="url(#shadow)">
+              <path d="M 24 4 C 14.06 4 6 12.06 6 22 C 6 34.5 24 52 24 52 C 24 52 42 34.5 42 22 C 42 12.06 33.94 4 24 4 Z" fill="${markerColor}" stroke="${strokeColor}" stroke-width="2.5"/>
+              <circle cx="24" cy="22" r="7" fill="#ffffff"/>
+            </g>
+          </svg>
+        `);
 
         new gMaps.Marker({
           position: mapPos,
           map: map,
           title: property.title,
           icon: {
-            path: teardropPinPath,
-            fillColor: markerColor,
-            fillOpacity: 1,
-            strokeColor: strokeColor,
-            strokeWeight: 2,
-            scale: 1.8,
-            anchor: new gMaps.Point(12, 22)
+            url: pinSvgDataUrl,
+            scaledSize: new gMaps.Size(44, 52),
+            anchor: new gMaps.Point(22, 50)
           }
         });
 
