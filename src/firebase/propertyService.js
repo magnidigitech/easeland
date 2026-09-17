@@ -1177,8 +1177,8 @@ export async function getPublicPropertyById(propertyId) {
 
     const approvedMedia = filterApprovedPublicMedia(rawMedia);
 
-    // Only expose boundary polygon if explicitly APPROVED by platform audit
-    const approvedBoundary = (data.boundary && data.boundary.boundaryStatus === BoundaryStatus.APPROVED) ? data.boundary : null;
+    // Expose plot boundary polygon for public map display
+    const publicBoundary = data.boundary || data.ownerSubmittedBoundary || data.approvedPolygon || data.polygon || null;
 
     // Public Projection
     const publicProperty = {
@@ -1199,7 +1199,7 @@ export async function getPublicPropertyById(propertyId) {
       media: approvedMedia,
       publicApprovedMedia: approvedMedia,
       location: data.location || null,
-      boundary: approvedBoundary,
+      boundary: publicBoundary,
       listingStatus: data.listingStatus || 'LIVE',
       isPlatformVerified: Boolean(data.isPlatformVerified || verVal === 'PLATFORM VERIFIED' || verVal === 'VERIFIED'),
       views: data.views || 0,
