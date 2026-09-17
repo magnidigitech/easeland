@@ -4,6 +4,7 @@ import {
   Building2,
   ShieldCheck,
   MessageSquare,
+  MessageCircle,
   Heart,
   Bell,
   User,
@@ -56,11 +57,6 @@ export default function UserDashboard({
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'properties', 'verification', 'enquiries', 'wishlist', 'notifications', 'account'
   const [propertyFilter, setPropertyFilter] = useState('ALL'); // 'ALL', 'LIVE', 'PENDING_VERIFICATION', 'CHANGES_REQUIRED', 'REJECTED', 'DRAFT', 'UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'
   const [enquiryType, setEnquiryType] = useState('RECEIVED'); // 'RECEIVED', 'SENT'
-
-  // Chat / Messaging State
-  const [openChatEnquiryId, setOpenChatEnquiryId] = useState(null);
-  const [chatInputText, setChatInputText] = useState({});
-  const [chatSending, setChatSending] = useState({});
 
   // Real Firebase & PostgreSQL interaction state
   const [fbSentEnquiries, setFbSentEnquiries] = useState([]);
@@ -390,61 +386,15 @@ export default function UserDashboard({
     }
   };
 
-  // Send live chat message handler with 0ms optimistic UI update
-  const handleSendMessage = async (enq) => {
-    const text = (chatInputText[enq.id] || '').trim();
-    if (!text || chatSending[enq.id]) return;
-
-    const isOwner = enquiryType === 'RECEIVED';
-    const senderRole = isOwner ? 'OWNER' : 'BUYER';
-    const senderName = isOwner
-      ? (user?.name || user?.displayName || 'Property Owner')
-      : (user?.name || user?.displayName || 'Interested Buyer');
-
-    const newMsgObj = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      senderId: user?.uid || user?.id,
-      senderName: senderName,
-      senderRole: senderRole,
-      text: text,
-      createdAt: new Date().toISOString()
-    };
-
-    // 1. Clear input text box immediately for instant responsiveness
-    setChatInputText(prev => ({ ...prev, [enq.id]: '' }));
-
-    // 2. Optimistically update local React state so sender sees message immediately
-    if (isOwner) {
-      setFbReceivedEnquiries(prev => prev.map(item => {
-        if ((item.enquiryId || item.id) === enq.id) {
-          const msgs = Array.isArray(item.messages) ? item.messages : [];
-          return { ...item, messages: [...msgs, newMsgObj], updatedAt: new Date().toISOString() };
-        }
-        return item;
-      }));
-    } else {
-      setFbSentEnquiries(prev => prev.map(item => {
-        if ((item.enquiryId || item.id) === enq.id) {
-          const msgs = Array.isArray(item.messages) ? item.messages : [];
-          return { ...item, messages: [...msgs, newMsgObj], updatedAt: new Date().toISOString() };
-        }
-        return item;
-      }));
-    }
-
-    setChatSending(prev => ({ ...prev, [enq.id]: true }));
-    try {
-      const res = await sendEnquiryMessage(enq.id, newMsgObj);
-      if (res && res.success) {
-        refreshEnquiriesAndData();
-      } else if (res && res.error) {
-        alert(`Failed to send message: ${res.error}`);
-      }
-    } catch (err) {
-      console.error('Error sending message:', err);
-    } finally {
-      setChatSending(prev => ({ ...prev, [enq.id]: false }));
-    }
+  const getCleanWhatsAppLink = (phoneStr, targetName, propertyName, role) => {
+    if (!phoneStr) return '#';
+    const cleanDigits = String(phoneStr).replace(/\D/g, '');
+    if (!cleanDigits) return '#';
+    const fullPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const msgText = role === 'OWNER'
+      ? `Hi ${targetName || 'there'}, I am the owner of ${propertyName || 'the property'} listed on EaseLand. Reaching out regarding your enquiry.`
+      : `Hi ${targetName || 'Owner'}, I am interested in your property ${propertyName || 'listing'} on EaseLand.`;
+    return `https://wa.me/${fullPhone}?text=${encodeURIComponent(msgText)}`;
   };
 
   const getEnquiryStatusBadge = (status) => {
@@ -467,19 +417,6 @@ export default function UserDashboard({
   const enquiriesReceived = fbReceivedEnquiries.map(e => {
     const eId = e.enquiryId || e.id;
     const initialMsgText = e.message || 'I am interested in this property. Please contact me.';
-    const initialMsgObj = {
-      id: `msg-initial-${eId}`,
-      senderId: e.customerId || e.buyerId || 'buyer',
-      senderName: e.customerName || e.buyerName || 'Interested Customer',
-      senderRole: 'BUYER',
-      text: initialMsgText,
-      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : (typeof e.createdAt === 'string' ? e.createdAt : new Date().toISOString())) : new Date().toISOString()
-    };
-
-    const rawMsgs = Array.isArray(e.messages) ? e.messages : [];
-    const hasInitial = rawMsgs.some(m => m && (m.id === initialMsgObj.id || (m.senderRole === 'BUYER' && m.text === initialMsgText)));
-    const msgList = hasInitial ? rawMsgs : [initialMsgObj, ...rawMsgs];
-
     return {
       id: eId,
       enquiryId: eId,
@@ -489,7 +426,6 @@ export default function UserDashboard({
       buyerPhone: e.customerPhone || e.buyerPhone || '+91 N/A',
       buyerEmail: e.customerEmail || e.buyerEmail || '',
       message: initialMsgText,
-      messages: msgList,
       status: e.status || 'SUBMITTED',
       date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : (typeof e.createdAt === 'string' ? e.createdAt.split('T')[0] : 'Recent')) : 'Recent',
       rawEnquiry: e
@@ -499,108 +435,19 @@ export default function UserDashboard({
   const enquiriesSent = fbSentEnquiries.map(e => {
     const eId = e.enquiryId || e.id;
     const initialMsgText = e.message || 'I am interested in this property. Please contact me.';
-    const initialMsgObj = {
-      id: `msg-initial-${eId}`,
-      senderId: e.customerId || e.buyerId || 'buyer',
-      senderName: e.customerName || e.buyerName || 'Interested Customer',
-      senderRole: 'BUYER',
-      text: initialMsgText,
-      createdAt: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toISOString() : (typeof e.createdAt === 'string' ? e.createdAt : new Date().toISOString())) : new Date().toISOString()
-    };
-
-    const rawMsgs = Array.isArray(e.messages) ? e.messages : [];
-    const hasInitial = rawMsgs.some(m => m && (m.id === initialMsgObj.id || (m.senderRole === 'BUYER' && m.text === initialMsgText)));
-    const msgList = hasInitial ? rawMsgs : [initialMsgObj, ...rawMsgs];
-
     return {
       id: eId,
       enquiryId: eId,
       propertyId: e.propertyId,
       propertyName: e.propertyTitle || 'Property Listing',
       ownerName: e.ownerName || 'Property Owner',
-      ownerPhone: 'Direct Owner',
+      ownerPhone: e.ownerPhone || e.ownerContact || e.phone || '',
       message: initialMsgText,
-      messages: msgList,
       status: e.status || 'SUBMITTED',
       date: e.createdAt ? (e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000).toLocaleDateString() : (typeof e.createdAt === 'string' ? e.createdAt.split('T')[0] : 'Recent')) : 'Recent',
       rawEnquiry: e
     };
   });
-
-  const renderChatBox = (enq, msgList, myRole) => {
-    const currentUserId = user?.uid || user?.id;
-
-    return (
-      <div className="mt-4 pt-4 border-t border-gray-200 bg-slate-50/90 rounded-2xl p-4 space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-          <h4 className="text-xs font-extrabold text-brand-charcoal uppercase tracking-wider flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-brand-yellow" />
-            Direct Messages ({enq.propertyName})
-          </h4>
-          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-            In-App Messaging
-          </span>
-        </div>
-
-        {/* Message Thread */}
-        <div className="max-h-64 overflow-y-auto space-y-3 p-2">
-          {msgList.length === 0 ? (
-            <p className="text-xs text-gray-400 italic text-center py-4">No messages yet. Send a message below to start chatting!</p>
-          ) : (
-            msgList.map((msg, idx) => {
-              const isMe = String(msg.senderId) === String(currentUserId) || (myRole === msg.senderRole);
-              return (
-                <div key={msg.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-extrabold text-gray-600">{msg.senderName}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${msg.senderRole === 'OWNER' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'}`}>
-                      {msg.senderRole}
-                    </span>
-                    <span className="text-[9px] text-gray-400">
-                      {msg.createdAt ? (typeof msg.createdAt === 'string' ? msg.createdAt.split('T')[0] : 'Just now') : ''}
-                    </span>
-                  </div>
-                  <div className={`max-w-md p-3.5 rounded-2xl text-xs font-semibold leading-relaxed shadow-sm ${
-                    isMe
-                      ? 'bg-brand-charcoal text-white rounded-tr-none'
-                      : 'bg-white text-gray-900 border border-gray-200 rounded-tl-none'
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Send Input Box */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSendMessage(enq);
-          }}
-          className="flex items-center gap-2 pt-2 border-t border-gray-200"
-        >
-          <input
-            type="text"
-            required
-            placeholder={myRole === 'OWNER' ? "Reply to buyer..." : "Message property owner..."}
-            value={chatInputText[enq.id] || ''}
-            onChange={(e) => setChatInputText({ ...chatInputText, [enq.id]: e.target.value })}
-            className="flex-1 p-3 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-900 focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={chatSending[enq.id] || !chatInputText[enq.id]?.trim()}
-            className="bg-brand-yellow hover:bg-brand-yellowHover disabled:opacity-50 text-brand-charcoal font-extrabold text-xs px-4 py-3 rounded-xl shadow flex items-center gap-1.5 transition-all shrink-0"
-          >
-            <Send className="w-4 h-4 text-brand-charcoal" />
-            <span>{chatSending[enq.id] ? 'Sending...' : 'Send'}</span>
-          </button>
-        </form>
-      </div>
-    );
-  };
 
   // Filter properties
   const filteredUserProperties = userProperties.filter(p => {
@@ -1385,8 +1232,6 @@ export default function UserDashboard({
                   ) : (
                     <div className="space-y-4">
                       {enquiriesReceived.map((enq) => {
-                        const isChatOpen = openChatEnquiryId === enq.id;
-                        const msgCount = (enq.messages || []).length;
                         return (
                           <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
                             <div className="flex items-center justify-between">
@@ -1419,28 +1264,24 @@ export default function UserDashboard({
                               </div>
 
                               <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setOpenChatEnquiryId(isChatOpen ? null : enq.id)}
-                                  className={`font-extrabold text-xs px-4 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 ${
-                                    isChatOpen
-                                      ? 'bg-brand-charcoal text-white'
-                                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                                  }`}
+                                <a
+                                  href={getCleanWhatsAppLink(enq.buyerPhone, enq.buyerName, enq.propertyName, 'OWNER')}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
                                 >
-                                  <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
-                                  <span>{isChatOpen ? 'Close Messages' : `Message Buyer (${msgCount})`}</span>
-                                </button>
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  <span>WhatsApp Buyer</span>
+                                </a>
                                 <a
                                   href={`tel:${enq.buyerPhone}`}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5"
+                                  className="bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
                                 >
-                                  <Phone className="w-3.5 h-3.5" />
+                                  <Phone className="w-3.5 h-3.5 text-brand-yellow" />
                                   <span>Call Buyer</span>
                                 </a>
                               </div>
                             </div>
-
-                            {isChatOpen && renderChatBox(enq, enq.messages || [], 'OWNER')}
                           </div>
                         );
                       })}
@@ -1466,8 +1307,6 @@ export default function UserDashboard({
                   ) : (
                     <div className="space-y-4">
                       {enquiriesSent.map((enq) => {
-                        const isChatOpen = openChatEnquiryId === enq.id;
-                        const msgCount = (enq.messages || []).length;
                         return (
                           <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
                             <div className="flex items-center justify-between">
@@ -1478,7 +1317,7 @@ export default function UserDashboard({
                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
                               <div>
                                 <p className="text-xs text-gray-500 font-medium">
-                                  Owner: <strong className="text-brand-charcoal">{enq.ownerName}</strong> ({enq.ownerPhone})
+                                  Owner: <strong className="text-brand-charcoal">{enq.ownerName}</strong> {enq.ownerPhone && enq.ownerPhone !== 'Direct Owner' ? `(${enq.ownerPhone})` : ''}
                                 </p>
                                 {enq.message && (
                                   <p className="text-xs text-gray-600 mt-2 leading-relaxed font-medium">"{enq.message}"</p>
@@ -1490,20 +1329,25 @@ export default function UserDashboard({
                             </div>
 
                             <div className="flex items-center justify-end gap-2 pt-1">
-                              <button
-                                onClick={() => setOpenChatEnquiryId(isChatOpen ? null : enq.id)}
-                                className={`font-extrabold text-xs px-4 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 ${
-                                  isChatOpen
-                                    ? 'bg-brand-charcoal text-white'
-                                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                                }`}
+                              <a
+                                href={getCleanWhatsAppLink(enq.ownerPhone, enq.ownerName, enq.propertyName, 'BUYER')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
                               >
-                                <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
-                                <span>{isChatOpen ? 'Close Messages' : `Message Owner (${msgCount})`}</span>
-                              </button>
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                <span>WhatsApp Owner</span>
+                              </a>
+                              {enq.ownerPhone && enq.ownerPhone !== 'Direct Owner' && (
+                                <a
+                                  href={`tel:${enq.ownerPhone}`}
+                                  className="bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
+                                >
+                                  <Phone className="w-3.5 h-3.5 text-brand-yellow" />
+                                  <span>Call Owner</span>
+                                </a>
+                              )}
                             </div>
-
-                            {isChatOpen && renderChatBox(enq, enq.messages || [], 'BUYER')}
                           </div>
                         );
                       })}
