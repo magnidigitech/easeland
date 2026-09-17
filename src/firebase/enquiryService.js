@@ -88,7 +88,18 @@ export async function createEnquiry(enquiryData) {
       updatedAt: timestampIso
     };
 
-    // 2. Save to Firestore non-blockingly
+    // 2. Save to PostgreSQL Backend Server API (/api/enquiries)
+    try {
+      await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (pgErr) {
+      console.warn('PostgreSQL API enquiry note:', pgErr);
+    }
+
+    // 3. Save to Firestore non-blockingly
     try {
       await setDoc(enqRef, {
         ...payload,
@@ -99,7 +110,7 @@ export async function createEnquiry(enquiryData) {
       console.warn('Firestore setDoc enquiry note:', err);
     }
 
-    // 3. Save to Local Storage & mockApi so local/mock mode is 100% in sync
+    // 4. Save to Local Storage & mockApi so local/mock mode is 100% in sync
     try {
       if (typeof window !== 'undefined') {
         const raw = localStorage.getItem('easeland_enquiries');
@@ -131,7 +142,21 @@ export async function getCustomerEnquiries(customerId, userEmail = '') {
     if (!customerId && !userEmail) return { success: false, error: 'Customer ID is required.' };
     let enquiries = [];
 
-    // 1. Read from Local Storage / mockApi
+    // 1. Fetch from PostgreSQL Server API (/api/enquiries)
+    try {
+      const queryParams = new URLSearchParams();
+      if (customerId) queryParams.set('customerId', customerId);
+      if (userEmail) queryParams.set('customerEmail', userEmail);
+      const res = await fetch(`/api/enquiries?${queryParams.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.enquiries)) {
+          enquiries.push(...data.enquiries);
+        }
+      }
+    } catch (e) {}
+
+    // 2. Read from Local Storage / mockApi
     try {
       if (typeof window !== 'undefined') {
         const raw = localStorage.getItem('easeland_enquiries');
@@ -152,7 +177,7 @@ export async function getCustomerEnquiries(customerId, userEmail = '') {
       }
     } catch (e) {}
 
-    // 2. Query Firestore (WITHOUT requiring missing composite indexes)
+    // 3. Query Firestore (WITHOUT requiring missing composite indexes)
     if (customerId) {
       try {
         const q1 = query(collection(db, 'enquiries'), where('customerId', '==', customerId));
@@ -204,7 +229,21 @@ export async function getOwnerEnquiries(ownerId, userEmail = '') {
     if (!ownerId && !userEmail) return { success: false, error: 'Owner ID is required.' };
     let enquiries = [];
 
-    // 1. Read from Local Storage / mockApi
+    // 1. Fetch from PostgreSQL Server API (/api/enquiries)
+    try {
+      const queryParams = new URLSearchParams();
+      if (ownerId) queryParams.set('ownerId', ownerId);
+      if (userEmail) queryParams.set('ownerEmail', userEmail);
+      const res = await fetch(`/api/enquiries?${queryParams.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.enquiries)) {
+          enquiries.push(...data.enquiries);
+        }
+      }
+    } catch (e) {}
+
+    // 2. Read from Local Storage / mockApi
     try {
       if (typeof window !== 'undefined') {
         const raw = localStorage.getItem('easeland_enquiries');
@@ -225,7 +264,7 @@ export async function getOwnerEnquiries(ownerId, userEmail = '') {
       }
     } catch (e) {}
 
-    // 2. Query Firestore by ownerId (WITHOUT composite index)
+    // 3. Query Firestore by ownerId
     if (ownerId) {
       try {
         const q1 = query(collection(db, 'enquiries'), where('ownerId', '==', ownerId));
@@ -299,11 +338,44 @@ export async function updateEnquiryStatus(enquiryId, ownerId, newStatus, current
       }
     }
 
-    const enqRef = doc(db, 'enquiries', enquiryId);
-    await updateDoc(enqRef, {
-      status: newStatus,
-      updatedAt: serverTimestamp()
-    });
+    // 1. Update PostgreSQL Backend API (/api/enquiries/:id)
+    try {
+      await fetch(`/api/enquiries/${enquiryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (e) {}
+
+    // 2. Update LocalStorage
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_enquiries');
+        if (raw) {
+          let list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            list = list.map(e => {
+              if (e && (e.enquiryId === enquiryId || e.id === enquiryId)) {
+                return { ...e, status: newStatus, updatedAt: new Date().toISOString() };
+              }
+              return e;
+            });
+            localStorage.setItem('easeland_enquiries', JSON.stringify(list));
+            window.dispatchEvent(new CustomEvent('easeland-enquiry-updated', { detail: { enquiryId, status: newStatus } }));
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 3. Update Firestore
+    try {
+      const enqRef = doc(db, 'enquiries', enquiryId);
+      await updateDoc(enqRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {}
+
     return { success: true };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };

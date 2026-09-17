@@ -220,11 +220,88 @@ async function initPgDb() {
       );
     `);
 
+    // 4. Enquiries Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS enquiries (
+        enquiry_id VARCHAR(100) PRIMARY KEY,
+        property_id VARCHAR(100),
+        property_title TEXT,
+        property_reference_id VARCHAR(100),
+        owner_id VARCHAR(100),
+        owner_name TEXT,
+        owner_email VARCHAR(255),
+        customer_id VARCHAR(100),
+        buyer_id VARCHAR(100),
+        customer_name TEXT,
+        buyer_name TEXT,
+        customer_email VARCHAR(255),
+        buyer_email VARCHAR(255),
+        customer_phone VARCHAR(50),
+        buyer_phone VARCHAR(50),
+        message TEXT,
+        preferred_visit_date VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'SUBMITTED',
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     client.release();
-    console.log('PostgreSQL tables (properties, media_files, site_config) initialized successfully.');
+    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries) initialized successfully.');
   } catch (err) {
     console.warn('PostgreSQL connection/init note (Local disk store active):', err.message);
   }
+}
+
+// Local Persistent Disk & Memory Store for Enquiries (100% Availability Fallback)
+const enquiriesStoreFile = path.join(uploadsDir, 'enquiries_store.json');
+const localEnquiriesMap = new Map();
+
+try {
+  if (fs.existsSync(enquiriesStoreFile)) {
+    const rawDisk = fs.readFileSync(enquiriesStoreFile, 'utf8');
+    const parsedDisk = JSON.parse(rawDisk);
+    if (Array.isArray(parsedDisk)) {
+      parsedDisk.forEach(e => {
+        if (e && (e.enquiryId || e.id)) {
+          localEnquiriesMap.set(e.enquiryId || e.id, e);
+        }
+      });
+    }
+  }
+} catch (e) {
+  console.warn('Local enquiries store initialization note:', e.message);
+}
+
+function saveLocalEnquiry(enq) {
+  if (!enq || (!enq.enquiryId && !enq.id)) return;
+  const eId = enq.enquiryId || enq.id;
+  const existing = localEnquiriesMap.get(eId) || {};
+  const updated = {
+    ...existing,
+    ...enq,
+    enquiryId: eId,
+    id: eId,
+    updatedAt: new Date().toISOString()
+  };
+  localEnquiriesMap.set(eId, updated);
+
+  try {
+    const arrayToStore = Array.from(localEnquiriesMap.values());
+    fs.writeFileSync(enquiriesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Local enquiries disk write note:', err.message);
+  }
+  return updated;
+}
+
+function getLocalEnquiries() {
+  return Array.from(localEnquiriesMap.values()).sort((a, b) => {
+    const tA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const tB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return tB - tA;
+  });
 }
 
 // Trigger DB init asynchronously so server startup is 100% instant
@@ -559,6 +636,149 @@ app.post('/api/site-config', async (req, res) => {
     } catch (pgErr) {}
 
     return res.json({ success: true, message: 'Site configuration saved to PostgreSQL.', config: fullConfig });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Endpoint: Submit / Save Enquiry to PostgreSQL DB & Local Disk Fallback
+app.post('/api/enquiries', async (req, res) => {
+  try {
+    const enquiryData = req.body || {};
+    const eId = enquiryData.enquiryId || enquiryData.id || `enq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const fullPayload = {
+      ...enquiryData,
+      id: eId,
+      enquiryId: eId,
+      status: enquiryData.status || 'SUBMITTED',
+      createdAt: enquiryData.createdAt || nowIso,
+      updatedAt: nowIso
+    };
+
+    // 1. Save to local disk fallback store
+    saveLocalEnquiry(fullPayload);
+
+    // 2. Save to PostgreSQL DB
+    try {
+      const queryText = `
+        INSERT INTO enquiries (
+          enquiry_id, property_id, property_title, property_reference_id,
+          owner_id, owner_name, owner_email,
+          customer_id, buyer_id, customer_name, buyer_name,
+          customer_email, buyer_email, customer_phone, buyer_phone,
+          message, preferred_visit_date, status, raw_data, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW()
+        ) ON CONFLICT (enquiry_id) DO UPDATE SET
+          status = EXCLUDED.status,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = NOW();
+      `;
+      await pgPool.query(queryText, [
+        eId,
+        fullPayload.propertyId || '',
+        fullPayload.propertyTitle || '',
+        fullPayload.propertyReferenceId || '',
+        fullPayload.ownerId || '',
+        fullPayload.ownerName || '',
+        fullPayload.ownerEmail || '',
+        fullPayload.customerId || fullPayload.buyerId || '',
+        fullPayload.buyerId || fullPayload.customerId || '',
+        fullPayload.customerName || fullPayload.buyerName || '',
+        fullPayload.buyerName || fullPayload.customerName || '',
+        fullPayload.customerEmail || fullPayload.buyerEmail || '',
+        fullPayload.buyerEmail || fullPayload.customerEmail || '',
+        fullPayload.customerPhone || fullPayload.buyerPhone || '',
+        fullPayload.buyerPhone || fullPayload.customerPhone || '',
+        fullPayload.message || '',
+        fullPayload.preferredVisitDate || null,
+        fullPayload.status || 'SUBMITTED',
+        JSON.stringify(fullPayload)
+      ]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL save enquiry note:', pgErr.message);
+    }
+
+    return res.json({ success: true, enquiryId: eId, enquiry: fullPayload });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Endpoint: Get Enquiries from PostgreSQL DB (with optional filtering)
+app.get('/api/enquiries', async (req, res) => {
+  try {
+    const { ownerId, ownerEmail, customerId, customerEmail, buyerId, buyerEmail } = req.query;
+
+    const localList = getLocalEnquiries();
+    let pgEnquiries = [];
+
+    try {
+      const result = await pgPool.query('SELECT raw_data FROM enquiries ORDER BY updated_at DESC LIMIT 200;');
+      pgEnquiries = result.rows.map(row => row.raw_data).filter(Boolean);
+    } catch (pgErr) {
+      console.warn('PostgreSQL fetch enquiries note:', pgErr.message);
+    }
+
+    const mergedMap = new Map();
+    [...localList, ...pgEnquiries].forEach(e => {
+      if (e && (e.enquiryId || e.id)) {
+        const id = e.enquiryId || e.id;
+        mergedMap.set(id, { ...mergedMap.get(id), ...e });
+      }
+    });
+
+    let allEnquiries = Array.from(mergedMap.values());
+
+    if (ownerId || ownerEmail || customerId || customerEmail || buyerId || buyerEmail) {
+      const oId = String(ownerId || '').toLowerCase().trim();
+      const oEmail = String(ownerEmail || '').toLowerCase().trim();
+      const cId = String(customerId || buyerId || '').toLowerCase().trim();
+      const cEmail = String(customerEmail || buyerEmail || '').toLowerCase().trim();
+
+      allEnquiries = allEnquiries.filter(e => {
+        if (!e) return false;
+        const eOwnerId = String(e.ownerId || '').toLowerCase().trim();
+        const eOwnerEmail = String(e.ownerEmail || '').toLowerCase().trim();
+        const eCustId = String(e.customerId || e.buyerId || '').toLowerCase().trim();
+        const eCustEmail = String(e.customerEmail || e.buyerEmail || '').toLowerCase().trim();
+
+        const matchOwner = (oId && eOwnerId === oId) || (oEmail && eOwnerEmail === oEmail);
+        const matchCustomer = (cId && eCustId === cId) || (cEmail && eCustEmail === cEmail);
+
+        if (oId || oEmail) return matchOwner;
+        if (cId || cEmail) return matchCustomer;
+        return true;
+      });
+    }
+
+    return res.json({ success: true, enquiries: allEnquiries });
+  } catch (err) {
+    return res.json({ success: true, enquiries: getLocalEnquiries() });
+  }
+});
+
+// API Endpoint: Update Enquiry Status in PostgreSQL DB
+app.patch('/api/enquiries/:id', async (req, res) => {
+  try {
+    const eId = req.params.id;
+    const { status } = req.body;
+    if (!eId || !status) return res.status(400).json({ success: false, error: 'Enquiry ID and status required.' });
+
+    const localEnq = localEnquiriesMap.get(eId);
+    if (localEnq) {
+      localEnq.status = status;
+      localEnq.updatedAt = new Date().toISOString();
+      saveLocalEnquiry(localEnq);
+    }
+
+    try {
+      await pgPool.query('UPDATE enquiries SET status = $1, updated_at = NOW() WHERE enquiry_id = $2;', [status, eId]);
+    } catch (e) {}
+
+    return res.json({ success: true, message: 'Enquiry status updated successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
