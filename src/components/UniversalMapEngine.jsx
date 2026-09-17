@@ -628,7 +628,7 @@ export default function UniversalMapEngine({
                     
                     <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1 shadow.md border border-amber-400/40">
                       <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="bg-metallic-gold bg-clip-text text-transparent">
+                      <span className="text-metallic-gold font-black">
                         {prop.verificationStatus || 'PLATFORM VERIFIED'}
                       </span>
                     </div>
