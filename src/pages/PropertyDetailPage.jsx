@@ -19,7 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { getPublicPropertyById } from '../firebase/propertyService.js';
-import { loadGoogleMapsScript } from '../services/locationProvider.js';
+import { loadGoogleMapsScript, extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider.js';
 import { getApplicableSpecificationFields, CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
 import { createEnquiry } from '../firebase/enquiryService.js';
 import { isPropertyWishlisted, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
@@ -119,19 +119,20 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   useEffect(() => {
     if (!property || !mapContainerRef.current) return;
 
-    const lat = property.location?.geoPoint?.latitude || property.location?.lat || property.location?.latitude;
-    const lng = property.location?.geoPoint?.longitude || property.location?.lng || property.location?.longitude;
+    const coords = extractCoordinates(property);
+    const lat = Number(coords.lat);
+    const lng = Number(coords.lng);
 
-    if (!lat || !lng) return;
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 
     loadGoogleMapsScript()
       .then((gMaps) => {
-        const mapPos = { lat: Number(lat), lng: Number(lng) };
+        const mapPos = { lat, lng };
 
         // Create native Google Map
         const map = new gMaps.Map(mapContainerRef.current, {
           center: mapPos,
-          zoom: 16,
+          zoom: 17,
           mapTypeId: 'roadmap',
           fullscreenControl: true,
           streetViewControl: false,
@@ -140,47 +141,56 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
         googleMapRef.current = map;
 
-        // Add Property Location Marker
+        // Price-Tier Marker Palette (100% matched to UniversalMapEngine search map)
+        const priceVal = Number(property.price) || 0;
+        let markerColor = '#10b981'; // Emerald Green
+        let strokeColor = '#047857';
+
+        if (priceVal > 15000000) {
+          markerColor = '#0B2545';  // Navy Blue (Luxury)
+          strokeColor = '#F4C542';  // Gold Border
+        } else if (priceVal > 6000000) {
+          markerColor = '#F4C542';  // Amber Gold
+          strokeColor = '#B48B1B';
+        } else if (priceVal > 3000000) {
+          markerColor = '#7c3aed';  // Deep Violet / Purple
+          strokeColor = '#5b21b6';
+        }
+
+        // Add Property Location Marker Pin
         new gMaps.Marker({
           position: mapPos,
           map: map,
           title: property.title,
           icon: {
             path: gMaps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: '#F4C542',
+            scale: 12,
+            fillColor: markerColor,
             fillOpacity: 1,
-            strokeColor: '#171A1C',
-            strokeWeight: 3
+            strokeColor: strokeColor,
+            strokeWeight: 3.5
           }
         });
 
-        // Add Approved Boundary Polygon (ONLY if boundaryStatus is APPROVED and polygon exists)
-        if (
-          property.boundary &&
-          property.boundary.boundaryStatus === 'APPROVED' &&
-          Array.isArray(property.boundary.approvedPolygon) &&
-          property.boundary.approvedPolygon.length >= 3
-        ) {
-          const polyCoords = property.boundary.approvedPolygon.map(v => ({
-            lat: Number(v.lat || v.latitude),
-            lng: Number(v.lng || v.longitude)
-          }));
+        // Add Plot Boundary Polygon if present
+        const formattedPoly = extractBoundaryPolygon(property);
+        if (formattedPoly && formattedPoly.length >= 3) {
+          const polyCoords = formattedPoly.map(pt => ({ lat: Number(pt[0]), lng: Number(pt[1]) }));
 
           const polygon = new gMaps.Polygon({
             paths: polyCoords,
-            strokeColor: '#10B981',
-            strokeOpacity: 0.9,
+            strokeColor: '#D4A017',
+            strokeOpacity: 0.95,
             strokeWeight: 3,
-            fillColor: '#10B981',
-            fillOpacity: 0.25,
+            fillColor: '#F4C542',
+            fillOpacity: 0.35,
             map: map
           });
 
-          // Fit bounds to polygon
+          // Fit map bounds precisely to plot boundary
           const bounds = new gMaps.LatLngBounds();
           polyCoords.forEach(c => bounds.extend(c));
-          map.fitBounds(bounds);
+          map.fitBounds(bounds, { padding: 40 });
         }
 
         // Fetch Google Places Nearby Infrastructure
