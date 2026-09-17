@@ -11,6 +11,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}[extname]`,
         manualChunks: {
           'vendor-leaflet': ['leaflet'],
           'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
