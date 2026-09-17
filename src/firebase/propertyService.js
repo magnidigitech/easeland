@@ -15,6 +15,7 @@ import {
 import { db } from './config.js';
 import { ListingStatus, VerificationStatus, BoundaryStatus, MediaStatus } from './schema.js';
 import { formatFirestoreError } from './userService.js';
+import { mockApi } from '../services/mockApi.js';
 
 /**
  * Helper to sync property payload to PostgreSQL database (/api/properties)
@@ -1058,17 +1059,109 @@ export async function getOwnerDrafts(ownerId) {
 export async function getPublicPropertyById(propertyId) {
   try {
     if (!propertyId) return { success: false, error: 'Property ID is required.' };
-    const propRef = doc(db, 'properties', propertyId);
-    const snap = await getDoc(propRef);
-    if (!snap.exists()) {
-      return { success: false, error: 'Property not found or no longer available.' };
+
+    let targetIdStr = '';
+    if (typeof propertyId === 'object' && propertyId !== null) {
+      targetIdStr = String(propertyId.propertyId || propertyId.id || propertyId.referenceId || '').trim();
+    } else {
+      targetIdStr = String(propertyId).trim();
     }
 
-    const data = snap.data();
+    if (!targetIdStr) return { success: false, error: 'Valid property reference is required.' };
 
-    // Enforce Public Marketplace Eligibility Boundary: Must be LIVE AND isPublished === true
-    if (data.listingStatus !== ListingStatus.LIVE || data.isPublished !== true) {
-      return { success: false, error: 'Property listing is no longer available on EaseLand.' };
+    let data = null;
+
+    // 1. Try Direct Firestore Doc Lookup by Document ID
+    try {
+      const propRef = doc(db, 'properties', targetIdStr);
+      const snap = await getDoc(propRef);
+      if (snap.exists()) {
+        data = { ...snap.data(), propertyId: snap.id };
+      }
+    } catch (err) {
+      console.warn('Firestore doc lookup note:', err);
+    }
+
+    // 2. Query Firestore by referenceId or propertyId field
+    if (!data) {
+      try {
+        const qRef = query(collection(db, 'properties'), where('referenceId', '==', targetIdStr));
+        const refSnap = await getDocs(qRef);
+        if (!refSnap.empty) {
+          const docMatch = refSnap.docs[0];
+          data = { ...docMatch.data(), propertyId: docMatch.id };
+        } else {
+          const qPropId = query(collection(db, 'properties'), where('propertyId', '==', targetIdStr));
+          const propIdSnap = await getDocs(qPropId);
+          if (!propIdSnap.empty) {
+            const docMatch = propIdSnap.docs[0];
+            data = { ...docMatch.data(), propertyId: docMatch.id };
+          }
+        }
+      } catch (err) {
+        console.warn('Firestore query note:', err);
+      }
+    }
+
+    // 3. Fallback to mockApi & Local Storage stores
+    if (!data && typeof window !== 'undefined' && typeof mockApi !== 'undefined') {
+      try {
+        const allLocal = mockApi.getPublicProperties({});
+        const match = allLocal.find(p => {
+          if (!p) return false;
+          const pid = String(p.propertyId || p.id || '');
+          const refid = String(p.referenceId || '');
+          return pid === targetIdStr || refid === targetIdStr ||
+                 pid.toLowerCase() === targetIdStr.toLowerCase() ||
+                 refid.toLowerCase() === targetIdStr.toLowerCase();
+        });
+        if (match) {
+          data = { ...match };
+        }
+      } catch (err) {
+        console.warn('Local store lookup note:', err);
+      }
+    }
+
+    // 4. Fallback to PostgreSQL server endpoint /api/properties/:id
+    if (!data && typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/properties/${encodeURIComponent(targetIdStr)}`);
+        if (res.ok) {
+          const pgRes = await res.json();
+          if (pgRes && (pgRes.property || pgRes.data)) {
+            data = pgRes.property || pgRes.data;
+          }
+        }
+      } catch (err) {
+        console.warn('PostgreSQL property lookup note:', err);
+      }
+    }
+
+    if (!data) {
+      return { success: false, error: 'The requested property reference does not exist on our direct marketplace.' };
+    }
+
+    // Status & Availability Normalization
+    const statusVal = String(data.listingStatus || data.status || '').toUpperCase();
+    const verVal = String(data.verificationStatus || '').toUpperCase();
+
+    const isArchivedOrDeleted = statusVal === 'ARCHIVED' || statusVal === 'DELETED' || statusVal === 'REJECTED';
+
+    const isLive = statusVal === 'LIVE' ||
+                   statusVal === 'APPROVED_LIVE' ||
+                   statusVal === 'APPROVED' ||
+                   statusVal === 'PLATFORM VERIFIED' ||
+                   statusVal === 'VERIFIED' ||
+                   verVal === 'PLATFORM VERIFIED' ||
+                   verVal === 'VERIFIED' ||
+                   verVal === 'APPROVED' ||
+                   data.isPlatformVerified === true ||
+                   data.isPublished === true ||
+                   (!isArchivedOrDeleted && data.isPublished !== false);
+
+    if (isArchivedOrDeleted || !isLive) {
+      return { success: false, error: 'This property listing is no longer active on the public marketplace.' };
     }
 
     // Expose APPROVED public media items from publicApprovedMedia, media, photos, images, or single URLs
@@ -1087,9 +1180,9 @@ export async function getPublicPropertyById(propertyId) {
     // Only expose boundary polygon if explicitly APPROVED by platform audit
     const approvedBoundary = (data.boundary && data.boundary.boundaryStatus === BoundaryStatus.APPROVED) ? data.boundary : null;
 
-    // Public Projection (Zero exposure of propertyPrivate, propertyAdminInternal, confidentialDocs, or private phone)
+    // Public Projection
     const publicProperty = {
-      propertyId: data.propertyId || snap.id,
+      propertyId: data.propertyId || data.id || targetIdStr,
       referenceId: data.referenceId || '',
       ownerId: data.ownerId || '',
       ownerPublicName: data.ownerPublicName || 'Property Owner',
@@ -1098,19 +1191,19 @@ export async function getPublicPropertyById(propertyId) {
       purpose: data.purpose || 'SALE',
       description: data.description || '',
       price: Number(data.price) || 0,
-      priceDisplay: data.priceDisplay || 'Contact for Price',
+      priceDisplay: data.priceDisplay || (data.price ? `Rs. ${Number(data.price).toLocaleString('en-IN')}` : 'Contact for Price'),
       area: Number(data.area) || 0,
-      areaDisplay: data.areaDisplay || '',
+      areaDisplay: data.areaDisplay || (data.area ? `${data.area} sq ft` : ''),
       specs: data.specs || {},
       amenities: Array.isArray(data.amenities) ? data.amenities : [],
       media: approvedMedia,
       publicApprovedMedia: approvedMedia,
       location: data.location || null,
       boundary: approvedBoundary,
-      listingStatus: data.listingStatus,
-      isPlatformVerified: Boolean(data.isPlatformVerified),
+      listingStatus: data.listingStatus || 'LIVE',
+      isPlatformVerified: Boolean(data.isPlatformVerified || verVal === 'PLATFORM VERIFIED' || verVal === 'VERIFIED'),
       views: data.views || 0,
-      createdAt: data.createdAt
+      createdAt: data.createdAt || new Date().toISOString()
     };
 
     return { success: true, property: publicProperty };

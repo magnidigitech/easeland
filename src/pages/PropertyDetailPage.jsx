@@ -28,10 +28,14 @@ import { useAuth } from '../context/AuthContext.jsx';
 export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavigateHome, onNavigateMap }) {
   // Extract propertyId from props or window URL (/property/:propertyId)
   const getPropertyIdFromUrl = () => {
-    if (propIdFromProps) return propIdFromProps;
+    if (propIdFromProps) {
+      return typeof propIdFromProps === 'object'
+        ? (propIdFromProps.propertyId || propIdFromProps.id || propIdFromProps.referenceId)
+        : propIdFromProps;
+    }
     const path = window.location.pathname;
-    const match = path.match(/\/property\/([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
+    const match = path.match(/\/property\/([a-zA-Z0-9_%-]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
   };
 
   const propertyId = getPropertyIdFromUrl();

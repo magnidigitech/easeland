@@ -348,7 +348,10 @@ export default function PropertiesSearchPage({
           properties={properties}
           filters={searchState}
           setFilters={setSearchState}
-          onSelectProperty={(pId) => onNavigateToProperty(pId)}
+          onSelectProperty={(p) => {
+            const targetId = typeof p === 'string' ? p : (p?.propertyId || p?.id || p?.referenceId);
+            onNavigateToProperty(targetId);
+          }}
           onWishlistToggle={handleWishlistToggle}
           isWishlisted={(pId) => wishlistSet.has(pId)}
           focusedProperty={focusedProperty}
