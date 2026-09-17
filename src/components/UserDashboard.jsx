@@ -73,15 +73,36 @@ export default function UserDashboard({
     }
   };
 
+  const refreshEnquiriesAndData = () => {
+    const userId = user?.uid || user?.id;
+    const userEmail = user?.email || '';
+    if (!user || (!userId && !userEmail)) return;
+
+    Promise.all([
+      getCustomerEnquiries(userId, userEmail),
+      getOwnerEnquiries(userId, userEmail),
+      getUserWishlistProperties(userId),
+      getDerivedEnquiryNotifications(userId),
+      getOwnerProperties(userId)
+    ]).then(([custRes, ownerRes, wishRes, notifRes, ownerPropRes]) => {
+      if (custRes.success) setFbSentEnquiries(custRes.enquiries || []);
+      if (ownerRes.success) setFbReceivedEnquiries(ownerRes.enquiries || []);
+      if (wishRes.success) setFbWishlistProps(wishRes.properties || []);
+      if (notifRes.success) setFbNotifications(notifRes.notifications || []);
+      if (ownerPropRes.success) setFbOwnerProperties(ownerPropRes.properties || []);
+    });
+  };
+
   useEffect(() => {
     const userId = user?.uid || user?.id;
-    if (!user || !userId) return;
+    const userEmail = user?.email || '';
+    if (!user || (!userId && !userEmail)) return;
     let isMounted = true;
     setFbLoading(true);
 
     Promise.all([
-      getCustomerEnquiries(userId),
-      getOwnerEnquiries(userId),
+      getCustomerEnquiries(userId, userEmail),
+      getOwnerEnquiries(userId, userEmail),
       getUserWishlistProperties(userId),
       getDerivedEnquiryNotifications(userId),
       getOwnerProperties(userId)
@@ -96,7 +117,15 @@ export default function UserDashboard({
       if (isMounted) setFbLoading(false);
     });
 
-    return () => { isMounted = false; };
+    const handleEnqSync = () => refreshEnquiriesAndData();
+    window.addEventListener('easeland-enquiry-created', handleEnqSync);
+    window.addEventListener('storage', handleEnqSync);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('easeland-enquiry-created', handleEnqSync);
+      window.removeEventListener('storage', handleEnqSync);
+    };
   }, [user]);
 
 

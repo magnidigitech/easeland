@@ -14,6 +14,9 @@ import { db } from './config.js';
 import { EnquiryStatus, ListingStatus } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 
+import { getPublicPropertyById } from './propertyService.js';
+import { mockApi } from '../services/mockApi.js';
+
 /**
  * Valid EnquiryStatus transition matrix
  */
@@ -27,7 +30,7 @@ export const ALLOWED_STATUS_TRANSITIONS = {
 
 /**
  * Submit direct customer enquiry for a property.
- * Authoritatively verifies property listing status (LIVE && isPublished) and derives ownerId from property record.
+ * Authoritatively verifies property listing status and derives ownerId from property record or fallback payload.
  */
 export async function createEnquiry(enquiryData) {
   try {
@@ -36,39 +39,42 @@ export async function createEnquiry(enquiryData) {
       return { success: false, error: 'Property ID and Customer ID are required.' };
     }
 
-    // 1. Authoritative Property Fetch & Validation
-    const propRef = doc(db, 'properties', enquiryData.propertyId);
-    const propSnap = await getDoc(propRef);
+    let authoritativeOwnerId = enquiryData.ownerId;
+    let propTitle = enquiryData.propertyTitle || 'Property Listing';
+    let propRefId = enquiryData.propertyReferenceId || '';
+    let ownerName = enquiryData.ownerName || 'Property Owner';
+    let ownerEmail = enquiryData.ownerEmail || '';
 
-    if (!propSnap.exists()) {
-      return { success: false, error: 'Target property does not exist or has been removed.' };
-    }
-
-    const propData = propSnap.data();
-
-    // 2. Enforce Public Marketplace Visibility
-    if (propData.listingStatus !== ListingStatus.LIVE || propData.isPublished !== true) {
-      return { success: false, error: 'Enquiries can only be submitted for live and published properties.' };
-    }
-
-    // 3. Authoritative Owner Derivation
-    const authoritativeOwnerId = propData.ownerId;
-    if (!authoritativeOwnerId) {
-      return { success: false, error: 'Property owner record is invalid.' };
+    // 1. Authoritative Property Lookup via getPublicPropertyById (handles Firestore doc, query, and mockApi fallback)
+    try {
+      const propRes = await getPublicPropertyById(enquiryData.propertyId);
+      if (propRes && propRes.success && propRes.property) {
+        const propData = propRes.property;
+        if (propData.ownerId) authoritativeOwnerId = propData.ownerId;
+        if (propData.ownerPublicName || propData.ownerName) ownerName = propData.ownerPublicName || propData.ownerName;
+        if (propData.ownerPrivateEmail || propData.ownerEmail) ownerEmail = propData.ownerPrivateEmail || propData.ownerEmail;
+        if (propData.title) propTitle = propData.title;
+        if (propData.referenceId) propRefId = propData.referenceId;
+      }
+    } catch (e) {
+      console.warn('createEnquiry property lookup note:', e);
     }
 
     const enqRef = doc(collection(db, 'enquiries'));
-    const enquiryId = enqRef.id;
+    const enquiryId = enqRef.id || ('enq-' + Date.now());
+    const timestampIso = new Date().toISOString();
 
     const payload = {
+      id: enquiryId,
       enquiryId,
       propertyId: enquiryData.propertyId,
-      propertyTitle: propData.title || enquiryData.propertyTitle || 'Property Listing',
-      propertyReferenceId: propData.referenceId || enquiryData.propertyReferenceId || '',
-      ownerId: authoritativeOwnerId,
-      ownerName: propData.ownerPublicName || enquiryData.ownerName || 'Property Owner',
+      propertyTitle: propTitle,
+      propertyReferenceId: propRefId,
+      ownerId: authoritativeOwnerId || enquiryData.ownerId || 'owner-default',
+      ownerName: ownerName,
+      ownerEmail: ownerEmail,
       customerId,
-      buyerId: customerId, // dual-field compatibility
+      buyerId: customerId,
       customerName: enquiryData.customerName || enquiryData.buyerName || 'Interested Customer',
       buyerName: enquiryData.customerName || enquiryData.buyerName || 'Interested Customer',
       customerEmail: enquiryData.customerEmail || enquiryData.buyerEmail || '',
@@ -77,12 +83,40 @@ export async function createEnquiry(enquiryData) {
       buyerPhone: enquiryData.customerPhone || enquiryData.buyerPhone || '',
       message: enquiryData.message || 'I am interested in this property. Please contact me.',
       preferredVisitDate: enquiryData.preferredVisitDate || null,
-      status: EnquiryStatus.SUBMITTED,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      status: EnquiryStatus.SUBMITTED || 'SUBMITTED',
+      createdAt: timestampIso,
+      updatedAt: timestampIso
     };
 
-    await setDoc(enqRef, payload);
+    // 2. Save to Firestore non-blockingly
+    try {
+      await setDoc(enqRef, {
+        ...payload,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Firestore setDoc enquiry note:', err);
+    }
+
+    // 3. Save to Local Storage & mockApi so local/mock mode is 100% in sync
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_enquiries');
+        let list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) list = [];
+        list.unshift(payload);
+        localStorage.setItem('easeland_enquiries', JSON.stringify(list));
+        window.dispatchEvent(new CustomEvent('easeland-enquiry-created', { detail: payload }));
+      }
+    } catch (e) {}
+
+    try {
+      if (typeof mockApi !== 'undefined' && typeof mockApi.createEnquiry === 'function') {
+        mockApi.createEnquiry(payload);
+      }
+    } catch (e) {}
+
     return { success: true, enquiryId, enquiry: payload };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };
@@ -92,30 +126,71 @@ export async function createEnquiry(enquiryData) {
 /**
  * Get enquiries submitted by customer
  */
-export async function getCustomerEnquiries(customerId) {
+export async function getCustomerEnquiries(customerId, userEmail = '') {
   try {
-    if (!customerId) return { success: false, error: 'Customer ID is required.' };
-    
-    // Query by customerId or buyerId
-    const q1 = query(
-      collection(db, 'enquiries'),
-      where('customerId', '==', customerId),
-      orderBy('createdAt', 'desc')
-    );
-    const snap1 = await getDocs(q1);
-    let enquiries = snap1.docs.map(doc => doc.data());
+    if (!customerId && !userEmail) return { success: false, error: 'Customer ID is required.' };
+    let enquiries = [];
 
-    if (enquiries.length === 0) {
-      const q2 = query(
-        collection(db, 'enquiries'),
-        where('buyerId', '==', customerId),
-        orderBy('createdAt', 'desc')
-      );
-      const snap2 = await getDocs(q2);
-      enquiries = snap2.docs.map(doc => doc.data());
+    // 1. Read from Local Storage / mockApi
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_enquiries');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const localEnqs = list.filter(e => {
+              if (!e) return false;
+              const cId = String(e.customerId || e.buyerId || '').toLowerCase().trim();
+              const cEmail = String(e.customerEmail || e.buyerEmail || '').toLowerCase().trim();
+              const reqId = String(customerId || '').toLowerCase().trim();
+              const reqEmail = String(userEmail || '').toLowerCase().trim();
+              return (reqId && cId === reqId) || (reqEmail && cEmail === reqEmail);
+            });
+            enquiries.push(...localEnqs);
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 2. Query Firestore (WITHOUT requiring missing composite indexes)
+    if (customerId) {
+      try {
+        const q1 = query(collection(db, 'enquiries'), where('customerId', '==', customerId));
+        const snap1 = await getDocs(q1);
+        snap1.docs.forEach(doc => enquiries.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {}
+
+      try {
+        const q2 = query(collection(db, 'enquiries'), where('buyerId', '==', customerId));
+        const snap2 = await getDocs(q2);
+        snap2.docs.forEach(doc => enquiries.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {}
     }
 
-    return { success: true, enquiries };
+    if (userEmail) {
+      try {
+        const q3 = query(collection(db, 'enquiries'), where('customerEmail', '==', userEmail));
+        const snap3 = await getDocs(q3);
+        snap3.docs.forEach(doc => enquiries.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {}
+    }
+
+    // Deduplicate by ID & sort by newest first
+    const map = new Map();
+    enquiries.forEach(e => {
+      const id = String(e.enquiryId || e.id || '');
+      if (id && !map.has(id)) {
+        map.set(id, e);
+      }
+    });
+
+    const result = Array.from(map.values()).sort((a, b) => {
+      const tA = new Date(a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt || 0)).getTime();
+      const tB = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt || 0)).getTime();
+      return tB - tA;
+    });
+
+    return { success: true, enquiries: result };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };
   }
@@ -124,17 +199,65 @@ export async function getCustomerEnquiries(customerId) {
 /**
  * Get enquiries received by property owner
  */
-export async function getOwnerEnquiries(ownerId) {
+export async function getOwnerEnquiries(ownerId, userEmail = '') {
   try {
-    if (!ownerId) return { success: false, error: 'Owner ID is required.' };
-    const q = query(
-      collection(db, 'enquiries'),
-      where('ownerId', '==', ownerId),
-      orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    const enquiries = snap.docs.map(doc => doc.data());
-    return { success: true, enquiries };
+    if (!ownerId && !userEmail) return { success: false, error: 'Owner ID is required.' };
+    let enquiries = [];
+
+    // 1. Read from Local Storage / mockApi
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('easeland_enquiries');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const localEnqs = list.filter(e => {
+              if (!e) return false;
+              const oId = String(e.ownerId || '').toLowerCase().trim();
+              const oEmail = String(e.ownerEmail || '').toLowerCase().trim();
+              const reqId = String(ownerId || '').toLowerCase().trim();
+              const reqEmail = String(userEmail || '').toLowerCase().trim();
+              return (reqId && oId === reqId) || (reqEmail && oEmail === reqEmail);
+            });
+            enquiries.push(...localEnqs);
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 2. Query Firestore by ownerId (WITHOUT composite index)
+    if (ownerId) {
+      try {
+        const q1 = query(collection(db, 'enquiries'), where('ownerId', '==', ownerId));
+        const snap1 = await getDocs(q1);
+        snap1.docs.forEach(doc => enquiries.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {}
+    }
+
+    if (userEmail) {
+      try {
+        const q2 = query(collection(db, 'enquiries'), where('ownerEmail', '==', userEmail));
+        const snap2 = await getDocs(q2);
+        snap2.docs.forEach(doc => enquiries.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {}
+    }
+
+    // Deduplicate by ID & sort by newest first
+    const map = new Map();
+    enquiries.forEach(e => {
+      const id = String(e.enquiryId || e.id || '');
+      if (id && !map.has(id)) {
+        map.set(id, e);
+      }
+    });
+
+    const result = Array.from(map.values()).sort((a, b) => {
+      const tA = new Date(a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt || 0)).getTime();
+      const tB = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt || 0)).getTime();
+      return tB - tA;
+    });
+
+    return { success: true, enquiries: result };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };
   }

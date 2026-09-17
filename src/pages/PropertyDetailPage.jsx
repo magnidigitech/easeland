@@ -283,15 +283,18 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
     try {
       const payload = {
-        propertyId: property.propertyId,
-        propertyTitle: property.title,
-        propertyReferenceId: property.referenceId,
-        customerId: user.uid,
-        buyerId: user.uid,
+        propertyId: property.propertyId || property.id,
+        propertyTitle: property.title || 'Property Listing',
+        propertyReferenceId: property.referenceId || `EL-PROP-${property.id || ''}`,
+        customerId: user?.uid || user?.id || 'guest-customer',
+        buyerId: user?.uid || user?.id || 'guest-customer',
         customerName: enquiryForm.name.trim(),
         customerPhone: enquiryForm.phone.trim(),
-        customerEmail: enquiryForm.email.trim(),
-        message: enquiryForm.message.trim()
+        customerEmail: enquiryForm.email.trim() || user?.email || '',
+        message: enquiryForm.message.trim(),
+        ownerId: property.ownerId || property.owner?.id || property.userId || property.uid,
+        ownerName: property.ownerPublicName || property.ownerName || 'Property Owner',
+        ownerEmail: property.ownerPrivateEmail || property.ownerPublicEmail || property.ownerEmail || ''
       };
 
       const res = await createEnquiry(payload);
