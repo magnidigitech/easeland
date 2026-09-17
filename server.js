@@ -492,6 +492,10 @@ app.delete('/api/properties/:id', async (req, res) => {
 
     return res.json({ success: true, message: 'Property deleted successfully.' });
   } catch (err) {
+    return res.status(500).json({ success: false, error: err.message || 'Delete failed' });
+  }
+});
+
 // API Endpoint: Get Site Configuration from PostgreSQL DB (with disk fallback)
 const siteConfigStoreFile = path.join(uploadsDir, 'site_config_store.json');
 let localSiteConfigMap = new Map();
