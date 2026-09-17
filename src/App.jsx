@@ -14,6 +14,7 @@ import PostPropertyWizard from './pages/PostPropertyWizard';
 import AdminPortal from './pages/AdminPortal';
 import UserDashboard from './components/UserDashboard';
 import PropertiesSearchPage from './pages/PropertiesSearchPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import { mockApi, applySiteTheme } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
@@ -115,6 +116,8 @@ export default function App() {
         targetPath = '/dashboard';
       } else if (pageName === 'wishlist') {
         targetPath = '/wishlist';
+      } else if (pageName === 'privacy-policy' || pageName === 'privacy') {
+        targetPath = '/privacy-policy';
       } else {
         targetPath = '/';
       }
@@ -190,9 +193,15 @@ export default function App() {
       return;
     }
 
+    if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') {
+      setActivePage('privacy-policy');
+      try { localStorage.setItem('easeland_active_page', 'privacy-policy'); } catch(e){}
+      return;
+    }
+
     // Default '/' path or unmapped route: check savedPage
     const savedPage = localStorage.getItem('easeland_active_page');
-    if (savedPage && ['buy', 'rent', 'sell', 'post-property', 'dashboard', 'wishlist', 'map', 'admin'].includes(savedPage)) {
+    if (savedPage && ['buy', 'rent', 'sell', 'post-property', 'dashboard', 'wishlist', 'map', 'admin', 'privacy-policy'].includes(savedPage)) {
       setActivePage(savedPage);
       let syncUrl = '/';
       if (savedPage === 'map') syncUrl = '/properties';
@@ -599,6 +608,11 @@ export default function App() {
         {activePage === 'rent' && <RentInfoPage onExploreClick={() => changeActivePage('map')} />}
         {activePage === 'sell' && <SellInfoPage onPostPropertyClick={handlePostPropertyClick} />}
 
+        {/* PRIVACY POLICY PAGE */}
+        {(activePage === 'privacy-policy' || activePage === 'privacy') && (
+          <PrivacyPolicyPage onBackToHome={() => changeActivePage('home')} />
+        )}
+
         {/* WIZARD & DASHBOARDS */}
         {activePage === 'post-property' && (
           <PostPropertyWizard
@@ -711,6 +725,7 @@ export default function App() {
             <div>
               <h4 className="font-extrabold text-brand-yellow uppercase tracking-wider mb-3">Legal & Support</h4>
               <ul className="space-y-2 text-gray-400 text-xs">
+                <li><button onClick={() => changeActivePage('privacy-policy')} className="hover:text-white font-bold text-brand-yellow underline">Privacy Policy</button></li>
                 <li><span>{siteConfig.footer?.officeAddress}</span></li>
                 <li><span>Phone: {siteConfig.footer?.supportPhone}</span></li>
                 <li><span>Email: {siteConfig.footer?.supportEmail}</span></li>
