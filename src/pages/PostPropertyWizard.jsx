@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
 import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById, deletePropertyListing } from '../firebase/propertyService.js';
@@ -13,6 +13,23 @@ import PropertyReviewStep from '../components/PropertyReviewStep.jsx';
 
 export default function PostPropertyWizard({ onComplete, onCancel, resumePropertyId = null }) {
   const { user, profile } = useAuth();
+
+  const checkProfileCriteria = () => {
+    const missing = [];
+    const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || '').trim();
+    const email = (user?.email || profile?.email || '').trim();
+    const phone = (user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || '').trim();
+    const city = (user?.city || user?.location || profile?.city || profile?.location || '').trim();
+
+    if (!name || name === 'EaseLand User') missing.push('Full Name');
+    if (!email) missing.push('Email Address');
+    if (!phone) missing.push('Phone Number');
+    if (!city) missing.push('City / Location');
+
+    return missing;
+  };
+
+  const missingProfileCriteria = checkProfileCriteria();
 
   const [step, setStep] = useState(1);
   const [propertyId, setPropertyId] = useState(null);
@@ -475,6 +492,44 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           ></div>
         </div>
       </div>
+
+      {/* PROFILE CRITERIA WARNING */}
+      {missingProfileCriteria.length > 0 && (
+        <div className="mb-6 p-5 bg-amber-50 border-2 border-amber-300 rounded-2xl space-y-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-200/70 text-amber-900 flex items-center justify-center font-extrabold shrink-0">
+              <AlertCircle className="w-5 h-5 text-amber-700" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-amber-950">Profile Criteria Required Before Posting</h3>
+              <p className="text-xs text-amber-800 font-semibold">
+                Your Account &amp; Profile settings are missing required fields. Please complete these details in Account Settings before posting your property.
+              </p>
+            </div>
+          </div>
+          <div className="pl-13 space-y-1">
+            <span className="text-[11px] font-black uppercase text-amber-900 tracking-wider">Missing Required Fields ({missingProfileCriteria.length}):</span>
+            <ul className="flex flex-wrap gap-2 pt-1">
+              {missingProfileCriteria.map((field) => (
+                <li key={field} className="bg-amber-200/60 text-amber-950 text-xs font-bold px-2.5 py-1 rounded-lg border border-amber-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                  <span>{field}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="pt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="bg-brand-charcoal hover:bg-black text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5"
+            >
+              <Settings className="w-4 h-4 text-brand-yellow" />
+              <span>Go to Account Settings to Complete</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MESSAGES */}
       {errorMsg && (

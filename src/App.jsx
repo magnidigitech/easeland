@@ -19,7 +19,7 @@ import { mockApi, applySiteTheme, safeArray } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
-import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown } from 'lucide-react';
+import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings } from 'lucide-react';
 
 const getInitialPageState = () => {
   if (typeof window === 'undefined') return { page: 'home', propId: null };
@@ -340,6 +340,23 @@ export default function App() {
   };
 
   const [editingPropertyId, setEditingPropertyId] = useState(null);
+  const [incompleteProfileFields, setIncompleteProfileFields] = useState([]);
+  const [isProfileWarningOpen, setIsProfileWarningOpen] = useState(false);
+
+  const checkProfileComplete = (u, p) => {
+    const missing = [];
+    const name = (u?.name || u?.displayName || p?.name || p?.displayName || '').trim();
+    const email = (u?.email || p?.email || '').trim();
+    const phone = (u?.phone || u?.phoneNumber || p?.phone || p?.phoneNumber || '').trim();
+    const city = (u?.city || u?.location || p?.city || p?.location || '').trim();
+
+    if (!name || name === 'EaseLand User') missing.push('Full Name');
+    if (!email) missing.push('Email Address');
+    if (!phone) missing.push('Phone Number');
+    if (!city) missing.push('City / Location');
+
+    return missing;
+  };
 
   const handlePostPropertyClick = (propId = null) => {
     const targetPropId = typeof propId === 'string' ? propId : null;
@@ -348,13 +365,25 @@ export default function App() {
       setAuthIntent('post-property');
       setIsAuthModalOpen(true);
     } else {
-      changeActivePage('post-property');
+      const missingFields = checkProfileComplete(currentUser, authProfile);
+      if (missingFields.length > 0) {
+        setIncompleteProfileFields(missingFields);
+        setIsProfileWarningOpen(true);
+      } else {
+        changeActivePage('post-property');
+      }
     }
   };
 
   const handleAuthSuccess = (authenticatedUser, intent) => {
     if (intent === 'post-property') {
-      changeActivePage('post-property');
+      const missingFields = checkProfileComplete(authenticatedUser, authProfile);
+      if (missingFields.length > 0) {
+        setIncompleteProfileFields(missingFields);
+        setIsProfileWarningOpen(true);
+      } else {
+        changeActivePage('post-property');
+      }
     } else {
       changeActivePage('dashboard');
     }
@@ -787,6 +816,68 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
       />
+
+      {/* INCOMPLETE PROFILE CRITERIA WARNING MODAL FOR POST PROPERTY */}
+      {isProfileWarningOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-amber-200 overflow-hidden space-y-5 p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-brand-charcoal">Profile Criteria Required</h3>
+                  <span className="text-xs text-amber-700 font-semibold">Account Setup Incomplete</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsProfileWarningOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed font-medium">
+              Before posting a property listing on EaseLand, all 4 Account &amp; Profile fields must be completed. Please fill out the missing required fields below:
+            </p>
+
+            <div className="bg-amber-50/80 rounded-xl p-4 border border-amber-200 space-y-2">
+              <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider block">
+                Missing Required Fields ({incompleteProfileFields.length}):
+              </span>
+              <ul className="space-y-1.5">
+                {incompleteProfileFields.map((fieldLabel) => (
+                  <li key={fieldLabel} className="text-xs font-extrabold text-amber-800 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                    <span>{fieldLabel}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setIsProfileWarningOpen(false);
+                  changeActivePage('dashboard');
+                }}
+                className="flex-1 bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
+              >
+                <Settings className="w-4 h-4 text-brand-yellow" />
+                <span>Fill Account Settings</span>
+              </button>
+              <button
+                onClick={() => setIsProfileWarningOpen(false)}
+                className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -455,26 +455,48 @@ export default function UserDashboard({
     return p.status === propertyFilter;
   });
 
+  const [profileSaveError, setProfileSaveError] = useState(null);
+
   const handleProfileSave = async (e) => {
     e.preventDefault();
+    setProfileSaveError(null);
+
+    const nameVal = (profileForm.name || '').trim();
+    const emailVal = (profileForm.email || '').trim();
+    const phoneVal = (profileForm.phone || '').trim();
+    const cityVal = (profileForm.city || '').trim();
+
+    if (!nameVal || nameVal === 'EaseLand User' || !emailVal || !phoneVal || !cityVal) {
+      const missing = [];
+      if (!nameVal || nameVal === 'EaseLand User') missing.push('Full Name');
+      if (!emailVal) missing.push('Email Address');
+      if (!phoneVal) missing.push('Phone Number');
+      if (!cityVal) missing.push('City / Location');
+
+      setProfileSaveError(`Please complete all 4 required account fields: ${missing.join(', ')}.`);
+      return;
+    }
+
     setSavingProfile(true);
     try {
       const res = await updateProfileData({
-        displayName: profileForm.name,
-        name: profileForm.name,
-        phone: profileForm.phone,
-        phoneNumber: profileForm.phone,
-        city: profileForm.city
+        displayName: nameVal,
+        name: nameVal,
+        email: emailVal,
+        phone: phoneVal,
+        phoneNumber: phoneVal,
+        city: cityVal,
+        location: cityVal
       });
       if (res && res.success) {
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3000);
       } else if (res && res.error) {
-        alert(`Error updating profile: ${res.error}`);
+        setProfileSaveError(`Error updating profile: ${res.error}`);
       }
     } catch (err) {
       console.error('Error saving profile:', err);
-      alert('Failed to update profile. Please try again.');
+      setProfileSaveError('Failed to update profile. Please try again.');
     } finally {
       setSavingProfile(false);
     }
@@ -1497,21 +1519,35 @@ export default function UserDashboard({
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
                 <h2 className="font-extrabold text-lg text-brand-charcoal">Account & Profile Settings</h2>
 
+                {profileSaveError && (
+                  <div className="bg-red-50 text-red-800 text-xs font-extrabold p-3 rounded-xl border border-red-200 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>{profileSaveError}</span>
+                  </div>
+                )}
+
                 {savedSuccess && (
                   <div className="bg-emerald-50 text-emerald-800 text-xs font-extrabold p-3 rounded-xl border border-emerald-200 flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span>Profile settings updated successfully!</span>
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Profile settings updated successfully! All posting criteria met.</span>
                   </div>
                 )}
 
                 <form onSubmit={handleProfileSave} className="space-y-4">
+                  <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-[11px] font-bold text-amber-900 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Note: All 4 profile fields below are required criteria before you can post property listings.</span>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        Full Name
+                        Full Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
+                        required
+                        placeholder="e.g. KrishnaSai Kannasani"
                         value={profileForm.name}
                         onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1520,10 +1556,12 @@ export default function UserDashboard({
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        Email Address
+                        Email Address <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="email"
+                        required
+                        placeholder="clinformatiqsessions@gmail.com"
                         value={profileForm.email}
                         onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1532,10 +1570,12 @@ export default function UserDashboard({
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        Phone Number
+                        Phone Number <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
+                        required
+                        placeholder="+91 98765 43210"
                         value={profileForm.phone}
                         onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1544,10 +1584,12 @@ export default function UserDashboard({
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        City / Location
+                        City / Location <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
+                        required
+                        placeholder="e.g. Guntur, Andhra Pradesh"
                         value={profileForm.city}
                         onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
