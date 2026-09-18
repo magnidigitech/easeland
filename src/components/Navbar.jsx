@@ -114,25 +114,23 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActivePage('dashboard')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-colors ${
+                  className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all ${
                     activePage === 'dashboard'
-                      ? 'bg-metallic-gold text-slate-950 border-amber-300 font-extrabold shadow-md'
-                      : 'bg-slate-900 text-slate-200 border-slate-700 hover:bg-slate-800'
+                      ? 'bg-slate-900 text-slate-100 border-2 border-amber-400 font-extrabold shadow-[0_0_15px_rgba(212,175,55,0.3)]'
+                      : 'bg-slate-900/80 text-slate-200 border border-slate-700 hover:bg-slate-800 hover:border-slate-600'
                   }`}
                   title="Open User Dashboard"
                 >
-                  <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shadow transition-colors ${
-                    activePage === 'dashboard'
-                      ? 'bg-slate-950 text-metallic-gold'
-                      : 'bg-metallic-gold text-slate-950'
-                  }`}>
+                  <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow-md border border-amber-300/40 shrink-0">
                     {(user.name || user.displayName || user.email || 'u').charAt(0).toLowerCase()}
                   </div>
                   <div className="text-left">
-                    <span className="block text-xs font-bold line-clamp-1 max-w-[110px]">
+                    <span className="block text-xs font-bold line-clamp-1 max-w-[110px] text-slate-100">
                       {user.name || user.displayName || 'EaseLand User'}
                     </span>
-                    <span className="block text-[9px] uppercase font-semibold opacity-80">
+                    <span className={`block text-[9px] uppercase font-black tracking-wider ${
+                      activePage === 'dashboard' ? 'text-amber-400' : 'text-slate-400'
+                    }`}>
                       {user.role === 'ADMIN' ? 'DASHBOARD' : 'Dashboard'}
                     </span>
                   </div>
