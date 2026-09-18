@@ -64,12 +64,30 @@ export default function App() {
     (typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true')
   );
 
+  const sanitizePhone = (ph) => {
+    if (!ph) return '';
+    const str = String(ph).trim();
+    const lower = str.toLowerCase();
+    if (
+      str === '+91 98765 43210' ||
+      str === '9876543210' ||
+      str === '+91 98765 00000' ||
+      str === '9876500000' ||
+      str === '+91 N/A' ||
+      str === 'N/A' ||
+      lower === 'n/a' ||
+      lower === 'null' ||
+      lower === 'undefined'
+    ) return '';
+    return str;
+  };
+
   const currentUser = authUser ? {
     uid: authUser.uid,
     id: authUser.uid,
     name: authProfile?.displayName || authUser.displayName || (isAdminSession ? 'EaseLand Admin' : 'EaseLand User'),
     email: authUser.email,
-    phone: authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || '',
+    phone: sanitizePhone(authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || authUser?.phone || ''),
     role: isAdminSession ? 'ADMIN' : (authProfile?.role || 'USER'),
     adminRole: isAdminSession,
     capabilities: isAdminSession ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (authProfile?.capabilities || ['CUSTOMER', 'OWNER']),
@@ -347,7 +365,7 @@ export default function App() {
     const missing = [];
     const name = (u?.name || u?.displayName || p?.name || p?.displayName || '').trim();
     const email = (u?.email || p?.email || '').trim();
-    const phone = (u?.phone || u?.phoneNumber || p?.phone || p?.phoneNumber || '').trim();
+    const phone = sanitizePhone(u?.phone || u?.phoneNumber || p?.phone || p?.phoneNumber || '');
     const city = (u?.city || u?.location || p?.city || p?.location || '').trim();
 
     if (!name || name === 'EaseLand User') missing.push('Full Name');

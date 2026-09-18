@@ -14,11 +14,29 @@ import PropertyReviewStep from '../components/PropertyReviewStep.jsx';
 export default function PostPropertyWizard({ onComplete, onCancel, resumePropertyId = null }) {
   const { user, profile } = useAuth();
 
+  const sanitizePhone = (ph) => {
+    if (!ph) return '';
+    const str = String(ph).trim();
+    const lower = str.toLowerCase();
+    if (
+      str === '+91 98765 43210' ||
+      str === '9876543210' ||
+      str === '+91 98765 00000' ||
+      str === '9876500000' ||
+      str === '+91 N/A' ||
+      str === 'N/A' ||
+      lower === 'n/a' ||
+      lower === 'null' ||
+      lower === 'undefined'
+    ) return '';
+    return str;
+  };
+
   const checkProfileCriteria = () => {
     const missing = [];
     const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || '').trim();
     const email = (user?.email || profile?.email || '').trim();
-    const phone = (user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || '').trim();
+    const phone = sanitizePhone(user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || '');
     const city = (user?.city || user?.location || profile?.city || profile?.location || '').trim();
 
     if (!name || name === 'EaseLand User') missing.push('Full Name');

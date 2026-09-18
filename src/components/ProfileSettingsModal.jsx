@@ -9,11 +9,29 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'security'
 
+  const sanitizePhone = (ph) => {
+    if (!ph) return '';
+    const str = String(ph).trim();
+    const lower = str.toLowerCase();
+    if (
+      str === '+91 98765 43210' ||
+      str === '9876543210' ||
+      str === '+91 98765 00000' ||
+      str === '9876500000' ||
+      str === '+91 N/A' ||
+      str === 'N/A' ||
+      lower === 'n/a' ||
+      lower === 'null' ||
+      lower === 'undefined'
+    ) return '';
+    return str;
+  };
+
   // Profile Form State
   const [profileData, setProfileData] = useState({
     name: profile?.displayName || user?.displayName || '',
     email: profile?.email || user?.email || '',
-    phone: profile?.phone || '',
+    phone: sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || ''),
   });
 
   // Security Form State

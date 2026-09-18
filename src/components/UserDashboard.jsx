@@ -155,12 +155,19 @@ export default function UserDashboard({
   const unreadNotificationsCount = (notifications || []).filter(n => !n.read).length;
 
 
+  const sanitizePhone = (ph) => {
+    if (!ph) return '';
+    const str = String(ph).trim();
+    if (str === '+91 98765 43210' || str === '9876543210' || str === '+91 98765 00000' || str === '9876500000' || str === '+91 N/A' || str === 'N/A') return '';
+    return str;
+  };
+
   // Account settings form state
   const [profileForm, setProfileForm] = useState({
     name: user?.name || user?.displayName || 'EaseLand User',
     email: user?.email || '',
-    phone: user?.phone || user?.phoneNumber || '',
-    city: 'Guntur, Andhra Pradesh',
+    phone: sanitizePhone(user?.phone || user?.phoneNumber),
+    city: user?.city || user?.location || '',
     accountType: 'Verified Property Owner & Buyer'
   });
   const [myPropertiesList, setMyPropertiesList] = useState([]);
@@ -171,8 +178,8 @@ export default function UserDashboard({
     setProfileForm({
       name: user?.name || user?.displayName || 'EaseLand User',
       email: user?.email || '',
-      phone: user?.phone || user?.phoneNumber || '',
-      city: 'Guntur, Andhra Pradesh',
+      phone: sanitizePhone(user?.phone || user?.phoneNumber),
+      city: user?.city || user?.location || '',
       accountType: 'Verified Property Owner & Buyer'
     });
   }, [user]);
@@ -463,7 +470,7 @@ export default function UserDashboard({
 
     const nameVal = (profileForm.name || '').trim();
     const emailVal = (profileForm.email || '').trim();
-    const phoneVal = (profileForm.phone || '').trim();
+    const phoneVal = sanitizePhone(profileForm.phone);
     const cityVal = (profileForm.city || '').trim();
 
     if (!nameVal || nameVal === 'EaseLand User' || !emailVal || !phoneVal || !cityVal) {
