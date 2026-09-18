@@ -335,8 +335,8 @@ export default function UniversalMapEngine({
     const rawTitle = String(property?.title || '').toLowerCase();
     const rawPrice = String(property?.priceDisplay || '').toLowerCase();
 
-    const isRent = rawPurpose === 'RENT' || rawTitle.includes('rent') || rawPrice.includes('/month') || rawPrice.includes('/mo') || rawPrice.includes('month');
-    const isLease = rawPurpose === 'LEASE' || rawTitle.includes('lease') || rawPrice.includes('lease') || rawPrice.includes('/yr') || rawPrice.includes('year');
+    const isRent = rawPurpose === 'RENT' || rawPrice.includes('/month') || rawPrice.includes('/mo') || rawTitle.includes('for rent');
+    const isLease = rawPurpose === 'LEASE' || rawTitle.includes('for lease') || (rawPrice.includes('/yr') && !rawPrice.includes('month'));
 
     if (isLease) {
       return {
@@ -377,34 +377,29 @@ export default function UniversalMapEngine({
     };
   };
 
-  // Helper to compute marker size & color gradient
+  // Helper to compute marker size & color gradient automatically based strictly on price (matching Map Price Legend)
   const getMarkerStyle = (property) => {
     const area = property.area || 1500;
     const size = Math.min(Math.max(Math.round(16 + (area / 800)), 16), 34);
 
-    const price = property.price || 3000000;
+    const price = Number(property.price) || 0;
     const boundaryStyle = getBoundaryStyle(property);
 
-    let color = '#22c55e'; // Emerald green (Low / Affordable)
+    let color = '#22c55e'; // Emerald green (Below 30 L / Affordable)
     let border = '#15803d';
 
-    if (boundaryStyle.typeLabel === 'For Lease') {
-      color = '#2563eb'; // Royal Blue for Lease
-      border = '#1d4ed8';
-    } else if (boundaryStyle.typeLabel === 'For Rent') {
-      color = '#10b981'; // Emerald Green for Rent
-      border = '#047857';
-    } else {
-      if (price > 15000000) { // Above 1.5 Cr
-        color = '#0B2545'; // Navy Blue (Luxury/High)
-        border = '#F4C542';
-      } else if (price > 6000000) { // 60 Lakhs - 1.5 Cr
-        color = '#F4C542'; // Yellow/Amber
-        border = '#B48B1B';
-      } else if (price > 3000000) { // 30 Lakhs - 60 Lakhs
-        color = '#7c3aed'; // Deep Violet / Purple
-        border = '#5b21b6';
-      }
+    if (price > 15000000) { // Above 1.5 Cr (Luxury)
+      color = '#0B2545'; // Dark Navy Blue
+      border = '#F4C542';
+    } else if (price > 6000000) { // 60 Lakhs - 1.5 Cr (Premium)
+      color = '#F4C542'; // Gold/Amber
+      border = '#B48B1B';
+    } else if (price > 3000000) { // 30 Lakhs - 60 Lakhs (Mid-Range)
+      color = '#7c3aed'; // Deep Violet / Purple
+      border = '#5b21b6';
+    } else { // Below 30 Lakhs (Affordable)
+      color = '#22c55e'; // Emerald Green
+      border = '#15803d';
     }
 
     return { size, color, border, boundaryStyle };
