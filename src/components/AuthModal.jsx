@@ -274,7 +274,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    placeholder="••••••••"
+                    placeholder="Enter password (min 8 chars)"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -302,7 +302,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     required
-                    placeholder="••••••••"
+                    placeholder="Re-enter password"
                     value={formData.confirmPassword || ''}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -347,7 +347,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    placeholder="••••••••"
+                    placeholder="Enter account password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"

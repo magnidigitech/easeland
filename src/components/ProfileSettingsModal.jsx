@@ -262,7 +262,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type={showNewPass ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder="Enter new password"
                     value={securityData.newPassword}
                     onChange={(e) => setSecurityData({ ...securityData, newPassword: e.target.value })}
                     className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -310,7 +310,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type={showConfirmPass ? 'text' : 'password'}
-                      placeholder="••••••••"
+                      placeholder="Confirm new password"
                       value={securityData.confirmPassword}
                       onChange={(e) => setSecurityData({ ...securityData, confirmPassword: e.target.value })}
                       className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"

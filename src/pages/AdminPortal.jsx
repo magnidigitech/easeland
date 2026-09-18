@@ -1466,7 +1466,7 @@ export default function AdminPortal() {
                   required
                   value={adminAuthPassword}
                   onChange={(e) => setAdminAuthPassword(e.target.value)}
-                  placeholder="••••••••••••"
+                  placeholder="Enter admin password"
                   className="w-full pl-10 pr-10 py-3 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
                 <button
@@ -4265,7 +4265,7 @@ export default function AdminPortal() {
                       <div className="relative">
                         <input
                           type={showUpdateAdminPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
+                          placeholder="Enter new password"
                           value={adminPassword}
                           onChange={(e) => setAdminPassword(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -4285,7 +4285,7 @@ export default function AdminPortal() {
                       <div className="relative">
                         <input
                           type={showUpdateAdminConfirmPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
+                          placeholder="Confirm new password"
                           value={adminConfirmPassword}
                           onChange={(e) => setAdminConfirmPassword(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
