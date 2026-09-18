@@ -508,7 +508,7 @@ export default function App() {
                         }}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                      <div className="absolute top-3 left-3 bg-brand-charcoal/90 text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow">
+                      <div className="absolute top-3 left-3 bg-brand-charcoal text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-brand-yellow/30">
                         <ShieldCheck className="w-3 h-3 text-brand-yellow" />
                         <span>{prop.verificationStatus}</span>
                       </div>

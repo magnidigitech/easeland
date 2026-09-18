@@ -74,7 +74,7 @@ export default function PropertyCard({
             <span className="px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide bg-metallic-gold text-slate-950 rounded-lg shadow-md border border-amber-300/40">
               {purpose === 'RENT' ? 'FOR RENT' : purpose === 'LEASE' ? 'FOR LEASE' : 'FOR SALE'}
             </span>
-            <span className="px-2.5 py-1 text-[11px] font-bold bg-slate-900/90 text-slate-200 backdrop-blur-md rounded-lg shadow-sm border border-slate-700">
+            <span className="px-2.5 py-1 text-[11px] font-bold bg-slate-900 text-slate-200 rounded-lg shadow-sm border border-slate-700">
               {propertyType.replace(/_/g, ' ')}
             </span>
           </div>
@@ -87,7 +87,7 @@ export default function PropertyCard({
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shadow-md ${
               isWishlisted
                 ? 'bg-rose-600 text-white scale-105 shadow-rose-900/50'
-                : 'bg-slate-900/80 text-slate-300 hover:text-rose-400 hover:bg-slate-800 border border-slate-700'
+                : 'bg-slate-900 text-slate-300 hover:text-rose-400 hover:bg-slate-800 border border-slate-700'
             }`}
           >
             <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
@@ -97,7 +97,7 @@ export default function PropertyCard({
         {/* Bottom Overlay Badges */}
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
           {property.isPlatformVerified && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950/90 backdrop-blur-md text-[11px] font-black tracking-widest uppercase rounded-lg shadow-[0_2px_10px_rgba(212,175,55,0.25)] border border-amber-400/50">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 text-[11px] font-black tracking-widest uppercase rounded-lg shadow-[0_2px_10px_rgba(212,175,55,0.25)] border border-amber-400/50">
               <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span className="text-metallic-gold font-black">
                 Platform Verified
@@ -106,7 +106,7 @@ export default function PropertyCard({
           )}
 
           {property.distKm != null && property.distKm < Infinity && (
-            <span className="ml-auto px-2 py-0.5 bg-slate-900/80 backdrop-blur-md text-slate-300 text-[10px] font-medium rounded-md border border-slate-700">
+            <span className="ml-auto px-2 py-0.5 bg-slate-900 text-slate-300 text-[10px] font-medium rounded-md border border-slate-700">
               {property.distKm} km away
             </span>
           )}
