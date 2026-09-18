@@ -708,24 +708,6 @@ export default function UserDashboard({
               </button>
 
               <button
-                onClick={() => setActiveTab('enquiries')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'enquiries'
-                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className={`w-4 h-4 ${activeTab === 'enquiries' ? 'text-slate-950' : 'text-amber-400'}`} />
-                  <span>Enquiries</span>
-                </div>
-                {enquiriesReceived.filter(e => e.status === 'SUBMITTED').length > 0 && (
-                  <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full">
-                    {enquiriesReceived.filter(e => e.status === 'SUBMITTED').length}
-                  </span>
-                )}
-              </button>
-
-              <button
                 onClick={() => setActiveTab('wishlist')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'wishlist'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
@@ -737,24 +719,6 @@ export default function UserDashboard({
                   <span>Wishlist ({wishlistProperties.length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
-              </button>
-
-              <button
-                onClick={() => setActiveTab('notifications')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'notifications'
-                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-slate-950' : 'text-amber-400'}`} />
-                  <span>Notifications</span>
-                </div>
-                {unreadNotificationsCount > 0 && (
-                  <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
-                    {unreadNotificationsCount}
-                  </span>
-                )}
               </button>
 
               <button
@@ -782,7 +746,7 @@ export default function UserDashboard({
               <div className="space-y-6">
 
                 {/* METRICS CARDS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
                   <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">My Listings</span>
@@ -802,16 +766,6 @@ export default function UserDashboard({
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
                       <CheckCircle2 className="w-6 h-6" />
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-                    <div>
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Total Enquiries</span>
-                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{enquiriesReceived.length}</span>
-                    </div>
-                    <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
-                      <MessageSquare className="w-6 h-6" />
                     </div>
                   </div>
 
@@ -1213,172 +1167,7 @@ export default function UserDashboard({
               </div>
             )}
 
-            {/* TAB 4: MY ENQUIRIES */}
-            {activeTab === 'enquiries' && (
-              <div className="space-y-6">
 
-                {/* ENQUIRY TYPE TOGGLE */}
-                <div className="bg-white rounded-2xl p-2 border border-gray-200 shadow-sm flex items-center gap-2 max-w-xs">
-                  <button
-                    onClick={() => setEnquiryType('RECEIVED')}
-                    className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all ${enquiryType === 'RECEIVED'
-                        ? 'bg-brand-charcoal text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                  >
-                    Received ({enquiriesReceived.length})
-                  </button>
-                  <button
-                    onClick={() => setEnquiryType('SENT')}
-                    className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all ${enquiryType === 'SENT'
-                        ? 'bg-brand-charcoal text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                  >
-                    Sent ({enquiriesSent.length})
-                  </button>
-                </div>
-
-                {/* ENQUIRY CARDS */}
-                {enquiryType === 'RECEIVED' ? (
-                  enquiriesReceived.length === 0 ? (
-                    <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-4">
-                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center text-2xl font-black">
-                        📩
-                      </div>
-                      <h3 className="text-lg font-extrabold text-brand-charcoal">No Enquiries Received Yet</h3>
-                      <p className="text-xs text-gray-500 max-w-md mx-auto font-medium">
-                        When buyers explore your verified property listings and submit direct contact requests, their details will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {enquiriesReceived.map((enq) => {
-                        return (
-                          <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-extrabold text-brand-yellow bg-brand-charcoal px-3 py-1 rounded-full">
-                                Property: {enq.propertyName}
-                              </span>
-                              <span className="text-xs text-gray-400 font-semibold">{enq.date}</span>
-                            </div>
-
-                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-extrabold text-sm text-brand-charcoal">{enq.buyerName}</h4>
-                                {getEnquiryStatusBadge(enq.status)}
-                              </div>
-                              <p className="text-xs text-gray-600 mt-2 leading-relaxed font-medium">"{enq.message}"</p>
-                            </div>
-
-                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                              <div className="flex items-center gap-4 text-xs font-bold text-gray-600">
-                                <span className="flex items-center gap-1">
-                                  <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                                  {enq.buyerPhone}
-                                </span>
-                                {enq.buyerEmail && (
-                                  <span className="flex items-center gap-1">
-                                    <Mail className="w-3.5 h-3.5 text-blue-600" />
-                                    {enq.buyerEmail}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={getCleanWhatsAppLink(enq.buyerPhone, enq.buyerName, enq.propertyName, 'OWNER')}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5" />
-                                  <span>WhatsApp Buyer</span>
-                                </a>
-                                <a
-                                  href={`tel:${enq.buyerPhone}`}
-                                  className="bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
-                                >
-                                  <Phone className="w-3.5 h-3.5 text-brand-yellow" />
-                                  <span>Call Buyer</span>
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
-                ) : (
-                  enquiriesSent.length === 0 ? (
-                    <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-4">
-                      <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center text-2xl font-black">
-                        📤
-                      </div>
-                      <h3 className="text-lg font-extrabold text-brand-charcoal">No Enquiries Sent Yet</h3>
-                      <p className="text-xs text-gray-500 max-w-md mx-auto font-medium">
-                        When you contact property owners or schedule site visits from the map view, your sent enquiries will be tracked here.
-                      </p>
-                      <button
-                        onClick={() => onNavigate('map')}
-                        className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-6 py-3 rounded-xl shadow-md inline-block"
-                      >
-                        Explore Interactive Map
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {enquiriesSent.map((enq) => {
-                        return (
-                          <div key={enq.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-extrabold text-sm text-brand-charcoal">{enq.propertyName}</h4>
-                              <span className="text-xs text-gray-400 font-semibold">{enq.date}</span>
-                            </div>
-
-                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
-                              <div>
-                                <p className="text-xs text-gray-500 font-medium">
-                                  Owner: <strong className="text-brand-charcoal">{enq.ownerName}</strong> {enq.ownerPhone && enq.ownerPhone !== 'Direct Owner' ? `(${enq.ownerPhone})` : ''}
-                                </p>
-                                {enq.message && (
-                                  <p className="text-xs text-gray-600 mt-2 leading-relaxed font-medium">"{enq.message}"</p>
-                                )}
-                              </div>
-                              <div>
-                                {getEnquiryStatusBadge(enq.status)}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-end gap-2 pt-1">
-                              <a
-                                href={getCleanWhatsAppLink(enq.ownerPhone, enq.ownerName, enq.propertyName, 'BUYER')}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                                <span>WhatsApp Owner</span>
-                              </a>
-                              {enq.ownerPhone && enq.ownerPhone !== 'Direct Owner' && (
-                                <a
-                                  href={`tel:${enq.ownerPhone}`}
-                                  className="bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all"
-                                >
-                                  <Phone className="w-3.5 h-3.5 text-brand-yellow" />
-                                  <span>Call Owner</span>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
-                )}
-
-              </div>
-            )}
 
             {/* TAB 5: SAVED WISHLIST */}
             {activeTab === 'wishlist' && (
@@ -1477,42 +1266,7 @@ export default function UserDashboard({
               </div>
             )}
 
-            {/* TAB 6: NOTIFICATIONS */}
-            {activeTab === 'notifications' && (
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-extrabold text-lg text-brand-charcoal">Notification Center</h2>
-                  <button
-                    onClick={markAllNotificationsRead}
-                    className="text-xs font-extrabold text-brand-charcoal hover:text-amber-700"
-                  >
-                    Mark All as Read
-                  </button>
-                </div>
 
-                <div className="space-y-3">
-                  {notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      className={`p-4 rounded-xl border flex items-start gap-4 transition-all ${n.read ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-brand-yellow/10 border-brand-yellow/30'
-                        }`}
-                    >
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${n.type === 'WARNING' ? 'bg-amber-500 text-white' : 'bg-brand-charcoal text-white'
-                        }`}>
-                        <Bell className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-extrabold text-xs text-brand-charcoal">{n.title}</h4>
-                          <span className="text-[10px] text-gray-400 font-semibold">{n.timestamp}</span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1 font-medium">{n.message}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* TAB 7: ACCOUNT SETTINGS */}
             {activeTab === 'account' && (
