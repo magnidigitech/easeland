@@ -122,7 +122,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
               <span>•</span>
               <span>{property.purpose === 'buy' ? 'For Sale' : 'For Rent'}</span>
               <span>•</span>
-              <span className="text-brand-charcoal">{property.location?.locality}, {property.location?.city}</span>
+              <span className="text-brand-charcoal">{[property.location?.locality, property.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || property.location?.city || property.location?.state || 'India'}</span>
             </div>
             
             <h1 className="text-2xl sm:text-4xl font-extrabold text-brand-charcoal tracking-tight">

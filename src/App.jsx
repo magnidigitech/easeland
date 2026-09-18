@@ -517,7 +517,7 @@ export default function App() {
                     <div className="p-5 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between text-xs text-gray-500 font-bold mb-1">
-                          <span>{prop.location?.locality}, {prop.location?.city}</span>
+                          <span>{[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}</span>
                           <span className="text-brand-charcoal">{prop.category}</span>
                         </div>
                         <h3 className="text-base font-bold text-brand-charcoal line-clamp-1 mb-3">
