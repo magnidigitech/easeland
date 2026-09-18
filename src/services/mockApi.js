@@ -398,13 +398,15 @@ export const mockApi = {
       const st = String(p.status || p.listingStatus || '').toUpperCase();
       const lst = String(p.listingStatus || '').toUpperCase();
       const vst = String(p.verificationStatus || '').toUpperCase();
-      const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || st === 'PLATFORM VERIFIED' || st === 'VERIFIED' ||
-                     lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || lst === 'PLATFORM VERIFIED' || lst === 'VERIFIED' ||
-                     vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED' ||
-                     p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
-                     (!p.status && !p.listingStatus && p.title);
-      const isExplicitlyBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || (st === 'PENDING_VERIFICATION' && !p.isPlatformVerified && lst !== 'LIVE') || st === 'CHANGES_REQUIRED';
-      return isLive && !isExplicitlyBlocked;
+
+      const isLive = (st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || p.isPublished === true);
+      const isVerified = (p.isPlatformVerified === true || vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED');
+      const isBlocked = (st === 'REJECTED' || st === 'DRAFT' || st === 'PENDING' || st === 'PENDING_VERIFICATION' || lst === 'REJECTED' || lst === 'DRAFT' || lst === 'PENDING' || lst === 'PENDING_VERIFICATION' || st === 'CHANGES_REQUIRED');
+
+      // Strict Enforcement: Exclude unverified drafts or pending submissions from public verified listings
+      if (isBlocked && !p.isPlatformVerified) return false;
+      if (!isLive && !isVerified) return false;
+      return true;
     });
     result = deduplicateProperties(result);
 
