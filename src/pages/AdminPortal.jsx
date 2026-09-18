@@ -638,14 +638,18 @@ export default function AdminPortal() {
       console.warn('Error loading reports:', e4);
     }
 
-    // 5. Site Config
-    let cfg = {};
+    // 5. Site Config (Populated with defaults across all 16 modules)
+    let cfg = mockApi.getSiteConfig();
     try {
       const cfgRes = await getSiteConfigAdmin();
-      cfg = (cfgRes.success && Object.keys(cfgRes.config).length > 0) ? cfgRes.config : mockApi.getSiteConfig();
+      if (cfgRes.success && cfgRes.config && Object.keys(cfgRes.config).length > 0) {
+        cfg = mockApi.mergeSiteConfigWithDefaults(cfgRes.config);
+      }
     } catch (e5) {
       console.warn('Error loading site config:', e5);
     }
+
+    setSiteConfig(cfg);
 
     const dls = typeof mockApi.getDealsAdmin === 'function' ? mockApi.getDealsAdmin() : [];
     const fups = typeof mockApi.getFollowUpsAdmin === 'function' ? mockApi.getFollowUpsAdmin() : [];

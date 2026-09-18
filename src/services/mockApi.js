@@ -164,7 +164,7 @@ const INITIAL_USERS = [
   }
 ];
 
-const DEFAULT_SITE_CONFIG = {
+export const DEFAULT_SITE_CONFIG = {
   overview: {
     siteName: 'EaseLand',
     status: 'PUBLISHED',
@@ -280,6 +280,32 @@ const DEFAULT_SITE_CONFIG = {
   }
 };
 
+export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
+  if (!userConfig || typeof userConfig !== 'object') return { ...DEFAULT_SITE_CONFIG };
+  return {
+    overview: { ...DEFAULT_SITE_CONFIG.overview, ...(userConfig.overview || {}) },
+    homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(userConfig.homepage || {}) },
+    navbar: { ...DEFAULT_SITE_CONFIG.navbar, ...(userConfig.navbar || {}) },
+    footer: { ...DEFAULT_SITE_CONFIG.footer, ...(userConfig.footer || {}) },
+    buyPage: { ...DEFAULT_SITE_CONFIG.buyPage, ...(userConfig.buyPage || {}) },
+    rentPage: { ...DEFAULT_SITE_CONFIG.rentPage, ...(userConfig.rentPage || {}) },
+    sellPage: { ...DEFAULT_SITE_CONFIG.sellPage, ...(userConfig.sellPage || {}) },
+    categories: (Array.isArray(userConfig.categories) && userConfig.categories.length > 0)
+      ? userConfig.categories
+      : DEFAULT_SITE_CONFIG.categories,
+    faqs: (Array.isArray(userConfig.faqs) && userConfig.faqs.length > 0)
+      ? userConfig.faqs
+      : (Array.isArray(userConfig.faq) && userConfig.faq.length > 0 ? userConfig.faq : DEFAULT_SITE_CONFIG.faqs),
+    contact: { ...DEFAULT_SITE_CONFIG.contact, ...(userConfig.contact || {}) },
+    branding: { ...DEFAULT_SITE_CONFIG.branding, ...(userConfig.branding || {}) },
+    theme: { ...DEFAULT_SITE_CONFIG.theme, ...(userConfig.theme || {}) },
+    media: { ...DEFAULT_SITE_CONFIG.media, ...(userConfig.media || {}) },
+    mapsConfig: { ...DEFAULT_SITE_CONFIG.mapsConfig, ...(userConfig.mapsConfig || {}) },
+    seo: { ...DEFAULT_SITE_CONFIG.seo, ...(userConfig.seo || {}) },
+    publish: { ...DEFAULT_SITE_CONFIG.publish, ...(userConfig.publish || {}) }
+  };
+};
+
 let rawUsers = getStoredData('easeland_registered_users', INITIAL_USERS);
 // Clean stale dummy users & guarantee core admin account exists
 let registeredUsers = rawUsers.filter(u =>
@@ -305,7 +331,8 @@ if (!registeredUsers.some(u => u.email === 'admin@easeland.in')) {
 }
 
 setStoredData('easeland_registered_users', registeredUsers);
-let siteConfig = getStoredData('easeland_site_config', DEFAULT_SITE_CONFIG);
+let siteConfig = mergeSiteConfigWithDefaults(getStoredData('easeland_site_config', DEFAULT_SITE_CONFIG));
+setStoredData('easeland_site_config', siteConfig);
 
 export const mockApi = {
   // -------------------------------------------------------------
@@ -1300,10 +1327,10 @@ export const mockApi = {
     }
   },
 
-  // -------------------------------------------------------------
-  // 8. MASTER SITE MANAGEMENT CMS API (All 16 Modules)
-  // -------------------------------------------------------------
+  mergeSiteConfigWithDefaults: mergeSiteConfigWithDefaults,
+
   getSiteConfig: () => {
+    siteConfig = mergeSiteConfigWithDefaults(siteConfig);
     if (siteConfig && siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
     }
@@ -1311,15 +1338,16 @@ export const mockApi = {
   },
 
   updateSiteConfig: (newPartialConfig) => {
-    siteConfig = {
+    siteConfig = mergeSiteConfigWithDefaults({
       ...siteConfig,
       ...newPartialConfig,
       publish: {
-        ...siteConfig.publish,
+        ...(siteConfig.publish || {}),
+        ...(newPartialConfig.publish || {}),
         lastPublishedBy: 'Scarlett (Admin)',
         lastPublishedTime: new Date().toISOString()
       }
-    };
+    });
     setStoredData('easeland_site_config', siteConfig);
     if (siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
