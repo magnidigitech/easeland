@@ -121,7 +121,11 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                   }`}
                   title="Open User Dashboard"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow">
+                  <div className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shadow transition-colors ${
+                    activePage === 'dashboard'
+                      ? 'bg-slate-950 text-metallic-gold'
+                      : 'bg-metallic-gold text-slate-950'
+                  }`}>
                     {(user.name || user.displayName || user.email || 'u').charAt(0).toLowerCase()}
                   </div>
                   <div className="text-left">
