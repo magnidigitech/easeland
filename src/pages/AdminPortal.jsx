@@ -277,6 +277,45 @@ export default function AdminPortal() {
   const [selectedUserForRemoval, setSelectedUserForRemoval] = useState(null);
   const [removalReason, setRemovalReason] = useState('Account permanently deleted by platform admin for policy violation');
 
+  // Dynamic Activity Logs & Audit Trail State
+  const defaultInitialLogs = [
+    '[2026-09-02 12:45:00] Admin Scarlett published site configuration changes live.',
+    '[2026-09-02 12:42:00] Admin Scarlett suspended user Ramesh Varma for 7 days (Fraudulent Title Document Upload).',
+    '[2026-09-02 11:30:00] Admin Scarlett verified and published property prop-106 live.'
+  ];
+
+  const [activityLogs, setActivityLogs] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('easeland_admin_activity_logs');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {}
+    return defaultInitialLogs;
+  });
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+
+  const logAdminActivity = (actionMessage) => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const currentAdminName = user?.displayName || user?.name || profile?.displayName || localStorage.getItem('easeland_admin_name') || 'Admin Scarlett';
+    const logEntry = `[${timestamp}] Admin ${currentAdminName} ${actionMessage}`;
+
+    setActivityLogs(prev => {
+      const updated = [logEntry, ...prev];
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('easeland_admin_activity_logs', JSON.stringify(updated.slice(0, 100)));
+        }
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   // Deal Dossier Modal State
   const [selectedDealForDossier, setSelectedDealForDossier] = useState(null);
 
@@ -300,6 +339,7 @@ export default function AdminPortal() {
   const handleResetToDefault = () => {
     const resetConfig = mockApi.resetSiteConfigAdmin();
     setSiteConfig({ ...resetConfig });
+    logAdminActivity('reset website configuration to factory defaults.');
     setIsResetModalOpen(false);
     setPublishSuccessMessage('All 16 CMS modules have been reset to factory default settings!');
     setTimeout(() => setPublishSuccessMessage(''), 4000);
@@ -763,6 +803,7 @@ export default function AdminPortal() {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: propId } }));
     }
+    logAdminActivity(`deleted property listing ${propId}.`);
 
     await loadData();
   };
@@ -788,6 +829,7 @@ export default function AdminPortal() {
     try {
       const adminUid = user?.uid || 'admin_auditor';
       await publishSiteConfigAdmin(siteConfig, adminUid);
+      logAdminActivity('published site configuration changes live.');
       setPublishSuccessMessage('Website configuration published live! All changes are active immediately on the public site.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
@@ -862,6 +904,7 @@ export default function AdminPortal() {
         window.dispatchEvent(new CustomEvent('easeland-property-approved', { detail: { propertyId: propId, status: 'LIVE' } }));
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: { propertyId: propId, status: 'LIVE' } }));
       }
+      logAdminActivity(`verified and published property ${propId} live.`);
 
       setPublishSuccessMessage('Property approved and successfully published LIVE!');
       setFeedbackNote('');
@@ -953,6 +996,7 @@ export default function AdminPortal() {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
         window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: payload }));
       }
+      logAdminActivity(`rejected property ${propId} (${note}).`);
 
       setPublishSuccessMessage('Property listing has been rejected.');
       setFeedbackNote('');
@@ -1040,6 +1084,7 @@ export default function AdminPortal() {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
         window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: payload }));
       }
+      logAdminActivity(`requested document changes for property ${propId}.`);
 
       setPublishSuccessMessage('Document changes requested from property owner.');
       setFeedbackNote('');
@@ -1100,6 +1145,7 @@ export default function AdminPortal() {
       } catch (e) {}
 
       setPublishSuccessMessage('Property listing deleted successfully.');
+      logAdminActivity(`deleted property listing ${propId}.`);
       setIsWorkspaceOpen(false);
       setSelectedProperty(null);
       await loadData();
@@ -1226,6 +1272,7 @@ export default function AdminPortal() {
       await suspendUserAccount(selectedUserForSuspension.id || selectedUserForSuspension.uid, user?.uid || 'admin_uid_001', suspensionDays, reasonText);
     } catch(e) {}
     mockApi.suspendUserAdmin(selectedUserForSuspension.id, totalHours, reasonText);
+    logAdminActivity(`suspended user ${selectedUserForSuspension?.name || selectedUserForSuspension?.email || 'User'} for ${suspensionDays} days (${reasonText}).`);
     
     setRegisteredUsersList(prev => prev.map(u => {
       if (u.id === selectedUserForSuspension.id || u.email === selectedUserForSuspension.email) {
@@ -1248,6 +1295,7 @@ export default function AdminPortal() {
       await unsuspendUserAccount(u.id || u.uid, user?.uid || 'admin_uid_001');
     } catch(e) {}
     mockApi.unsuspendUserAdmin(u.id);
+    logAdminActivity(`unsuspended user ${u.name || u.email || 'User'}.`);
     setRegisteredUsersList(prev => prev.map(usr => {
       if (usr.id === u.id || usr.email === usr.email) {
         return {
@@ -1276,6 +1324,7 @@ export default function AdminPortal() {
     } catch(e) {}
 
     mockApi.removeUserAdmin(selectedUserForRemoval.id, removalReason);
+    logAdminActivity(`permanently removed user account ${selectedUserForRemoval?.name || selectedUserForRemoval?.email || 'User'}.`);
 
     try {
       if (typeof window !== 'undefined') {
@@ -4086,14 +4135,65 @@ export default function AdminPortal() {
             {/* TAB: REPORTS & LOGS */}
             {activeTab === 'reports' && (
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                <div className="border-b border-gray-100 pb-4">
-                  <h3 className="text-lg font-black text-brand-charcoal">Reports & Activity Logs</h3>
-                  <p className="text-xs text-gray-500 font-medium">Audit logs of all legal approvals, user suspensions, and site publications.</p>
+                <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-brand-yellow font-extrabold text-xs uppercase tracking-wider mb-0.5">
+                      <Clock className="w-4 h-4 text-brand-charcoal" />
+                      <span>Platform Audit & Security Trail</span>
+                    </div>
+                    <h3 className="text-lg font-black text-brand-charcoal">Reports & Activity Logs</h3>
+                    <p className="text-xs text-gray-500 font-medium">Real-time audit logs of all legal approvals, user suspensions, CMS edits, and site publications.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-brand-charcoal text-brand-yellow font-extrabold text-xs px-3 py-1.5 rounded-full border border-gray-800">
+                      {activityLogs.length} Total Logs
+                    </span>
+                    {activityLogs.length > 0 && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to clear all activity audit logs?')) {
+                            setActivityLogs([]);
+                            try { localStorage.removeItem('easeland_admin_activity_logs'); } catch(e){}
+                          }
+                        }}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-3 py-1.5 rounded-xl border border-red-200 transition-colors"
+                      >
+                        Clear Audit Trail
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs font-mono text-gray-700 space-y-2">
-                  <div>[2026-09-02 12:45:00] Admin Scarlett published site configuration changes live.</div>
-                  <div>[2026-09-02 12:42:00] Admin Scarlett suspended user Ramesh Varma for 7 days (Fraudulent Title Document Upload).</div>
-                  <div>[2026-09-02 11:30:00] Admin Scarlett verified and published property prop-106 live.</div>
+
+                {/* LOG FILTER SEARCH */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Filter logs by admin name, property ID, user, action..."
+                    value={logSearchQuery}
+                    onChange={(e) => setLogSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                  />
+                </div>
+
+                {/* LOG ENTRIES CONTAINER */}
+                <div className="p-4 bg-slate-950 text-slate-100 rounded-2xl border border-slate-800 text-xs font-mono max-h-96 overflow-y-auto space-y-2 shadow-inner">
+                  {activityLogs.filter(log => !logSearchQuery.trim() || log.toLowerCase().includes(logSearchQuery.toLowerCase().trim())).length === 0 ? (
+                    <div className="py-8 text-center text-slate-500 font-sans text-xs">
+                      No activity logs match your filter search.
+                    </div>
+                  ) : (
+                    activityLogs
+                      .filter(log => !logSearchQuery.trim() || log.toLowerCase().includes(logSearchQuery.toLowerCase().trim()))
+                      .map((logStr, idx) => (
+                        <div key={idx} className="hover:bg-slate-900/90 p-2 rounded-lg transition-colors flex items-start gap-2 border-b border-slate-900/50">
+                          <span className="text-amber-400 font-bold shrink-0">›</span>
+                          <span className="leading-relaxed break-all">
+                            {logStr}
+                          </span>
+                        </div>
+                      ))
+                  )}
                 </div>
               </div>
             )}
