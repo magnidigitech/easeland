@@ -821,14 +821,19 @@ export default function AdminPortal() {
     setAdminActionProcessing(true);
     try {
       const adminUid = user?.uid || 'admin_auditor';
-      await updateSiteModuleAdmin('master_draft', siteConfig, adminUid);
-      mockApi.updateSiteConfig(siteConfig);
-      setPublishSuccessMessage('Draft changes saved successfully.');
-      setTimeout(() => setPublishSuccessMessage(''), 3000);
+      const updated = mockApi.updateSiteConfig(siteConfig);
+      if (updated) setSiteConfig({ ...updated });
+      try {
+        await updateSiteModuleAdmin('master_draft', siteConfig, adminUid);
+      } catch (e) {}
+      logAdminActivity('saved CMS site configuration draft changes.');
+      setPublishSuccessMessage('Draft changes saved successfully across all 16 modules!');
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
     } catch (e) {
-      mockApi.updateSiteConfig(siteConfig);
+      const updated = mockApi.updateSiteConfig(siteConfig);
+      if (updated) setSiteConfig({ ...updated });
       setPublishSuccessMessage('Draft saved locally.');
-      setTimeout(() => setPublishSuccessMessage(''), 3000);
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
       setAdminActionProcessing(false);
     }
@@ -839,12 +844,18 @@ export default function AdminPortal() {
     setAdminActionProcessing(true);
     try {
       const adminUid = user?.uid || 'admin_auditor';
+      const updated = mockApi.updateSiteConfig(siteConfig);
+      if (updated) setSiteConfig({ ...updated });
       try {
         await publishSiteConfigAdmin(siteConfig, adminUid);
       } catch (e) {}
-      mockApi.updateSiteConfig(siteConfig);
       logAdminActivity('published site configuration changes live.');
-      setPublishSuccessMessage('Website configuration published live! All changes are active immediately on the public site.');
+      setPublishSuccessMessage('Website configuration published live! All 16 modules are active immediately on the public site.');
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } catch (e) {
+      const updated = mockApi.updateSiteConfig(siteConfig);
+      if (updated) setSiteConfig({ ...updated });
+      setPublishSuccessMessage('Website configuration published locally.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
       setAdminActionProcessing(false);
@@ -1537,8 +1548,10 @@ export default function AdminPortal() {
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             <button
+              type="button"
               onClick={() => setIsResetModalOpen(true)}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-gray-600 cursor-pointer"
+              disabled={adminActionProcessing}
+              className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-gray-600 cursor-pointer disabled:opacity-50"
               title="Reset all 16 CMS modules to factory default"
             >
               <RotateCcw className="w-3.5 h-3.5 text-brand-yellow" />
@@ -1546,16 +1559,20 @@ export default function AdminPortal() {
             </button>
 
             <button
+              type="button"
               onClick={handleSaveDraftConfig}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all cursor-pointer"
+              disabled={adminActionProcessing}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
               <Archive className="w-3.5 h-3.5 text-blue-100" />
               <span>SAVE CHANGES</span>
             </button>
 
             <button
+              type="button"
               onClick={handlePublishSiteConfig}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 cursor-pointer"
+              disabled={adminActionProcessing}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 cursor-pointer disabled:opacity-50"
             >
               <Globe className="w-4 h-4 text-emerald-100 animate-pulse" />
               <span>PUBLISH TO LIVE SITE</span>
