@@ -219,8 +219,8 @@ export default function AdminPortal() {
   const [adminPhone, setAdminPhone] = useState(() => localStorage.getItem('easeland_admin_phone') || '');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
-  const [showAdminPassword, setShowAdminPassword] = useState(false);
-  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
+  const [showUpdateAdminPassword, setShowUpdateAdminPassword] = useState(false);
+  const [showUpdateAdminConfirmPassword, setShowUpdateAdminConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (isAdminAuthenticated) {
@@ -4264,7 +4264,7 @@ export default function AdminPortal() {
                       <label className="block text-xs font-bold text-gray-700 mb-1">Update Admin Password</label>
                       <div className="relative">
                         <input
-                          type={showAdminPassword ? 'text' : 'password'}
+                          type={showUpdateAdminPassword ? 'text' : 'password'}
                           placeholder="••••••••"
                           value={adminPassword}
                           onChange={(e) => setAdminPassword(e.target.value)}
@@ -4272,11 +4272,11 @@ export default function AdminPortal() {
                         />
                         <button
                           type="button"
-                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          onClick={() => setShowUpdateAdminPassword(!showUpdateAdminPassword)}
                           className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
-                          title={showAdminPassword ? "Hide password text" : "Show password text"}
+                          title={showUpdateAdminPassword ? "Hide password text" : "Show password text"}
                         >
-                          {showAdminPassword ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                          {showUpdateAdminPassword ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
                         </button>
                       </div>
                     </div>
@@ -4284,7 +4284,7 @@ export default function AdminPortal() {
                       <label className="block text-xs font-bold text-gray-700 mb-1">Confirm New Password</label>
                       <div className="relative">
                         <input
-                          type={showAdminConfirmPassword ? 'text' : 'password'}
+                          type={showUpdateAdminConfirmPassword ? 'text' : 'password'}
                           placeholder="••••••••"
                           value={adminConfirmPassword}
                           onChange={(e) => setAdminConfirmPassword(e.target.value)}
@@ -4292,11 +4292,11 @@ export default function AdminPortal() {
                         />
                         <button
                           type="button"
-                          onClick={() => setShowAdminConfirmPassword(!showAdminConfirmPassword)}
+                          onClick={() => setShowUpdateAdminConfirmPassword(!showUpdateAdminConfirmPassword)}
                           className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
-                          title={showAdminConfirmPassword ? "Hide password text" : "Show password text"}
+                          title={showUpdateAdminConfirmPassword ? "Hide password text" : "Show password text"}
                         >
-                          {showAdminConfirmPassword ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                          {showUpdateAdminConfirmPassword ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
                         </button>
                       </div>
                     </div>
