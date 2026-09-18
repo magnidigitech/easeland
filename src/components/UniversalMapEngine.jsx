@@ -319,27 +319,95 @@ export default function UniversalMapEngine({
     }
   }, [isSidePanelOpen]);
 
+  // Helper to compute boundary polygon styling based on transaction purpose (Sale vs Rent vs Lease)
+  const getBoundaryStyle = (property) => {
+    if (!property) return {
+      color: '#d97706',
+      fillColor: '#f59e0b',
+      fillOpacity: 0.38,
+      weight: 3.5,
+      dashArray: '6, 6',
+      typeLabel: 'For Sale',
+      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300'
+    };
+
+    const rawPurpose = String(property?.purpose || property?.listingType || property?.type || '').toUpperCase().trim();
+    const rawTitle = String(property?.title || '').toLowerCase();
+    const rawPrice = String(property?.priceDisplay || '').toLowerCase();
+
+    const isRent = rawPurpose === 'RENT' || rawTitle.includes('rent') || rawPrice.includes('/month') || rawPrice.includes('/mo') || rawPrice.includes('month');
+    const isLease = rawPurpose === 'LEASE' || rawTitle.includes('lease') || rawPrice.includes('lease') || rawPrice.includes('/yr') || rawPrice.includes('year');
+
+    if (isLease) {
+      return {
+        color: '#1d4ed8',     // Deep Royal Blue Border
+        fillColor: '#3b82f6', // Vivid Royal Blue Fill
+        fillOpacity: 0.38,
+        weight: 3.5,
+        dashArray: '5, 5',
+        lineJoin: 'round',
+        typeLabel: 'For Lease',
+        badgeClass: 'bg-blue-100 text-blue-800 border-blue-300'
+      };
+    }
+
+    if (isRent) {
+      return {
+        color: '#047857',     // Deep Emerald Green Border
+        fillColor: '#10b981', // Vivid Emerald Fill
+        fillOpacity: 0.38,
+        weight: 3.5,
+        dashArray: '8, 4',
+        lineJoin: 'round',
+        typeLabel: 'For Rent',
+        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300'
+      };
+    }
+
+    // Default: SALE (Brand Gold / Amber)
+    return {
+      color: '#d97706',     // Deep Gold / Amber Border
+      fillColor: '#f59e0b', // Vivid Brand Gold Fill
+      fillOpacity: 0.38,
+      weight: 3.5,
+      dashArray: '6, 6',
+      lineJoin: 'round',
+      typeLabel: 'For Sale',
+      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300'
+    };
+  };
+
   // Helper to compute marker size & color gradient
   const getMarkerStyle = (property) => {
     const area = property.area || 1500;
     const size = Math.min(Math.max(Math.round(16 + (area / 800)), 16), 34);
 
     const price = property.price || 3000000;
+    const boundaryStyle = getBoundaryStyle(property);
+
     let color = '#22c55e'; // Emerald green (Low / Affordable)
     let border = '#15803d';
 
-    if (price > 15000000) { // Above 1.5 Cr
-      color = '#0B2545'; // Navy Blue (Luxury/High)
-      border = '#F4C542';
-    } else if (price > 6000000) { // 60 Lakhs - 1.5 Cr
-      color = '#F4C542'; // Yellow/Amber
-      border = '#B48B1B';
-    } else if (price > 3000000) { // 30 Lakhs - 60 Lakhs
-      color = '#7c3aed'; // Deep Violet / Purple (Replaced Blue to avoid confusion with live GPS blue dot)
-      border = '#5b21b6';
+    if (boundaryStyle.typeLabel === 'For Lease') {
+      color = '#2563eb'; // Royal Blue for Lease
+      border = '#1d4ed8';
+    } else if (boundaryStyle.typeLabel === 'For Rent') {
+      color = '#10b981'; // Emerald Green for Rent
+      border = '#047857';
+    } else {
+      if (price > 15000000) { // Above 1.5 Cr
+        color = '#0B2545'; // Navy Blue (Luxury/High)
+        border = '#F4C542';
+      } else if (price > 6000000) { // 60 Lakhs - 1.5 Cr
+        color = '#F4C542'; // Yellow/Amber
+        border = '#B48B1B';
+      } else if (price > 3000000) { // 30 Lakhs - 60 Lakhs
+        color = '#7c3aed'; // Deep Violet / Purple
+        border = '#5b21b6';
+      }
     }
 
-    return { size, color, border };
+    return { size, color, border, boundaryStyle };
   };
 
   // Render Map Markers and Plot Boundary Polygons when properties update
@@ -454,17 +522,18 @@ export default function UniversalMapEngine({
 
       markersLayerRef.current.addLayer(marker);
 
-      // Render Approved GeoJSON Boundary Polygon
+      // Render Approved GeoJSON Boundary Polygon with Purpose-Differentiated Colors (Sale vs Rent vs Lease)
       if (formattedPoly.length >= 3) {
+        const polyStyle = getBoundaryStyle(prop);
         const polygon = L.polygon(formattedPoly, {
-          color: '#D4A017',
-          fillColor: '#F4C542',
-          fillOpacity: 0.45,
-          weight: 3,
-          dashArray: '6, 6',
-          lineJoin: 'round'
+          color: polyStyle.color,
+          fillColor: polyStyle.fillColor,
+          fillOpacity: polyStyle.fillOpacity,
+          weight: polyStyle.weight,
+          dashArray: polyStyle.dashArray,
+          lineJoin: polyStyle.lineJoin || 'round'
         });
-        polygon.bindTooltip(`Approved Plot Boundary (${prop.title || 'Plot'})`, { sticky: true });
+        polygon.bindTooltip(`Approved Plot Boundary [${polyStyle.typeLabel}] (${prop.title || 'Plot'})`, { sticky: true });
         polygon.on('click', () => {
           if (mapInstanceRef.current) {
             mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
@@ -646,9 +715,14 @@ export default function UniversalMapEngine({
                     <div>
                       <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold mb-1">
                         <span>{prop.location?.locality || prop.location?.city || 'India'}</span>
-                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold">
-                          Direct Owner
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded font-extrabold text-[10px] border ${getBoundaryStyle(prop).badgeClass}`}>
+                            {getBoundaryStyle(prop).typeLabel}
+                          </span>
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold text-[10px]">
+                            Direct Owner
+                          </span>
+                        </div>
                       </div>
 
                       <h3 className="text-sm font-bold text-brand-charcoal line-clamp-1 group-hover:text-black mb-2">
@@ -854,13 +928,33 @@ export default function UniversalMapEngine({
               <span className="text-[10px] text-emerald-400 font-bold">Affordable</span>
             </div>
 
-            {/* Item 5: Plot Boundary */}
-            <div className="flex items-center justify-between pt-1.5 border-t border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-[#F4C542]/30 border border-dashed border-[#F4C542] shrink-0"></span>
-                <span className="text-gray-300">Plot Boundary</span>
+            {/* Item 5: Purpose Boundary Delineation */}
+            <div className="pt-2 border-t border-white/10 space-y-1.5">
+              <span className="text-[10px] text-gray-400 font-extrabold uppercase block tracking-wider">Boundary Colors</span>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-2.5 rounded bg-[#f59e0b]/30 border border-dashed border-[#f59e0b] shrink-0"></span>
+                  <span className="text-gray-200 text-[11px]">For Sale Boundary</span>
+                </div>
+                <span className="text-[10px] text-amber-400 font-extrabold">Gold / Amber</span>
               </div>
-              <span className="text-[10px] text-gray-400 font-medium">Delineated</span>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-2.5 rounded bg-[#10b981]/30 border border-dashed border-[#10b981] shrink-0"></span>
+                  <span className="text-gray-200 text-[11px]">For Rent Boundary</span>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-extrabold">Emerald Green</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-2.5 rounded bg-[#3b82f6]/30 border border-dashed border-[#3b82f6] shrink-0"></span>
+                  <span className="text-gray-200 text-[11px]">For Lease Boundary</span>
+                </div>
+                <span className="text-[10px] text-blue-400 font-extrabold">Royal Blue</span>
+              </div>
             </div>
           </div>
         </div>
