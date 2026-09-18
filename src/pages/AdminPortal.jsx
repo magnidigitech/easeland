@@ -219,6 +219,8 @@ export default function AdminPortal() {
   const [adminPhone, setAdminPhone] = useState(() => localStorage.getItem('easeland_admin_phone') || '');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (isAdminAuthenticated) {
@@ -4260,23 +4262,43 @@ export default function AdminPortal() {
                     <h4 className="font-extrabold text-xs text-gray-500 uppercase tracking-wider">Security & Access Key</h4>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">Update Admin Password</label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showAdminPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={adminPassword}
+                          onChange={(e) => setAdminPassword(e.target.value)}
+                          className="w-full bg-white border border-gray-300 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
+                          title={showAdminPassword ? "Hide password text" : "Show password text"}
+                        >
+                          {showAdminPassword ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">Confirm New Password</label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        value={adminConfirmPassword}
-                        onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showAdminConfirmPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={adminConfirmPassword}
+                          onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                          className="w-full bg-white border border-gray-300 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminConfirmPassword(!showAdminConfirmPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
+                          title={showAdminConfirmPassword ? "Hide password text" : "Show password text"}
+                        >
+                          {showAdminConfirmPassword ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="pt-2 flex items-center justify-between">
                       <span className="text-xs font-bold text-gray-700">Require 2FA for Admin Portal</span>

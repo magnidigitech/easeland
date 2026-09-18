@@ -9,6 +9,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
   const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot'
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Form State
@@ -299,13 +300,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.confirmPassword || ''}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 transition-colors"
+                    title={showConfirmPassword ? "Hide password text" : "Show password text"}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4 text-slate-700" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-slate-400 hover:text-slate-600" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

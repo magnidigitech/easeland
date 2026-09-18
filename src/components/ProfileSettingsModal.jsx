@@ -40,6 +40,8 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     smsAlerts: profile?.preferences?.smsAlerts ?? true
   });
 
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -307,12 +309,20 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
-                      type="password"
+                      type={showConfirmPass ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={securityData.confirmPassword}
                       onChange={(e) => setSecurityData({ ...securityData, confirmPassword: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                      className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPass(!showConfirmPass)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                      title={showConfirmPass ? "Hide password text" : "Show password text"}
+                    >
+                      {showConfirmPass ? <EyeOff className="w-4 h-4 text-brand-charcoal" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                    </button>
                   </div>
                 </div>
               )}
