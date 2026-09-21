@@ -13,7 +13,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-xl text-white border-b border-slate-800 shadow-2xl">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl text-slate-900 border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
@@ -25,26 +25,26 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             <img
               src={siteConfig?.navbar?.logoEmblemUrl || "/easeland_emblem_transparent.png"}
               alt="EaseLand Logo"
-              className="h-11 w-auto object-contain group-hover:scale-105 transition-transform drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]"
+              className="h-11 w-auto object-contain group-hover:scale-105 transition-transform"
             />
             <div>
-              <span className="text-2xl font-extrabold tracking-tight text-slate-100 font-sans">
-                {siteConfig?.navbar?.logoTextPrefix || 'Ease'}<span className="text-metallic-gold">{siteConfig?.navbar?.logoTextSuffix || 'Land'}</span>
+              <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-sans">
+                {siteConfig?.navbar?.logoTextPrefix || 'Ease'}<span className="text-amber-500">{siteConfig?.navbar?.logoTextSuffix || 'Land'}</span>
               </span>
-              <span className="block text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+              <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
                 {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig?.navbar?.logoSubtext || 'Direct Property Platform')}
               </span>
             </div>
           </div>
 
           {/* DESKTOP NAVIGATION (BUY, RENT, SELL) */}
-          <nav className="hidden md:flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-3">
             <button
               onClick={() => setActivePage('buy')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-widest transition-all duration-200 focus:outline-none focus:ring-0 select-none ${
                 activePage === 'buy'
-                  ? 'text-amber-400 bg-amber-400/10 border border-amber-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                  ? 'text-amber-600 bg-amber-500/10 border border-amber-400/50 shadow-sm'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-transparent font-bold'
               }`}
             >
               {siteConfig?.navbar?.buyLabel || 'BUY'}
@@ -54,8 +54,8 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               onClick={() => setActivePage('rent')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-widest transition-all duration-200 focus:outline-none focus:ring-0 select-none ${
                 activePage === 'rent'
-                  ? 'text-amber-400 bg-amber-400/10 border border-amber-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                  ? 'text-amber-600 bg-amber-500/10 border border-amber-400/50 shadow-sm'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-transparent font-bold'
               }`}
             >
               {siteConfig?.navbar?.rentLabel || 'RENT'}
@@ -65,8 +65,8 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               onClick={() => setActivePage('sell')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-widest transition-all duration-200 focus:outline-none focus:ring-0 select-none ${
                 activePage === 'sell'
-                  ? 'text-amber-400 bg-amber-400/10 border border-amber-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
+                  ? 'text-amber-600 bg-amber-500/10 border border-amber-400/50 shadow-sm'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-transparent font-bold'
               }`}
             >
               {siteConfig?.navbar?.sellLabel || 'SELL'}
@@ -80,12 +80,12 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             {user && (
               <button
                 onClick={() => setActivePage('wishlist')}
-                className="relative p-2.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
+                className="relative p-2.5 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors border border-transparent"
                 title="My Saved Properties"
               >
                 <Heart className="w-5 h-5" />
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-metallic-gold text-slate-950 text-[11px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-amber-300">
+                  <span className="absolute -top-1 -right-1 bg-metallic-gold text-slate-950 text-[11px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-md border border-amber-300">
                     {wishlistCount}
                   </span>
                 )}
@@ -97,7 +97,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               activePage === 'admin' ? (
                 <button
                   onClick={() => setActivePage('home')}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg border border-emerald-400/40 flex items-center gap-2 transition-all transform hover:scale-105 select-none"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-md border border-emerald-500 flex items-center gap-2 transition-all transform hover:scale-105 select-none"
                   title="Preview consumer live site"
                 >
                   <ShieldCheck className="w-4 h-4 text-emerald-100" />
@@ -106,7 +106,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               ) : (
                 <button
                   onClick={() => setActivePage('admin')}
-                  className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 border border-amber-300/40 select-none"
+                  className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-4 py-2 rounded-xl shadow-md flex items-center gap-2 transition-all transform hover:scale-105 border border-amber-300 select-none"
                   title="Return to Admin Site Control Studio"
                 >
                   <ShieldCheck className="w-4 h-4 text-slate-950" />
@@ -122,20 +122,20 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                   onClick={() => setActivePage('dashboard')}
                   className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all ${
                     activePage === 'dashboard'
-                      ? 'bg-slate-900 text-slate-100 border-2 border-amber-400 font-extrabold shadow-[0_0_15px_rgba(212,175,55,0.3)]'
-                      : 'bg-slate-900/80 text-slate-200 border border-slate-700 hover:bg-slate-800 hover:border-slate-600'
+                      ? 'bg-slate-100 text-slate-900 border-2 border-amber-500 font-extrabold shadow-sm'
+                      : 'bg-slate-50 text-slate-800 border border-slate-200 hover:bg-slate-100'
                   }`}
                   title="Open User Dashboard"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow-md border border-amber-300/40 shrink-0">
+                  <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow-md border border-amber-300 shrink-0">
                     {(user.name || user.displayName || user.email || 'u').charAt(0).toLowerCase()}
                   </div>
                   <div className="text-left">
-                    <span className="block text-xs font-bold line-clamp-1 max-w-[110px] text-slate-100">
+                    <span className="block text-xs font-bold line-clamp-1 max-w-[110px] text-slate-900">
                       {user.name || user.displayName || 'EaseLand User'}
                     </span>
                     <span className={`block text-[9px] uppercase font-black tracking-wider ${
-                      activePage === 'dashboard' ? 'text-amber-400' : 'text-slate-400'
+                      activePage === 'dashboard' ? 'text-amber-600' : 'text-slate-500'
                     }`}>
                       {user.role === 'ADMIN' ? 'DASHBOARD' : 'Dashboard'}
                     </span>
@@ -144,7 +144,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
                 <button
                   onClick={onOpenProfileSettings}
-                  className="p-2 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
+                  className="p-2 text-slate-700 hover:text-amber-600 hover:bg-slate-100 rounded-xl transition-colors border border-transparent"
                   title="Profile & Security Settings"
                 >
                   <Settings className="w-5 h-5" />
@@ -152,7 +152,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
                 <button
                   onClick={onLogoutClick}
-                  className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
+                  className="p-2 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-xl transition-colors border border-transparent"
                   title="Sign Out"
                 >
                   <LogOut className="w-5 h-5" />
@@ -161,9 +161,9 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             ) : (
               <button
                 onClick={onLoginClick}
-                className="text-xs font-bold text-slate-200 hover:text-amber-400 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
+                className="text-xs font-bold text-slate-800 hover:text-amber-600 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors border border-transparent"
               >
-                <User className="w-4 h-4" />
+                <User className="w-4 h-4 text-slate-600" />
                 <span>LOGIN / REGISTER</span>
               </button>
             )}
@@ -171,7 +171,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             {/* POST PROPERTY PRIMARY BUTTON */}
             <button
               onClick={onPostPropertyClick}
-              className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5 border border-amber-300/40"
+              className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5 border border-amber-300"
             >
               <PlusCircle className="w-4 h-4 stroke-[2.5]" />
               <span>POST PROPERTY</span>
@@ -182,13 +182,13 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           <div className="flex md:hidden items-center gap-3">
             <button
               onClick={onPostPropertyClick}
-              className="bg-brand-yellow text-brand-charcoal font-bold text-xs px-3.5 py-2 rounded-lg"
+              className="bg-metallic-gold text-slate-950 font-bold text-xs px-3.5 py-2 rounded-lg"
             >
               Post Property
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-gray-300 hover:text-white"
+              className="p-2 text-slate-700 hover:text-slate-900"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {mobileMenuOpen ? (
@@ -205,28 +205,28 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
       {/* MOBILE MENU DRAWER */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-brand-charcoal border-b border-white/10 px-4 pt-2 pb-6 space-y-3">
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-2 pb-6 space-y-3">
           <button
             onClick={() => { setActivePage('home'); setMobileMenuOpen(false); }}
-            className="block w-full text-left py-2 text-gray-200 font-semibold"
+            className="block w-full text-left py-2 text-slate-800 font-semibold"
           >
             Home
           </button>
           <button
             onClick={() => { setActivePage('buy'); setMobileMenuOpen(false); }}
-            className="block w-full text-left py-2 text-gray-200 font-semibold"
+            className="block w-full text-left py-2 text-slate-800 font-semibold"
           >
             Buy Info
           </button>
           <button
             onClick={() => { setActivePage('rent'); setMobileMenuOpen(false); }}
-            className="block w-full text-left py-2 text-gray-200 font-semibold"
+            className="block w-full text-left py-2 text-slate-800 font-semibold"
           >
             Rent Info
           </button>
           <button
             onClick={() => { setActivePage('sell'); setMobileMenuOpen(false); }}
-            className="block w-full text-left py-2 text-gray-200 font-semibold"
+            className="block w-full text-left py-2 text-slate-800 font-semibold"
           >
             Sell Info
           </button>
@@ -234,21 +234,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           {user && (
             <button
               onClick={() => { setActivePage('wishlist'); setMobileMenuOpen(false); }}
-              className="block w-full text-left py-2 text-brand-yellow font-bold"
+              className="block w-full text-left py-2 text-amber-600 font-bold"
             >
               Saved Wishlist Properties ({wishlistCount})
             </button>
           )}
 
           {user ? (
-            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
-              <span className="font-bold text-white">{user.name}</span>
-              <button onClick={onLogoutClick} className="text-red-400 font-bold">Log Out</button>
+            <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-900">{user.name}</span>
+              <button onClick={onLogoutClick} className="text-rose-600 font-bold">Log Out</button>
             </div>
           ) : (
             <button
               onClick={() => { onLoginClick(); setMobileMenuOpen(false); }}
-              className="block w-full text-left py-2 text-brand-yellow font-bold border-t border-white/10"
+              className="block w-full text-left py-2 text-amber-600 font-bold border-t border-slate-200"
             >
               Login / Register Account
             </button>
