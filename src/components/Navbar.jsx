@@ -38,11 +38,13 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           </div>
 
           {/* DESKTOP NAVIGATION (BUY, RENT, SELL) */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-4">
             <button
               onClick={() => setActivePage('buy')}
-              className={`text-sm font-semibold tracking-wide transition-colors py-2 border-b-2 ${
-                activePage === 'buy' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-widest transition-all duration-200 focus:outline-none focus:ring-0 select-none ${
+                activePage === 'buy'
+                  ? 'text-amber-400 bg-amber-400/10 border border-amber-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
               }`}
             >
               {siteConfig?.navbar?.buyLabel || 'BUY'}
@@ -50,8 +52,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             
             <button
               onClick={() => setActivePage('rent')}
-              className={`text-sm font-semibold tracking-wide transition-colors py-2 border-b-2 ${
-                activePage === 'rent' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-widest transition-all duration-200 focus:outline-none focus:ring-0 select-none ${
+                activePage === 'rent'
+                  ? 'text-amber-400 bg-amber-400/10 border border-amber-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
               }`}
             >
               {siteConfig?.navbar?.rentLabel || 'RENT'}
@@ -59,8 +63,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             
             <button
               onClick={() => setActivePage('sell')}
-              className={`text-sm font-semibold tracking-wide transition-colors py-2 border-b-2 ${
-                activePage === 'sell' ? 'border-amber-400 text-amber-400 font-extrabold shadow-[0_4px_12px_rgba(212,175,55,0.2)]' : 'border-transparent text-slate-300 hover:text-slate-100'
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-widest transition-all duration-200 focus:outline-none focus:ring-0 select-none ${
+                activePage === 'sell'
+                  ? 'text-amber-400 bg-amber-400/10 border border-amber-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent'
               }`}
             >
               {siteConfig?.navbar?.sellLabel || 'SELL'}
