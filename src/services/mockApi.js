@@ -245,7 +245,7 @@ export const DEFAULT_SITE_CONFIG = {
   },
   theme: {
     primaryColor: '#eab308',
-    darkBgColor: '#0b132b',
+    darkBgColor: '#0b2545',
     accentColor: '#ffffff',
     fontFamily: 'Plus Jakarta Sans',
     darkMode: false
