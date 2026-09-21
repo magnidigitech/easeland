@@ -46,8 +46,8 @@ export const applySiteTheme = (themeConfig) => {
   }
 
   if (themeConfig.darkBgColor) {
-    root.style.setProperty('--brand-charcoal', themeConfig.darkBgColor);
-    root.style.setProperty('--brand-charcoal-light', themeConfig.darkBgColor);
+    root.style.setProperty('--brand-navy', themeConfig.darkBgColor);
+    root.style.setProperty('--brand-navy-light', themeConfig.darkBgColor);
   }
 
   if (themeConfig.accentColor) {

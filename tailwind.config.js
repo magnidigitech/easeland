@@ -23,8 +23,6 @@ export default {
           yellowHover: '#ca8a04', // Normal Yellow Hover
           navy: '#0b2545', // Classic Deep Navy Blue
           navyLight: '#1e3a8a', // Rich Navy Blue Accent
-          charcoal: '#0b2545', // Primary Deep Navy
-          charcoalLight: '#1e3a8a', // Navy Accent
           forest: '#0b2545',
           forestLight: '#1e3a8a',
           offwhite: '#ffffff',

@@ -5,8 +5,8 @@
 :root {
   --brand-yellow: #eab308;
   --brand-yellow-hover: #ca8a04;
-  --brand-charcoal: #0b2545;
-  --brand-charcoal-light: #1e3a8a;
+  --brand-navy: #0b2545;
+  --brand-navy-light: #1e3a8a;
   --brand-blue: #38bdf8;
   --brand-font: 'Plus Jakarta Sans', sans-serif;
   
@@ -108,19 +108,23 @@
 }
 
 /* DYNAMIC BRAND COLOR THEME ENGINE OVERRIDES */
+.bg-brand-navy,
 .bg-brand-charcoal {
   background: linear-gradient(145deg, #0b2545 0%, #1e3a8a 100%) !important;
   color: #ffffff !important;
 }
 
+.hover\:bg-brand-navyLight:hover,
 .hover\:bg-brand-charcoalLight:hover {
   background: linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 100%) !important;
 }
 
+.text-brand-navy,
 .text-brand-charcoal {
   color: #0b2545 !important;
 }
 
+.border-brand-navy,
 .border-brand-charcoal {
   border-color: #cbd5e1 !important;
 }
