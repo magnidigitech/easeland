@@ -67,11 +67,11 @@ export default function PropertyCategoryCards({ onSelectCategory }) {
           <span className="text-xs font-extrabold uppercase tracking-widest text-slate-950 bg-metallic-gold px-3.5 py-1.5 rounded-md shadow-md border border-amber-300 inline-block">
             Property Categories
           </span>
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight mt-3">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-3">
             Explore Properties by Category
           </h2>
         </div>
-        <p className="text-sm text-slate-300 font-medium max-w-md mt-2 md:mt-0 leading-relaxed">
+        <p className="text-sm text-slate-600 font-medium max-w-md mt-2 md:mt-0 leading-relaxed">
           All property categories utilize our single Universal Map Discovery Engine with verified listings and direct owner contacts.
         </p>
       </div>

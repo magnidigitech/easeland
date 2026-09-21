@@ -244,11 +244,11 @@ export const DEFAULT_SITE_CONFIG = {
     slogan: 'Zero Brokerage. 100% Verified.'
   },
   theme: {
-    primaryColor: '#F4C542',
-    darkBgColor: '#0B2545',
-    accentColor: '#2563EB',
+    primaryColor: '#eab308',
+    darkBgColor: '#0b132b',
+    accentColor: '#ffffff',
     fontFamily: 'Plus Jakarta Sans',
-    darkMode: true
+    darkMode: false
   },
   media: {
     heroBannerUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80',

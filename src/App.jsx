@@ -569,7 +569,7 @@ export default function App() {
                 <span className="text-xs font-extrabold uppercase tracking-widest text-slate-950 bg-metallic-gold px-3 py-1 rounded-md shadow-md border border-amber-300">
                   Frequently Asked Questions
                 </span>
-                <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100 tracking-tight mt-3">
+                <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-3">
                   Everything You Need to Know About EaseLand
                 </h2>
               </div>

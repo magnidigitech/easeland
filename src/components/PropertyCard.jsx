@@ -114,56 +114,56 @@ export default function PropertyCard({
       </div>
 
       {/* Content Container */}
-      <div className="p-4 flex-1 flex flex-col justify-between bg-gradient-to-b from-slate-900/80 to-slate-950">
+      <div className="p-4 flex-1 flex flex-col justify-between bg-white border-t border-slate-100">
         <div>
           {/* Price Header */}
           <div className="flex items-baseline justify-between gap-2 mb-1.5">
-            <h3 className="text-xl font-extrabold text-metallic-gold group-hover:text-amber-300 transition-colors">
+            <h3 className="text-xl font-extrabold text-blue-950 group-hover:text-amber-600 transition-colors">
               {priceDisplay}
             </h3>
             {areaDisplay && (
-              <span className="text-xs font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500">
                 {areaDisplay}
               </span>
             )}
           </div>
 
           {/* Title */}
-          <h4 className="text-sm font-bold text-slate-100 line-clamp-1 mb-2 group-hover:text-amber-400 transition-colors">
+          <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mb-2 group-hover:text-amber-600 transition-colors">
             {title}
           </h4>
 
           {/* Location */}
-          <div className="flex items-center gap-1 text-xs text-slate-400 mb-3">
-            <MapPin className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
+          <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
+            <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span className="truncate">{locationText}</span>
           </div>
         </div>
 
         {/* Specifications Footer */}
-        <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
           <div className="flex items-center gap-3">
             {!isPlotOrLand && bedrooms > 0 && (
-              <div className="flex items-center gap-1 font-semibold text-slate-300">
+              <div className="flex items-center gap-1 font-semibold text-slate-700">
                 <Bed className="w-3.5 h-3.5 text-slate-400" />
                 <span>{bedrooms} BHK</span>
               </div>
             )}
             {!isPlotOrLand && bathrooms > 0 && (
-              <div className="flex items-center gap-1 font-semibold text-slate-300">
+              <div className="flex items-center gap-1 font-semibold text-slate-700">
                 <Bath className="w-3.5 h-3.5 text-slate-400" />
                 <span>{bathrooms} Bath</span>
               </div>
             )}
             {areaDisplay && (
-              <div className="flex items-center gap-1 font-semibold text-slate-300">
+              <div className="flex items-center gap-1 font-semibold text-slate-700">
                 <Maximize2 className="w-3.5 h-3.5 text-slate-400" />
                 <span>{areaDisplay}</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-0.5 text-xs font-bold text-amber-400 group-hover:translate-x-0.5 transition-transform">
+          <div className="flex items-center gap-0.5 text-xs font-bold text-amber-600 group-hover:translate-x-0.5 transition-transform">
             <span>View</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </div>

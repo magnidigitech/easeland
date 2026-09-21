@@ -21,30 +21,35 @@
 
 @layer base {
   body {
-    background-color: var(--metallic-dark);
+    background-color: #f8fafc;
     background-image: 
-      radial-gradient(at 0% 0%, rgba(234, 179, 8, 0.06) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.05) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(28, 37, 65, 0.6) 0px, transparent 100%);
+      radial-gradient(at 0% 0%, rgba(234, 179, 8, 0.05) 0px, transparent 40%),
+      radial-gradient(at 100% 100%, rgba(11, 19, 43, 0.04) 0px, transparent 40%);
     background-attachment: fixed;
-    color: #f1f5f9;
+    color: #0b132b;
     font-family: var(--brand-font);
   }
 }
 
-/* NAVY BLUE & NORMAL YELLOW THEME UTILITY CLASSES */
+/* 70% WHITE / 20% NAVY BLUE / 10% YELLOW THEME UTILITY CLASSES */
 .bg-metallic-dark {
-  background: linear-gradient(135deg, #070d1e 0%, #0b132b 50%, #1c2541 100%) !important;
-}
-
-.bg-metallic-steel {
   background: linear-gradient(135deg, #0b132b 0%, #1c2541 100%) !important;
 }
 
+.bg-metallic-steel {
+  background: linear-gradient(135deg, #1c2541 0%, #2b3a55 100%) !important;
+}
+
 .bg-metallic-card {
-  background: linear-gradient(145deg, rgba(28, 37, 65, 0.95) 0%, rgba(11, 19, 43, 0.98) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(11, 19, 43, 0.08), 0 2px 6px -1px rgba(11, 19, 43, 0.04) !important;
+  color: #0b132b !important;
+}
+
+.bg-metallic-card:hover {
+  border-color: #eab308 !important;
+  box-shadow: 0 10px 30px -4px rgba(234, 179, 8, 0.25) !important;
 }
 
 .bg-metallic-gold,
@@ -56,16 +61,18 @@
 }
 
 .bg-metallic-gold-hover:hover,
-.hover\:bg-brand-yellowHover:hover {
+.hover\:bg-brand-yellowHover:hover,
+.hover\:bg-amber-400:hover {
   background: #ca8a04 !important;
   color: #0b132b !important;
   -webkit-text-fill-color: #0b132b !important;
 }
 
 .bg-metallic-silver {
-  background: #2b3a55 !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
+  background: #f1f5f9 !important;
+  color: #0b132b !important;
+  -webkit-text-fill-color: #0b132b !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 .text-metallic-gold,
@@ -75,7 +82,7 @@
 }
 
 .text-metallic-silver {
-  color: #cbd5e1 !important;
+  color: #475569 !important;
   background: none !important;
 }
 
@@ -86,7 +93,7 @@
 }
 
 .border-metallic-slate {
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: #e2e8f0 !important;
 }
 
 /* NORMAL YELLOW (NO METALLIC SHIMMER) */
@@ -102,11 +109,12 @@
 
 /* DYNAMIC BRAND COLOR THEME ENGINE OVERRIDES */
 .bg-brand-charcoal {
-  background: linear-gradient(145deg, #1c2541 0%, #0b132b 100%) !important;
+  background: linear-gradient(145deg, #0b132b 0%, #1c2541 100%) !important;
+  color: #ffffff !important;
 }
 
 .hover\:bg-brand-charcoalLight:hover {
-  background: linear-gradient(145deg, #2b3a55 0%, #1c2541 100%) !important;
+  background: linear-gradient(145deg, #1c2541 0%, #2b3a55 100%) !important;
 }
 
 .text-brand-charcoal {
@@ -114,7 +122,7 @@
 }
 
 .border-brand-charcoal {
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* FORM ELEMENTS & DROPDOWN ACCESSIBILITY - High Contrast Legible Text */
