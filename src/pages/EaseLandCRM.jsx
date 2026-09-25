@@ -53,7 +53,9 @@ import {
   deleteCrmVisit,
   getCrmAnalytics,
   matchPropertiesForLead,
-  matchLeadsForProperty
+  matchLeadsForProperty,
+  formatAmountInWords,
+  numToWordsIndian
 } from '../firebase/crmService.js';
 import { mockApi } from '../services/mockApi.js';
 
@@ -62,7 +64,11 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const [activeTab, setActiveTab] = useState('pipeline'); // 'pipeline', 'leads', 'matchmaker', 'visits', 'overview'
   const [selectedAgent, setSelectedAgent] = useState('ALL');
   const [loading, setLoading] = useState(true);
-  const [isSingleViewport, setIsSingleViewport] = useState(true); // Single Viewport fit (all 8 stage cards fit on 1 screen)
+  const [isSingleViewport, setIsSingleViewport] = useState(true); // Single Viewport fit layout
+
+  // Drag and Drop State for Kanban
+  const [draggedDealId, setDraggedDealId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
 
   // Core CRM Data
   const [leads, setLeads] = useState([]);
@@ -603,11 +609,11 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
               </div>
             </div>
 
-            {/* KANBAN PIPELINE LANES */}
+            {/* KANBAN PIPELINE LANES WITH DRAG & DROP */}
             <div className={
               isSingleViewport
-                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 w-full pb-4 items-start min-h-[600px]"
-                : "flex gap-4 overflow-x-auto pb-4 items-start min-h-[600px]"
+                ? "flex gap-3 overflow-x-auto pb-6 items-stretch min-h-[calc(100vh-250px)] w-full"
+                : "flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100vh-250px)]"
             }>
               {kanbanStages
                 .filter(st => dealStageFilter === 'ALL' || dealStageFilter === st)
@@ -615,95 +621,154 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   const stageDeals = filteredDeals.filter(d => d.stage === stage);
                   const stageTotal = stageDeals.reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0);
                   const stageTotalLakhs = (stageTotal / 100000).toFixed(1);
+                  const isDropTarget = dragOverStage === stage;
 
                   return (
                     <div
                       key={stage}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverStage !== stage) setDragOverStage(stage);
+                      }}
+                      onDragLeave={(e) => {
+                        if (e.currentTarget.contains(e.relatedTarget)) return;
+                        setDragOverStage(null);
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        const dealId = draggedDealId || e.dataTransfer.getData('text/plain');
+                        setDragOverStage(null);
+                        setDraggedDealId(null);
+                        if (dealId) {
+                          await handleAdvanceDealStage(dealId, stage, 'Moved via Drag & Drop');
+                        }
+                      }}
                       className={
-                        (isSingleViewport ? "w-full min-w-0" : "w-80 shrink-0") +
-                        " bg-slate-100/90 rounded-2xl border border-slate-200 p-2.5 flex flex-col gap-2.5 shadow-inner"
+                        (isSingleViewport ? "w-[260px] min-w-[240px] flex-1 max-w-[320px] shrink-0" : "w-80 shrink-0") +
+                        " rounded-2xl border-2 flex flex-col justify-between transition-all duration-200 shadow-sm min-h-[580px] " +
+                        (isDropTarget
+                          ? "bg-amber-100/90 border-amber-400 border-dashed ring-4 ring-amber-400/30 scale-[1.01] shadow-xl"
+                          : "bg-slate-100/80 border-slate-200 hover:border-slate-300"
+                        )
                       }
                     >
                       {/* LANE HEADER */}
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 gap-1">
+                      <div className="p-3 border-b border-slate-200/80 bg-white/60 backdrop-blur-xs rounded-t-2xl flex items-center justify-between gap-2 shrink-0">
                         <div className="min-w-0 flex-1">
-                          <span className="text-[11px] font-black text-slate-900 block truncate" title={CrmStageLabels[stage] || stage}>
+                          <span className="text-xs font-black text-slate-900 block truncate" title={CrmStageLabels[stage] || stage}>
                             {CrmStageLabels[stage] || stage}
                           </span>
-                          <span className="text-[9px] font-extrabold text-slate-500 block truncate">
+                          <span className="text-[10px] font-extrabold text-amber-700 block truncate">
                             Rs. {stageTotalLakhs}L ({stageDeals.length})
                           </span>
                         </div>
-                        <span className="w-5 h-5 rounded-full bg-white text-slate-800 font-black text-[10px] flex items-center justify-center border border-slate-300 shrink-0">
+                        <span className="w-6 h-6 rounded-full bg-slate-900 text-white font-black text-[10px] flex items-center justify-center border border-slate-800 shrink-0 shadow-xs">
                           {stageDeals.length}
                         </span>
                       </div>
 
-                      {/* DEAL CARDS IN THIS LANE */}
-                      <div className="space-y-2.5 min-h-[100px]">
+                      {/* DROP BADGE INDICATOR */}
+                      {isDropTarget && (
+                        <div className="mx-3 mt-2 py-2 bg-amber-400/20 border border-amber-400/60 rounded-xl text-center text-amber-900 text-xs font-black animate-pulse">
+                          Drop Deal Here to Move
+                        </div>
+                      )}
+
+                      {/* DEAL CARDS CONTAINER (SCROLLABLE VERTICALLY TO FILL SPACE) */}
+                      <div className="p-3 space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-320px)] custom-scrollbar">
                         {stageDeals.length === 0 ? (
-                          <div className="py-8 text-center text-slate-400 text-[11px] font-semibold">
-                            No deals
+                          <div className="py-16 text-center text-slate-400 text-xs font-semibold flex flex-col items-center gap-1.5 border border-dashed border-slate-300/80 rounded-xl my-2">
+                            <Briefcase className="w-5 h-5 text-slate-300" />
+                            <span>No deals in this stage</span>
                           </div>
                         ) : (
-                          stageDeals.map((deal) => (
-                            <div
-                              key={deal.id}
-                              className="bg-white p-3 rounded-xl border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all space-y-2 cursor-pointer group"
-                              onClick={() => setSelectedDealForDossier(deal)}
-                            >
-                              {/* BUYER & PROBABILITY */}
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="font-black text-xs text-slate-900 group-hover:text-amber-600 transition-colors truncate" title={deal.customerName}>
-                                  {deal.customerName}
-                                </span>
-                                <span className="bg-slate-100 text-slate-700 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-slate-200 shrink-0">
-                                  {deal.probability}%
-                                </span>
-                              </div>
+                          stageDeals.map((deal) => {
+                            const isBeingDragged = draggedDealId === deal.id;
 
-                              {/* PROPERTY TITLE & VALUE */}
-                              <div>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Parcel</span>
-                                <p className="text-[11px] font-black text-slate-800 line-clamp-1" title={deal.propertyTitle}>{deal.propertyTitle}</p>
-                                <span className="text-[11px] font-black text-emerald-600 block">{deal.dealValueDisplay}</span>
-                              </div>
+                            return (
+                              <div
+                                key={deal.id}
+                                draggable={true}
+                                onDragStart={(e) => {
+                                  setDraggedDealId(deal.id);
+                                  e.dataTransfer.setData('text/plain', deal.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedDealId(null);
+                                  setDragOverStage(null);
+                                }}
+                                onClick={() => setSelectedDealForDossier(deal)}
+                                className={
+                                  "bg-white p-3.5 rounded-xl border transition-all space-y-2.5 cursor-grab active:cursor-grabbing group shadow-xs hover:shadow-md " +
+                                  (isBeingDragged
+                                    ? "opacity-40 border-amber-400 border-2 border-dashed scale-95"
+                                    : "border-slate-200 hover:border-amber-400"
+                                  )
+                                }
+                              >
+                                {/* CARD TOP GRIP & BUYER */}
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <span className="text-slate-300 group-hover:text-amber-500 font-mono text-[10px] select-none cursor-grab" title="Drag to move deal">
+                                      ⋮⋮
+                                    </span>
+                                    <span className="font-black text-xs text-slate-900 group-hover:text-amber-600 transition-colors truncate" title={deal.customerName}>
+                                      {deal.customerName}
+                                    </span>
+                                  </div>
 
-                              {/* AGENT & ACTIONS */}
-                              <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] gap-1">
-                                <span className="text-slate-500 font-bold truncate max-w-[50px]">{deal.assignedAgent?.split(' ')[0]}</span>
-                                
-                                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={() => handleTriggerWhatsApp(deal.customerPhone, deal.customerName, deal.propertyTitle)}
-                                    className="p-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-colors"
-                                    title="Open WhatsApp chat with buyer"
-                                  >
-                                    <MessageSquare className="w-3 h-3" />
-                                  </button>
-
-                                  <button
-                                    onClick={(e) => handleDeleteDeal(e, deal.id, deal.customerName)}
-                                    className="p-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
-                                    title="Delete Deal completely from CRM"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                  
-                                  {/* STAGE ADVANCER DROPDOWN */}
-                                  <select
-                                    value={deal.stage}
-                                    onChange={(e) => handleAdvanceDealStage(deal.id, e.target.value)}
-                                    className="bg-slate-100 text-slate-800 text-[9px] font-black px-1 py-0.5 rounded-lg border border-slate-200 focus:outline-none cursor-pointer max-w-[70px] truncate"
-                                  >
-                                    {kanbanStages.map((st) => (
-                                      <option key={st} value={st}>{CrmStageLabels[st] || st}</option>
-                                    ))}
-                                  </select>
+                                  <span className="bg-slate-100 text-slate-700 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-slate-200 shrink-0">
+                                    {deal.probability}%
+                                  </span>
                                 </div>
+
+                                {/* PROPERTY PARCEL TITLE & DEAL VALUE */}
+                                <div>
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Property Parcel</span>
+                                  <p className="text-xs font-black text-slate-800 line-clamp-1" title={deal.propertyTitle}>{deal.propertyTitle}</p>
+                                  <span className="text-xs font-black text-emerald-600 mt-0.5 block">{deal.dealValueDisplay}</span>
+                                </div>
+
+                                {/* AGENT & ACTIONS FOOTER */}
+                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] gap-1">
+                                  <span className="text-slate-500 font-bold truncate max-w-[65px]" title={deal.assignedAgent}>
+                                    {deal.assignedAgent?.split(' ')[0]}
+                                  </span>
+                                  
+                                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => handleTriggerWhatsApp(deal.customerPhone, deal.customerName, deal.propertyTitle)}
+                                      className="p-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-colors"
+                                      title="Open WhatsApp chat with buyer"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      onClick={(e) => handleDeleteDeal(e, deal.id, deal.customerName)}
+                                      className="p-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                                      title="Delete Deal completely from CRM"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    
+                                    {/* STAGE ADVANCER DROPDOWN */}
+                                    <select
+                                      value={deal.stage}
+                                      onChange={(e) => handleAdvanceDealStage(deal.id, e.target.value)}
+                                      className="bg-slate-100 text-slate-800 text-[9px] font-black px-1 py-0.5 rounded-lg border border-slate-200 focus:outline-none cursor-pointer max-w-[75px] truncate"
+                                    >
+                                      {kanbanStages.map((st) => (
+                                        <option key={st} value={st}>{CrmStageLabels[st] || st}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+
                               </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
 
@@ -1421,6 +1486,17 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     onChange={(e) => setNewDealForm({ ...newDealForm, dealValue: Number(e.target.value) })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
+                  {newDealForm.dealValue > 0 && (
+                    <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-0.5">
+                      <div className="flex items-center justify-between text-xs font-black text-slate-900">
+                        <span className="text-slate-500 font-extrabold uppercase text-[10px]">Formatted Value:</span>
+                        <span className="text-emerald-700 font-black">{formatAmountInWords(newDealForm.dealValue)}</span>
+                      </div>
+                      <p className="text-[11px] font-extrabold text-amber-900 tracking-tight">
+                        {numToWordsIndian(newDealForm.dealValue)}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Initial Stage</label>

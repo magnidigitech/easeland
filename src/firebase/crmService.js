@@ -49,6 +49,47 @@ export const CrmLeadSources = {
   REFERRAL: 'Partner Referral'
 };
 
+export function formatAmountInWords(amount) {
+  const num = Number(amount);
+  if (isNaN(num) || num <= 0) return '';
+  if (num >= 10000000) {
+    const cr = num / 10000000;
+    return 'Rs. ' + (cr % 1 === 0 ? cr : cr.toFixed(2)) + ' Crore' + (cr > 1 ? 's' : '');
+  } else if (num >= 100000) {
+    const lakhs = num / 100000;
+    return 'Rs. ' + (lakhs % 1 === 0 ? lakhs : lakhs.toFixed(2)) + ' Lakh' + (lakhs > 1 ? 's' : '');
+  } else if (num >= 1000) {
+    const k = num / 1000;
+    return 'Rs. ' + (k % 1 === 0 ? k : k.toFixed(1)) + ' Thousand';
+  }
+  return 'Rs. ' + num.toLocaleString('en-IN');
+}
+
+export function numToWordsIndian(num) {
+  const n = Number(num);
+  if (isNaN(n) || n <= 0) return '';
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function inWords(val) {
+    let strVal = val.toString();
+    if (strVal.length > 9) return '';
+    let nPadded = ('000000000' + strVal).slice(-9);
+    let m = nPadded.match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+    if (!m) return '';
+    let res = '';
+    res += (Number(m[1]) !== 0) ? (a[Number(m[1])] || (b[m[1][0]] + ' ' + a[m[1][1]])) + ' Crore ' : '';
+    res += (Number(m[2]) !== 0) ? (a[Number(m[2])] || (b[m[2][0]] + ' ' + a[m[2][1]])) + ' Lakh ' : '';
+    res += (Number(m[3]) !== 0) ? (a[Number(m[3])] || (b[m[3][0]] + ' ' + a[m[3][1]])) + ' Thousand ' : '';
+    res += (Number(m[4]) !== 0) ? (a[Number(m[4])] || (b[m[4][0]] + ' ' + a[m[4][1]])) + ' Hundred ' : '';
+    res += (Number(m[5]) !== 0) ? ((res !== '') ? 'and ' : '') + (a[Number(m[5])] || (b[m[5][0]] + ' ' + a[m[5][1]])) + ' ' : '';
+    return res.trim();
+  }
+
+  const words = inWords(n);
+  return words ? (words + ' Rupees Only') : '';
+}
+
 export const DEFAULT_CRM_AGENTS = [
   { id: 'agent-1', name: 'EaseLand Admin', role: 'Principal Broker / Administrator', email: 'admin@easeland.in', phone: '+91 98765 00000' }
 ];
