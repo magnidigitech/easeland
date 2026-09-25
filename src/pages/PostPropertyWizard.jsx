@@ -903,11 +903,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 type="button"
                 onClick={handlePrevStep}
                 disabled={step === 1}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors ${
-                  step === 1 ? 'opacity-40 cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-100'
+                className={`px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors border ${
+                  step === 1
+                    ? 'cursor-not-allowed text-slate-500 bg-gray-100 border-gray-200 font-bold'
+                    : 'text-brand-navy hover:text-brand-navy bg-white hover:bg-gray-50 border-gray-300 font-extrabold shadow-sm'
                 }`}
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className={`w-4 h-4 ${step === 1 ? 'text-slate-500' : 'text-brand-navy'}`} />
                 <span>Previous Step</span>
               </button>
 
