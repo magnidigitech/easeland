@@ -612,7 +612,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             {/* KANBAN PIPELINE LANES WITH DRAG & DROP */}
             <div className={
               isSingleViewport
-                ? "flex gap-3 overflow-x-auto pb-6 items-stretch min-h-[calc(100vh-250px)] w-full"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 w-full pb-4"
                 : "flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100vh-250px)]"
             }>
               {kanbanStages
@@ -644,16 +644,16 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                         }
                       }}
                       className={
-                        (isSingleViewport ? "w-[260px] min-w-[240px] flex-1 max-w-[320px] shrink-0" : "w-80 shrink-0") +
-                        " rounded-2xl border-2 flex flex-col justify-between transition-all duration-200 shadow-sm min-h-[580px] " +
+                        (isSingleViewport ? "w-full min-w-0 h-[290px]" : "w-80 shrink-0 min-h-[580px]") +
+                        " rounded-2xl border-2 flex flex-col justify-between transition-all duration-200 shadow-xs " +
                         (isDropTarget
                           ? "bg-amber-100/90 border-amber-400 border-dashed ring-4 ring-amber-400/30 scale-[1.01] shadow-xl"
-                          : "bg-slate-100/80 border-slate-200 hover:border-slate-300"
+                          : "bg-slate-100/80 border-slate-200/90 hover:border-slate-300"
                         )
                       }
                     >
                       {/* LANE HEADER */}
-                      <div className="p-3 border-b border-slate-200/80 bg-white/60 backdrop-blur-xs rounded-t-2xl flex items-center justify-between gap-2 shrink-0">
+                      <div className="p-2.5 px-3 border-b border-slate-200/80 bg-white/70 backdrop-blur-xs rounded-t-2xl flex items-center justify-between gap-2 shrink-0">
                         <div className="min-w-0 flex-1">
                           <span className="text-xs font-black text-slate-900 block truncate" title={CrmStageLabels[stage] || stage}>
                             {CrmStageLabels[stage] || stage}
@@ -662,7 +662,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                             Rs. {stageTotalLakhs}L ({stageDeals.length})
                           </span>
                         </div>
-                        <span className="w-6 h-6 rounded-full bg-slate-900 text-white font-black text-[10px] flex items-center justify-center border border-slate-800 shrink-0 shadow-xs">
+                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white font-black text-[10px] flex items-center justify-center border border-slate-800 shrink-0 shadow-xs">
                           {stageDeals.length}
                         </span>
                       </div>
@@ -675,9 +675,15 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                       )}
 
                       {/* DEAL CARDS CONTAINER (SCROLLABLE VERTICALLY TO FILL SPACE) */}
-                      <div className="p-3 space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-320px)] custom-scrollbar">
+                      <div className={
+                        "p-2.5 space-y-2.5 flex-1 overflow-y-auto custom-scrollbar " +
+                        (isSingleViewport ? "max-h-[220px]" : "max-h-[calc(100vh-320px)]")
+                      }>
                         {stageDeals.length === 0 ? (
-                          <div className="py-16 text-center text-slate-400 text-xs font-semibold flex flex-col items-center gap-1.5 border border-dashed border-slate-300/80 rounded-xl my-2">
+                          <div className={
+                            "text-center text-slate-400 text-xs font-semibold flex flex-col items-center justify-center gap-1.5 border border-dashed border-slate-300/80 rounded-xl my-1 " +
+                            (isSingleViewport ? "py-6" : "py-16")
+                          }>
                             <Briefcase className="w-5 h-5 text-slate-300" />
                             <span>No deals in this stage</span>
                           </div>
