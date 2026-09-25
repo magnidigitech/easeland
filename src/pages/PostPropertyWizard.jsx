@@ -246,7 +246,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       }
       const areaNum = Number(formData.area);
       if (!formData.area || isNaN(areaNum) || areaNum <= 0) {
-        errors.area = 'Please enter a valid total area in sq ft.';
+        errors.area = `Please enter a valid total area (${formData.areaUnit || 'sq ft'}).`;
       }
       if (!formData.description || formData.description.trim().length < 3) {
         errors.description = 'Property Description is required (minimum 3 characters).';

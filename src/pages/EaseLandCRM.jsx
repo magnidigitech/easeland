@@ -121,7 +121,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     customerPhone: '',
     visitDate: new Date().toISOString().split('T')[0],
     visitTime: '10:30 AM',
-    agentAssigned: DEFAULT_CRM_AGENTS[2].name,
+    agentAssigned: DEFAULT_CRM_AGENTS[0]?.name || 'EaseLand Admin',
     customerNotes: ''
   });
 
@@ -908,7 +908,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                                   customerPhone: activeLeadForMatching.phone,
                                   visitDate: new Date().toISOString().split('T')[0],
                                   visitTime: '11:00 AM',
-                                  agentAssigned: activeLeadForMatching.assignedAgent || DEFAULT_CRM_AGENTS[2].name,
+                                  agentAssigned: activeLeadForMatching.assignedAgent || DEFAULT_CRM_AGENTS[0]?.name || 'EaseLand Admin',
                                   customerNotes: 'Matchmaker inspection visit for ' + (property.title || 'Plot')
                                 });
                                 setIsScheduleVisitModalOpen(true);

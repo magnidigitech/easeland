@@ -4984,11 +4984,11 @@ export default function AdminPortal({ onNavigate }) {
                 <div className="text-xs font-semibold text-gray-700 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <Phone className="w-3.5 h-3.5 text-brand-blue" />
-                    <span>Buyer Phone: <strong>{selectedDealForDossier.customerPhone || '+91 98765 43210'}</strong></span>
+                    <span>Buyer Phone: <strong>{selectedDealForDossier.customerPhone || 'Not Specified'}</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
                     <User className="w-3.5 h-3.5 text-brand-yellow" />
-                    <span>Seller Owner: <strong>{selectedDealForDossier.ownerName || 'Ramesh Varma'}</strong></span>
+                    <span>Seller Owner: <strong>{selectedDealForDossier.ownerName || 'Verified Property Owner'}</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
