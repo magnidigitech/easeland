@@ -55,7 +55,9 @@ import {
   matchPropertiesForLead,
   matchLeadsForProperty,
   formatAmountInWords,
-  numToWordsIndian
+  numToWordsIndian,
+  syncFromLiveEnquiries,
+  syncDealsToLeads
 } from '../firebase/crmService.js';
 import { mockApi } from '../services/mockApi.js';
 
@@ -144,6 +146,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const loadCrmData = async (showLoadingState = true) => {
     if (showLoadingState) setLoading(true);
     try {
+      // Auto-sync real platform inquiries and deal buyers into CRM leads
+      await syncFromLiveEnquiries();
+      await syncDealsToLeads();
+
       const [leadsData, dealsData, visitsData, analyticsData] = await Promise.all([
         getCrmLeads(),
         getCrmDeals(),
@@ -155,6 +161,11 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
       setDeals(dealsData);
       setVisits(visitsData);
       setAnalytics(analyticsData);
+
+      // Auto-select first active buyer for matchmaker if not selected
+      if (leadsData.length > 0) {
+        setActiveLeadForMatching(prev => (prev ? (leadsData.find(l => l.id === prev.id) || prev) : leadsData[0]));
+      }
 
       // Load properties from mockApi / localStorage
       const props = mockApi.getPublicProperties();
@@ -962,9 +973,11 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   }}
                   className="bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
                 >
-                  <option value="">Select a prospective buyer...</option>
+                  <option value="">
+                    {leads.length === 0 ? 'No registered buyers found (0 leads)...' : 'Select a prospective buyer...'}
+                  </option>
                   {leads.map(l => (
-                    <option key={l.id} value={l.id}>{l.name} ({l.preferredLocation})</option>
+                    <option key={l.id} value={l.id}>{l.name} ({l.preferredLocation || 'Any Location'})</option>
                   ))}
                 </select>
               </div>
@@ -972,12 +985,35 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
 
             {/* MATCH RESULTS SECTION */}
             {!activeLeadForMatching ? (
-              <div className="py-16 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
-                <Sparkles className="w-10 h-10 text-amber-400 mx-auto" />
-                <h4 className="font-black text-sm text-slate-800">Select a Prospective Buyer to Run Matching</h4>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Pick any lead from your CRM directory above to automatically score and rank all verified land plots against their exact requirements.
-                </p>
+              <div className="py-14 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
+                  <Sparkles className="w-6 h-6 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="font-black text-base text-slate-900">No Prospective Buyers Selected</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 font-medium">
+                    Add a buyer lead to your directory or sync existing deals to automatically score and rank all verified land plots against buyer criteria.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => setIsNewLeadModalOpen(true)}
+                    className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+                    <span>Add New Buyer Lead</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await loadCrmData(true);
+                      triggerToast('Synced all inquiries and deal buyers into CRM leads!');
+                    }}
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4 text-amber-400" />
+                    <span>Sync Deals & Inquiries</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">

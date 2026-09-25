@@ -334,6 +334,39 @@ export async function getCrmDeals() {
   return filtered;
 }
 
+export async function syncDealsToLeads() {
+  const deals = await getCrmDeals();
+  const existingLeads = await getCrmLeads();
+  const existingNames = new Set(existingLeads.map(l => (l.name || '').toLowerCase().trim()));
+  const existingPhones = new Set(existingLeads.map(l => l.phone).filter(Boolean));
+
+  let syncedCount = 0;
+  for (const d of deals) {
+    if (!d.customerName) continue;
+    const cleanName = d.customerName.toLowerCase().trim();
+    if (existingNames.has(cleanName) || (d.customerPhone && existingPhones.has(d.customerPhone))) {
+      continue;
+    }
+    const leadData = {
+      name: d.customerName,
+      phone: d.customerPhone || '',
+      email: d.customerEmail || '',
+      source: CrmLeadSources.WEBSITE_ENQUIRY,
+      score: CrmLeadScores.HOT,
+      preferredLocation: d.propertyLocation || 'Amaravati / Guntur Region',
+      preferredPropertyType: 'Open Plots',
+      budgetMax: Number(d.dealValue) || 0,
+      notes: 'Auto-registered from deal: ' + (d.propertyTitle || 'Listing'),
+      assignedAgent: d.assignedAgent || DEFAULT_CRM_AGENTS[0].name
+    };
+    await createCrmLead(leadData);
+    existingNames.add(cleanName);
+    if (d.customerPhone) existingPhones.add(d.customerPhone);
+    syncedCount++;
+  }
+  return syncedCount;
+}
+
 export async function createCrmDeal(dealData) {
   const dealId = 'deal-' + Date.now().toString().slice(-6);
   const nowIso = new Date().toISOString();
@@ -381,6 +414,29 @@ export async function createCrmDeal(dealData) {
   const current = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
   const updated = [payload, ...current.filter(d => d.id !== dealId)];
   setStored('easeland_crm_deals', updated);
+
+  // Auto-register lead for buyer if not present
+  if (payload.customerName) {
+    const existingLeads = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
+    const exists = existingLeads.some(l => 
+      (l.name && l.name.toLowerCase().trim() === payload.customerName.toLowerCase().trim()) ||
+      (l.phone && payload.customerPhone && l.phone === payload.customerPhone)
+    );
+    if (!exists) {
+      await createCrmLead({
+        name: payload.customerName,
+        phone: payload.customerPhone || '',
+        email: payload.customerEmail || '',
+        source: CrmLeadSources.WEBSITE_ENQUIRY,
+        score: CrmLeadScores.HOT,
+        preferredLocation: payload.propertyLocation || 'Amaravati / Guntur Region',
+        preferredPropertyType: 'Open Plots',
+        budgetMax: payload.dealValue,
+        notes: 'Auto-registered from deal: ' + payload.propertyTitle,
+        assignedAgent: payload.assignedAgent
+      });
+    }
+  }
 
   return { success: true, deal: payload };
 }
