@@ -96,7 +96,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         getPropertyById(resumePropertyId, user.uid).then(res => {
           if (res.success && res.property) {
             const p = res.property;
-            setPropertyId(p.propertyId);
+            const pId = p.propertyId || p.id;
+            setPropertyId(pId);
             setReferenceId(p.referenceId);
             setFormData({
               title: p.title || '',
@@ -111,7 +112,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT
               },
               amenities: Array.isArray(p.amenities) ? p.amenities : [],
-              media: Array.isArray(p.media) ? p.media : [],
+              media: Array.isArray(p.media) ? p.media : (Array.isArray(p.photos) ? p.photos : []),
+              photos: Array.isArray(p.photos) ? p.photos : [],
+              documents: Array.isArray(p.documents) ? p.documents : [],
+              videoUrl: p.videoUrl || p.videoLink || null,
+              videoLink: p.videoLink || p.videoUrl || null,
+              embeddedVideoUrl: p.embeddedVideoUrl || null,
               location: p.location || null,
               boundary: p.boundary || null,
               ownerSubmittedBoundary: p.ownerSubmittedBoundary || null
@@ -133,7 +139,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
   // Resume selected draft
   const handleResumeDraft = (draft) => {
-    setPropertyId(draft.propertyId);
+    const dId = draft.propertyId || draft.id;
+    setPropertyId(dId);
     setReferenceId(draft.referenceId);
     setFormData({
       title: draft.title || '',
@@ -148,7 +155,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         areaUnit: draft.areaUnit || draft.specs?.areaUnit || AreaUnit.SQ_FT
       },
       amenities: Array.isArray(draft.amenities) ? draft.amenities : [],
-      media: Array.isArray(draft.media) ? draft.media : [],
+      media: Array.isArray(draft.media) ? draft.media : (Array.isArray(draft.photos) ? draft.photos : []),
+      photos: Array.isArray(draft.photos) ? draft.photos : [],
+      documents: Array.isArray(draft.documents) ? draft.documents : [],
+      videoUrl: draft.videoUrl || draft.videoLink || null,
+      videoLink: draft.videoLink || draft.videoUrl || null,
+      embeddedVideoUrl: draft.embeddedVideoUrl || null,
       location: draft.location || null,
       boundary: draft.boundary || null
     });

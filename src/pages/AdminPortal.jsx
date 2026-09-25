@@ -247,6 +247,7 @@ export default function AdminPortal() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
+  const [auditRemovedItemKeys, setAuditRemovedItemKeys] = useState(new Set());
 
   // Custom feedback text for verification review
   const [feedbackNote, setFeedbackNote] = useState('');
@@ -1189,6 +1190,7 @@ export default function AdminPortal() {
 
   const openWorkspace = async (prop) => {
     setSelectedProperty(prop);
+    setAuditRemovedItemKeys(new Set());
     setIsWorkspaceOpen(true);
     setActiveTab('workspace');
     const pId = prop?.id || prop?.propertyId;
@@ -1280,6 +1282,236 @@ export default function AdminPortal() {
         await startPropertyReview(pId, user.uid, user?.displayName || 'EaseLand Auditor');
       }
     } catch (err) {}
+  };
+
+  // Auditor Media & Document Editing / Removal Handler
+  const handleAdminRemoveMediaItem = async (type, item, propId) => {
+    if (!propId || !item) return;
+    const pIdStr = String(propId);
+
+    try {
+      if (type === 'photo') {
+        const photoUrl = typeof item === 'string' ? item : (item.url || item.src || '');
+        if (!photoUrl) return;
+
+        setAuditRemovedItemKeys(prev => {
+          const next = new Set(prev);
+          next.add(photoUrl);
+          next.add(photoUrl.toLowerCase());
+          return next;
+        });
+
+        // 1. Update selectedProperty
+        setSelectedProperty(prev => {
+          if (!prev) return prev;
+          const updatedPhotos = (prev.photos || []).filter(u => u !== photoUrl);
+          const updatedMedia = (prev.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl);
+          return {
+            ...prev,
+            photos: updatedPhotos,
+            media: updatedMedia
+          };
+        });
+
+        // 2. Update verificationQueue & allProperties
+        setVerificationQueue(prev => prev.map(p => {
+          if (String(p.id || p.propertyId) === pIdStr) {
+            return {
+              ...p,
+              photos: (p.photos || []).filter(u => u !== photoUrl),
+              media: (p.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl)
+            };
+          }
+          return p;
+        }));
+
+        setAllProperties(prev => prev.map(p => {
+          if (String(p.id || p.propertyId) === pIdStr) {
+            return {
+              ...p,
+              photos: (p.photos || []).filter(u => u !== photoUrl),
+              media: (p.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl)
+            };
+          }
+          return p;
+        }));
+
+        // 3. Clean local storage
+        try {
+          if (typeof window !== 'undefined') {
+            const rawDelMedia = localStorage.getItem('easeland_deleted_media') || '[]';
+            const parsedDel = JSON.parse(rawDelMedia);
+            if (!parsedDel.includes(photoUrl)) {
+              parsedDel.push(photoUrl);
+              localStorage.setItem('easeland_deleted_media', JSON.stringify(parsedDel));
+            }
+            const stored = localStorage.getItem(`easeland_media_${pIdStr}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                localStorage.setItem(`easeland_media_${pIdStr}`, JSON.stringify(parsed.filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl)));
+              }
+            }
+            const userMedia = localStorage.getItem('easeland_user_media');
+            if (userMedia) {
+              const parsed = JSON.parse(userMedia);
+              if (Array.isArray(parsed)) {
+                localStorage.setItem('easeland_user_media', JSON.stringify(parsed.filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl)));
+              }
+            }
+          }
+        } catch (e) {}
+
+        // 4. Update Firestore & PostgreSQL non-blockingly
+        try {
+          const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+          const { db } = await import('../firebase/config.js');
+          const propRef = doc(db, 'properties', pIdStr);
+          await updateDoc(propRef, {
+            photos: (selectedProperty?.photos || []).filter(u => u !== photoUrl),
+            updatedAt: serverTimestamp()
+          });
+        } catch (fsErr) {}
+
+        try {
+          await fetch(`/api/properties/${pIdStr}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              photos: (selectedProperty?.photos || []).filter(u => u !== photoUrl)
+            })
+          });
+        } catch (pgErr) {}
+
+        logAdminActivity(`Auditor removed ineligible photo from property ${pIdStr}.`);
+      } else if (type === 'video') {
+        const videoUrl = typeof item === 'string' ? item : (item.url || item.embedUrl || '');
+        if (!videoUrl) return;
+
+        setAuditRemovedItemKeys(prev => {
+          const next = new Set(prev);
+          next.add(videoUrl);
+          next.add(videoUrl.toLowerCase());
+          return next;
+        });
+
+        // 1. Update selectedProperty
+        setSelectedProperty(prev => {
+          if (!prev) return prev;
+          const updatedMedia = (prev.media || []).filter(m => {
+            const u = typeof m === 'string' ? m : (m.url || m.embedUrl);
+            return u !== videoUrl;
+          });
+          return {
+            ...prev,
+            videoUrl: prev.videoUrl === videoUrl ? null : prev.videoUrl,
+            videoLink: prev.videoLink === videoUrl ? null : prev.videoLink,
+            embeddedVideoUrl: prev.embeddedVideoUrl === videoUrl ? null : prev.embeddedVideoUrl,
+            droneVideoUrl: prev.droneVideoUrl === videoUrl ? null : prev.droneVideoUrl,
+            media: updatedMedia
+          };
+        });
+
+        // 2. Update verificationQueue & allProperties
+        setVerificationQueue(prev => prev.map(p => {
+          if (String(p.id || p.propertyId) === pIdStr) {
+            return {
+              ...p,
+              videoUrl: p.videoUrl === videoUrl ? null : p.videoUrl,
+              videoLink: p.videoLink === videoUrl ? null : p.videoLink,
+              embeddedVideoUrl: p.embeddedVideoUrl === videoUrl ? null : p.embeddedVideoUrl,
+              media: (p.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== videoUrl)
+            };
+          }
+          return p;
+        }));
+
+        setAllProperties(prev => prev.map(p => {
+          if (String(p.id || p.propertyId) === pIdStr) {
+            return {
+              ...p,
+              videoUrl: p.videoUrl === videoUrl ? null : p.videoUrl,
+              videoLink: p.videoLink === videoUrl ? null : p.videoLink,
+              embeddedVideoUrl: p.embeddedVideoUrl === videoUrl ? null : p.embeddedVideoUrl,
+              media: (p.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== videoUrl)
+            };
+          }
+          return p;
+        }));
+
+        try {
+          const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+          const { db } = await import('../firebase/config.js');
+          const propRef = doc(db, 'properties', pIdStr);
+          await updateDoc(propRef, {
+            videoUrl: null,
+            videoLink: null,
+            embeddedVideoUrl: null,
+            droneVideoUrl: null,
+            updatedAt: serverTimestamp()
+          });
+        } catch (fsErr) {}
+
+        logAdminActivity(`Auditor removed ineligible video from property ${pIdStr}.`);
+      } else if (type === 'document') {
+        const docId = item.docId || item.id || item.name || item.url || '';
+        const docName = item.documentName || item.name || 'Document';
+        const docUrl = item.url || item.publicUrl || '';
+
+        setAuditRemovedItemKeys(prev => {
+          const next = new Set(prev);
+          if (docId) next.add(String(docId));
+          if (docName) next.add(String(docName));
+          if (docUrl && docUrl !== '#') next.add(String(docUrl));
+          return next;
+        });
+
+        // 1. Update selectedProperty
+        setSelectedProperty(prev => {
+          if (!prev) return prev;
+          const updatedDocs = (prev.documents || []).filter(d => {
+            const id = d.docId || d.id || d.name || d.url;
+            return id !== docId && d.name !== docName && d.url !== docUrl;
+          });
+          return {
+            ...prev,
+            documents: updatedDocs,
+            propertyDocuments: (prev.propertyDocuments || []).filter(d => (d.docId || d.id || d.name) !== docId),
+            confidentialDocuments: (prev.confidentialDocuments || []).filter(d => (d.docId || d.id || d.name) !== docId)
+          };
+        });
+
+        // 2. Update verificationQueue & allProperties
+        setVerificationQueue(prev => prev.map(p => {
+          if (String(p.id || p.propertyId) === pIdStr) {
+            return {
+              ...p,
+              documents: (p.documents || []).filter(d => (d.docId || d.id || d.name || d.url) !== docId && d.name !== docName && d.url !== docUrl)
+            };
+          }
+          return p;
+        }));
+
+        setAllProperties(prev => prev.map(p => {
+          if (String(p.id || p.propertyId) === pIdStr) {
+            return {
+              ...p,
+              documents: (p.documents || []).filter(d => (d.docId || d.id || d.name || d.url) !== docId && d.name !== docName && d.url !== docUrl)
+            };
+          }
+          return p;
+        }));
+
+        try {
+          const { removeConfidentialPropertyDocument } = await import('../firebase/documentService.js');
+          await removeConfidentialPropertyDocument(docId, pIdStr, selectedProperty?.ownerId);
+        } catch (docErr) {}
+
+        logAdminActivity(`Auditor removed ineligible document "${docName}" from property ${pIdStr}.`);
+      }
+    } catch (err) {
+      console.error('Error removing file during audit:', err);
+    }
   };
 
   // User Suspension & Removal Handlers
@@ -3284,6 +3516,8 @@ export default function AdminPortal() {
 
                             const cleanUrl = typeof urlStr === 'string' ? urlStr.toLowerCase() : '';
 
+                            if (auditRemovedItemKeys.has(urlStr) || auditRemovedItemKeys.has(cleanUrl)) return;
+
                             // 1. CHECK IF DOCUMENT
                             let isDocument = false;
                             if (typeof item === 'object') {
@@ -3324,12 +3558,17 @@ export default function AdminPortal() {
                               }
 
                               const docUrl = urlStr || '#';
-                              const key = docUrl !== '#' ? docUrl : ((typeof item === 'object' && item.docId) || docName);
+                              const docId = (typeof item === 'object' && item.docId) || docName;
+                              const key = docUrl !== '#' ? docUrl : docId;
+
+                              if (auditRemovedItemKeys.has(key) || auditRemovedItemKeys.has(docName) || auditRemovedItemKeys.has(docUrl) || auditRemovedItemKeys.has(String(docId))) {
+                                return;
+                              }
 
                               if (key && !seenDocKeys.has(key)) {
                                 seenDocKeys.add(key);
                                 documents.push({
-                                  docId: (typeof item === 'object' && item.docId) || `doc-${documents.length + 1}`,
+                                  docId: docId,
                                   name: docName,
                                   type: docType,
                                   url: docUrl,
@@ -3371,6 +3610,10 @@ export default function AdminPortal() {
                                   videoKey = videoKey.toLowerCase();
                                 }
 
+                                if (auditRemovedItemKeys.has(videoKey) || auditRemovedItemKeys.has(videoUrl) || auditRemovedItemKeys.has(cleanUrl)) {
+                                  return;
+                                }
+
                                 if (!seenVideoUrls.has(videoKey)) {
                                   seenVideoUrls.add(videoKey);
                                   let videoTitle = 'Submitted Property Video';
@@ -3391,6 +3634,9 @@ export default function AdminPortal() {
 
                             // 3. IF NOT DOCUMENT AND NOT VIDEO -> EVALUATE AS USER UPLOADED PHOTO
                             if (urlStr && isValidPhotoUrl(urlStr) && !seenPhotoUrls.has(urlStr)) {
+                              if (auditRemovedItemKeys.has(urlStr) || auditRemovedItemKeys.has(cleanUrl)) {
+                                return;
+                              }
                               seenPhotoUrls.add(urlStr);
                               photos.push(urlStr);
                             }
@@ -3401,35 +3647,64 @@ export default function AdminPortal() {
                               
                               {/* SUBMITTED MEDIA PHOTO GALLERY */}
                               <div className="space-y-3 pt-4 border-t border-slate-200">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                  <ImageIcon className="w-4 h-4 text-blue-600" />
-                                  <span>Submitted Property Photos ({photos.length})</span>
-                                </h4>
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                                    <span>Submitted Property Photos ({photos.length})</span>
+                                  </h4>
+                                  <span className="text-[11px] font-semibold text-slate-500">
+                                    Auditor can remove ineligible or blurred photos directly
+                                  </span>
+                                </div>
                                 {photos.length === 0 ? (
                                   <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic">
-                                    No property photos uploaded by user.
+                                    No property photos currently listed or remaining.
                                   </div>
                                 ) : (
                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                                     {photos.map((imgUrl, idx) => (
                                       <div
                                         key={idx}
-                                        onClick={() => setEnlargedMediaUrl(imgUrl)}
-                                        className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                                        className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all"
                                       >
                                         <img
                                           src={imgUrl}
                                           alt={`User property photo ${idx + 1}`}
-                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
+                                          onClick={() => setEnlargedMediaUrl(imgUrl)}
                                           onError={(e) => {
                                             if (e.currentTarget && e.currentTarget.parentElement) {
                                               e.currentTarget.parentElement.style.display = 'none';
                                             }
                                           }}
                                         />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                                          <Eye className="w-4 h-4" />
-                                          <span>Enlarge</span>
+                                        
+                                        {/* Status / Policy Badge */}
+                                        <span className="absolute top-1.5 left-1.5 z-10 bg-emerald-700/90 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none">
+                                          Eligible
+                                        </span>
+
+                                        {/* Admin Remove Button */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleAdminRemoveMediaItem('photo', imgUrl, propId);
+                                          }}
+                                          className="absolute top-1.5 right-1.5 z-20 bg-red-600 hover:bg-red-700 text-white p-1 rounded-md shadow-md transition-all flex items-center gap-1 text-[10px] font-bold"
+                                          title="Remove non-compliant photo"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 text-white" />
+                                          <span className="hidden group-hover:inline pr-0.5">Remove</span>
+                                        </button>
+
+                                        {/* Hover Overlay with Enlarge */}
+                                        <div
+                                          onClick={() => setEnlargedMediaUrl(imgUrl)}
+                                          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1 cursor-pointer"
+                                        >
+                                          <Eye className="w-3.5 h-3.5" />
+                                          <span>Click to Enlarge</span>
                                         </div>
                                       </div>
                                     ))}
@@ -3439,10 +3714,15 @@ export default function AdminPortal() {
 
                               {/* SUBMITTED VIDEO PRESENTATION & REVIEW SECTION */}
                               <div className="space-y-4 pt-4 border-t border-slate-200">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                  <Video className="w-4 h-4 text-amber-600" />
-                                  <span>Submitted Property Videos & Walkthroughs ({videos.length})</span>
-                                </h4>
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                    <Video className="w-4 h-4 text-amber-600" />
+                                    <span>Submitted Property Videos & Walkthroughs ({videos.length})</span>
+                                  </h4>
+                                  <span className="text-[11px] font-semibold text-slate-500">
+                                    Auditor can remove copyright-violating or invalid videos
+                                  </span>
+                                </div>
                                 {videos.length === 0 ? (
                                   <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-600 font-semibold italic flex items-center gap-2">
                                     <Video className="w-4 h-4 text-amber-500 shrink-0" />
@@ -3490,18 +3770,34 @@ export default function AdminPortal() {
                                               className="w-full aspect-video rounded-xl max-h-96"
                                             />
                                           )}
-                                          <div className="p-2 flex items-center justify-between text-xs text-slate-300 border-t border-slate-800 mt-2">
-                                            <span className="font-bold flex items-center gap-1.5 text-amber-400">
-                                              🎬 {isYoutube ? 'YouTube Video' : isDrive ? 'Google Drive Video' : 'Direct Upload Video'}
-                                            </span>
-                                            <a
-                                              href={vItem}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="text-amber-400 hover:text-amber-300 font-extrabold underline flex items-center gap-1"
-                                            >
-                                              <span>Open External Video Link ↗</span>
-                                            </a>
+                                          <div className="p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 border-t border-slate-800 mt-2">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-bold flex items-center gap-1.5 text-amber-400">
+                                                🎬 {isYoutube ? 'YouTube Video' : isDrive ? 'Google Drive Video' : 'Direct Upload Video'}
+                                              </span>
+                                              <span className="bg-emerald-900/60 text-emerald-300 border border-emerald-600/40 text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
+                                                Eligible Media
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <a
+                                                href={vItem}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-amber-400 hover:text-amber-300 font-extrabold underline flex items-center gap-1"
+                                              >
+                                                <span>Open External Video Link ↗</span>
+                                              </a>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleAdminRemoveMediaItem('video', vItem, propId)}
+                                                className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg transition-all shadow-sm flex items-center gap-1"
+                                                title="Remove non-compliant video"
+                                              >
+                                                <Trash2 className="w-3 h-3 text-white" />
+                                                <span>Remove Video</span>
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
                                       );
@@ -3512,14 +3808,19 @@ export default function AdminPortal() {
 
                               {/* UPLOADED VERIFICATION DOCUMENTS (ALWAYS VISIBLE SECTION) */}
                               <div className="space-y-3 pt-4 border-t border-slate-200">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                                  <FileText className="w-4 h-4 text-indigo-600" />
-                                  <span>Uploaded Verification Documents ({documents.length})</span>
-                                </h4>
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                                    <FileText className="w-4 h-4 text-indigo-600" />
+                                    <span>Uploaded Verification Documents ({documents.length})</span>
+                                  </h4>
+                                  <span className="text-[11px] font-semibold text-slate-500">
+                                    Auditor can remove fake or unreadable documents
+                                  </span>
+                                </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   {documents.length === 0 ? (
                                     <div className="col-span-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 italic font-semibold">
-                                      No physical documents attached. Property subject to basic title and field verification.
+                                      No physical documents currently attached.
                                     </div>
                                   ) : (
                                     documents.map((docItem, idx) => {
@@ -3540,16 +3841,27 @@ export default function AdminPortal() {
                                               </span>
                                             </div>
                                           </div>
-                                          {docUrlStr && docUrlStr !== '#' && (
-                                            <a
-                                              href={docUrlStr}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm shrink-0 whitespace-nowrap"
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            {docUrlStr && docUrlStr !== '#' && (
+                                              <a
+                                                href={docUrlStr}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition-all shadow-sm whitespace-nowrap"
+                                              >
+                                                View / Download PDF ↗
+                                              </a>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => handleAdminRemoveMediaItem('document', docItem, propId)}
+                                              className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg transition-all shadow-sm flex items-center gap-1"
+                                              title="Remove invalid or policy-violating document"
                                             >
-                                              View / Download PDF ↗
-                                            </a>
-                                          )}
+                                              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                              <span>Remove</span>
+                                            </button>
+                                          </div>
                                         </div>
                                       );
                                     })

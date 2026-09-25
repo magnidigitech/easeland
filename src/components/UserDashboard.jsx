@@ -1054,7 +1054,15 @@ export default function UserDashboard({
                           <span className="font-extrabold uppercase tracking-wider block mb-1">
                             Verification Status & Feedback:
                           </span>
-                          <span>{prop.adminNote}</span>
+                          <span>
+                            {prop.adminNote || (
+                              (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW')
+                                ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
+                                : ((prop.status === 'LIVE' || prop.status === 'APPROVED')
+                                    ? 'Property audited and verified live on marketplace. Edit locked after verification.'
+                                    : 'Property draft created. Complete all steps to submit for verification.')
+                            )}
+                          </span>
                         </div>
 
                         {/* CARD FOOTER ACTIONS */}
@@ -1069,18 +1077,30 @@ export default function UserDashboard({
                             {/* DRAFT */}
                             {prop.status === 'DRAFT' && (
                               <button
-                                onClick={() => onPostProperty(prop.propertyId)}
-                                className="px-3 py-1.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal rounded-lg flex items-center gap-1 font-bold shadow-sm"
+                                onClick={() => onPostProperty(prop.id || prop.propertyId)}
+                                className="px-3 py-1.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-navy rounded-lg flex items-center gap-1 font-bold shadow-sm"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-3.5 h-3.5 text-brand-navy" />
                                 <span>Resume Draft</span>
                               </button>
                             )}
 
-                            {/* CHANGES REQUIRED */}
+                            {/* PENDING VERIFICATION & UNDER REVIEW (EDIT ALLOWED BEFORE AUDIT DONE) */}
+                            {(prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
+                              <button
+                                onClick={() => onPostProperty(prop.id || prop.propertyId)}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors"
+                                title="Update property details, files, or media before admin audit completes"
+                              >
+                                <Edit className="w-3.5 h-3.5 text-white" />
+                                <span>Edit Listing</span>
+                              </button>
+                            )}
+
+                            {/* CHANGES REQUIRED (ADMIN REQUESTED CHANGES) */}
                             {prop.status === 'CHANGES_REQUIRED' && (
                               <button
-                                onClick={() => onPostProperty(prop.propertyId)}
+                                onClick={() => onPostProperty(prop.id || prop.propertyId)}
                                 className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
@@ -1088,33 +1108,26 @@ export default function UserDashboard({
                               </button>
                             )}
 
-                            {/* LIVE / APPROVED */}
+                            {/* LIVE / APPROVED (AUDIT DONE - EDIT NOT AVAILABLE) */}
                             {(prop.status === 'LIVE' || prop.status === 'APPROVED') && (
                               <>
                                 <button
-                                  onClick={() => onPostProperty(prop.id || prop.propertyId)}
-                                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-brand-charcoal rounded-lg flex items-center gap-1"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
                                   onClick={() => handleOwnerPropertyAction('UNAVAILABLE', prop)}
-                                  className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1 font-bold"
                                 >
                                   <Clock className="w-3.5 h-3.5 text-orange-600" />
                                   <span>Pause</span>
                                 </button>
                                 <button
                                   onClick={() => handleOwnerPropertyAction('SOLD', prop)}
-                                  className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-lg flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-lg flex items-center gap-1 font-bold"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
                                   <span>Mark Sold</span>
                                 </button>
                                 <button
                                   onClick={() => handleOwnerPropertyAction('RENTED', prop)}
-                                  className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 rounded-lg flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 rounded-lg flex items-center gap-1 font-bold"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
                                   <span>Mark Rented</span>
