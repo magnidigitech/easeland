@@ -247,12 +247,81 @@ async function initPgDb() {
       );
     `);
 
+    // 5. Site Visitors Table (3-Minute Engaged Visitors)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS site_visitors (
+        visitor_id VARCHAR(100) PRIMARY KEY,
+        name TEXT,
+        phone VARCHAR(50),
+        email VARCHAR(255),
+        preferred_property_type VARCHAR(100),
+        preferred_location TEXT,
+        stay_duration_seconds INTEGER DEFAULT 180,
+        source VARCHAR(100) DEFAULT '3_MIN_ENGAGEMENT_POPUP',
+        status VARCHAR(50) DEFAULT 'NEW',
+        notes TEXT,
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     client.release();
-    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries) initialized successfully.');
+    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors) initialized successfully.');
   } catch (err) {
     console.warn('PostgreSQL connection/init note (Local disk store active):', err.message);
   }
 }
+
+// Local Persistent Disk & Memory Store for Site Visitors (100% Availability Fallback)
+const visitorsStoreFile = path.join(uploadsDir, 'visitors_store.json');
+const localVisitorsMap = new Map();
+
+try {
+  if (fs.existsSync(visitorsStoreFile)) {
+    const rawDisk = fs.readFileSync(visitorsStoreFile, 'utf8');
+    const parsedDisk = JSON.parse(rawDisk);
+    if (Array.isArray(parsedDisk)) {
+      parsedDisk.forEach(v => {
+        if (v && (v.visitorId || v.id)) {
+          localVisitorsMap.set(v.visitorId || v.id, v);
+        }
+      });
+    }
+  }
+} catch (e) {
+  console.warn('Local visitors store initialization note:', e.message);
+}
+
+function saveLocalVisitor(visitor) {
+  if (!visitor || (!visitor.visitorId && !visitor.id)) return;
+  const vId = visitor.visitorId || visitor.id;
+  const existing = localVisitorsMap.get(vId) || {};
+  const updated = {
+    ...existing,
+    ...visitor,
+    id: vId,
+    visitorId: vId,
+    updatedAt: new Date().toISOString()
+  };
+  localVisitorsMap.set(vId, updated);
+  try {
+    const arrayToStore = Array.from(localVisitorsMap.values());
+    fs.writeFileSync(visitorsStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Local visitors disk write note:', err.message);
+  }
+  return updated;
+}
+
+function getLocalVisitors() {
+  return Array.from(localVisitorsMap.values()).sort((a, b) => {
+    const tA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+    const tB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+    return tB - tA;
+  });
+}
+
 
 // Local Persistent Disk & Memory Store for Enquiries (100% Availability Fallback)
 const enquiriesStoreFile = path.join(uploadsDir, 'enquiries_store.json');
@@ -828,6 +897,167 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
     }
 
     return res.json({ success: true, message: newMsg });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// SITE VISITORS API ENDPOINTS (3-Minute Engaged Visitors)
+// ============================================================================
+
+// Submit 3-Minute Site Visitor Lead to PostgreSQL DB
+app.post('/api/visitors', async (req, res) => {
+  try {
+    const visitorData = req.body || {};
+    const vId = visitorData.visitorId || visitorData.id || `vis-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const fullPayload = {
+      ...visitorData,
+      id: vId,
+      visitorId: vId,
+      name: (visitorData.name || 'Site Visitor').trim(),
+      phone: (visitorData.phone || '').trim(),
+      email: (visitorData.email || '').trim(),
+      preferredPropertyType: visitorData.preferredPropertyType || 'Open Plots',
+      preferredLocation: visitorData.preferredLocation || 'Amaravati / Guntur',
+      stayDurationSeconds: Number(visitorData.stayDurationSeconds) || 180,
+      source: visitorData.source || '3_MIN_ENGAGEMENT_POPUP',
+      status: visitorData.status || 'NEW',
+      notes: visitorData.notes || 'Browsed site for over 3 minutes and submitted lead popup.',
+      createdAt: visitorData.createdAt || nowIso,
+      updatedAt: nowIso
+    };
+
+    // 1. Save to local fallback store
+    saveLocalVisitor(fullPayload);
+
+    // 2. Save to PostgreSQL DB
+    try {
+      const queryText = `
+        INSERT INTO site_visitors (
+          visitor_id, name, phone, email, preferred_property_type,
+          preferred_location, stay_duration_seconds, source, status,
+          notes, raw_data, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
+        ) ON CONFLICT (visitor_id) DO UPDATE SET
+          name = EXCLUDED.name,
+          phone = EXCLUDED.phone,
+          email = EXCLUDED.email,
+          status = EXCLUDED.status,
+          notes = EXCLUDED.notes,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = NOW();
+      `;
+      await pgPool.query(queryText, [
+        vId,
+        fullPayload.name,
+        fullPayload.phone,
+        fullPayload.email,
+        fullPayload.preferredPropertyType,
+        fullPayload.preferredLocation,
+        fullPayload.stayDurationSeconds,
+        fullPayload.source,
+        fullPayload.status,
+        fullPayload.notes,
+        JSON.stringify(fullPayload)
+      ]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL save visitor note:', pgErr.message);
+    }
+
+    return res.json({ success: true, visitorId: vId, visitor: fullPayload });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get Site Visitors List from PostgreSQL DB (with local fallback merge)
+app.get('/api/visitors', async (req, res) => {
+  try {
+    const localList = getLocalVisitors();
+    let pgVisitors = [];
+
+    try {
+      const result = await pgPool.query('SELECT raw_data FROM site_visitors ORDER BY created_at DESC LIMIT 300;');
+      pgVisitors = result.rows.map(row => row.raw_data).filter(Boolean);
+    } catch (pgErr) {
+      console.warn('PostgreSQL fetch visitors note:', pgErr.message);
+    }
+
+    const mergedMap = new Map();
+    [...localList, ...pgVisitors].forEach(v => {
+      if (v && (v.visitorId || v.id)) {
+        const id = v.visitorId || v.id;
+        mergedMap.set(id, { ...mergedMap.get(id), ...v });
+      }
+    });
+
+    const allVisitors = Array.from(mergedMap.values()).sort((a, b) => {
+      const tA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const tB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return tB - tA;
+    });
+
+    return res.json({ success: true, count: allVisitors.length, visitors: allVisitors });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Update Visitor Status or Notes in PostgreSQL DB
+app.patch('/api/visitors/:id', async (req, res) => {
+  try {
+    const vId = req.params.id;
+    const { status, notes, assignedAgent } = req.body || {};
+    const nowIso = new Date().toISOString();
+
+    const localVis = localVisitorsMap.get(vId) || { id: vId, visitorId: vId };
+    if (status) localVis.status = status;
+    if (notes !== undefined) localVis.notes = notes;
+    if (assignedAgent !== undefined) localVis.assignedAgent = assignedAgent;
+    localVis.updatedAt = nowIso;
+    saveLocalVisitor(localVis);
+
+    try {
+      await pgPool.query(`
+        UPDATE site_visitors 
+        SET 
+          status = COALESCE($1, status),
+          notes = COALESCE($2, notes),
+          raw_data = $3,
+          updated_at = NOW()
+        WHERE visitor_id = $4;
+      `, [status || null, notes !== undefined ? notes : null, JSON.stringify(localVis), vId]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL update visitor note:', pgErr.message);
+    }
+
+    return res.json({ success: true, visitor: localVis });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete Visitor Record
+app.delete('/api/visitors/:id', async (req, res) => {
+  try {
+    const vId = req.params.id;
+    localVisitorsMap.delete(vId);
+    try {
+      const arrayToStore = Array.from(localVisitorsMap.values());
+      fs.writeFileSync(visitorsStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+    } catch (e) {}
+
+    try {
+      await pgPool.query('DELETE FROM site_visitors WHERE visitor_id = $1;', [vId]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL delete visitor note:', pgErr.message);
+    }
+
+    return res.json({ success: true, message: 'Visitor deleted successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

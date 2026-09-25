@@ -7,6 +7,7 @@ import PropertyDetailsView from './components/PropertyDetailsView';
 import PropertyDetailPage from './pages/PropertyDetailPage';
 import AuthModal from './components/AuthModal';
 import ProfileSettingsModal from './components/ProfileSettingsModal';
+import VisitorLeadModal from './components/VisitorLeadModal';
 import BuyInfoPage from './pages/BuyInfoPage';
 import RentInfoPage from './pages/RentInfoPage';
 import SellInfoPage from './pages/SellInfoPage';

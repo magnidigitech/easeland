@@ -513,6 +513,18 @@ export async function updateCrmVisitStatus(visitId, newStatus, feedbackText = ''
   return { success: true };
 }
 
+export async function deleteCrmVisit(visitId) {
+  try {
+    await deleteDoc(doc(db, 'crm_visits', visitId));
+  } catch (e) {}
+
+  const current = getStored('easeland_crm_visits', INITIAL_CRM_VISITS);
+  const updated = current.filter(v => v.id !== visitId);
+  setStored('easeland_crm_visits', updated);
+
+  return { success: true };
+}
+
 /**
  * ---------------------------------------------------------------
  * SMART BUYER-PROPERTY MATCHMAKING ENGINE

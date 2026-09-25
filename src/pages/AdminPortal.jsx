@@ -48,7 +48,11 @@ import {
   Save,
   Upload,
   Video,
-  Trash2
+  Trash2,
+  UserCheck,
+  PhoneCall,
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
 import { mockApi, safeArray } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -79,6 +83,12 @@ import {
   updateSiteModuleAdmin,
   publishSiteConfigAdmin
 } from '../firebase/siteManagementService.js';
+import {
+  getVisitorLeads,
+  updateVisitorStatus,
+  deleteVisitorLead,
+  convertVisitorToCrmLead
+} from '../firebase/visitorService.js';
 
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
@@ -248,6 +258,45 @@ export default function AdminPortal({ onNavigate }) {
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
   const [auditRemovedItemKeys, setAuditRemovedItemKeys] = useState(new Set());
+
+  // 3-Minute Site Visitor Leads (PostgreSQL /api/visitors)
+  const [visitorLeads, setVisitorLeads] = useState([]);
+  const [visitorLoading, setVisitorLoading] = useState(false);
+  const [visitorSearchQuery, setVisitorSearchQuery] = useState('');
+  const [visitorStatusFilter, setVisitorStatusFilter] = useState('ALL');
+  const [visitorToast, setVisitorToast] = useState('');
+
+  const loadVisitorLeads = async () => {
+    try {
+      setVisitorLoading(true);
+      const data = await getVisitorLeads();
+      setVisitorLeads(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Error loading visitor leads:', err);
+    } finally {
+      setVisitorLoading(false);
+    }
+  };
+
+  const handleUpdateVisitorStatus = async (visitorId, newStatus) => {
+    await updateVisitorStatus(visitorId, newStatus);
+    setVisitorLeads(prev => prev.map(v => (v.id === visitorId || v.visitorId === visitorId ? { ...v, status: newStatus } : v)));
+  };
+
+  const handleDeleteVisitor = async (visitorId) => {
+    if (!window.confirm('Are you sure you want to delete this visitor lead from PostgreSQL?')) return;
+    await deleteVisitorLead(visitorId);
+    setVisitorLeads(prev => prev.filter(v => v.id !== visitorId && v.visitorId !== visitorId));
+  };
+
+  const handleConvertVisitorToCrm = async (visitor) => {
+    const res = await convertVisitorToCrmLead(visitor);
+    if (res.success) {
+      setVisitorToast(`Successfully converted ${visitor.name || 'Visitor'} to CRM Deal Pipeline!`);
+      setTimeout(() => setVisitorToast(''), 4000);
+      handleUpdateVisitorStatus(visitor.id || visitor.visitorId, 'CONVERTED');
+    }
+  };
 
   // Custom feedback text for verification review
   const [feedbackNote, setFeedbackNote] = useState('');
@@ -722,12 +771,16 @@ export default function AdminPortal({ onNavigate }) {
     } else {
       setSelectedProperty(null);
     }
+
+    // Load Site Visitor Leads (PostgreSQL /api/visitors)
+    loadVisitorLeads();
   };
 
   useEffect(() => {
     loadData();
     const handleRefresh = () => loadData();
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
+    const handleVisitorRefresh = () => loadVisitorLeads();
 
     window.addEventListener('easeland-users-updated', handleRefresh);
     window.addEventListener('easeland-property-created', handleRefresh);
@@ -737,6 +790,9 @@ export default function AdminPortal({ onNavigate }) {
     window.addEventListener('easeland-property-updated', handleRefresh);
     window.addEventListener('easeland-property-deleted', handleRefresh);
     window.addEventListener('easeland-site-config-updated', handleConfigUpdated);
+    window.addEventListener('easeland-visitor-lead-created', handleVisitorRefresh);
+    window.addEventListener('easeland-visitor-lead-updated', handleVisitorRefresh);
+    window.addEventListener('easeland-visitor-lead-deleted', handleVisitorRefresh);
     window.addEventListener('storage', handleRefresh);
 
     return () => {
@@ -748,6 +804,9 @@ export default function AdminPortal({ onNavigate }) {
       window.removeEventListener('easeland-property-updated', handleRefresh);
       window.removeEventListener('easeland-property-deleted', handleRefresh);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
+      window.removeEventListener('easeland-visitor-lead-created', handleVisitorRefresh);
+      window.removeEventListener('easeland-visitor-lead-updated', handleVisitorRefresh);
+      window.removeEventListener('easeland-visitor-lead-deleted', handleVisitorRefresh);
       window.removeEventListener('storage', handleRefresh);
     };
   }, []);
@@ -1863,6 +1922,7 @@ export default function AdminPortal({ onNavigate }) {
                 { id: 'verification', label: `Verification Queue (${verificationQueue.length})`, icon: Clock, badge: verificationQueue.length },
                 { id: 'workspace', label: 'Verification Workspace', icon: ShieldCheck },
                 { id: 'users', label: 'User Governance', icon: Users },
+                { id: 'visitors', label: `Visitors Details (${visitorLeads.length})`, icon: UserCheck, badge: visitorLeads.filter(v => v.status === 'NEW').length },
                 { id: 'enquiries', label: 'Enquiry Directory', icon: MessageSquare },
                 { id: 'crm', label: 'Deal CRM Pipeline', icon: Briefcase },
                 { id: 'followups', label: 'Follow-ups Scheduler', icon: Calendar },
@@ -4219,6 +4279,277 @@ export default function AdminPortal({ onNavigate }) {
                     </table>
                   </div>
                 </div>
+
+              </div>
+            )}
+
+            {/* TAB: VISITORS DETAILS (3-MINUTE SITE ENGAGEMENT REGISTRY) */}
+            {activeTab === 'visitors' && (
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
+                
+                {/* HEADER */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-black">
+                        <UserCheck className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <h3 className="text-lg font-black text-brand-charcoal">
+                        Visitors Details &amp; 3-Min Lead Registry
+                      </h3>
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                        PostgreSQL Live
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 font-medium mt-1">
+                      Prospective buyers captured via engagement popup after browsing the site for at least 3 minutes.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={loadVisitorLeads}
+                      disabled={visitorLoading}
+                      className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${visitorLoading ? 'animate-spin text-brand-yellow' : 'text-gray-600'}`} />
+                      <span>{visitorLoading ? 'Refreshing...' : 'Refresh List'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* TOAST ALERT */}
+                {visitorToast && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-extrabold rounded-xl flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span>{visitorToast}</span>
+                  </div>
+                )}
+
+                {/* KPI METRIC CARDS */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block">Total Captured</span>
+                    <span className="text-2xl font-black text-blue-900">{visitorLeads.length}</span>
+                    <span className="text-[10px] text-blue-600 block mt-0.5 font-semibold">Saved in PostgreSQL</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">New / Pending</span>
+                    <span className="text-2xl font-black text-amber-900">
+                      {visitorLeads.filter(v => v.status === 'NEW').length}
+                    </span>
+                    <span className="text-[10px] text-amber-700 block mt-0.5 font-semibold">Awaiting first contact</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">Contacted / Converted</span>
+                    <span className="text-2xl font-black text-emerald-900">
+                      {visitorLeads.filter(v => v.status === 'CONTACTED' || v.status === 'CONVERTED' || v.status === 'QUALIFIED').length}
+                    </span>
+                    <span className="text-[10px] text-emerald-600 block mt-0.5 font-semibold">Active in sales cycle</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 block">Avg Site Engagement</span>
+                    <span className="text-2xl font-black text-purple-900">3+ Mins</span>
+                    <span className="text-[10px] text-purple-600 block mt-0.5 font-semibold">High purchase intent</span>
+                  </div>
+                </div>
+
+                {/* SEARCH & FILTER CONTROLS */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-gray-50 rounded-2xl border border-gray-200">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      placeholder="Search name, phone, city..."
+                      value={visitorSearchQuery}
+                      onChange={(e) => setVisitorSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <span className="text-xs font-bold text-gray-500">Filter Status:</span>
+                    <select
+                      value={visitorStatusFilter}
+                      onChange={(e) => setVisitorStatusFilter(e.target.value)}
+                      className="bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-yellow cursor-pointer"
+                    >
+                      <option value="ALL">All Statuses ({visitorLeads.length})</option>
+                      <option value="NEW">New ({visitorLeads.filter(v => v.status === 'NEW').length})</option>
+                      <option value="CONTACTED">Contacted</option>
+                      <option value="QUALIFIED">Qualified</option>
+                      <option value="CONVERTED">Converted to CRM</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* VISITOR LEADS LIST */}
+                {(() => {
+                  const filtered = visitorLeads.filter(v => {
+                    const matchesSearch = !visitorSearchQuery ||
+                      (v.name || '').toLowerCase().includes(visitorSearchQuery.toLowerCase()) ||
+                      (v.phone || '').includes(visitorSearchQuery) ||
+                      (v.email || '').toLowerCase().includes(visitorSearchQuery.toLowerCase()) ||
+                      (v.preferredLocation || '').toLowerCase().includes(visitorSearchQuery.toLowerCase()) ||
+                      (v.preferredPropertyType || '').toLowerCase().includes(visitorSearchQuery.toLowerCase());
+                    const matchesStatus = visitorStatusFilter === 'ALL' || v.status === visitorStatusFilter;
+                    return matchesSearch && matchesStatus;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="p-12 text-center bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                        <Clock className="w-8 h-8 text-gray-400 mx-auto" />
+                        <h4 className="font-extrabold text-sm text-gray-700">No Visitor Leads Matching Filter</h4>
+                        <p className="text-xs text-gray-400">
+                          {visitorLeads.length === 0
+                            ? 'New user leads will appear here automatically when users browse the site for over 3 minutes.'
+                            : 'Try adjusting your search query or status filter.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {filtered.map((vis) => {
+                        const rawPhone = (vis.phone || '').replace(/[^0-9]/g, '');
+                        const waPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+                        const durationMins = Math.round((vis.stayDurationSeconds || 180) / 60);
+
+                        return (
+                          <div
+                            key={vis.id || vis.visitorId}
+                            className="p-4 bg-gray-50 rounded-2xl border border-gray-200 hover:border-amber-300/80 transition-all space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-brand-navy text-brand-yellow flex items-center justify-center font-black text-sm shrink-0">
+                                  {(vis.name || 'V')[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-black text-sm text-brand-charcoal">{vis.name || 'Site Visitor'}</span>
+                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                      vis.status === 'CONVERTED' ? 'bg-purple-100 text-purple-800' :
+                                      vis.status === 'QUALIFIED' ? 'bg-emerald-100 text-emerald-800' :
+                                      vis.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                      {vis.status || 'NEW'}
+                                    </span>
+                                    <span className="text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
+                                      {durationMins}+ Mins On Site
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-gray-500 font-medium block mt-0.5">
+                                    ID: {vis.id || vis.visitorId} • Captured: {vis.createdAt ? new Date(vis.createdAt).toLocaleString('en-IN') : 'Recent'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* STATUS SELECTOR */}
+                              <div className="flex items-center gap-2 self-start sm:self-auto">
+                                <label className="text-[11px] font-bold text-gray-500">Status:</label>
+                                <select
+                                  value={vis.status || 'NEW'}
+                                  onChange={(e) => handleUpdateVisitorStatus(vis.id || vis.visitorId, e.target.value)}
+                                  className="text-xs font-bold bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow cursor-pointer"
+                                >
+                                  <option value="NEW">NEW</option>
+                                  <option value="CONTACTED">CONTACTED</option>
+                                  <option value="QUALIFIED">QUALIFIED</option>
+                                  <option value="CONVERTED">CONVERTED</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* DETAILS GRID */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                              <div className="bg-white p-2.5 rounded-xl border border-gray-200 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Contact Phone</span>
+                                  <span className="font-extrabold text-brand-navy">{vis.phone || 'Not Specified'}</span>
+                                </div>
+                                {vis.phone && (
+                                  <div className="flex items-center gap-1">
+                                    <a
+                                      href={`https://wa.me/${waPhone}?text=${encodeURIComponent('Hello ' + (vis.name || '') + ', thank you for visiting EaseLand! We noticed you were exploring properties on our platform.')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors"
+                                      title="Chat on WhatsApp"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                    </a>
+                                    <a
+                                      href={`tel:${vis.phone}`}
+                                      className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors"
+                                      title="Call Visitor"
+                                    >
+                                      <Phone className="w-3.5 h-3.5 text-blue-600" />
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Email Address</span>
+                                <span className="font-extrabold text-brand-navy truncate block">
+                                  {vis.email || 'Not Provided'}
+                                </span>
+                              </div>
+
+                              <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Interested In</span>
+                                <span className="font-extrabold text-brand-navy truncate block">
+                                  {vis.preferredPropertyType || 'Open Plots'} • {vis.preferredLocation || 'AP Region'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* ACTIONS BAR */}
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[11px] text-gray-400 font-medium">
+                                Source: {vis.source || '3_MIN_ENGAGEMENT_POPUP'}
+                              </span>
+
+                              <div className="flex items-center gap-2">
+                                {vis.status !== 'CONVERTED' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleConvertVisitorToCrm(vis)}
+                                    className="px-3.5 py-1.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-navy font-extrabold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                                  >
+                                    <Briefcase className="w-3.5 h-3.5" />
+                                    <span>Convert to CRM Deal</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] font-extrabold text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-200 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-purple-600" />
+                                    In Deal Pipeline
+                                  </span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteVisitor(vis.id || vis.visitorId)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete visitor record"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
               </div>
             )}
