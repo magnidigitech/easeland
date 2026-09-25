@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
 import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById, deletePropertyListing } from '../firebase/propertyService.js';
 import { saveOwnerBoundarySubmission } from '../firebase/boundaryService.js';
+import { AreaUnit } from '../firebase/specificationsConfig.js';
 import PropertyLocationStep from '../components/PropertyLocationStep.jsx';
 import PropertySpecificationsStep from '../components/PropertySpecificationsStep.jsx';
 import PropertyMediaStep from '../components/PropertyMediaStep.jsx';
@@ -79,8 +80,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     purpose: Purpose.SALE,
     price: '',
     area: '',
+    areaUnit: AreaUnit.SQ_FT,
     description: '',
-    specs: {},
+    specs: { areaUnit: AreaUnit.SQ_FT },
     amenities: [],
     media: [],
     location: null,
@@ -102,8 +104,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               purpose: p.purpose || Purpose.SALE,
               price: p.price ? String(p.price) : '',
               area: p.area ? String(p.area) : '',
+              areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT,
               description: p.description || '',
-              specs: p.specs || {},
+              specs: {
+                ...(p.specs || {}),
+                areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT
+              },
               amenities: Array.isArray(p.amenities) ? p.amenities : [],
               media: Array.isArray(p.media) ? p.media : [],
               location: p.location || null,
@@ -135,8 +141,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       purpose: draft.purpose || Purpose.SALE,
       price: draft.price ? String(draft.price) : '',
       area: draft.area ? String(draft.area) : '',
+      areaUnit: draft.areaUnit || draft.specs?.areaUnit || AreaUnit.SQ_FT,
       description: draft.description || '',
-      specs: draft.specs || {},
+      specs: {
+        ...(draft.specs || {}),
+        areaUnit: draft.areaUnit || draft.specs?.areaUnit || AreaUnit.SQ_FT
+      },
       amenities: Array.isArray(draft.amenities) ? draft.amenities : [],
       media: Array.isArray(draft.media) ? draft.media : [],
       location: draft.location || null,
@@ -196,7 +206,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
   const getAreaDisplay = () => {
     const a = Number(formData.area) || 0;
-    const unit = formData.specs?.areaUnit || 'sq ft';
+    const unit = formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT;
     return `${a.toLocaleString()} ${unit}`;
   };
 
@@ -336,9 +346,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         price: priceNum,
         priceDisplay: getPriceDisplay(),
         area: areaNum,
+        areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
         areaDisplay: getAreaDisplay(),
         description: formData.description,
-        specs: formData.specs || {},
+        specs: {
+          ...(formData.specs || {}),
+          areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT
+        },
         amenities: formData.amenities || [],
         location: formData.location || null,
         media: formData.media || [],
@@ -671,7 +685,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Expected Price (INR) *
@@ -731,6 +745,34 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   </p>
                 )}
               </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Measurement Area Unit
+                </label>
+                <select
+                  value={formData.areaUnit || AreaUnit.SQ_FT}
+                  onChange={(e) => {
+                    const newUnit = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      areaUnit: newUnit,
+                      specs: {
+                        ...(prev.specs || {}),
+                        areaUnit: newUnit
+                      }
+                    }));
+                  }}
+                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:ring-amber-400 focus:outline-none transition-all cursor-pointer"
+                >
+                  {Object.values(AreaUnit).map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+                <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
+                  Unit: {formData.areaUnit || AreaUnit.SQ_FT}
+                </span>
+              </div>
             </div>
 
             <div>
@@ -783,7 +825,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             specsData={formData.specs || {}}
             selectedAmenities={formData.amenities || []}
             onChangeSpecs={(updatedSpecs) => {
-              setFormData(prev => ({ ...prev, specs: updatedSpecs }));
+              setFormData(prev => ({
+                ...prev,
+                specs: {
+                  ...updatedSpecs,
+                  areaUnit: prev.areaUnit || updatedSpecs.areaUnit || AreaUnit.SQ_FT
+                }
+              }));
             }}
             onChangeAmenities={(updatedAmenities) => {
               setFormData(prev => ({ ...prev, amenities: updatedAmenities }));

@@ -268,7 +268,7 @@ export default function PropertyReviewStep({
 
           <div>
             <span className="block text-gray-500 font-bold mb-0.5">Total Area</span>
-            <span className="font-extrabold text-brand-charcoal">{formData.areaDisplay || `${formData.area} sq ft`}</span>
+            <span className="font-extrabold text-brand-charcoal">{formData.areaDisplay || `${formData.area} ${formData.areaUnit || formData.specs?.areaUnit || 'sq ft'}`}</span>
           </div>
 
           <div className="sm:col-span-2">
@@ -338,13 +338,15 @@ export default function PropertyReviewStep({
         </div>
 
         <div className="space-y-3 text-xs">
-          {formData.specs && Object.keys(formData.specs).length > 0 ? (
+          {formData.specs && Object.entries(formData.specs).filter(([key, val]) => key !== 'areaUnit' && val !== undefined && val !== '').length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {Object.entries(formData.specs).map(([key, val]) => (
-                <div key={key} className="bg-gray-50 p-2 rounded-lg border border-gray-200">
-                  <span className="block text-[10px] text-gray-500 font-bold uppercase">{key}</span>
-                  <span className="font-extrabold text-brand-charcoal">{String(val)}</span>
-                </div>
+              {Object.entries(formData.specs)
+                .filter(([key, val]) => key !== 'areaUnit' && val !== undefined && val !== '')
+                .map(([key, val]) => (
+                  <div key={key} className="bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <span className="block text-[10px] text-gray-500 font-bold uppercase">{key}</span>
+                    <span className="font-extrabold text-brand-charcoal">{String(val)}</span>
+                  </div>
               ))}
             </div>
           ) : (

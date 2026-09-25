@@ -1,7 +1,6 @@
 import React from 'react';
 import { Sliders, CheckCircle2, AlertCircle, Building, ShieldCheck, Tag, Info } from 'lucide-react';
 import {
-  AreaUnit,
   FacingDirection,
   FurnishingStatus,
   PropertyAge,
@@ -63,19 +62,6 @@ export default function PropertySpecificationsStep({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
-          {/* AREA UNIT SELECTOR */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Measurement Area Unit</label>
-            <select
-              value={specsData.areaUnit || AreaUnit.SQ_FT}
-              onChange={(e) => handleFieldChange('areaUnit', e.target.value)}
-              className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
-            >
-              {Object.values(AreaUnit).map(unit => (
-                <option key={unit} value={unit}>{unit}</option>
-              ))}
-            </select>
-          </div>
 
           {/* FACING DIRECTION */}
           {fieldsConfig.showFacing && (
