@@ -462,38 +462,44 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
           {/* NAVIGATION TABS BAR                                           */}
           {/* ------------------------------------------------------------- */}
           <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1 border-t border-slate-800">
-            {[
-              { id: 'pipeline', label: 'Deal Pipeline (Kanban)', icon: Layers, count: deals.length },
-              { id: 'leads', label: 'Buyer & Lead Directory', icon: Users, count: leads.length },
-              { id: 'matchmaker', label: 'AI Land-Buyer Matchmaker', icon: Sparkles, count: availableProperties.length },
-              { id: 'visits', label: 'Site Visits & Inspections', icon: Calendar, count: visits.length },
-              { id: 'overview', label: 'Executive Performance', icon: TrendingUp }
-            ].map((tab) => {
-              const IconComp = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={'flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ' +
-                    (isActive
-                      ? 'bg-slate-50 text-slate-900 border-t-2 border-amber-400 shadow'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                    )
-                  }
-                >
-                  <IconComp className={'w-4 h-4 ' + (isActive ? 'text-slate-900' : 'text-slate-400')} />
-                  <span>{tab.label}</span>
-                  {tab.count !== undefined && (
-                    <span className={'px-1.5 py-0.5 rounded-md text-[10px] font-black ' +
-                      (isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300')
-                    }>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            {(() => {
+              const activeMatchCount = activeLeadForMatching 
+                ? matchPropertiesForLead(activeLeadForMatching, availableProperties).length 
+                : 0;
+
+              return [
+                { id: 'pipeline', label: 'Deal Pipeline (Kanban)', icon: Layers, count: deals.length },
+                { id: 'leads', label: 'Buyer Directory', icon: Users, count: leads.length },
+                { id: 'matchmaker', label: 'AI Land-Buyer Matchmaker', icon: Sparkles, count: activeMatchCount },
+                { id: 'visits', label: 'Site Visits & Inspections', icon: Calendar, count: visits.length },
+                { id: 'overview', label: 'Executive Performance', icon: TrendingUp }
+              ].map((tab) => {
+                const IconComp = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={'flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ' +
+                      (isActive
+                        ? 'bg-slate-50 text-slate-900 border-t-2 border-amber-400 shadow'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                      )
+                    }
+                  >
+                    <IconComp className={'w-4 h-4 ' + (isActive ? 'text-slate-900' : 'text-slate-400')} />
+                    <span>{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span className={'px-1.5 py-0.5 rounded-md text-[10px] font-black ' +
+                        (isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300')
+                      }>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              });
+            })()}
           </div>
 
         </div>
