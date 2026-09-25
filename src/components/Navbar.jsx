@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Heart, PlusCircle, User, ShieldCheck, LogOut, Settings } from 'lucide-react';
+import { Building2, Heart, PlusCircle, User, ShieldCheck, LogOut, Settings, Briefcase } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 
 export default function Navbar({ activePage, setActivePage, wishlistCount, user, onLoginClick, onLogoutClick, onPostPropertyClick, onOpenProfileSettings }) {
@@ -74,7 +74,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           </nav>
 
           {/* RIGHT ACTION CONTROLS */}
-          <div className="hidden lg:flex items-center gap-5">
+          <div className="hidden lg:flex items-center gap-4">
 
             {/* WISHLIST BUTTON - ONLY SHOWN WHEN USER IS LOGGED IN */}
             {user && (
@@ -92,27 +92,42 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               </button>
             )}
 
-            {/* SPECIAL NAVBAR BOX FOR ADMIN: "CHECK LIVE SITE" & "ADMIN SITE STUDIO" */}
+            {/* SPECIAL NAVBAR BOX FOR ADMIN: "CHECK LIVE SITE" & "ADMIN SITE STUDIO" & "CRM STUDIO" */}
             {user && user.role === 'ADMIN' && (
-              activePage === 'admin' ? (
+              <div className="flex items-center gap-2">
+                {activePage === 'admin' ? (
+                  <button
+                    onClick={() => setActivePage('home')}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border border-emerald-500 flex items-center gap-1.5 transition-all transform hover:scale-105 select-none"
+                    title="Preview consumer live site"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-100" />
+                    <span>CHECK LIVE SITE</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActivePage('admin')}
+                    className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 border border-amber-300 select-none"
+                    title="Return to Admin Site Control Studio"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-slate-950" />
+                    <span>ADMIN STUDIO</span>
+                  </button>
+                )}
+
                 <button
-                  onClick={() => setActivePage('home')}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-md border border-emerald-500 flex items-center gap-2 transition-all transform hover:scale-105 select-none"
-                  title="Preview consumer live site"
+                  onClick={() => setActivePage('crm')}
+                  className={`font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border flex items-center gap-1.5 transition-all select-none ${
+                    activePage === 'crm'
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 ring-2 ring-amber-400/50'
+                      : 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
+                  }`}
+                  title="Open EaseLand CRM & Sales War Room"
                 >
-                  <ShieldCheck className="w-4 h-4 text-emerald-100" />
-                  <span>CHECK LIVE SITE</span>
+                  <Briefcase className="w-3.5 h-3.5 text-amber-400" />
+                  <span>CRM STUDIO</span>
                 </button>
-              ) : (
-                <button
-                  onClick={() => setActivePage('admin')}
-                  className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-4 py-2 rounded-xl shadow-md flex items-center gap-2 transition-all transform hover:scale-105 border border-amber-300 select-none"
-                  title="Return to Admin Site Control Studio"
-                >
-                  <ShieldCheck className="w-4 h-4 text-slate-950" />
-                  <span>ADMIN SITE STUDIO</span>
-                </button>
-              )
+              </div>
             )}
 
             {/* AUTHENTICATION STATE CONTROL */}
@@ -238,6 +253,25 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             >
               Saved Wishlist Properties ({wishlistCount})
             </button>
+          )}
+
+          {user && user.role === 'ADMIN' && (
+            <div className="pt-2 border-t border-slate-200 space-y-2">
+              <button
+                onClick={() => { setActivePage('admin'); setMobileMenuOpen(false); }}
+                className="w-full text-left py-2 px-3 rounded-lg bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4 text-slate-950" />
+                <span>Admin Site Studio</span>
+              </button>
+              <button
+                onClick={() => { setActivePage('crm'); setMobileMenuOpen(false); }}
+                className="w-full text-left py-2 px-3 rounded-lg bg-slate-900 text-white font-extrabold text-xs flex items-center gap-2"
+              >
+                <Briefcase className="w-4 h-4 text-amber-400" />
+                <span>EaseLand CRM Studio</span>
+              </button>
+            </div>
           )}
 
           {user ? (

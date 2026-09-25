@@ -198,7 +198,7 @@ const parseSafeDate = (val) => {
   return 'Recent';
 };
 
-export default function AdminPortal() {
+export default function AdminPortal({ onNavigate }) {
   const { user, profile, loginAdmin, logoutUser } = useAuth();
 
   // Admin Auth Gate State
@@ -4323,13 +4323,22 @@ export default function AdminPortal() {
                     <p className="text-xs text-gray-500 font-medium">Manage buyer-seller deal stages, legal audits, and registration progress.</p>
                   </div>
 
-                  <button
-                    onClick={() => handleOpenScheduleModal()}
-                    className="px-4 py-2.5 rounded-xl bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs flex items-center gap-2 shadow-md transition-all self-start sm:self-auto"
-                  >
-                    <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-                    Schedule Follow-up / Visit
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onNavigate ? onNavigate('crm') : window.location.assign('/crm')}
+                      className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs flex items-center gap-2 shadow-md transition-all self-start sm:self-auto border border-slate-700"
+                    >
+                      <Briefcase className="w-4 h-4 text-brand-yellow" />
+                      Launch EaseLand CRM Studio →
+                    </button>
+                    <button
+                      onClick={() => handleOpenScheduleModal()}
+                      className="px-4 py-2.5 rounded-xl bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs flex items-center gap-2 shadow-md transition-all self-start sm:self-auto"
+                    >
+                      <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+                      Schedule Follow-up / Visit
+                    </button>
+                  </div>
                 </div>
 
                 {/* STAGE FILTERS */}

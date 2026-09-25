@@ -12,6 +12,7 @@ import RentInfoPage from './pages/RentInfoPage';
 import SellInfoPage from './pages/SellInfoPage';
 import PostPropertyWizard from './pages/PostPropertyWizard';
 import AdminPortal from './pages/AdminPortal';
+import EaseLandCRM from './pages/EaseLandCRM';
 import UserDashboard from './components/UserDashboard';
 import PropertiesSearchPage from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -40,6 +41,7 @@ const getInitialPageState = () => {
 
   if (cleanPath.startsWith('/properties')) return { page: 'map', propId: null };
   if (cleanPath === '/admin' || modeParam === 'admin') return { page: 'admin', propId: null };
+  if (cleanPath === '/crm' || modeParam === 'crm' || urlParams.get('view') === 'crm') return { page: 'crm', propId: null };
   if (cleanPath === '/buy') return { page: 'buy', propId: null };
   if (cleanPath === '/rent') return { page: 'rent', propId: null };
   if (cleanPath === '/sell') return { page: 'sell', propId: null };
@@ -465,7 +467,7 @@ export default function App() {
       <main className="flex-1">
 
         {/* PAGE 1: HOME */}
-        {(activePage === 'home' || !['map', 'properties', 'property-detail', 'buy', 'rent', 'sell', 'post-property', 'admin', 'dashboard', 'wishlist', 'privacy-policy', 'privacy'].includes(activePage)) && (
+        {(activePage === 'home' || !['map', 'properties', 'property-detail', 'buy', 'rent', 'sell', 'post-property', 'admin', 'crm', 'dashboard', 'wishlist', 'privacy-policy', 'privacy'].includes(activePage)) && (
           <div>
             <HeroSearch onSearch={handleHeroSearch} />
             
@@ -717,7 +719,15 @@ export default function App() {
           />
         )}
 
-        {activePage === 'admin' && <AdminPortal />}
+        {activePage === 'admin' && <AdminPortal onNavigate={(page) => changeActivePage(page)} />}
+
+        {/* EASELAND CRM STUDIO & SALES WAR ROOM */}
+        {activePage === 'crm' && (
+          <EaseLandCRM
+            onReturnToAdmin={() => changeActivePage('admin')}
+            onNavigateToMarketplace={() => changeActivePage('home')}
+          />
+        )}
 
         {/* USER DASHBOARD (COVERING ALL 7 BLOCKS) */}
         {activePage === 'dashboard' && (
