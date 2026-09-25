@@ -182,7 +182,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         </p>
 
         {/* DEEP SEARCH CARD */}
-        <div className="bg-metallic-card rounded-2xl p-4 sm:p-6 shadow-2xl text-slate-100 max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
+        <div className="bg-slate-900/95 rounded-2xl p-4 sm:p-6 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
           
           {/* Purpose Tabs */}
           <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
@@ -192,7 +192,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 onClick={() => setPurpose('buy')}
                 className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border ${
                   purpose === 'buy'
-                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
                 }`}
               >
@@ -204,7 +204,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 onClick={() => setPurpose('rent')}
                 className={`px-5 py-2 rounded-xl text-sm font-bold transition-all border ${
                   purpose === 'rent'
-                    ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
                 }`}
               >
