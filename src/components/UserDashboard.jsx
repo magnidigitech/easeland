@@ -604,26 +604,26 @@ export default function UserDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-metallic-dark text-slate-100 py-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* HEADER BAR */}
-        <div className="bg-metallic-card text-white rounded-3xl p-6 sm:p-8 shadow-2xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-700/60 backdrop-blur-xl">
+        <div className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-sm mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-200">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-metallic-gold text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg border-2 border-amber-300/40">
+            <div className="w-16 h-16 rounded-2xl bg-metallic-gold text-slate-950 font-black text-2xl flex items-center justify-center shadow-md border-2 border-amber-300">
               {(profileForm?.name || user?.name || user?.displayName || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">
+                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
                   {profileForm.name}
                 </h1>
-                <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
                   Verified User
                 </span>
               </div>
-              <p className="text-slate-300 text-xs mt-1 font-medium flex items-center gap-3">
+              <p className="text-slate-600 text-xs mt-1 font-medium flex items-center gap-3">
                 {profileForm.email && <span>{profileForm.email}</span>}
                 {profileForm.phone && (
                   <>
@@ -634,7 +634,7 @@ export default function UserDashboard({
                 {profileForm.city && (
                   <>
                     <span>•</span>
-                    <span className="text-metallic-gold font-bold">{profileForm.city}</span>
+                    <span className="text-amber-600 font-bold">{profileForm.city}</span>
                   </>
                 )}
               </p>
@@ -643,7 +643,7 @@ export default function UserDashboard({
 
           <button
             onClick={onPostProperty}
-            className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center gap-2 transition-transform hover:scale-105 border border-amber-300/40"
+            className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3.5 rounded-xl shadow-md flex items-center gap-2 transition-transform hover:scale-105 border border-amber-300"
           >
             <PlusCircle className="w-4 h-4 stroke-[2.5]" />
             <span>POST NEW PROPERTY</span>
@@ -655,12 +655,12 @@ export default function UserDashboard({
 
           {/* BLOCK 1: SIDEBAR NAVIGATION */}
           <div className="lg:col-span-3 space-y-2">
-            <div className="bg-metallic-card rounded-2xl shadow-lg border border-slate-700/60 p-3 space-y-1">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 space-y-1">
 
               {(user?.role === 'ADMIN' || user?.email === 'admin@easeland.in' || user?.email?.includes('admin')) && (
                 <button
                   onClick={() => onNavigate('admin')}
-                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 shadow-xl border border-amber-300 mb-2 transform hover:scale-[1.02]"
+                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 shadow-md border border-amber-300 mb-2 transform hover:scale-[1.02]"
                 >
                   <div className="flex items-center gap-3">
                     <ShieldCheck className="w-4 h-4 text-slate-950" />
@@ -674,11 +674,11 @@ export default function UserDashboard({
                 onClick={() => setActiveTab('overview')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'overview'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
+                    : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-slate-950' : 'text-amber-500'}`} />
                   <span>Overview</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
@@ -688,11 +688,11 @@ export default function UserDashboard({
                 onClick={() => setActiveTab('properties')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'properties'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
+                    : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Building2 className={`w-4 h-4 ${activeTab === 'properties' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <Building2 className={`w-4 h-4 ${activeTab === 'properties' ? 'text-slate-950' : 'text-amber-500'}`} />
                   <span>My Properties ({userProperties.length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
@@ -702,15 +702,15 @@ export default function UserDashboard({
                 onClick={() => setActiveTab('verification')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'verification'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
+                    : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <ShieldCheck className={`w-4 h-4 ${activeTab === 'verification' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <ShieldCheck className={`w-4 h-4 ${activeTab === 'verification' ? 'text-slate-950' : 'text-amber-500'}`} />
                   <span>Verification Status</span>
                 </div>
                 {userProperties.some(p => p.status === 'PENDING_VERIFICATION') && (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                 )}
               </button>
 
@@ -718,11 +718,11 @@ export default function UserDashboard({
                 onClick={() => setActiveTab('wishlist')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'wishlist'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
+                    : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Heart className={`w-4 h-4 ${activeTab === 'wishlist' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <Heart className={`w-4 h-4 ${activeTab === 'wishlist' ? 'text-slate-950' : 'text-amber-500'}`} />
                   <span>Wishlist ({wishlistProperties.length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
@@ -732,11 +732,11 @@ export default function UserDashboard({
                 onClick={() => setActiveTab('account')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'account'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
-                    : 'text-slate-300 border-transparent hover:bg-slate-800 hover:text-slate-100'
+                    : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <Settings className={`w-4 h-4 ${activeTab === 'account' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <Settings className={`w-4 h-4 ${activeTab === 'account' ? 'text-slate-950' : 'text-amber-500'}`} />
                   <span>Account Settings</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
