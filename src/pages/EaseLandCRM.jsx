@@ -483,15 +483,15 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     className={'flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ' +
                       (isActive
                         ? 'bg-slate-50 text-slate-900 border-t-2 border-amber-400 shadow'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                       )
                     }
                   >
-                    <IconComp className={'w-4 h-4 ' + (isActive ? 'text-slate-900' : 'text-slate-400')} />
+                    <IconComp className={'w-4 h-4 ' + (isActive ? 'text-slate-900' : 'text-amber-400')} />
                     <span>{tab.label}</span>
                     {tab.count !== undefined && (
                       <span className={'px-1.5 py-0.5 rounded-md text-[10px] font-black ' +
-                        (isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300')
+                        (isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-amber-300 border border-slate-700')
                       }>
                         {tab.count}
                       </span>
@@ -525,47 +525,47 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {analytics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
-                <Briefcase className="w-6 h-6 text-amber-600" />
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-amber-100/70 border border-amber-300/80 flex items-center justify-center shrink-0">
+                <Briefcase className="w-6 h-6 text-amber-700 stroke-[2.2]" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Active Pipeline</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">Active Pipeline</span>
                 <span className="text-lg font-black text-slate-900">{analytics.pipelineValueDisplay}</span>
-                <span className="text-[11px] font-bold text-amber-600 block">{analytics.activeDealsCount} deals in progress</span>
+                <span className="text-[11px] font-extrabold text-amber-800 block">{analytics.activeDealsCount} deals in progress</span>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
-                <Award className="w-6 h-6 text-emerald-600" />
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100/70 border border-emerald-300/80 flex items-center justify-center shrink-0">
+                <Award className="w-6 h-6 text-emerald-700 stroke-[2.2]" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Closed Revenue</span>
-                <span className="text-lg font-black text-emerald-600">{analytics.closedValueDisplay}</span>
-                <span className="text-[11px] font-bold text-slate-500 block">{analytics.wonDealsCount} completed registrations</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">Closed Revenue</span>
+                <span className="text-lg font-black text-emerald-700">{analytics.closedValueDisplay}</span>
+                <span className="text-[11px] font-extrabold text-slate-700 block">{analytics.wonDealsCount} completed registrations</span>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6 text-blue-600" />
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-blue-100/70 border border-blue-300/80 flex items-center justify-center shrink-0">
+                <Users className="w-6 h-6 text-blue-700 stroke-[2.2]" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Lead Conversion</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">Lead Conversion</span>
                 <span className="text-lg font-black text-slate-900">{analytics.conversionRate}% Win Rate</span>
-                <span className="text-[11px] font-bold text-blue-600 block">{analytics.hotLeadsCount} Hot High-Intent Leads</span>
+                <span className="text-[11px] font-extrabold text-blue-800 block">{analytics.hotLeadsCount} Hot High-Intent Leads</span>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
-                <Calendar className="w-6 h-6 text-indigo-600" />
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-indigo-100/70 border border-indigo-300/80 flex items-center justify-center shrink-0">
+                <Calendar className="w-6 h-6 text-indigo-700 stroke-[2.2]" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Field Inspections</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">Field Inspections</span>
                 <span className="text-lg font-black text-slate-900">{analytics.scheduledVisitsCount} Scheduled</span>
-                <span className="text-[11px] font-bold text-indigo-600 block">Active physical site visits</span>
+                <span className="text-[11px] font-extrabold text-indigo-800 block">Active physical site visits</span>
               </div>
             </div>
 
