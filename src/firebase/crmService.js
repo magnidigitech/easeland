@@ -69,13 +69,13 @@ const getStored = (key, fallback) => {
   return fallback;
 };
 
-const setStored = (key, data) => {
+const setStored = (key, data, silent = false) => {
   memoryCache.set(key, data);
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(data));
     }
-    if (typeof window !== 'undefined') {
+    if (!silent && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('easeland-crm-storage-updated', { detail: { key } }));
     }
   } catch (e) {}
@@ -129,10 +129,12 @@ export async function getCrmLeads() {
   }
 
   // Purge any residual dummy data
-  leads = filterOutDummyItems(leads);
-  setStored('easeland_crm_leads', leads);
+  const filtered = filterOutDummyItems(leads);
+  if (filtered.length !== leads.length) {
+    setStored('easeland_crm_leads', filtered, true);
+  }
 
-  return leads;
+  return filtered;
 }
 
 /**
@@ -283,10 +285,12 @@ export async function getCrmDeals() {
   }
 
   // Purge any residual dummy data
-  deals = filterOutDummyItems(deals);
-  setStored('easeland_crm_deals', deals);
+  const filtered = filterOutDummyItems(deals);
+  if (filtered.length !== deals.length) {
+    setStored('easeland_crm_deals', filtered, true);
+  }
 
-  return deals;
+  return filtered;
 }
 
 export async function createCrmDeal(dealData) {
@@ -435,10 +439,12 @@ export async function getCrmVisits() {
   }
 
   // Purge any residual dummy data
-  visits = filterOutDummyItems(visits);
-  setStored('easeland_crm_visits', visits);
+  const filtered = filterOutDummyItems(visits);
+  if (filtered.length !== visits.length) {
+    setStored('easeland_crm_visits', filtered, true);
+  }
 
-  return visits;
+  return filtered;
 }
 
 export async function scheduleCrmVisit(visitData) {

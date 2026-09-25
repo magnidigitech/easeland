@@ -133,8 +133,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   };
 
   // Load CRM Data
-  const loadCrmData = async () => {
-    setLoading(true);
+  const loadCrmData = async (showLoadingState = true) => {
+    if (showLoadingState) setLoading(true);
     try {
       const [leadsData, dealsData, visitsData, analyticsData] = await Promise.all([
         getCrmLeads(),
@@ -154,18 +154,28 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     } catch (err) {
       console.warn('Error loading CRM data:', err);
     } finally {
-      setLoading(false);
+      if (showLoadingState) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCrmData();
+    loadCrmData(true);
 
-    // Listen for custom events
-    const handleUpdate = () => loadCrmData();
+    // Listen for custom events with debouncing to prevent event storms
+    let debounceTimer = null;
+    const handleUpdate = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadCrmData(false);
+      }, 200);
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('easeland-crm-storage-updated', handleUpdate);
-      return () => window.removeEventListener('easeland-crm-storage-updated', handleUpdate);
+      return () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        window.removeEventListener('easeland-crm-storage-updated', handleUpdate);
+      };
     }
   }, []);
 
