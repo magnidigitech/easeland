@@ -877,78 +877,78 @@ export default function UniversalMapEngine({
         <div ref={mapContainerRef} className="w-full h-full z-0 min-h-[300px]"></div>
 
         {/* TOP-RIGHT CORNER MAP LEGEND CARD */}
-        <div className="absolute top-4 right-16 z-30 bg-brand-charcoal/95 backdrop-blur-md text-white p-3 rounded-2xl border border-white/15 shadow-2xl w-60">
-          <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-extrabold text-brand-yellow">
-              <Compass className="w-3.5 h-3.5" />
+        <div className="absolute top-4 right-16 z-30 bg-slate-950 text-white p-3.5 rounded-2xl border border-slate-700 shadow-2xl w-64">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-400">
+              <Compass className="w-4 h-4 text-amber-400" />
               <span>Map Price Legend</span>
             </div>
-            <span className="text-[10px] text-gray-400 font-semibold uppercase">Color Guide</span>
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Color Guide</span>
           </div>
 
-          <div className="space-y-2 text-xs font-semibold">
+          <div className="space-y-2.5 text-xs font-bold">
             {/* Item 1: Above 1.5 Cr */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#0B2545] border border-[#F4C542] shrink-0 shadow-sm"></span>
-                <span className="text-gray-200">Above Rs. 1.5 Cr</span>
+                <span className="w-3 h-3 rounded-full bg-[#0B2545] border border-amber-400 shrink-0 shadow-sm"></span>
+                <span className="text-white font-extrabold">Above Rs. 1.5 Cr</span>
               </div>
-              <span className="text-[10px] text-brand-yellow font-bold">Luxury</span>
+              <span className="text-[10px] text-amber-400 font-black">Luxury</span>
             </div>
 
             {/* Item 2: 60 L - 1.5 Cr */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#F4C542] border border-[#B48B1B] shrink-0 shadow-sm"></span>
-                <span className="text-gray-200">Rs. 60 L – 1.5 Cr</span>
+                <span className="text-white font-extrabold">Rs. 60 L – 1.5 Cr</span>
               </div>
-              <span className="text-[10px] text-amber-300 font-bold">Premium</span>
+              <span className="text-[10px] text-amber-300 font-black">Premium</span>
             </div>
 
             {/* Item 3: 30 L - 60 L */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#7c3aed] border border-[#5b21b6] shrink-0 shadow-sm"></span>
-                <span className="text-gray-200">Rs. 30 L – 60 L</span>
+                <span className="text-white font-extrabold">Rs. 30 L – 60 L</span>
               </div>
-              <span className="text-[10px] text-purple-300 font-bold">Mid-Range</span>
+              <span className="text-[10px] text-purple-300 font-black">Mid-Range</span>
             </div>
 
             {/* Item 4: Below 30 L */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#22c55e] border border-[#15803d] shrink-0 shadow-sm"></span>
-                <span className="text-gray-200">Below Rs. 30 L</span>
+                <span className="text-white font-extrabold">Below Rs. 30 L</span>
               </div>
-              <span className="text-[10px] text-emerald-400 font-bold">Affordable</span>
+              <span className="text-[10px] text-emerald-400 font-black">Affordable</span>
             </div>
 
             {/* Item 5: Purpose Boundary Delineation */}
-            <div className="pt-2 border-t border-white/10 space-y-1.5">
-              <span className="text-[10px] text-gray-400 font-extrabold uppercase block tracking-wider">Boundary Colors</span>
+            <div className="pt-2.5 border-t border-slate-800 space-y-2">
+              <span className="text-[10px] text-slate-400 font-black uppercase block tracking-wider">Boundary Colors</span>
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-2.5 rounded bg-[#f59e0b]/30 border border-dashed border-[#f59e0b] shrink-0"></span>
-                  <span className="text-gray-200 text-[11px]">For Sale Boundary</span>
+                  <span className="w-3.5 h-2.5 rounded bg-amber-400/40 border border-dashed border-amber-400 shrink-0"></span>
+                  <span className="text-white font-extrabold text-[11px]">For Sale Boundary</span>
                 </div>
-                <span className="text-[10px] text-amber-400 font-extrabold">Gold / Amber</span>
+                <span className="text-[10px] text-amber-400 font-black">Gold / Amber</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-2.5 rounded bg-[#10b981]/30 border border-dashed border-[#10b981] shrink-0"></span>
-                  <span className="text-gray-200 text-[11px]">For Rent Boundary</span>
+                  <span className="w-3.5 h-2.5 rounded bg-emerald-500/40 border border-dashed border-emerald-400 shrink-0"></span>
+                  <span className="text-white font-extrabold text-[11px]">For Rent Boundary</span>
                 </div>
-                <span className="text-[10px] text-emerald-400 font-extrabold">Emerald Green</span>
+                <span className="text-[10px] text-emerald-400 font-black">Emerald Green</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-2.5 rounded bg-[#3b82f6]/30 border border-dashed border-[#3b82f6] shrink-0"></span>
-                  <span className="text-gray-200 text-[11px]">For Lease Boundary</span>
+                  <span className="w-3.5 h-2.5 rounded bg-blue-500/40 border border-dashed border-blue-400 shrink-0"></span>
+                  <span className="text-white font-extrabold text-[11px]">For Lease Boundary</span>
                 </div>
-                <span className="text-[10px] text-blue-400 font-extrabold">Royal Blue</span>
+                <span className="text-[10px] text-blue-400 font-black">Royal Blue</span>
               </div>
             </div>
           </div>
