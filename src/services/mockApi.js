@@ -273,6 +273,13 @@ export const DEFAULT_SITE_CONFIG = {
     ogImageUrl: '/easeland_logo.png',
     canonicalUrl: 'https://easeland.in'
   },
+  featuredListings: {
+    badgeText: 'VERIFIED LISTINGS',
+    sectionTitle: 'Featured & Recent Verified Properties',
+    displayCount: 3,
+    featuredPropertyIds: [],
+    showOnlyFeatured: false
+  },
   publish: {
     autoPublish: false,
     version: '2.4.0',
@@ -285,6 +292,7 @@ export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
   return {
     overview: { ...DEFAULT_SITE_CONFIG.overview, ...(userConfig.overview || {}) },
     homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(userConfig.homepage || {}) },
+    featuredListings: { ...DEFAULT_SITE_CONFIG.featuredListings, ...(userConfig.featuredListings || {}) },
     navbar: { ...DEFAULT_SITE_CONFIG.navbar, ...(userConfig.navbar || {}) },
     footer: { ...DEFAULT_SITE_CONFIG.footer, ...(userConfig.footer || {}) },
     buyPage: { ...DEFAULT_SITE_CONFIG.buyPage, ...(userConfig.buyPage || {}) },

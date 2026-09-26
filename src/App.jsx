@@ -475,71 +475,129 @@ export default function App() {
             <PropertyCategoryCards onSelectCategory={handleCategorySelect} />
 
             {/* FEATURED / RECENT VERIFIED PROPERTIES */}
-            <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-              <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
-                <div>
-                  <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-800 bg-emerald-100 px-3 py-1 rounded-md">
-                    Verified Listings
-                  </span>
-                  <h2 className="text-2xl sm:text-4xl font-extrabold text-brand-charcoal tracking-tight mt-3">
-                    Featured & Recent Verified Properties
-                  </h2>
-                </div>
-                <button
-                  onClick={() => changeActivePage('map')}
-                  className="mt-3 md:mt-0 text-sm font-bold text-brand-charcoal hover:text-brand-yellowHover flex items-center gap-1"
-                >
-                  <span>Explore All Properties on Map</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+            {(() => {
+              const featuredConfig = siteConfig?.featuredListings || {};
+              const featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String);
+              const displayCount = Number(featuredConfig.displayCount) || 3;
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {properties.slice(0, 3).map((prop) => (
-                  <div
-                    key={prop.id}
-                    onClick={() => handleSelectProperty(prop)}
-                    className="group bg-white rounded-2xl border border-brand-bordergray shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden flex flex-col transform hover:-translate-y-1"
-                  >
-                    <div className="relative h-48 bg-gray-100 overflow-hidden">
-                      <img
-                        src={prop.photos?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
-                        alt={prop.title}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
-                        }}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute top-3 left-3 bg-brand-charcoal text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-brand-yellow/30">
-                        <ShieldCheck className="w-3 h-3 text-brand-yellow" />
-                        <span>{prop.verificationStatus}</span>
-                      </div>
+              // Filter candidate properties
+              const candidateProps = properties.length > 0 ? properties : [];
+
+              // Explicitly featured properties matching IDs
+              const explicitlyFeatured = candidateProps.filter(p => {
+                const id1 = String(p.id || '');
+                const id2 = String(p.propertyId || '');
+                return featuredIds.includes(id1) || featuredIds.includes(id2);
+              });
+
+              // Sort explicitly featured by Admin selected order
+              explicitlyFeatured.sort((a, b) => {
+                const idA = String(a.id || a.propertyId);
+                const idB = String(b.id || b.propertyId);
+                return featuredIds.indexOf(idA) - featuredIds.indexOf(idB);
+              });
+
+              // Other verified properties
+              const nonFeatured = candidateProps.filter(p => {
+                const id1 = String(p.id || '');
+                const id2 = String(p.propertyId || '');
+                return !featuredIds.includes(id1) && !featuredIds.includes(id2);
+              });
+
+              let homepageProperties = [];
+              if (featuredConfig.showOnlyFeatured && explicitlyFeatured.length > 0) {
+                homepageProperties = explicitlyFeatured.slice(0, displayCount);
+              } else {
+                homepageProperties = [...explicitlyFeatured, ...nonFeatured].slice(0, displayCount);
+              }
+
+              if (homepageProperties.length === 0) return null;
+
+              return (
+                <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
+                    <div>
+                      <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-800 bg-emerald-100 px-3 py-1 rounded-md">
+                        {featuredConfig.badgeText || 'VERIFIED LISTINGS'}
+                      </span>
+                      <h2 className="text-2xl sm:text-4xl font-extrabold text-brand-charcoal tracking-tight mt-3">
+                        {featuredConfig.sectionTitle || 'Featured & Recent Verified Properties'}
+                      </h2>
                     </div>
-
-                    <div className="p-5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between text-xs text-gray-500 font-bold mb-1">
-                          <span>{[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}</span>
-                          <span className="text-brand-charcoal">{prop.category}</span>
-                        </div>
-                        <h3 className="text-base font-bold text-brand-charcoal line-clamp-1 mb-3">
-                          {prop.title}
-                        </h3>
-                      </div>
-
-                      <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                        <div>
-                          <span className="text-xs text-gray-400 block font-medium">Listed Price</span>
-                          <span className="text-lg font-extrabold text-emerald-700">{prop.priceDisplay}</span>
-                        </div>
-                        <span className="text-xs font-bold text-brand-charcoal">{prop.areaDisplay}</span>
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => changeActivePage('map')}
+                      className="mt-3 md:mt-0 text-sm font-bold text-brand-charcoal hover:text-brand-yellowHover flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Explore All Properties on Map</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
-                ))}
-              </div>
-            </section>
+
+                  <div className={`grid grid-cols-1 ${
+                    homepageProperties.length === 1 ? 'max-w-md mx-auto' :
+                    homepageProperties.length === 2 ? 'sm:grid-cols-2 max-w-4xl mx-auto' :
+                    'sm:grid-cols-2 lg:grid-cols-3'
+                  } gap-6`}>
+                    {homepageProperties.map((prop) => {
+                      const propId = String(prop.id || prop.propertyId);
+                      const isFeatured = featuredIds.includes(propId);
+
+                      return (
+                        <div
+                          key={prop.id || prop.propertyId}
+                          onClick={() => handleSelectProperty(prop)}
+                          className={`group bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden flex flex-col transform hover:-translate-y-1 ${
+                            isFeatured ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-brand-bordergray'
+                          }`}
+                        >
+                          <div className="relative h-48 bg-gray-100 overflow-hidden">
+                            <img
+                              src={prop.photos?.[0] || prop.media?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
+                              alt={prop.title}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+                              }}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            {isFeatured ? (
+                              <div className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
+                                <span>★ FEATURED VERIFIED</span>
+                              </div>
+                            ) : (
+                              <div className="absolute top-3 left-3 bg-brand-charcoal text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-brand-yellow/30">
+                                <ShieldCheck className="w-3 h-3 text-brand-yellow" />
+                                <span>{prop.verificationStatus || 'PLATFORM VERIFIED'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="p-5 flex-1 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between text-xs text-gray-500 font-bold mb-1">
+                                <span>{[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}</span>
+                                <span className="text-brand-charcoal">{prop.category}</span>
+                              </div>
+                              <h3 className="text-base font-bold text-brand-charcoal line-clamp-1 mb-3">
+                                {prop.title}
+                              </h3>
+                            </div>
+
+                            <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                              <div>
+                                <span className="text-xs text-gray-400 block font-medium">Listed Price</span>
+                                <span className="text-lg font-extrabold text-emerald-700">{prop.priceDisplay || prop.price}</span>
+                              </div>
+                              <span className="text-xs font-bold text-brand-charcoal">{prop.areaDisplay || prop.area}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* PLATFORM INFORMATION SECTION WITH BACKGROUND IMAGE */}
             <section className="relative bg-brand-charcoal text-white py-20 px-4 sm:px-6 lg:px-8 my-12 overflow-hidden">

@@ -52,7 +52,8 @@ import {
   UserCheck,
   PhoneCall,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Star
 } from 'lucide-react';
 import { mockApi, safeArray } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -254,6 +255,7 @@ export default function AdminPortal({ onNavigate }) {
   const [allProperties, setAllProperties] = useState([]);
   const [allPropSearchQuery, setAllPropSearchQuery] = useState('');
   const [allPropStatusFilter, setAllPropStatusFilter] = useState('ALL');
+  const [featuredSearchQuery, setFeaturedSearchQuery] = useState('');
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
@@ -1700,20 +1702,21 @@ export default function AdminPortal({ onNavigate }) {
   const cmsModules = [
     { id: 'overview', label: '1. Overview', icon: Globe },
     { id: 'homepage', label: '2. Homepage', icon: Layout },
-    { id: 'navbar', label: '3. Navbar', icon: Layers },
-    { id: 'footer', label: '4. Footer', icon: Archive },
-    { id: 'buyPage', label: '5. Buy Page', icon: DollarSign },
-    { id: 'rentPage', label: '6. Rent Page', icon: Key },
-    { id: 'sellPage', label: '7. Sell Page', icon: PlusCircle },
-    { id: 'categories', label: '8. Categories', icon: Filter },
-    { id: 'faq', label: '9. FAQ Section', icon: HelpCircle },
-    { id: 'contact', label: '10. Contact', icon: Mail },
-    { id: 'branding', label: '11. Branding', icon: ShieldCheck },
-    { id: 'theme', label: '12. Theme & Colors', icon: Palette },
-    { id: 'media', label: '13. Media', icon: ImageIcon },
-    { id: 'maps', label: '14. Maps Config', icon: MapPin },
-    { id: 'seo', label: '15. SEO Tags', icon: Search },
-    { id: 'publish', label: '16. Publish Live', icon: CheckSquare }
+    { id: 'featuredListings', label: '3. Verified Listings', icon: Star },
+    { id: 'navbar', label: '4. Navbar', icon: Layers },
+    { id: 'footer', label: '5. Footer', icon: Archive },
+    { id: 'buyPage', label: '6. Buy Page', icon: DollarSign },
+    { id: 'rentPage', label: '7. Rent Page', icon: Key },
+    { id: 'sellPage', label: '8. Sell Page', icon: PlusCircle },
+    { id: 'categories', label: '9. Categories', icon: Filter },
+    { id: 'faq', label: '10. FAQ Section', icon: HelpCircle },
+    { id: 'contact', label: '11. Contact', icon: Mail },
+    { id: 'branding', label: '12. Branding', icon: ShieldCheck },
+    { id: 'theme', label: '13. Theme & Colors', icon: Palette },
+    { id: 'media', label: '14. Media', icon: ImageIcon },
+    { id: 'maps', label: '15. Maps Config', icon: MapPin },
+    { id: 'seo', label: '16. SEO Tags', icon: Search },
+    { id: 'publish', label: '17. Publish Live', icon: CheckSquare }
   ];
 
   if (!isAdminAuthenticated) {
@@ -2101,6 +2104,228 @@ export default function AdminPortal({ onNavigate }) {
                         value={siteConfig.homepage?.heroBackgroundImage || ''}
                         onChange={(val) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
                       />
+                    </div>
+                  </div>
+                )}
+
+                {/* MODULE 3: VERIFIED & FEATURED LISTINGS CONTROL */}
+                {cmsTab === 'featuredListings' && (
+                  <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
+                    <div className="border-b border-gray-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-black text-brand-charcoal">Verified & Featured Properties Control</h3>
+                        <p className="text-xs text-gray-500 font-medium">Decide which featured properties to highlight and set how many properties display on the Home Page.</p>
+                      </div>
+                      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-xl">
+                        <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-bold text-emerald-800">
+                          {safeArray(siteConfig.featuredListings?.featuredPropertyIds).length} Featured Selected
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Section Configuration Inputs */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Section Badge Text</label>
+                        <input
+                          type="text"
+                          value={siteConfig.featuredListings?.badgeText || 'VERIFIED LISTINGS'}
+                          onChange={(e) => setSiteConfig(prev => ({
+                            ...prev,
+                            featuredListings: { ...prev.featuredListings, badgeText: e.target.value }
+                          }))}
+                          className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                          placeholder="VERIFIED LISTINGS"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Section Heading Title</label>
+                        <input
+                          type="text"
+                          value={siteConfig.featuredListings?.sectionTitle || 'Featured & Recent Verified Properties'}
+                          onChange={(e) => setSiteConfig(prev => ({
+                            ...prev,
+                            featuredListings: { ...prev.featuredListings, sectionTitle: e.target.value }
+                          }))}
+                          className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                          placeholder="Featured & Recent Verified Properties"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Home Page Display Count</label>
+                        <select
+                          value={siteConfig.featuredListings?.displayCount || 3}
+                          onChange={(e) => setSiteConfig(prev => ({
+                            ...prev,
+                            featuredListings: { ...prev.featuredListings, displayCount: Number(e.target.value) }
+                          }))}
+                          className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                        >
+                          <option value={1}>1 Property</option>
+                          <option value={2}>2 Properties</option>
+                          <option value={3}>3 Properties (Default 3-Grid)</option>
+                          <option value={4}>4 Properties</option>
+                          <option value={6}>6 Properties (2 Rows)</option>
+                          <option value={8}>8 Properties</option>
+                          <option value={9}>9 Properties (3 Rows)</option>
+                          <option value={12}>12 Properties</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Display Strategy Preference */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-amber-50/60 rounded-2xl border border-amber-200 gap-3">
+                      <div>
+                        <span className="block text-xs font-black text-amber-900">Featured Display Preference</span>
+                        <span className="block text-[11px] text-amber-700 font-medium">Choose whether to show fallback verified properties when featured count is under display limit.</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSiteConfig(prev => ({
+                            ...prev,
+                            featuredListings: { ...prev.featuredListings, showOnlyFeatured: false }
+                          }))}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            !siteConfig.featuredListings?.showOnlyFeatured
+                              ? 'bg-brand-charcoal text-brand-yellow shadow-sm font-extrabold'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Featured + Recent Verified
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSiteConfig(prev => ({
+                            ...prev,
+                            featuredListings: { ...prev.featuredListings, showOnlyFeatured: true }
+                          }))}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            siteConfig.featuredListings?.showOnlyFeatured
+                              ? 'bg-amber-600 text-white shadow-sm font-extrabold'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Show Only Featured
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Property Selection List */}
+                    <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-black text-brand-charcoal">Verified Properties Selection</h4>
+                          <p className="text-[11px] text-gray-500 font-medium">Click "Feature on Homepage" to star properties. Starred properties appear first on the Home Page.</p>
+                        </div>
+                        <div className="relative flex-1 max-w-xs">
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Search title, locality, city..."
+                            value={featuredSearchQuery}
+                            onChange={(e) => setFeaturedSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Properties Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {safeArray(allProperties).filter(p => {
+                          if (!p) return false;
+                          if (!featuredSearchQuery.trim()) return true;
+                          const q = featuredSearchQuery.toLowerCase().trim();
+                          const title = (p.title || '').toLowerCase();
+                          const city = (p.location?.city || p.city || '').toLowerCase();
+                          const locality = (p.location?.locality || p.locality || '').toLowerCase();
+                          const pId = String(p.id || p.propertyId || '').toLowerCase();
+                          return title.includes(q) || city.includes(q) || locality.includes(q) || pId.includes(q);
+                        }).map((prop) => {
+                          const pId = String(prop.id || prop.propertyId);
+                          const currentFeaturedIds = safeArray(siteConfig.featuredListings?.featuredPropertyIds).map(String);
+                          const isFeatured = currentFeaturedIds.includes(pId);
+                          const featuredIndex = currentFeaturedIds.indexOf(pId);
+
+                          return (
+                            <div
+                              key={pId}
+                              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                                isFeatured
+                                  ? 'bg-amber-50/70 border-amber-400/80 shadow-md ring-2 ring-amber-400/30'
+                                  : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm'
+                              }`}
+                            >
+                              <div className="space-y-3">
+                                <div className="relative h-36 bg-gray-100 rounded-xl overflow-hidden">
+                                  <img
+                                    src={prop.photos?.[0] || prop.media?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'}
+                                    alt={prop.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80';
+                                    }}
+                                  />
+                                  {isFeatured ? (
+                                    <div className="absolute top-2.5 left-2.5 bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md border border-amber-300">
+                                      <Sparkles className="w-3 h-3 text-white" />
+                                      <span>Homepage Featured #{featuredIndex + 1}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="absolute top-2.5 left-2.5 bg-brand-charcoal/90 text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md">
+                                      <ShieldCheck className="w-3 h-3 text-brand-yellow" />
+                                      <span>Verified Listing</span>
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-2.5 right-2.5 bg-gray-900/80 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                    {prop.category || 'Property'}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h5 className="text-xs font-extrabold text-brand-charcoal line-clamp-1">{prop.title || 'Untitled Property'}</h5>
+                                  <p className="text-[11px] text-gray-500 font-semibold truncate mt-0.5">
+                                    {[prop.location?.locality, prop.location?.city].filter(Boolean).join(', ') || prop.location?.city || prop.locality || 'Guntur, AP'}
+                                  </p>
+                                  <div className="text-xs font-black text-emerald-700 mt-1">
+                                    {prop.priceDisplay || prop.price || 'Contact for Price'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextFeatured = isFeatured
+                                      ? currentFeaturedIds.filter(id => id !== pId)
+                                      : [...currentFeaturedIds, pId];
+                                    setSiteConfig(prev => ({
+                                      ...prev,
+                                      featuredListings: {
+                                        ...prev.featuredListings,
+                                        featuredPropertyIds: nextFeatured
+                                      }
+                                    }));
+                                  }}
+                                  className={`w-full py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                    isFeatured
+                                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm'
+                                      : 'bg-brand-charcoal hover:bg-brand-charcoalLight text-white shadow-sm'
+                                  }`}
+                                >
+                                  <Sparkles className={`w-3.5 h-3.5 ${isFeatured ? 'text-white' : 'text-brand-yellow'}`} />
+                                  <span>{isFeatured ? '★ Featured on Homepage (Click to Remove)' : '☆ Feature on Homepage'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
