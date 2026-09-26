@@ -2809,7 +2809,7 @@ export default function AdminPortal({ onNavigate }) {
                       </span>
                     </div>
 
-                    {/* MINIMAL CLEAN LIVE STATUS CONTAINER */}
+                    {/* CLEAN LIVE STATUS CARD WITH CHECK LIVE SITE ACTION */}
                     <div className="p-6 bg-gradient-to-r from-slate-900 to-brand-navy rounded-2xl text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-slate-800">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center shadow-inner">
@@ -2817,7 +2817,7 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
                         <div>
                           <h4 className="font-extrabold text-base text-white">Live Site Sync Status</h4>
-                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are prepared. Publishing will update all live user sessions immediately.</p>
+                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are prepared. Click "PUBLISH TO LIVE SITE" in the top bar above to update all user sessions instantly.</p>
                         </div>
                       </div>
 
@@ -2829,81 +2829,15 @@ export default function AdminPortal({ onNavigate }) {
                               window.open('/', '_blank');
                             }
                           }}
-                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-2 transition-all cursor-pointer"
+                          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
                         >
-                          <Globe className="w-4 h-4 text-emerald-400" />
+                          <Globe className="w-4.5 h-4.5 text-slate-950" />
                           <span>Check Live Site</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsResetModalOpen(true)}
-                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-2 transition-all cursor-pointer"
-                        >
-                          <RotateCcw className="w-4 h-4 text-slate-400" />
-                          <span>Reset Defaults</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handlePublishSiteConfig}
-                          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
-                        >
-                          <CheckCircle2 className="w-4.5 h-4.5 text-slate-950" />
-                          PUBLISH LIVE NOW
                         </button>
                       </div>
                     </div>
                   </div>
                 )}
-
-                {/* UNIVERSAL PERSISTENT CMS CONTROL BAR (AVAILABLE ON ALL 16 MODULES) */}
-                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-500 font-extrabold flex items-center justify-center shrink-0">
-                      <Sliders className="w-5 h-5 text-amber-500" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-brand-charcoal uppercase tracking-wider">
-                        CMS Studio Control • {cmsModules.find(m => m.id === cmsTab)?.label || 'Active Module'}
-                      </h4>
-                      <p className="text-[11px] text-gray-500 font-medium">
-                        Save draft changes or publish live updates instantly across all 16 modules.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
-                    <button
-                      type="button"
-                      onClick={handleSaveDraftConfig}
-                      disabled={adminActionProcessing}
-                      className="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 transition-all"
-                    >
-                      <Save className="w-4 h-4 text-gray-600" />
-                      <span>Save Draft</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsResetModalOpen(true)}
-                      disabled={adminActionProcessing}
-                      className="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 font-extrabold text-xs px-3.5 py-2.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-gray-600" />
-                      <span>Reset</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handlePublishSiteConfig}
-                      disabled={adminActionProcessing}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition-all transform hover:scale-105"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-100" />
-                      <span>PUBLISH LIVE</span>
-                    </button>
-                  </div>
-                </div>
-
               </div>
             )}
 
