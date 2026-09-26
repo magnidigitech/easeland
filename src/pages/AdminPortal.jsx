@@ -5265,7 +5265,7 @@ export default function AdminPortal({ onNavigate }) {
               <div>
                 <div className="flex items-center gap-2 text-xs font-black text-brand-yellow uppercase tracking-wider">
                   <Briefcase className="w-4 h-4 text-brand-yellow" />
-                  Platform Deal CRM Dossier
+                  Platform Deal Details
                 </div>
                 <h3 className="text-xl font-black text-brand-charcoal mt-0.5">{selectedDealForDossier.customerName}</h3>
               </div>
@@ -5377,7 +5377,7 @@ export default function AdminPortal({ onNavigate }) {
                 onClick={() => setSelectedDealForDossier(null)}
                 className="px-5 py-2.5 rounded-xl bg-brand-charcoal text-white font-extrabold text-xs hover:bg-brand-charcoalLight shadow transition-all"
               >
-                Close Dossier
+                Close Details
               </button>
             </div>
           </div>

@@ -1727,7 +1727,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <FileText className="w-5 h-5 text-slate-950" />
                 </div>
                 <div>
-                  <h4 className="font-black text-base">Transaction Deal Dossier</h4>
+                  <h4 className="font-black text-base">Transaction Deal Details</h4>
                   <span className="text-xs text-amber-400 font-semibold">{selectedDealForDossier.id}</span>
                 </div>
               </div>
@@ -1851,7 +1851,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                 onClick={() => setSelectedDealForDossier(null)}
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-colors cursor-pointer"
               >
-                Close Dossier
+                Close Details
               </button>
             </div>
 
