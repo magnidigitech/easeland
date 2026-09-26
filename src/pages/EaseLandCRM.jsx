@@ -82,7 +82,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [leadScoreFilter, setLeadScoreFilter] = useState('ALL');
-  const [dealStageFilter, setDealStageFilter] = useState('ALL');
+  const [selectedStageFilters, setSelectedStageFilters] = useState([]);
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
 
@@ -217,6 +217,37 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     });
   }, [leads, searchQuery, leadScoreFilter, selectedAgent]);
 
+  // Stage Multi-Select Toggle Handler
+  const handleToggleStageFilter = (stKey) => {
+    if (selectedStageFilters.length === 0) {
+      setSelectedStageFilters([stKey]);
+    } else if (selectedStageFilters.includes(stKey)) {
+      const updated = selectedStageFilters.filter(k => k !== stKey);
+      setSelectedStageFilters(updated);
+    } else {
+      const updated = [...selectedStageFilters, stKey];
+      if (updated.length === kanbanStages.length) {
+        setSelectedStageFilters([]);
+      } else {
+        setSelectedStageFilters(updated);
+      }
+    }
+  };
+
+  const handleSelectAllStages = () => {
+    setSelectedStageFilters([]);
+  };
+
+  const getStageFilterLabel = () => {
+    if (selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) {
+      return `All Stages (${deals.length})`;
+    }
+    if (selectedStageFilters.length === 1) {
+      return CrmStageLabels[selectedStageFilters[0]] || selectedStageFilters[0];
+    }
+    return `${selectedStageFilters.length} Stages Selected`;
+  };
+
   // Filtered Deals
   const filteredDeals = useMemo(() => {
     return deals.filter((deal) => {
@@ -226,12 +257,16 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         deal.propertyTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         deal.ownerName?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesStage = dealStageFilter === 'ALL' || deal.stage === dealStageFilter;
+      const matchesStage =
+        selectedStageFilters.length === 0 ||
+        selectedStageFilters.length === kanbanStages.length ||
+        selectedStageFilters.includes(deal.stage);
+
       const matchesAgent = selectedAgent === 'ALL' || deal.assignedAgent === selectedAgent;
 
       return matchesSearch && matchesStage && matchesAgent;
     });
-  }, [deals, searchQuery, dealStageFilter, selectedAgent]);
+  }, [deals, searchQuery, selectedStageFilters, selectedAgent]);
 
   // Filtered Visits
   const filteredVisits = useMemo(() => {
@@ -630,7 +665,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   />
                 </div>
 
-                {/* CUSTOM STAGE FILTER DROPDOWN */}
+                {/* CUSTOM MULTI-SELECT CHECKBOX STAGE FILTER DROPDOWN */}
                 <div className="relative">
                   <button
                     type="button"
@@ -639,7 +674,12 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   >
                     <div className="flex items-center gap-1.5">
                       <Filter className="w-3.5 h-3.5 text-amber-500" />
-                      <span>{dealStageFilter === 'ALL' ? `All Stages (${deals.length})` : (CrmStageLabels[dealStageFilter] || dealStageFilter)}</span>
+                      <span>{getStageFilterLabel()}</span>
+                      {selectedStageFilters.length > 0 && selectedStageFilters.length < kanbanStages.length && (
+                        <span className="bg-amber-400 text-slate-950 text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
+                          {selectedStageFilters.length}
+                        </span>
+                      )}
                     </div>
                     <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${isStageDropdownOpen ? 'rotate-180 text-amber-600' : ''}`} />
                   </button>
@@ -647,44 +687,87 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   {isStageDropdownOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsStageDropdownOpen(false)}></div>
-                      <div className="absolute right-0 mt-1.5 w-64 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-150">
-                        <button
-                          type="button"
-                          onClick={() => { setDealStageFilter('ALL'); setIsStageDropdownOpen(false); }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black flex items-center justify-between transition-colors cursor-pointer ${
-                            dealStageFilter === 'ALL' ? 'bg-amber-100 text-amber-950 font-extrabold' : 'text-slate-700 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>All Stages</span>
-                          <span className="bg-slate-200 text-slate-800 text-[10px] px-2 py-0.5 rounded-full font-black">{deals.length}</span>
-                        </button>
+                      <div className="absolute right-0 mt-1.5 w-72 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 select-none">
+                        
+                        {/* POPOVER HEADER WITH SELECT ALL CHECKBOX */}
+                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={handleSelectAllStages}
+                            className="flex items-center gap-2 text-xs font-black text-slate-800 hover:text-amber-600 transition-colors cursor-pointer"
+                          >
+                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                              selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length
+                                ? 'bg-amber-500 border-amber-500 text-slate-950'
+                                : 'border-slate-300 bg-white'
+                            }`}>
+                              {(selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && (
+                                <Check className="w-3 h-3 stroke-[3]" />
+                              )}
+                            </div>
+                            <span>Select All Stages</span>
+                          </button>
+                          <span className="text-[10px] font-black text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                            {deals.length} Total
+                          </span>
+                        </div>
 
                         <div className="h-px bg-slate-100 my-1"></div>
 
-                        <div className="max-h-60 overflow-y-auto space-y-0.5">
+                        {/* STAGES CHECKBOX LIST */}
+                        <div className="max-h-64 overflow-y-auto space-y-0.5 pr-0.5">
                           {kanbanStages.map((st) => {
                             const count = deals.filter(d => d.stage === st).length;
-                            const isSelected = dealStageFilter === st;
+                            const isChecked = selectedStageFilters.length === 0 || 
+                                              selectedStageFilters.length === kanbanStages.length || 
+                                              selectedStageFilters.includes(st);
                             return (
                               <button
                                 key={st}
                                 type="button"
-                                onClick={() => { setDealStageFilter(st); setIsStageDropdownOpen(false); }}
-                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                                  isSelected ? 'bg-amber-100 text-amber-950 font-black' : 'text-slate-700 hover:bg-slate-100'
+                                onClick={() => handleToggleStageFilter(st)}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer group ${
+                                  isChecked ? 'bg-amber-50/80 text-slate-900 font-extrabold' : 'text-slate-600 hover:bg-slate-100'
                                 }`}
                               >
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                                    isChecked
+                                      ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-xs'
+                                      : 'border-slate-300 bg-white group-hover:border-amber-400'
+                                  }`}>
+                                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                  </div>
                                   <span>{CrmStageLabels[st] || st}</span>
                                 </div>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${isSelected ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                                  isChecked ? 'bg-amber-200/70 text-amber-900' : 'bg-slate-100 text-slate-400'
+                                }`}>
                                   {count}
                                 </span>
                               </button>
                             );
                           })}
                         </div>
+
+                        {/* POPOVER FOOTER ACTIONS */}
+                        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs px-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStageFilters([])}
+                            className="text-[11px] font-bold text-amber-600 hover:underline cursor-pointer"
+                          >
+                            Reset Selection
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsStageDropdownOpen(false)}
+                            className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] rounded-lg transition-colors cursor-pointer"
+                          >
+                            Done
+                          </button>
+                        </div>
+
                       </div>
                     </>
                   )}
@@ -720,7 +803,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                 : "flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100vh-250px)]"
             }>
               {kanbanStages
-                .filter(st => dealStageFilter === 'ALL' || dealStageFilter === st)
+                .filter(st => selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length || selectedStageFilters.includes(st))
                 .map((stage) => {
                   const stageDeals = filteredDeals.filter(d => d.stage === stage);
                   const stageTotal = stageDeals.reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0);
