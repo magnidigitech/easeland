@@ -17,10 +17,11 @@ import EaseLandCRM from './pages/EaseLandCRM';
 import UserDashboard from './components/UserDashboard';
 import PropertiesSearchPage from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import { mockApi, applySiteTheme, safeArray } from './services/mockApi';
+import { mockApi, applySiteTheme, safeArray, deduplicateProperties } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
+import { searchPublicProperties } from './firebase/searchService.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings } from 'lucide-react';
 
 const getInitialPageState = () => {
@@ -134,10 +135,34 @@ export default function App() {
   const [generalContactSubmitted, setGeneralContactSubmitted] = useState(false);
   const [generalContactLoading, setGeneralContactLoading] = useState(false);
 
-  // Fetch properties based on active filters
-  const loadProperties = () => {
-    const data = mockApi.getPublicProperties(filters);
-    setProperties(data);
+  // Fetch properties based on active filters (Live PostgreSQL + Firestore + LocalStorage)
+  const loadProperties = async () => {
+    let pgProperties = [];
+    try {
+      const res = await fetch('/api/properties');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.properties)) {
+          pgProperties = json.properties;
+        }
+      }
+    } catch (pgErr) {}
+
+    let fsProperties = [];
+    try {
+      const result = await searchPublicProperties({
+        searchState: filters,
+        pageSize: 100
+      });
+      if (result.success && Array.isArray(result.properties)) {
+        fsProperties = result.properties;
+      }
+    } catch (fsErr) {}
+
+    const localData = mockApi.getPublicProperties(filters) || [];
+
+    const merged = deduplicateProperties([...pgProperties, ...fsProperties, ...localData]);
+    setProperties(merged);
     setWishlistCount(mockApi.getWishlist().length);
   };
 
@@ -287,6 +312,8 @@ export default function App() {
         window.history.scrollRestoration = 'manual';
       }
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     }
 
     // 3. Handle PopState Browser History Navigation
@@ -294,6 +321,8 @@ export default function App() {
       syncStateFromUrl();
       if (typeof window !== 'undefined') {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -311,6 +340,8 @@ export default function App() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     }
   }, [activePage, activePropertyId]);
 
@@ -553,7 +584,9 @@ export default function App() {
                   <div className={`grid grid-cols-1 ${
                     homepageProperties.length === 1 ? 'max-w-md mx-auto' :
                     homepageProperties.length === 2 ? 'sm:grid-cols-2 max-w-4xl mx-auto' :
-                    'sm:grid-cols-2 lg:grid-cols-3'
+                    homepageProperties.length === 3 ? 'sm:grid-cols-2 lg:grid-cols-3' :
+                    homepageProperties.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' :
+                    'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
                   } gap-6`}>
                     {homepageProperties.map((prop) => {
                       const propId = String(prop.id || prop.propertyId);
