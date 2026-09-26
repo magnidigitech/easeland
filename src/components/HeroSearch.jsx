@@ -18,6 +18,23 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     return () => window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
   }, []);
 
+  // Synchronize state with initialState prop updates
+  useEffect(() => {
+    if (initialState) {
+      if (initialState.query !== undefined) setQuery(initialState.query || '');
+      if (initialState.purpose !== undefined) setPurpose(initialState.purpose === 'RENT' ? 'rent' : 'buy');
+
+      let catVal = initialState.category || initialState.propertyType || 'All';
+      if (catVal === 'OPEN_PLOT' || catVal === 'OPEN_PLOTS') catVal = 'Open Plots';
+      else if (catVal === 'HOUSE' || catVal === 'VILLA' || catVal === 'HOUSES') catVal = 'Houses';
+      else if (catVal === 'APARTMENT' || catVal === 'FLAT' || catVal === 'APARTMENTS') catVal = 'Apartments';
+      else if (catVal === 'COMMERCIAL') catVal = 'Commercial';
+      else if (catVal === 'RENTAL' || initialState.purpose === 'RENT') catVal = 'Rentals';
+
+      setCategory(catVal);
+    }
+  }, [initialState]);
+
   // Initialize Google Places Autocomplete restricted to India
   useEffect(() => {
     if (window.google && window.google.maps && window.google.maps.places && inputRef.current) {
@@ -136,7 +153,11 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
 
         <select
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setCategory(val);
+            triggerSearch(query, purpose, val);
+          }}
           className="py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
         >
           <option value="All" className="bg-slate-900 text-white">All Categories</option>
@@ -144,6 +165,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           <option value="Houses" className="bg-slate-900 text-white">Houses & Villas</option>
           <option value="Apartments" className="bg-slate-900 text-white">Apartments</option>
           <option value="Commercial" className="bg-slate-900 text-white">Commercial</option>
+          <option value="Rentals" className="bg-slate-900 text-white">Rentals</option>
         </select>
 
         <button
@@ -254,7 +276,11 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             <div className="w-full sm:w-44">
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCategory(val);
+                  triggerSearch(query, purpose, val);
+                }}
                 className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
               >
                 <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
@@ -262,6 +288,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 <option value="Houses" className="bg-slate-900 text-white font-bold">Houses & Villas</option>
                 <option value="Apartments" className="bg-slate-900 text-white font-bold">Apartments</option>
                 <option value="Commercial" className="bg-slate-900 text-white font-bold">Commercial</option>
+                <option value="Rentals" className="bg-slate-900 text-white font-bold">Rentals</option>
               </select>
             </div>
 

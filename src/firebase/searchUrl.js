@@ -124,10 +124,18 @@ export function urlParamsToSearchState(searchString = '') {
   // Validate PropertyType Enum
   const validPropertyType = Object.values(PropertyType).includes(typeParam) ? typeParam : 'ALL';
 
+  let resolvedCategory = 'All';
+  if (validPropertyType === 'OPEN_PLOT') resolvedCategory = 'Open Plots';
+  else if (validPropertyType === 'HOUSE' || validPropertyType === 'VILLA') resolvedCategory = 'Houses';
+  else if (validPropertyType === 'APARTMENT') resolvedCategory = 'Apartments';
+  else if (validPropertyType === 'COMMERCIAL') resolvedCategory = 'Commercial';
+  else if (validPurpose === 'RENT') resolvedCategory = 'Rentals';
+
   return {
     query: q,
     purpose: validPurpose,
     propertyType: validPropertyType,
+    category: resolvedCategory,
     state: stateParam,
     district: districtParam,
     city: cityParam,
