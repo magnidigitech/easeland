@@ -83,6 +83,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const [searchQuery, setSearchQuery] = useState('');
   const [leadScoreFilter, setLeadScoreFilter] = useState('ALL');
   const [dealStageFilter, setDealStageFilter] = useState('ALL');
+  const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false);
+  const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
 
   // Modals
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
@@ -405,19 +407,51 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             <div className="flex items-center gap-2.5 flex-wrap">
               
               {/* AGENT FILTER SELECTOR */}
-              <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs">
-                <Users className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-slate-400 text-[11px] font-bold">Agent:</span>
-                <select
-                  value={selectedAgent}
-                  onChange={(e) => setSelectedAgent(e.target.value)}
-                  className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
+                  className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:border-slate-600 px-3 py-1.5 rounded-xl text-xs text-white font-bold transition-all cursor-pointer"
                 >
-                  <option value="ALL" className="bg-slate-900 text-white">All Team Portfolio</option>
-                  {DEFAULT_CRM_AGENTS.map((ag) => (
-                    <option key={ag.id} value={ag.name} className="bg-slate-900 text-white">{ag.name}</option>
-                  ))}
-                </select>
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-slate-400 text-[11px]">Agent:</span>
+                  <span className="text-white font-black">{selectedAgent === 'ALL' ? 'All Team Portfolio' : selectedAgent}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isAgentDropdownOpen ? 'rotate-180 text-amber-400' : ''}`} />
+                </button>
+
+                {isAgentDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsAgentDropdownOpen(false)}></div>
+                    <div className="absolute left-0 mt-1.5 w-56 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl z-50 p-1.5 space-y-0.5">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedAgent('ALL'); setIsAgentDropdownOpen(false); }}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                          selectedAgent === 'ALL' ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        <span>All Team Portfolio</span>
+                        {selectedAgent === 'ALL' && <Check className="w-3.5 h-3.5 text-slate-950" />}
+                      </button>
+
+                      <div className="h-px bg-slate-800 my-1"></div>
+
+                      {DEFAULT_CRM_AGENTS.map((ag) => (
+                        <button
+                          key={ag.id}
+                          type="button"
+                          onClick={() => { setSelectedAgent(ag.name); setIsAgentDropdownOpen(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                            selectedAgent === ag.name ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>{ag.name}</span>
+                          {selectedAgent === ag.name && <Check className="w-3.5 h-3.5 text-slate-950" />}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* ACTION: CREATE NEW LEAD */}
@@ -596,16 +630,65 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   />
                 </div>
 
-                <select
-                  value={dealStageFilter}
-                  onChange={(e) => setDealStageFilter(e.target.value)}
-                  className="bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">All Stages ({deals.length})</option>
-                  {kanbanStages.map((st) => (
-                    <option key={st} value={st}>{CrmStageLabels[st] || st}</option>
-                  ))}
-                </select>
+                {/* CUSTOM STAGE FILTER DROPDOWN */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsStageDropdownOpen(!isStageDropdownOpen)}
+                    className="bg-slate-50 border border-slate-300 hover:border-amber-400 hover:bg-white text-slate-800 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center justify-between gap-2 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Filter className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{dealStageFilter === 'ALL' ? `All Stages (${deals.length})` : (CrmStageLabels[dealStageFilter] || dealStageFilter)}</span>
+                    </div>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${isStageDropdownOpen ? 'rotate-180 text-amber-600' : ''}`} />
+                  </button>
+
+                  {isStageDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsStageDropdownOpen(false)}></div>
+                      <div className="absolute right-0 mt-1.5 w-64 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => { setDealStageFilter('ALL'); setIsStageDropdownOpen(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black flex items-center justify-between transition-colors cursor-pointer ${
+                            dealStageFilter === 'ALL' ? 'bg-amber-100 text-amber-950 font-extrabold' : 'text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>All Stages</span>
+                          <span className="bg-slate-200 text-slate-800 text-[10px] px-2 py-0.5 rounded-full font-black">{deals.length}</span>
+                        </button>
+
+                        <div className="h-px bg-slate-100 my-1"></div>
+
+                        <div className="max-h-60 overflow-y-auto space-y-0.5">
+                          {kanbanStages.map((st) => {
+                            const count = deals.filter(d => d.stage === st).length;
+                            const isSelected = dealStageFilter === st;
+                            return (
+                              <button
+                                key={st}
+                                type="button"
+                                onClick={() => { setDealStageFilter(st); setIsStageDropdownOpen(false); }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                                  isSelected ? 'bg-amber-100 text-amber-950 font-black' : 'text-slate-700 hover:bg-slate-100'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                                  <span>{CrmStageLabels[st] || st}</span>
+                                </div>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${isSelected ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
