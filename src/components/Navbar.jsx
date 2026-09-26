@@ -92,19 +92,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               </button>
             )}
 
-            {/* SPECIAL NAVBAR BOX FOR ADMIN: "CHECK LIVE SITE" & "ADMIN SITE STUDIO" & "CRM STUDIO" */}
+            {/* SPECIAL NAVBAR BOX FOR ADMIN: "ADMIN SITE STUDIO" & "CRM STUDIO" */}
             {user && user.role === 'ADMIN' && (
               <div className="flex items-center gap-2">
-                {activePage === 'admin' ? (
-                  <button
-                    onClick={() => setActivePage('home')}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border border-emerald-500 flex items-center gap-1.5 transition-all transform hover:scale-105 select-none whitespace-nowrap"
-                    title="Preview consumer live site"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-emerald-100" />
-                    <span className="whitespace-nowrap">CHECK LIVE SITE</span>
-                  </button>
-                ) : (
+                {activePage !== 'admin' && (
                   <button
                     onClick={() => setActivePage('admin')}
                     className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 border border-amber-300 select-none whitespace-nowrap"
