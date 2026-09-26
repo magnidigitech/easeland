@@ -115,7 +115,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     propertyLocation: 'Amaravati Capital Region',
     ownerName: '',
     ownerPhone: '',
-    dealValue: 4500000,
+    dealValue: '',
     commissionRate: 1.5,
     stage: CrmDealStages.NEW,
     expectedClosingDate: '',
@@ -266,7 +266,11 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   // Handle Create Deal Submit
   const handleCreateDealSubmit = async (e) => {
     e.preventDefault();
-    const res = await createCrmDeal(newDealForm);
+    const dealPayload = {
+      ...newDealForm,
+      dealValue: Number(newDealForm.dealValue) || 0
+    };
+    const res = await createCrmDeal(dealPayload);
     if (res.success) {
       triggerToast('Deal for ' + newDealForm.customerName + ' successfully initiated.');
       setIsNewDealModalOpen(false);
@@ -278,7 +282,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         propertyLocation: 'Amaravati Capital Region',
         ownerName: '',
         ownerPhone: '',
-        dealValue: 4500000,
+        dealValue: '',
         commissionRate: 1.5,
         stage: CrmDealStages.NEW,
         expectedClosingDate: '',
@@ -388,7 +392,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     Ease<span className="text-amber-400">Land</span> CRM Studio
                   </span>
                   <span className="bg-amber-400/20 text-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-amber-400/40 uppercase tracking-widest">
-                    Sales War Room
+                    Enterprise Suite
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 font-medium">
@@ -1529,19 +1533,19 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="number"
                     required
-                    placeholder="4500000"
+                    placeholder="e.g. 4500000"
                     value={newDealForm.dealValue}
-                    onChange={(e) => setNewDealForm({ ...newDealForm, dealValue: Number(e.target.value) })}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, dealValue: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
                   />
-                  {newDealForm.dealValue > 0 && (
+                  {Number(newDealForm.dealValue) > 0 && (
                     <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-0.5">
                       <div className="flex items-center justify-between text-xs font-black text-slate-900">
                         <span className="text-slate-500 font-extrabold uppercase text-[10px]">Formatted Value:</span>
-                        <span className="text-emerald-700 font-black">{formatAmountInWords(newDealForm.dealValue)}</span>
+                        <span className="text-emerald-700 font-black">{formatAmountInWords(Number(newDealForm.dealValue))}</span>
                       </div>
                       <p className="text-[11px] font-extrabold text-amber-900 tracking-tight">
-                        {numToWordsIndian(newDealForm.dealValue)}
+                        {numToWordsIndian(Number(newDealForm.dealValue))}
                       </p>
                     </div>
                   )}

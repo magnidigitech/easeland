@@ -122,7 +122,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                       ? 'bg-amber-400 text-slate-950 border-amber-300 ring-2 ring-amber-400/50'
                       : 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
                   }`}
-                  title="Open EaseLand CRM & Sales War Room"
+                  title="Open EaseLand CRM Studio"
                 >
                   <Briefcase className="w-3.5 h-3.5 text-amber-400" />
                   <span>CRM STUDIO</span>

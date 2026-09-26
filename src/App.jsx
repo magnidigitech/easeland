@@ -722,7 +722,7 @@ export default function App() {
 
         {activePage === 'admin' && <AdminPortal onNavigate={(page) => changeActivePage(page)} />}
 
-        {/* EASELAND CRM STUDIO & SALES WAR ROOM */}
+        {/* EASELAND CRM STUDIO & ENTERPRISE SUITE */}
         {activePage === 'crm' && (
           <EaseLandCRM
             onReturnToAdmin={() => changeActivePage('admin')}
