@@ -377,21 +377,59 @@ export default function App() {
   }, [filters, activePage]);
 
   const handleHeroSearch = (searchPayload) => {
+    let propType = searchPayload?.propertyType || 'ALL';
+    let purp = searchPayload?.purpose || 'ALL';
+
+    const catStr = String(searchPayload?.category || '').toLowerCase();
+    if (catStr.includes('plot') || catStr === 'open plots') propType = 'OPEN_PLOT';
+    else if (catStr.includes('house') || catStr.includes('villa') || catStr === 'houses') propType = 'HOUSE';
+    else if (catStr.includes('apartment') || catStr.includes('flat') || catStr === 'apartments') propType = 'APARTMENT';
+    else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
+
     setFilters(prev => ({
       ...prev,
       cleared: false,
-      ...searchPayload
+      ...searchPayload,
+      propertyType: propType !== 'ALL' ? propType : (prev.propertyType || 'ALL'),
+      purpose: purp !== 'ALL' ? purp : (prev.purpose || 'ALL')
     }));
     changeActivePage('map');
   };
 
-
   const handleCategorySelect = (catTitle) => {
-    setFilters(prev => ({
-      ...prev,
+    let propType = 'ALL';
+    let purp = 'ALL';
+
+    const catStr = String(catTitle || '').toLowerCase();
+    if (catStr.includes('plot') || catStr === 'open plots') propType = 'OPEN_PLOT';
+    else if (catStr.includes('house') || catStr.includes('villa') || catStr === 'houses') propType = 'HOUSE';
+    else if (catStr.includes('apartment') || catStr.includes('flat') || catStr === 'apartments') propType = 'APARTMENT';
+    else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
+
+    const updatedFilters = {
+      query: '',
+      purpose: purp,
+      propertyType: propType,
+      category: catTitle,
       cleared: false,
-      category: catTitle
-    }));
+      state: '',
+      district: '',
+      city: '',
+      locality: '',
+      minPrice: '',
+      maxPrice: '',
+      minArea: '',
+      maxArea: '',
+      bedrooms: 'ANY',
+      facing: 'ALL',
+      furnishing: 'ALL',
+      amenities: [],
+      sortBy: 'newest'
+    };
+
+    setFilters(updatedFilters);
     changeActivePage('map');
   };
 

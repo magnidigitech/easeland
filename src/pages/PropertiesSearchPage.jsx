@@ -15,7 +15,91 @@ import {
   MapPin, Map as MapIcon, List, RotateCcw, AlertCircle, Sparkles, Building, Loader2
 } from 'lucide-react';
 
-const PAGE_SIZE = 12;
+export function matchesSearchFilters(p, searchState = {}) {
+  if (!p) return false;
+
+  // 1. Purpose filter (SALE vs RENT)
+  if (searchState.purpose && searchState.purpose !== 'ALL') {
+    const pPurpose = String(p.purpose || 'SALE').toUpperCase();
+    const targetPurpose = String(searchState.purpose).toUpperCase();
+    if (targetPurpose === 'RENT') {
+      const isRental = pPurpose.includes('RENT') || String(p.priceDisplay || '').toLowerCase().includes('month') || String(p.category || '').toLowerCase().includes('rental');
+      if (!isRental) return false;
+    } else if (targetPurpose === 'SALE') {
+      if (pPurpose.includes('RENT') && !pPurpose.includes('SALE')) return false;
+    }
+  }
+
+  // 2. Property Type filter
+  if (searchState.propertyType && searchState.propertyType !== 'ALL') {
+    const pType = String(p.propertyType || p.type || '').toUpperCase();
+    const pCat = String(p.category || p.title || '').toUpperCase();
+    const targetType = String(searchState.propertyType).toUpperCase();
+
+    if (targetType === 'OPEN_PLOT' || targetType === 'PLOT') {
+      const isPlot = pType.includes('PLOT') || pCat.includes('PLOT') || pCat.includes('LAND');
+      if (!isPlot) return false;
+    } else if (targetType === 'HOUSE' || targetType === 'VILLA') {
+      const isHouse = pType.includes('HOUSE') || pType.includes('VILLA') || pCat.includes('HOUSE') || pCat.includes('VILLA') || pCat.includes('HOME');
+      if (!isHouse) return false;
+    } else if (targetType === 'APARTMENT' || targetType === 'FLAT') {
+      const isApt = pType.includes('APARTMENT') || pType.includes('FLAT') || pCat.includes('APARTMENT') || pCat.includes('FLAT');
+      if (!isApt) return false;
+    } else if (targetType === 'COMMERCIAL') {
+      const isComm = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
+      if (!isComm) return false;
+    }
+  }
+
+  // 3. Category string fallback check
+  if (searchState.category && searchState.category !== 'All' && searchState.category !== 'ALL') {
+    const pType = String(p.propertyType || p.type || '').toUpperCase();
+    const pCat = String(p.category || p.title || '').toUpperCase();
+    const catStr = String(searchState.category).toLowerCase();
+
+    if (catStr.includes('plot')) {
+      if (!pType.includes('PLOT') && !pCat.includes('PLOT') && !pCat.includes('LAND')) return false;
+    } else if (catStr.includes('house') || catStr.includes('villa')) {
+      if (!pType.includes('HOUSE') && !pType.includes('VILLA') && !pCat.includes('HOUSE') && !pCat.includes('VILLA')) return false;
+    } else if (catStr.includes('apartment') || catStr.includes('flat')) {
+      if (!pType.includes('APARTMENT') && !pType.includes('FLAT') && !pCat.includes('APARTMENT') && !pCat.includes('FLAT')) return false;
+    } else if (catStr.includes('commercial')) {
+      if (!pType.includes('COMMERCIAL') && !pCat.includes('COMMERCIAL') && !pCat.includes('OFFICE') && !pCat.includes('SHOP')) return false;
+    } else if (catStr.includes('rent')) {
+      if (!pType.includes('RENT') && !pCat.includes('RENT') && !String(p.purpose || '').toUpperCase().includes('RENT')) return false;
+    }
+  }
+
+  // 4. Search Query keyword token check
+  if (searchState.query && searchState.query.trim()) {
+    const q = searchState.query.trim().toLowerCase();
+    if (q !== 'near me') {
+      const title = String(p.title || '').toLowerCase();
+      const desc = String(p.description || '').toLowerCase();
+      const city = String(p.location?.city || p.location?.district || p.location?.state || '').toLowerCase();
+      const locality = String(p.location?.locality || '').toLowerCase();
+      const cat = String(p.category || p.propertyType || '').toLowerCase();
+      const refId = String(p.referenceId || p.propertyId || p.id || '').toLowerCase();
+
+      const blob = `${title} ${desc} ${city} ${locality} ${cat} ${refId}`;
+      const tokens = q.split(/\s+/).filter(Boolean);
+      const matches = tokens.every(token => blob.includes(token));
+      if (!matches) return false;
+    }
+  }
+
+  // 5. Price range
+  if (searchState.minPrice != null && searchState.minPrice !== '') {
+    const price = Number(p.price) || 0;
+    if (price > 0 && price < Number(searchState.minPrice)) return false;
+  }
+  if (searchState.maxPrice != null && searchState.maxPrice !== '') {
+    const price = Number(p.price) || 0;
+    if (price > 0 && price > Number(searchState.maxPrice)) return false;
+  }
+
+  return true;
+}
 
 export default function PropertiesSearchPage({
   onNavigateToProperty = () => { },
@@ -96,7 +180,7 @@ export default function PropertiesSearchPage({
 
       const localData = mockApi.getPublicProperties(stateToUse) || [];
 
-      // 3. Merge PostgreSQL + Firestore + LocalStorage properties
+      // 3. Merge PostgreSQL + Firestore + LocalStorage properties and apply matchesSearchFilters
       const allCandidateProps = [...pgProperties, ...fsProperties, ...localData];
       const liveProperties = allCandidateProps.filter(p => {
         if (!p) return false;
@@ -109,7 +193,8 @@ export default function PropertiesSearchPage({
                        p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
                        (!p.status && !p.listingStatus && p.title);
         const isBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || st === 'CHANGES_REQUIRED';
-        return isLive && !isBlocked;
+        
+        return isLive && !isBlocked && matchesSearchFilters(p, stateToUse);
       });
 
       const combined = deduplicateProperties(liveProperties);
