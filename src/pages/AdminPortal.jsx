@@ -2809,31 +2809,16 @@ export default function AdminPortal({ onNavigate }) {
                       </span>
                     </div>
 
-                    {/* CLEAN LIVE STATUS CARD WITH CHECK LIVE SITE ACTION */}
-                    <div className="p-6 bg-gradient-to-r from-slate-900 to-brand-navy rounded-2xl text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-slate-800">
+                    {/* CLEAN LIVE STATUS CARD (NO DUPLICATE CHECK LIVE SITE BUTTON) */}
+                    <div className="p-6 bg-gradient-to-r from-slate-900 to-brand-navy rounded-2xl text-white flex items-center justify-between gap-6 shadow-md border border-slate-800">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center shadow-inner">
-                          <CheckCircle2 className="w-7 h-7" />
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center shadow-inner shrink-0">
+                          <CheckCircle2 className="w-7 h-7 text-emerald-400" />
                         </div>
                         <div>
-                          <h4 className="font-extrabold text-base text-white">Live Site Sync Status</h4>
-                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are prepared. Click "PUBLISH TO LIVE SITE" in the top bar above to update all user sessions instantly.</p>
+                          <h4 className="font-extrabold text-base text-white">Live Site Sync Engine Active</h4>
+                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are validated and ready. Click "PUBLISH TO LIVE SITE" in the top bar above to broadcast updates instantly across all active user sessions.</p>
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (typeof window !== 'undefined') {
-                              window.open('/', '_blank');
-                            }
-                          }}
-                          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
-                        >
-                          <Globe className="w-4.5 h-4.5 text-slate-950" />
-                          <span>Check Live Site</span>
-                        </button>
                       </div>
                     </div>
                   </div>
