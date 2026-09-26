@@ -137,13 +137,13 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="py-2 px-3 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-brand-yellow"
+          className="py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
         >
-          <option value="All">All Categories</option>
-          <option value="Open Plots">Open Plots</option>
-          <option value="Houses">Houses & Villas</option>
-          <option value="Apartments">Apartments</option>
-          <option value="Commercial">Commercial</option>
+          <option value="All" className="bg-slate-900 text-white">All Categories</option>
+          <option value="Open Plots" className="bg-slate-900 text-white">Open Plots</option>
+          <option value="Houses" className="bg-slate-900 text-white">Houses & Villas</option>
+          <option value="Apartments" className="bg-slate-900 text-white">Apartments</option>
+          <option value="Commercial" className="bg-slate-900 text-white">Commercial</option>
         </select>
 
         <button
@@ -255,13 +255,13 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full py-3.5 px-3 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900"
+                className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
               >
-                <option value="All">All Categories</option>
-                <option value="Open Plots">Open Plots</option>
-                <option value="Houses">Houses & Villas</option>
-                <option value="Apartments">Apartments</option>
-                <option value="Commercial">Commercial</option>
+                <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
+                <option value="Open Plots" className="bg-slate-900 text-white font-bold">Open Plots</option>
+                <option value="Houses" className="bg-slate-900 text-white font-bold">Houses & Villas</option>
+                <option value="Apartments" className="bg-slate-900 text-white font-bold">Apartments</option>
+                <option value="Commercial" className="bg-slate-900 text-white font-bold">Commercial</option>
               </select>
             </div>
 

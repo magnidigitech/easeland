@@ -293,13 +293,13 @@ export default function PropertiesSearchPage({
               <select
                 value={searchState.sortBy || 'newest'}
                 onChange={(e) => handleSortChange(e.target.value)}
-                className="appearance-none bg-gray-800 text-white text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-gray-700 focus:outline-none focus:border-brand-yellow"
+                className="appearance-none bg-slate-900 text-white text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer"
               >
-                <option value="newest">Newest First</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="area_asc">Area: Small to Large</option>
-                <option value="area_desc">Area: Large to Small</option>
+                <option value="newest" className="bg-slate-900 text-white font-bold">Newest First</option>
+                <option value="price_asc" className="bg-slate-900 text-white font-bold">Price: Low to High</option>
+                <option value="price_desc" className="bg-slate-900 text-white font-bold">Price: High to Low</option>
+                <option value="area_asc" className="bg-slate-900 text-white font-bold">Area: Small to Large</option>
+                <option value="area_desc" className="bg-slate-900 text-white font-bold">Area: Large to Small</option>
               </select>
               <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
             </div>
