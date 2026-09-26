@@ -387,14 +387,24 @@ export default function App() {
     else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
-    setFilters(prev => ({
-      ...prev,
+    const newFilters = {
+      ...filters,
       cleared: false,
       ...searchPayload,
-      propertyType: propType !== 'ALL' ? propType : (prev.propertyType || 'ALL'),
-      purpose: purp !== 'ALL' ? purp : (prev.purpose || 'ALL')
-    }));
-    changeActivePage('map');
+      propertyType: propType !== 'ALL' ? propType : (searchPayload?.propertyType || 'ALL'),
+      purpose: purp !== 'ALL' ? purp : (searchPayload?.purpose || 'ALL')
+    };
+
+    setFilters(newFilters);
+
+    try {
+      const searchString = searchStateToUrlParams(newFilters);
+      if (window.location.pathname + window.location.search !== searchString) {
+        window.history.pushState(null, '', searchString);
+      }
+    } catch (e) {}
+
+    setActivePage('map');
   };
 
   const handleCategorySelect = (catTitle) => {
@@ -430,7 +440,15 @@ export default function App() {
     };
 
     setFilters(updatedFilters);
-    changeActivePage('map');
+
+    try {
+      const searchString = searchStateToUrlParams(updatedFilters);
+      if (window.location.pathname + window.location.search !== searchString) {
+        window.history.pushState(null, '', searchString);
+      }
+    } catch (e) {}
+
+    setActivePage('map');
   };
 
   const handleSelectProperty = (prop) => {
@@ -824,6 +842,7 @@ export default function App() {
         {/* PAGE 2: PRIMARY MARKETPLACE SEARCH & MAP DISCOVERY (BLOCK 17) */}
         {(activePage === 'map' || activePage === 'properties') && (
           <PropertiesSearchPage
+            initialFilters={filters}
             onNavigateToProperty={(pId) => changeActivePage('property-detail', pId)}
             onOpenAuthModal={() => {
               setAuthIntent('login');

@@ -102,14 +102,31 @@ export function matchesSearchFilters(p, searchState = {}) {
 }
 
 export default function PropertiesSearchPage({
+  initialFilters = null,
   onNavigateToProperty = () => { },
   onOpenAuthModal = () => { }
 }) {
   const { user: authUser } = useAuth();
   const uid = authUser?.uid || null;
 
-  // 1. Initialize search state from URL query parameters
-  const [searchState, setSearchState] = useState(() => urlParamsToSearchState(window.location.search));
+  // 1. Initialize search state from URL query parameters or initialFilters
+  const [searchState, setSearchState] = useState(() => {
+    const fromUrl = urlParamsToSearchState(window.location.search);
+    if (initialFilters && (initialFilters.propertyType !== 'ALL' || initialFilters.category || initialFilters.query)) {
+      return { ...fromUrl, ...initialFilters };
+    }
+    return fromUrl;
+  });
+
+  // Keep searchState synchronized whenever initialFilters updates
+  useEffect(() => {
+    if (initialFilters) {
+      setSearchState(prev => ({
+        ...prev,
+        ...initialFilters
+      }));
+    }
+  }, [initialFilters]);
 
   // 2. Query Results & Pagination State
   const [properties, setProperties] = useState([]);

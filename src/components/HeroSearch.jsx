@@ -3,10 +3,29 @@ import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2 } from 'l
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 
+function normalizeCategoryValue(val, purpVal) {
+  if (!val || val === 'All' || val === 'ALL') {
+    return purpVal === 'RENT' ? 'Rentals' : 'All';
+  }
+  const lower = String(val).toLowerCase();
+  if (lower.includes('plot')) return 'Open Plots';
+  if (lower.includes('house') || lower.includes('villa')) return 'Houses';
+  if (lower.includes('apartment') || lower.includes('flat')) return 'Apartments';
+  if (lower.includes('commercial')) return 'Commercial';
+  if (lower.includes('rent')) return 'Rentals';
+  if (val === 'OPEN_PLOT' || val === 'OPEN_PLOTS') return 'Open Plots';
+  if (val === 'HOUSE' || val === 'VILLA' || val === 'HOUSES') return 'Houses';
+  if (val === 'APARTMENT' || val === 'FLAT' || val === 'APARTMENTS') return 'Apartments';
+  if (val === 'COMMERCIAL') return 'Commercial';
+  if (val === 'RENTAL') return 'Rentals';
+  return 'All';
+}
+
 export default function HeroSearch({ onSearch, isCompact = false, initialState = null }) {
+
   const [purpose, setPurpose] = useState(initialState?.purpose === 'RENT' ? 'rent' : 'buy');
   const [query, setQuery] = useState(initialState?.query || initialState?.address || '');
-  const [category, setCategory] = useState(initialState?.category || initialState?.propertyType || 'All');
+  const [category, setCategory] = useState(() => normalizeCategoryValue(initialState?.category || initialState?.propertyType, initialState?.purpose));
   const [isLocating, setIsLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
@@ -23,15 +42,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     if (initialState) {
       if (initialState.query !== undefined) setQuery(initialState.query || '');
       if (initialState.purpose !== undefined) setPurpose(initialState.purpose === 'RENT' ? 'rent' : 'buy');
-
-      let catVal = initialState.category || initialState.propertyType || 'All';
-      if (catVal === 'OPEN_PLOT' || catVal === 'OPEN_PLOTS') catVal = 'Open Plots';
-      else if (catVal === 'HOUSE' || catVal === 'VILLA' || catVal === 'HOUSES') catVal = 'Houses';
-      else if (catVal === 'APARTMENT' || catVal === 'FLAT' || catVal === 'APARTMENTS') catVal = 'Apartments';
-      else if (catVal === 'COMMERCIAL') catVal = 'Commercial';
-      else if (catVal === 'RENTAL' || initialState.purpose === 'RENT') catVal = 'Rentals';
-
-      setCategory(catVal);
+      setCategory(normalizeCategoryValue(initialState.category || initialState.propertyType, initialState.purpose));
     }
   }, [initialState]);
 
