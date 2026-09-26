@@ -10,7 +10,7 @@ import { db } from './config.js';
 import { logAdminActivity } from './verificationService.js';
 
 const CMS_MODULE_KEYS = [
-  'overview', 'homepage', 'navbar', 'footer', 'buyPage',
+  'overview', 'homepage', 'featuredListings', 'navbar', 'footer', 'buyPage',
   'rentPage', 'sellPage', 'categories', 'faq', 'contact',
   'branding', 'theme', 'media', 'mapsConfig', 'seo', 'publish'
 ];

@@ -281,13 +281,24 @@ export default function App() {
     // 1. Synchronize state with current URL on mount / reload
     syncStateFromUrl();
 
-    // 2. Handle PopState Browser History Navigation
+    // 2. Disable browser scroll restoration & force scroll to top on mount
+    if (typeof window !== 'undefined') {
+      if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+
+    // 3. Handle PopState Browser History Navigation
     const handlePopState = () => {
       syncStateFromUrl();
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
     };
     window.addEventListener('popstate', handlePopState);
 
-    // 3. Listen for session profile updates
+    // 4. Listen for session profile updates
     const handleProfileUpdated = () => {};
     window.addEventListener('easeland-user-profile-updated', handleProfileUpdated);
 
@@ -296,6 +307,12 @@ export default function App() {
       window.removeEventListener('easeland-user-profile-updated', handleProfileUpdated);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [activePage, activePropertyId]);
 
   useEffect(() => {
     loadProperties();
