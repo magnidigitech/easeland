@@ -98,34 +98,34 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 {activePage === 'admin' ? (
                   <button
                     onClick={() => setActivePage('home')}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border border-emerald-500 flex items-center gap-1.5 transition-all transform hover:scale-105 select-none"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border border-emerald-500 flex items-center gap-1.5 transition-all transform hover:scale-105 select-none whitespace-nowrap"
                     title="Preview consumer live site"
                   >
                     <ShieldCheck className="w-4 h-4 text-emerald-100" />
-                    <span>CHECK LIVE SITE</span>
+                    <span className="whitespace-nowrap">CHECK LIVE SITE</span>
                   </button>
                 ) : (
                   <button
                     onClick={() => setActivePage('admin')}
-                    className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 border border-amber-300 select-none"
+                    className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 border border-amber-300 select-none whitespace-nowrap"
                     title="Return to Admin Site Control Studio"
                   >
                     <ShieldCheck className="w-4 h-4 text-slate-950" />
-                    <span>ADMIN STUDIO</span>
+                    <span className="whitespace-nowrap">ADMIN STUDIO</span>
                   </button>
                 )}
 
                 <button
                   onClick={() => setActivePage('crm')}
-                  className={`font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border flex items-center gap-1.5 transition-all select-none ${
+                  className={`font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border flex items-center gap-1.5 transition-all select-none whitespace-nowrap ${
                     activePage === 'crm'
                       ? 'bg-amber-400 text-slate-950 border-amber-300 ring-2 ring-amber-400/50'
                       : 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
                   }`}
                   title="Open EaseLand CRM Studio"
                 >
-                  <Briefcase className="w-3.5 h-3.5 text-amber-400" />
-                  <span>CRM STUDIO</span>
+                  <Briefcase className={`w-3.5 h-3.5 ${activePage === 'crm' ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <span className="whitespace-nowrap">CRM STUDIO</span>
                 </button>
               </div>
             )}
