@@ -52,9 +52,7 @@ import {
   UserCheck,
   PhoneCall,
   ExternalLink,
-  Sparkles,
-  Star,
-  ChevronDown
+  Sparkles
 } from 'lucide-react';
 import { mockApi, safeArray } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -111,7 +109,7 @@ function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/v
   return (
     <div className="space-y-2">
       {label && <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider">{label}</label>}
-      
+
       <div className="flex flex-col sm:flex-row items-stretch gap-2">
         <div className="relative flex-1">
           <input
@@ -201,7 +199,7 @@ const parseSafeDate = (val) => {
     if (typeof val.toDate === 'function') {
       try {
         return val.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      } catch (e) {}
+      } catch (e) { }
     }
     if (val.seconds) {
       return new Date(val.seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -222,7 +220,7 @@ export default function AdminPortal({ onNavigate }) {
 
   const isAdminAuthenticated = profile?.role === 'ADMIN' || profile?.adminRole === true || localStorage.getItem('easeland_admin_authenticated') === 'true';
 
-  const [activeTab, setActiveTab] = useState('cms'); 
+  const [activeTab, setActiveTab] = useState('cms');
   // 'cms', 'verification', 'workspace', 'users', 'enquiries', 'crm', 'followups', 'reports', 'archive', 'security'
 
   // Admin Profile & Dedicated Security Credentials State
@@ -256,13 +254,6 @@ export default function AdminPortal({ onNavigate }) {
   const [allProperties, setAllProperties] = useState([]);
   const [allPropSearchQuery, setAllPropSearchQuery] = useState('');
   const [allPropStatusFilter, setAllPropStatusFilter] = useState('ALL');
-  const [featuredSearchQuery, setFeaturedSearchQuery] = useState('');
-  const [featuredLocationFilter, setFeaturedLocationFilter] = useState([]);
-  const [featuredPriceFilter, setFeaturedPriceFilter] = useState('ALL');
-  const [featuredCategoryFilter, setFeaturedCategoryFilter] = useState('ALL');
-  const [featuredSortBy, setFeaturedSortBy] = useState('FEATURED_FIRST');
-  const [selectedFeaturedPropertyIds, setSelectedFeaturedPropertyIds] = useState([]);
-  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
@@ -354,7 +345,7 @@ export default function AdminPortal({ onNavigate }) {
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return defaultInitialLogs;
   });
   const [logSearchQuery, setLogSearchQuery] = useState('');
@@ -372,7 +363,7 @@ export default function AdminPortal({ onNavigate }) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('easeland_admin_activity_logs', JSON.stringify(updated.slice(0, 100)));
         }
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
   };
@@ -473,7 +464,7 @@ export default function AdminPortal({ onNavigate }) {
             postgresProps = pgData.properties;
           }
         }
-      } catch (pgErr) {}
+      } catch (pgErr) { }
 
       let localProps = [];
       try {
@@ -488,7 +479,7 @@ export default function AdminPortal({ onNavigate }) {
             }
           });
         }
-      } catch (lErr) {}
+      } catch (lErr) { }
 
       const queueMap = new Map();
       let mockQueueProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : [];
@@ -539,7 +530,7 @@ export default function AdminPortal({ onNavigate }) {
           const rawDeleted = localStorage.getItem('easeland_deleted_properties');
           if (rawDeleted) deletedIds = JSON.parse(rawDeleted).map(String);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const FAKE_DEMO_IDS = ['prop-102', 'prop-104', 'prop-105'];
       allMergedProps = Array.from(queueMap.values()).filter(p => {
@@ -581,7 +572,7 @@ export default function AdminPortal({ onNavigate }) {
     queue = queue.map(p => {
       const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy;
       const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
-      
+
       let matchedUser = users.find(u => {
         if (!u) return false;
         const uUid = String(u.uid || u.id || '').toLowerCase().trim();
@@ -608,7 +599,7 @@ export default function AdminPortal({ onNavigate }) {
               }
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const effectiveUser = matchedUser || localUserProfile;
@@ -727,7 +718,7 @@ export default function AdminPortal({ onNavigate }) {
         const rawDel = localStorage.getItem('easeland_deleted_users');
         if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const cleanUsers = users.filter(u => {
       if (!u) return false;
@@ -858,7 +849,7 @@ export default function AdminPortal({ onNavigate }) {
       const parsedDeleted = JSON.parse(rawDeleted);
       if (!parsedDeleted.includes(pIdStr)) parsedDeleted.push(pIdStr);
       localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
-    } catch (e) {}
+    } catch (e) { }
 
     setAllProperties(prev => prev.filter(p => p && String(p.id || p.propertyId) !== pIdStr));
     setVerificationQueue(prev => prev.filter(p => p && String(p.id || p.propertyId) !== pIdStr));
@@ -866,14 +857,14 @@ export default function AdminPortal({ onNavigate }) {
     try {
       const { deletePropertyListing } = await import('../firebase/propertyService.js');
       await deletePropertyListing(propId, user?.uid, true);
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       const { mockApi } = await import('../services/mockApi.js');
       if (typeof mockApi.deleteProperty === 'function') {
         mockApi.deleteProperty(propId);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: propId } }));
@@ -894,7 +885,7 @@ export default function AdminPortal({ onNavigate }) {
       if (updated) setSiteConfig({ ...updated });
       try {
         await updateSiteModuleAdmin('master_draft', siteConfig, adminUid);
-      } catch (e) {}
+      } catch (e) { }
       logAdminActivity('saved CMS site configuration draft changes.');
       setPublishSuccessMessage('Draft changes saved successfully across all 16 modules!');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
@@ -908,27 +899,6 @@ export default function AdminPortal({ onNavigate }) {
     }
   };
 
-  const handleUpdateFeaturedConfig = async (nextFeaturedObj) => {
-    const updatedSiteConfig = {
-      ...siteConfig,
-      featuredListings: nextFeaturedObj
-    };
-    setSiteConfig(updatedSiteConfig);
-    mockApi.updateSiteConfig(updatedSiteConfig);
-
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('easeland_site_config', JSON.stringify(updatedSiteConfig));
-        window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: updatedSiteConfig }));
-      }
-    } catch (e) {}
-
-    try {
-      const adminUid = user?.uid || 'admin_auditor';
-      await publishSiteConfigAdmin(updatedSiteConfig, adminUid);
-    } catch (e) {}
-  };
-
   const handlePublishSiteConfig = async () => {
     if (adminActionProcessing) return;
     setAdminActionProcessing(true);
@@ -938,7 +908,7 @@ export default function AdminPortal({ onNavigate }) {
       if (updated) setSiteConfig({ ...updated });
       try {
         await publishSiteConfigAdmin(siteConfig, adminUid);
-      } catch (e) {}
+      } catch (e) { }
       logAdminActivity('published site configuration changes live.');
       setPublishSuccessMessage('Website configuration published live! All 16 modules are active immediately on the public site.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
@@ -963,7 +933,7 @@ export default function AdminPortal({ onNavigate }) {
       // 1. Cloud Firestore update
       try {
         await approvePropertyVerification(propId, adminUid, adminName, note);
-      } catch (e1) {}
+      } catch (e1) { }
 
       // 2. Mock API memory store update
       if (typeof mockApi.approvePropertyAdmin === 'function') {
@@ -989,7 +959,7 @@ export default function AdminPortal({ onNavigate }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-      } catch (pgErr) {}
+      } catch (pgErr) { }
 
       // 4. LocalStorage update
       try {
@@ -1012,7 +982,7 @@ export default function AdminPortal({ onNavigate }) {
           });
           localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
         }
-      } catch (lErr) {}
+      } catch (lErr) { }
 
       // 5. Notify window to refresh all user dashboards immediately
       if (typeof window !== 'undefined') {
@@ -1047,7 +1017,7 @@ export default function AdminPortal({ onNavigate }) {
 
       try {
         await rejectPropertyVerification(propId, adminUid, adminName, note);
-      } catch (e1) {}
+      } catch (e1) { }
 
       if (typeof mockApi.rejectPropertyAdmin === 'function') {
         mockApi.rejectPropertyAdmin(propId, note);
@@ -1074,7 +1044,7 @@ export default function AdminPortal({ onNavigate }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-      } catch (pgErr) {}
+      } catch (pgErr) { }
 
       try {
         const targetIdStr = String(propId);
@@ -1105,7 +1075,7 @@ export default function AdminPortal({ onNavigate }) {
             }
           }
         });
-      } catch (lErr) {}
+      } catch (lErr) { }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
@@ -1139,7 +1109,7 @@ export default function AdminPortal({ onNavigate }) {
 
       try {
         await requestVerificationChanges(propId, adminUid, adminName, note);
-      } catch (e1) {}
+      } catch (e1) { }
 
       if (typeof mockApi.requestChangesAdmin === 'function') {
         mockApi.requestChangesAdmin(propId, note);
@@ -1164,7 +1134,7 @@ export default function AdminPortal({ onNavigate }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-      } catch (pgErr) {}
+      } catch (pgErr) { }
 
       try {
         const targetIdStr = String(propId);
@@ -1193,7 +1163,7 @@ export default function AdminPortal({ onNavigate }) {
             }
           }
         });
-      } catch (lErr) {}
+      } catch (lErr) { }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
@@ -1238,7 +1208,7 @@ export default function AdminPortal({ onNavigate }) {
           if (idVal && !parsedDeleted.includes(idVal)) parsedDeleted.push(idVal);
         });
         localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
-      } catch (e) {}
+      } catch (e) { }
 
       // Immediately remove from UI state for 0ms lag
       setVerificationQueue(prev => prev.filter(p => {
@@ -1257,7 +1227,7 @@ export default function AdminPortal({ onNavigate }) {
         if (typeof mockApi.deleteProperty === 'function') {
           mockApi.deleteProperty(propId);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       setPublishSuccessMessage('Property listing deleted successfully.');
       logAdminActivity(`deleted property listing ${propId}.`);
@@ -1322,7 +1292,7 @@ export default function AdminPortal({ onNavigate }) {
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // 2. Fetch confidential documents and verification evidence from Firestore
     try {
@@ -1364,13 +1334,13 @@ export default function AdminPortal({ onNavigate }) {
           };
         });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       if (user?.uid) {
         await startPropertyReview(pId, user.uid, user?.displayName || 'EaseLand Auditor');
       }
-    } catch (err) {}
+    } catch (err) { }
   };
 
   // Auditor Media & Document Editing / Removal Handler
@@ -1449,7 +1419,7 @@ export default function AdminPortal({ onNavigate }) {
               }
             }
           }
-        } catch (e) {}
+        } catch (e) { }
 
         // 4. Update Firestore & PostgreSQL non-blockingly
         try {
@@ -1460,7 +1430,7 @@ export default function AdminPortal({ onNavigate }) {
             photos: (selectedProperty?.photos || []).filter(u => u !== photoUrl),
             updatedAt: serverTimestamp()
           });
-        } catch (fsErr) {}
+        } catch (fsErr) { }
 
         try {
           await fetch(`/api/properties/${pIdStr}`, {
@@ -1470,7 +1440,7 @@ export default function AdminPortal({ onNavigate }) {
               photos: (selectedProperty?.photos || []).filter(u => u !== photoUrl)
             })
           });
-        } catch (pgErr) {}
+        } catch (pgErr) { }
 
         logAdminActivity(`Auditor removed ineligible photo from property ${pIdStr}.`);
       } else if (type === 'video') {
@@ -1539,7 +1509,7 @@ export default function AdminPortal({ onNavigate }) {
             droneVideoUrl: null,
             updatedAt: serverTimestamp()
           });
-        } catch (fsErr) {}
+        } catch (fsErr) { }
 
         logAdminActivity(`Auditor removed ineligible video from property ${pIdStr}.`);
       } else if (type === 'document') {
@@ -1594,7 +1564,7 @@ export default function AdminPortal({ onNavigate }) {
         try {
           const { removeConfidentialPropertyDocument } = await import('../firebase/documentService.js');
           await removeConfidentialPropertyDocument(docId, pIdStr, selectedProperty?.ownerId);
-        } catch (docErr) {}
+        } catch (docErr) { }
 
         logAdminActivity(`Auditor removed ineligible document "${docName}" from property ${pIdStr}.`);
       }
@@ -1613,13 +1583,13 @@ export default function AdminPortal({ onNavigate }) {
     if (!selectedUserForSuspension) return;
     const totalHours = (suspensionDays * 24) + parseInt(suspensionHours || 0);
     const reasonText = suspensionReason === 'Other' ? customReasonText : suspensionReason;
-    
+
     try {
       await suspendUserAccount(selectedUserForSuspension.id || selectedUserForSuspension.uid, user?.uid || 'admin_uid_001', suspensionDays, reasonText);
-    } catch(e) {}
+    } catch (e) { }
     mockApi.suspendUserAdmin(selectedUserForSuspension.id, totalHours, reasonText);
     logAdminActivity(`suspended user ${selectedUserForSuspension?.name || selectedUserForSuspension?.email || 'User'} for ${suspensionDays} days (${reasonText}).`);
-    
+
     setRegisteredUsersList(prev => prev.map(u => {
       if (u.id === selectedUserForSuspension.id || u.email === selectedUserForSuspension.email) {
         return {
@@ -1639,7 +1609,7 @@ export default function AdminPortal({ onNavigate }) {
   const handleUnsuspendUser = async (u) => {
     try {
       await unsuspendUserAccount(u.id || u.uid, user?.uid || 'admin_uid_001');
-    } catch(e) {}
+    } catch (e) { }
     mockApi.unsuspendUserAdmin(u.id);
     logAdminActivity(`unsuspended user ${u.name || u.email || 'User'}.`);
     setRegisteredUsersList(prev => prev.map(usr => {
@@ -1667,7 +1637,7 @@ export default function AdminPortal({ onNavigate }) {
 
     try {
       await removeUserAccount(selectedUserForRemoval.id || selectedUserForRemoval.uid, user?.uid || 'admin_uid_001', removalReason);
-    } catch(e) {}
+    } catch (e) { }
 
     mockApi.removeUserAdmin(selectedUserForRemoval.id, removalReason);
     logAdminActivity(`permanently removed user account ${selectedUserForRemoval?.name || selectedUserForRemoval?.email || 'User'}.`);
@@ -1694,7 +1664,7 @@ export default function AdminPortal({ onNavigate }) {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     setRegisteredUsersList(prev => prev.filter(u => {
       const id1 = String(u.id || u.uid || '').toLowerCase().trim();
@@ -1852,11 +1822,11 @@ export default function AdminPortal({ onNavigate }) {
 
   return (
     <div className="min-h-screen bg-metallic-dark text-slate-100">
-      
+
       {/* ADMIN TOP SUB-HEADER TOOLBAR */}
       <div className="bg-slate-900 text-white border-b border-slate-800 shadow-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          
+
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md border border-amber-300">
               <ShieldCheck className="w-5 h-5 text-slate-950" />
@@ -1914,10 +1884,10 @@ export default function AdminPortal({ onNavigate }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
+
           {/* SIDEBAR NAVIGATION */}
           <div className="lg:col-span-3 space-y-4">
-            
+
             {/* SECTION A: MASTER SITE CMS STUDIO (16 MODULES) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3 space-y-1">
               <div className="px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest text-brand-yellow bg-brand-charcoal rounded-xl mb-2 flex items-center justify-between">
@@ -1927,11 +1897,10 @@ export default function AdminPortal({ onNavigate }) {
 
               <button
                 onClick={() => setActiveTab('cms')}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'cms'
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'cms'
                     ? 'bg-brand-yellow text-brand-charcoal shadow-md'
                     : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2.5">
                   <Sliders className="w-4 h-4 text-brand-charcoal" />
@@ -1949,7 +1918,6 @@ export default function AdminPortal({ onNavigate }) {
 
               {[
                 { id: 'all-properties', label: `All Properties (${allProperties.length})`, icon: Building2, badge: 0 },
-                { id: 'verified-listings', label: `Verified Listings Control`, icon: Star, badge: safeArray(siteConfig.featuredListings?.featuredPropertyIds).length },
                 { id: 'verification', label: `Verification Queue (${verificationQueue.length})`, icon: Clock, badge: verificationQueue.length },
                 { id: 'workspace', label: 'Verification Workspace', icon: ShieldCheck },
                 { id: 'users', label: 'User Governance', icon: Users },
@@ -1965,11 +1933,10 @@ export default function AdminPortal({ onNavigate }) {
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all ${
-                      activeTab === item.id
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all ${activeTab === item.id
                         ? 'bg-brand-charcoal text-white shadow-md'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <IconComponent className={`w-4 h-4 ${activeTab === item.id ? 'text-brand-yellow' : 'text-gray-500'}`} />
@@ -1991,7 +1958,7 @@ export default function AdminPortal({ onNavigate }) {
             {/* TAB: SITE MANAGEMENT CMS STUDIO (ALL 16 MODULES) */}
             {activeTab === 'cms' && (
               <div className="space-y-6">
-                
+
                 {/* 16 MODULE SELECTION PILLS GRID */}
                 <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
                   <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
@@ -2009,11 +1976,10 @@ export default function AdminPortal({ onNavigate }) {
                         <button
                           key={mod.id}
                           onClick={() => setCmsTab(mod.id)}
-                          className={`p-2.5 rounded-xl text-left border text-[11px] font-extrabold transition-all flex flex-col justify-between h-16 ${
-                            cmsTab === mod.id
+                          className={`p-2.5 rounded-xl text-left border text-[11px] font-extrabold transition-all flex flex-col justify-between h-16 ${cmsTab === mod.id
                               ? 'bg-brand-charcoal text-white border-brand-charcoal shadow-md ring-2 ring-brand-yellow'
                               : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           <IconComp className={`w-4 h-4 ${cmsTab === mod.id ? 'text-brand-yellow' : 'text-gray-500'}`} />
                           <span className="line-clamp-1">{mod.label}</span>
@@ -2065,11 +2031,10 @@ export default function AdminPortal({ onNavigate }) {
                       </div>
                       <button
                         onClick={() => setSiteConfig(prev => ({ ...prev, overview: { ...prev.overview, emergencyMaintenance: !prev.overview?.emergencyMaintenance } }))}
-                        className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                          siteConfig.overview?.emergencyMaintenance
+                        className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${siteConfig.overview?.emergencyMaintenance
                             ? 'bg-red-600 text-white shadow'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
+                          }`}
                       >
                         {siteConfig.overview?.emergencyMaintenance ? 'MAINTENANCE ACTIVE' : 'SYSTEM NORMAL'}
                       </button>
@@ -2135,13 +2100,6 @@ export default function AdminPortal({ onNavigate }) {
                     </div>
                   </div>
                 )}
-
-
-
-
-
-
-
 
                 {/* MODULE 3: NAVBAR */}
                 {cmsTab === 'navbar' && (
@@ -2843,7 +2801,7 @@ export default function AdminPortal({ onNavigate }) {
                     <div className="border-b border-gray-100 pb-4 flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-black text-brand-charcoal">16. Preview & Publish Live</h3>
-                        <p className="text-xs text-gray-500 font-medium">Inspect configuration snapshot and publish instantly to the live marketplace.</p>
+                        <p className="text-xs text-gray-500 font-medium">Publish configuration updates instantly to all live marketplace sessions.</p>
                       </div>
                       <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold text-xs px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2851,104 +2809,46 @@ export default function AdminPortal({ onNavigate }) {
                       </span>
                     </div>
 
-                    {/* EXECUTIVE VISUAL SNAPSHOT CARDS GRID (ZERO RAW CODE) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {/* CARD 1: BRANDING & THEMING */}
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Branding & Logo</span>
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        </div>
-                        <h4 className="font-extrabold text-sm text-brand-charcoal">
-                          {siteConfig.overview?.siteName || siteConfig.branding?.platformName || 'EaseLand'}
-                        </h4>
-                        <div className="text-xs font-semibold text-gray-600 space-y-1">
-                          <div>Tagline: <strong className="text-gray-900">{siteConfig.branding?.brandTagline || siteConfig.branding?.tagline || 'Direct Property Platform'}</strong></div>
-                          <div>Theme Accent: <strong className="text-brand-blue">{siteConfig.theme?.primaryColor || '#F4C542'}</strong></div>
-                        </div>
-                      </div>
-
-                      {/* CARD 2: HERO COVER & NAVIGATION */}
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Hero Banner & CTA</span>
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        </div>
-                        <h4 className="font-extrabold text-sm text-brand-charcoal line-clamp-1">
-                          {(siteConfig.homepage?.heroTitlePrefix || '') + (siteConfig.homepage?.heroTitleHighlight || '') || 'Direct Property Discovery'}
-                        </h4>
-                        <div className="text-xs font-semibold text-gray-600 space-y-1">
-                          <div>Primary CTA: <strong className="text-gray-900">{siteConfig.navbar?.postButtonLabel || 'POST PROPERTY'}</strong></div>
-                          <div>Badge Text: <strong className="text-emerald-600 font-extrabold">{siteConfig.homepage?.heroTagline || siteConfig.buyPage?.badgeText || '100% DIRECT OWNER'}</strong></div>
-                        </div>
-                      </div>
-
-                      {/* CARD 3: MAPS CONFIGURATION */}
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Map Engine & Zoom</span>
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        </div>
-                        <h4 className="font-extrabold text-sm text-brand-charcoal">
-                          Google & Leaflet Layers
-                        </h4>
-                        <div className="text-xs font-semibold text-gray-600 space-y-1">
-                          <div>Default Center: <strong className="text-gray-900">{siteConfig.mapsConfig?.defaultLat || 16.3124}, {siteConfig.mapsConfig?.defaultLng || 80.4285}</strong></div>
-                          <div>Zoom Range: <strong className="text-brand-yellow font-black">Level 1 - 22 (Max Ultra-Close)</strong></div>
-                        </div>
-                      </div>
-
-                      {/* CARD 4: AUDIT & SUPPORT */}
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Security & Contact</span>
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        </div>
-                        <h4 className="font-extrabold text-sm text-brand-charcoal">
-                          Encrypted Vault Active
-                        </h4>
-                        <div className="text-xs font-semibold text-gray-600 space-y-1">
-                          <div>Support Hotline: <strong className="text-gray-900">{siteConfig.footer?.supportPhone || '+91 98765 43210'}</strong></div>
-                          <div>Support Email: <strong className="text-brand-blue">{siteConfig.footer?.supportEmail || 'support@easeland.in'}</strong></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SYSTEM PUBLISHING STATUS BANNER */}
-                    <div className="bg-brand-charcoal text-white p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-brand-yellow text-brand-charcoal font-black flex items-center justify-center text-sm shadow">
-                          <ShieldCheck className="w-6 h-6" />
+                    {/* MINIMAL CLEAN LIVE STATUS CONTAINER */}
+                    <div className="p-6 bg-gradient-to-r from-slate-900 to-brand-navy rounded-2xl text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-slate-800">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center shadow-inner">
+                          <CheckCircle2 className="w-7 h-7" />
                         </div>
                         <div>
-                          <span className="font-extrabold text-xs text-brand-yellow block uppercase tracking-wider">Instant Re-hydration Engine</span>
-                          <span className="text-xs text-gray-300 font-medium">All 16 CMS modules will broadcast live across all user sessions instantly with 0ms downtime.</span>
+                          <h4 className="font-extrabold text-base text-white">Live Site Sync Status</h4>
+                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are prepared. Publishing will update all live user sessions immediately.</p>
                         </div>
                       </div>
-                    </div>
 
-                    {/* PUBLISH BUTTON */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
-                      <div>
-                        <span className="block text-xs font-extrabold text-brand-charcoal">Ready to Push Changes Live or Restore Defaults?</span>
-                        <span className="block text-[11px] text-gray-500 font-medium">Publish live updates or restore all 16 CMS modules to factory default settings.</span>
-                      </div>
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                      <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== 'undefined') {
+                              window.open('/', '_blank');
+                            }
+                          }}
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-2 transition-all cursor-pointer"
+                        >
+                          <Globe className="w-4 h-4 text-emerald-400" />
+                          <span>Check Live Site</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setIsResetModalOpen(true)}
-                          className="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 font-extrabold text-xs px-4 py-3 rounded-xl shadow-sm flex items-center gap-2 transition-all"
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-2 transition-all cursor-pointer"
                         >
-                          <RotateCcw className="w-4 h-4 text-gray-600" />
-                          <span>Reset to Default</span>
+                          <RotateCcw className="w-4 h-4 text-slate-400" />
+                          <span>Reset Defaults</span>
                         </button>
                         <button
                           type="button"
                           onClick={handlePublishSiteConfig}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm px-7 py-3.5 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105"
+                          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105"
                         >
-                          <CheckCircle2 className="w-5 h-5 text-emerald-100" />
-                          PUBLISH CHANGES LIVE
+                          <CheckCircle2 className="w-4.5 h-4.5 text-slate-950" />
+                          PUBLISH LIVE NOW
                         </button>
                       </div>
                     </div>
@@ -3006,498 +2906,6 @@ export default function AdminPortal({ onNavigate }) {
 
               </div>
             )}
-
-            {/* TAB: VERIFIED & FEATURED LISTINGS CONTROL */}
-            {activeTab === 'verified-listings' && (() => {
-              const parsePriceInLakhs = (raw) => {
-                if (raw === null || raw === undefined) return 0;
-                if (typeof raw === 'number') {
-                  return raw > 10000 ? raw / 100000 : raw;
-                }
-                const str = String(raw).trim();
-                if (!str) return 0;
-
-                if (/crore/i.test(str)) {
-                  const match = str.match(/([0-9,.]+)/);
-                  if (match) return (parseFloat(match[1].replace(/,/g, '')) || 0) * 100;
-                }
-                if (/lakh/i.test(str)) {
-                  const match = str.match(/([0-9,.]+)/);
-                  if (match) return parseFloat(match[1].replace(/,/g, '')) || 0;
-                }
-                const cleanDigits = str.replace(/[^0-9.]/g, '');
-                const val = parseFloat(cleanDigits) || 0;
-                if (val > 10000) return val / 100000;
-                return val;
-              };
-
-              const availableLocations = Array.from(new Set(
-                safeArray(allProperties).map(p => p.location?.city || p.city || p.location?.locality || p.locality || 'Guntur').filter(Boolean)
-              ));
-
-              const filteredProps = safeArray(allProperties).filter(p => {
-                if (!p) return false;
-                
-                if (featuredSearchQuery.trim()) {
-                  const q = featuredSearchQuery.toLowerCase().trim();
-                  const title = (p.title || '').toLowerCase();
-                  const city = (p.location?.city || p.city || '').toLowerCase();
-                  const locality = (p.location?.locality || p.locality || '').toLowerCase();
-                  const pId = String(p.id || p.propertyId || '').toLowerCase();
-                  const ownerName = (p.owner?.name || p.ownerPublicName || '').toLowerCase();
-                  if (!title.includes(q) && !city.includes(q) && !locality.includes(q) && !pId.includes(q) && !ownerName.includes(q)) {
-                    return false;
-                  }
-                }
-
-                if (featuredLocationFilter.length > 0) {
-                  const pLoc = (p.location?.city || p.city || p.location?.locality || p.locality || '').toLowerCase();
-                  if (!featuredLocationFilter.some(loc => pLoc.includes(loc.toLowerCase()))) {
-                    return false;
-                  }
-                }
-
-                if (featuredCategoryFilter !== 'ALL') {
-                  const targetCat = featuredCategoryFilter.toLowerCase();
-                  const pCat = String(p.category || p.propertyType || '').toLowerCase();
-                  
-                  if (targetCat.includes('plot') || targetCat.includes('land')) {
-                    if (!pCat.includes('plot') && !pCat.includes('land')) return false;
-                  } else if (targetCat.includes('house') || targetCat.includes('villa')) {
-                    if (!pCat.includes('house') && !pCat.includes('villa') && !pCat.includes('home')) return false;
-                  } else if (targetCat.includes('apartment') || targetCat.includes('flat')) {
-                    if (!pCat.includes('apartment') && !pCat.includes('flat')) return false;
-                  } else if (targetCat.includes('commercial')) {
-                    if (!pCat.includes('commercial') && !pCat.includes('office') && !pCat.includes('shop')) return false;
-                  } else {
-                    if (pCat !== targetCat) return false;
-                  }
-                }
-
-                if (featuredPriceFilter !== 'ALL') {
-                  const numPriceLakhs = parsePriceInLakhs(p.price || p.priceDisplay);
-                  if (featuredPriceFilter === 'UNDER_30L' && numPriceLakhs >= 30) return false;
-                  if (featuredPriceFilter === '30L_75L' && (numPriceLakhs < 30 || numPriceLakhs > 75)) return false;
-                  if (featuredPriceFilter === 'ABOVE_75L' && numPriceLakhs <= 75) return false;
-                }
-
-                return true;
-              });
-
-              filteredProps.sort((a, b) => {
-                if (featuredSortBy === 'LOCATION_ASC') {
-                  const locA = (a.location?.city || a.city || a.location?.locality || a.locality || '').toLowerCase();
-                  const locB = (b.location?.city || b.city || b.location?.locality || b.locality || '').toLowerCase();
-                  return locA.localeCompare(locB);
-                }
-                if (featuredSortBy === 'PRICE_ASC') {
-                  return parsePriceInLakhs(a.price || a.priceDisplay) - parsePriceInLakhs(b.price || b.priceDisplay);
-                }
-                if (featuredSortBy === 'PRICE_DESC') {
-                  return parsePriceInLakhs(b.price || b.priceDisplay) - parsePriceInLakhs(a.price || a.priceDisplay);
-                }
-                const currentFeaturedIds = safeArray(siteConfig.featuredListings?.featuredPropertyIds).map(String);
-                const isA = currentFeaturedIds.includes(String(a.id || a.propertyId));
-                const isB = currentFeaturedIds.includes(String(b.id || b.propertyId));
-                if (isA && !isB) return -1;
-                if (!isA && isB) return 1;
-                return 0;
-              });
-
-              const currentFeaturedIds = safeArray(siteConfig.featuredListings?.featuredPropertyIds).map(String);
-
-              return (
-                <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                  <div className="border-b border-gray-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
-                        <h3 className="text-xl font-black text-brand-charcoal">Verified & Featured Properties Control</h3>
-                      </div>
-                      <p className="text-xs text-gray-500 font-medium mt-1">
-                        Organize verified properties by location and price, feature properties on the Home Page, and set display counts.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-xl">
-                      <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="text-xs font-bold text-emerald-800">
-                        {currentFeaturedIds.length} Featured Properties Active
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Section Badge Text</label>
-                      <input
-                        type="text"
-                        value={siteConfig.featuredListings?.badgeText || 'VERIFIED LISTINGS'}
-                        onChange={(e) => handleUpdateFeaturedConfig({
-                          ...siteConfig.featuredListings,
-                          badgeText: e.target.value
-                        })}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                        placeholder="VERIFIED LISTINGS"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Section Heading Title</label>
-                      <input
-                        type="text"
-                        value={siteConfig.featuredListings?.sectionTitle || 'Featured & Recent Verified Properties'}
-                        onChange={(e) => handleUpdateFeaturedConfig({
-                          ...siteConfig.featuredListings,
-                          sectionTitle: e.target.value
-                        })}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                        placeholder="Featured & Recent Verified Properties"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Home Page Display Count</label>
-                      <select
-                        value={siteConfig.featuredListings?.displayCount || 3}
-                        onChange={(e) => handleUpdateFeaturedConfig({
-                          ...siteConfig.featuredListings,
-                          displayCount: Number(e.target.value)
-                        })}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                      >
-                        <option value={1}>1 Property</option>
-                        <option value={2}>2 Properties</option>
-                        <option value={3}>3 Properties (Default 3-Grid)</option>
-                        <option value={4}>4 Properties</option>
-                        <option value={5}>5 Properties</option>
-                        <option value={6}>6 Properties (2 Rows)</option>
-                        <option value={8}>8 Properties</option>
-                        <option value={9}>9 Properties (3 Rows)</option>
-                        <option value={12}>12 Properties</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-amber-50/70 rounded-2xl border border-amber-200 gap-3">
-                    <div>
-                      <span className="block text-xs font-black text-amber-900">Featured Display Strategy</span>
-                      <span className="block text-[11px] text-amber-700 font-medium">Choose whether to show recent verified properties when featured count is below the display limit.</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateFeaturedConfig({
-                          ...siteConfig.featuredListings,
-                          showOnlyFeatured: false
-                        })}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                          !siteConfig.featuredListings?.showOnlyFeatured
-                            ? 'bg-brand-charcoal text-brand-yellow shadow-md'
-                            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        Featured + Recent Verified
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateFeaturedConfig({
-                          ...siteConfig.featuredListings,
-                          showOnlyFeatured: true
-                        })}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                          siteConfig.featuredListings?.showOnlyFeatured
-                            ? 'bg-amber-600 text-white shadow-md'
-                            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        Show Only Featured
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 bg-gray-50/80 p-4 rounded-2xl border border-gray-200">
-                    <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-                      <span className="text-xs font-black text-brand-charcoal uppercase tracking-wider flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-brand-yellow" />
-                        Organize & Filter Verified Properties
-                      </span>
-                      <span className="text-[11px] font-extrabold text-gray-500">
-                        Showing {filteredProps.length} of {allProperties.length} Properties
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      <div className="relative">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Search Keywords</label>
-                        <div className="relative">
-                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="text"
-                            placeholder="Search title, ID, owner..."
-                            value={featuredSearchQuery}
-                            onChange={(e) => setFeaturedSearchQuery(e.target.value)}
-                            className="w-full pl-8 pr-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="relative">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Location Dropdown Filter</label>
-                        <button
-                          type="button"
-                          onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold flex items-center justify-between gap-1 shadow-sm text-gray-800 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-1.5 truncate">
-                            <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span className="truncate">
-                              {featuredLocationFilter.length === 0
-                                ? 'All Locations'
-                                : `${featuredLocationFilter.length} Location${featuredLocationFilter.length > 1 ? 's' : ''}`}
-                            </span>
-                          </div>
-                          <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                        </button>
-
-                        {isLocationDropdownOpen && (
-                          <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-30 p-3 space-y-2 max-h-60 overflow-y-auto">
-                            <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-                              <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Locations ({availableLocations.length})</span>
-                              <button
-                                type="button"
-                                onClick={() => setFeaturedLocationFilter([])}
-                                className="text-[10px] font-extrabold text-amber-600 hover:underline"
-                              >
-                                Reset
-                              </button>
-                            </div>
-
-                            {availableLocations.length === 0 ? (
-                              <div className="text-xs text-gray-400 py-2 text-center">No locations found</div>
-                            ) : (
-                              availableLocations.map((loc) => {
-                                const isChecked = featuredLocationFilter.includes(loc);
-                                return (
-                                  <label
-                                    key={loc}
-                                    className="flex items-center gap-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 p-1.5 rounded-lg cursor-pointer select-none"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {
-                                        setFeaturedLocationFilter(prev =>
-                                          isChecked ? prev.filter(l => l !== loc) : [...prev, loc]
-                                        );
-                                      }}
-                                      className="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-400"
-                                    />
-                                    <span className="truncate">{loc}</span>
-                                  </label>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Property Category</label>
-                        <select
-                          value={featuredCategoryFilter}
-                          onChange={(e) => setFeaturedCategoryFilter(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                        >
-                          <option value="ALL">All Categories</option>
-                          <option value="Open Plots">Open Plots & Lands</option>
-                          <option value="Houses & Villas">Houses & Villas</option>
-                          <option value="Apartments">Apartments & Flats</option>
-                          <option value="Commercial">Commercial Properties</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Price Range Filter</label>
-                        <select
-                          value={featuredPriceFilter}
-                          onChange={(e) => setFeaturedPriceFilter(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                        >
-                          <option value="ALL">All Price Ranges</option>
-                          <option value="UNDER_30L">Under 30 Lakhs</option>
-                          <option value="30L_75L">30 Lakhs - 75 Lakhs</option>
-                          <option value="ABOVE_75L">Above 75 Lakhs</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Organize & Sort By</label>
-                        <select
-                          value={featuredSortBy}
-                          onChange={(e) => setFeaturedSortBy(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                        >
-                          <option value="FEATURED_FIRST">Featured First + Newest</option>
-                          <option value="LOCATION_ASC">Location (A-Z)</option>
-                          <option value="PRICE_ASC">Price (Low to High)</option>
-                          <option value="PRICE_DESC">Price (High to Low)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="bg-brand-charcoal text-white rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={filteredProps.length > 0 && filteredProps.every(p => selectedFeaturedPropertyIds.includes(String(p.id || p.propertyId)))}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                const allFilteredIds = filteredProps.map(p => String(p.id || p.propertyId));
-                                setSelectedFeaturedPropertyIds(Array.from(new Set([...selectedFeaturedPropertyIds, ...allFilteredIds])));
-                              } else {
-                                const filteredIdsSet = new Set(filteredProps.map(p => String(p.id || p.propertyId)));
-                                setSelectedFeaturedPropertyIds(prev => prev.filter(id => !filteredIdsSet.has(id)));
-                              }
-                            }}
-                            className="w-4 h-4 text-brand-yellow rounded border-gray-600 focus:ring-brand-yellow"
-                          />
-                          <span className="text-xs font-bold">Select All Filtered ({filteredProps.length})</span>
-                        </label>
-                        {selectedFeaturedPropertyIds.length > 0 && (
-                          <span className="bg-brand-yellow text-brand-charcoal text-[11px] font-black px-2.5 py-0.5 rounded-full">
-                            {selectedFeaturedPropertyIds.length} Selected
-                          </span>
-                        )}
-                      </div>
-
-                      {selectedFeaturedPropertyIds.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newSet = new Set([...currentFeaturedIds, ...selectedFeaturedPropertyIds]);
-                              handleUpdateFeaturedConfig({
-                                ...siteConfig.featuredListings,
-                                featuredPropertyIds: Array.from(newSet)
-                              });
-                              setSelectedFeaturedPropertyIds([]);
-                            }}
-                            className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow transition-all flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-white" />
-                            Feature Selected ({selectedFeaturedPropertyIds.length})
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const filteredOut = currentFeaturedIds.filter(id => !selectedFeaturedPropertyIds.includes(id));
-                              handleUpdateFeaturedConfig({
-                                ...siteConfig.featuredListings,
-                                featuredPropertyIds: filteredOut
-                              });
-                              setSelectedFeaturedPropertyIds([]);
-                            }}
-                            className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-1.5 rounded-xl border border-gray-700 transition-all cursor-pointer"
-                          >
-                            Unfeature Selected
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredProps.map((prop) => {
-                      const pId = String(prop.id || prop.propertyId);
-                      const isFeatured = currentFeaturedIds.includes(pId);
-                      const featuredIndex = currentFeaturedIds.indexOf(pId);
-                      const isChecked = selectedFeaturedPropertyIds.includes(pId);
-
-                      return (
-                        <div
-                          key={pId}
-                          className={`rounded-2xl border p-4 transition-all relative flex flex-col justify-between ${
-                            isFeatured
-                              ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-400/40 shadow-md'
-                              : 'bg-white border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="space-y-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    setSelectedFeaturedPropertyIds(prev =>
-                                      isChecked ? prev.filter(id => id !== pId) : [...prev, pId]
-                                    );
-                                  }}
-                                  className="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-400 cursor-pointer"
-                                />
-                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                                  ID: {pId}
-                                </span>
-                              </div>
-                              {isFeatured ? (
-                                <span className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
-                                  <Star className="w-3 h-3 fill-white" />
-                                  Featured #{featuredIndex + 1}
-                                </span>
-                              ) : (
-                                <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                  Verified Only
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={prop.images?.[0] || prop.imageUrl || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=400&q=80'}
-                                alt={prop.title}
-                                className="w-16 h-16 rounded-xl object-cover border border-gray-200 shrink-0"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs font-black text-brand-charcoal truncate">{prop.title}</h4>
-                                <div className="flex items-center gap-1 text-[11px] text-gray-500 font-medium mt-0.5">
-                                  <MapPin className="w-3 h-3 text-amber-500 shrink-0" />
-                                  <span className="truncate">{prop.location?.locality || prop.locality || prop.location?.city || prop.city || 'Guntur'}</span>
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  <span className="text-xs font-black text-emerald-600">
-                                    {prop.price || prop.priceDisplay || 'Contact for Price'}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-gray-400">
-                                    {prop.category || 'Property'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleFeaturedProperty(pId)}
-                              className={`w-full py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                                isFeatured
-                                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300'
-                                  : 'bg-brand-charcoal hover:bg-brand-charcoalLight text-white shadow-md'
-                              }`}
-                            >
-                              <Sparkles className={`w-3.5 h-3.5 ${isFeatured ? 'text-white' : 'text-brand-yellow'}`} />
-                              <span>{isFeatured ? '★ Featured on Homepage (Click to Remove)' : '☆ Feature on Homepage'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* TAB: ALL PROPERTIES MASTER DIRECTORY */}
             {activeTab === 'all-properties' && (
@@ -3584,10 +2992,10 @@ export default function AdminPortal({ onNavigate }) {
                       const isAdminPoster = ownerEmail.includes('admin') || ownerName.toLowerCase().includes('admin');
 
                       const priceVal = Number(prop.price) || 0;
-                      const priceLabel = prop.priceDisplay || (priceVal >= 10000000 
-                        ? `Rs. ${(priceVal / 10000000).toFixed(2)} Cr` 
-                        : priceVal >= 100000 
-                          ? `Rs. ${(priceVal / 100000).toFixed(2)} Lakhs` 
+                      const priceLabel = prop.priceDisplay || (priceVal >= 10000000
+                        ? `Rs. ${(priceVal / 10000000).toFixed(2)} Cr`
+                        : priceVal >= 100000
+                          ? `Rs. ${(priceVal / 100000).toFixed(2)} Lakhs`
                           : `Rs. ${priceVal.toLocaleString()}`);
 
                       const submittedDate = parseSafeDate(prop.submittedDate || prop.createdAt || prop.verifiedDate || prop.updatedAt);
@@ -3638,13 +3046,12 @@ export default function AdminPortal({ onNavigate }) {
 
                           {/* STATUS & ACTION */}
                           <div className="col-span-2 text-right flex flex-col items-end gap-1.5">
-                            <span className={`font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                              isLive ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                              isPending ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                              isChanges ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                              isRejected ? 'bg-red-100 text-red-800 border border-red-300' :
-                              'bg-gray-100 text-gray-700 border border-gray-300'
-                            }`}>
+                            <span className={`font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider ${isLive ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                isPending ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                                  isChanges ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                                    isRejected ? 'bg-red-100 text-red-800 border border-red-300' :
+                                      'bg-gray-100 text-gray-700 border border-gray-300'
+                              }`}>
                               {isLive ? 'PLATFORM VERIFIED' : isPending ? 'PENDING AUDIT' : isChanges ? 'CHANGES REQD' : isRejected ? 'REJECTED' : 'DRAFT'}
                             </span>
 
@@ -3732,11 +3139,10 @@ export default function AdminPortal({ onNavigate }) {
 
                         {/* SEPARATE COLUMN: OWNER CONTACT */}
                         <div className="col-span-2">
-                          <span className={`font-extrabold text-[11px] block line-clamp-1 ${
-                            prop.owner?.phone && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
+                          <span className={`font-extrabold text-[11px] block line-clamp-1 ${prop.owner?.phone && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
                               ? 'text-slate-900'
                               : 'text-amber-700 font-semibold'
-                          }`}>
+                            }`}>
                             {prop.owner?.phone && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
                               ? prop.owner.phone
                               : 'Number Not Updated'}
@@ -3847,8 +3253,8 @@ export default function AdminPortal({ onNavigate }) {
                     const priceStr = typeof activeAuditProp.priceDisplay === 'string' && activeAuditProp.priceDisplay
                       ? activeAuditProp.priceDisplay
                       : (activeAuditProp.price && !isNaN(Number(activeAuditProp.price))
-                          ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}`
-                          : 'Price on Request');
+                        ? `Rs. ${Number(activeAuditProp.price).toLocaleString('en-IN')}`
+                        : 'Price on Request');
 
                     const ownerNameRaw = activeAuditProp.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(String(activeAuditProp.owner.name).trim())
                       ? activeAuditProp.owner.name
@@ -3883,7 +3289,7 @@ export default function AdminPortal({ onNavigate }) {
 
                     return (
                       <div className="bg-white rounded-2xl p-6 border border-slate-300 shadow-lg space-y-6 text-slate-900">
-                        
+
                         {/* HEADER BAR */}
                         <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
                           <div>
@@ -3925,7 +3331,7 @@ export default function AdminPortal({ onNavigate }) {
 
                         {/* 2-COLUMN DATA CARDS */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          
+
                           {/* OWNER & CONTACT INFORMATION CARD */}
                           <div className="space-y-3">
                             <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
@@ -3996,8 +3402,8 @@ export default function AdminPortal({ onNavigate }) {
                           const amenitiesList = Array.isArray(activeAuditProp.amenities)
                             ? activeAuditProp.amenities.map(a => typeof a === 'string' ? a : (a?.name || a?.label || String(a || ''))).filter(Boolean)
                             : (typeof activeAuditProp.amenities === 'string'
-                                ? activeAuditProp.amenities.split(',').map(s => s.trim()).filter(Boolean)
-                                : []);
+                              ? activeAuditProp.amenities.split(',').map(s => s.trim()).filter(Boolean)
+                              : []);
 
                           if (!descVal && amenitiesList.length === 0) return null;
 
@@ -4039,7 +3445,7 @@ export default function AdminPortal({ onNavigate }) {
                                 extraDocs = parsedDocs.filter(d => (d && (d.propertyId === propId || !d.propertyId)));
                               }
                             }
-                          } catch (e) {}
+                          } catch (e) { }
 
                           let extraMedia = [];
                           try {
@@ -4050,7 +3456,7 @@ export default function AdminPortal({ onNavigate }) {
                                 extraMedia = parsedMedia.filter(m => (m && (m.propertyId === propId || !m.propertyId)));
                               }
                             }
-                          } catch (e) {}
+                          } catch (e) { }
 
                           const rawItems = [
                             ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
@@ -4234,7 +3640,7 @@ export default function AdminPortal({ onNavigate }) {
 
                           return (
                             <div className="space-y-6">
-                              
+
                               {/* SUBMITTED MEDIA PHOTO GALLERY */}
                               <div className="space-y-3 pt-4 border-t border-slate-200">
                                 <div className="flex items-center justify-between">
@@ -4268,7 +3674,7 @@ export default function AdminPortal({ onNavigate }) {
                                             }
                                           }}
                                         />
-                                        
+
                                         {/* Status / Policy Badge */}
                                         <span className="absolute top-1.5 left-1.5 z-10 bg-emerald-700/90 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none">
                                           Eligible
@@ -4555,7 +3961,7 @@ export default function AdminPortal({ onNavigate }) {
             {/* TAB: USER GOVERNANCE & TEMPORARY SUSPENSION */}
             {activeTab === 'users' && (
               <div className="space-y-6">
-                
+
                 {/* METRICS HEADER */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
@@ -4637,11 +4043,10 @@ export default function AdminPortal({ onNavigate }) {
                       <button
                         key={st}
                         onClick={() => setUserStatusFilter(st)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
-                          userStatusFilter === st
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${userStatusFilter === st
                             ? 'bg-brand-charcoal text-white shadow'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                          }`}
                       >
                         {st}
                       </button>
@@ -4672,9 +4077,9 @@ export default function AdminPortal({ onNavigate }) {
                             if (userSearchQuery) {
                               const q = userSearchQuery.toLowerCase();
                               return (u.name || '').toLowerCase().includes(q) ||
-                                     (u.email || '').toLowerCase().includes(q) ||
-                                     (u.phone || '').includes(q) ||
-                                     (u.uid || '').toLowerCase().includes(q);
+                                (u.email || '').toLowerCase().includes(q) ||
+                                (u.phone || '').includes(q) ||
+                                (u.uid || '').toLowerCase().includes(q);
                             }
                             return true;
                           })
@@ -4712,23 +4117,21 @@ export default function AdminPortal({ onNavigate }) {
                               </td>
 
                               <td className="py-3 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${
-                                  u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
                                     ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                     : 'bg-slate-100 text-slate-700 border border-slate-200'
-                                }`}>
+                                  }`}>
                                   {u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password')}
                                 </span>
                               </td>
 
                               <td className="py-3 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${
-                                  u.role === 'ADMIN' || u.email === 'admin@easeland.in'
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${u.role === 'ADMIN' || u.email === 'admin@easeland.in'
                                     ? 'bg-purple-100 text-purple-900 border border-purple-200'
                                     : u.role?.includes('VERIFIED') || u.postedListingsCount > 0
-                                    ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}>
+                                      ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}>
                                   {u.role === 'ADMIN' || u.email === 'admin@easeland.in' ? 'ADMINISTRATOR' : (u.postedListingsCount > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : u.role)}
                                 </span>
                               </td>
@@ -4816,7 +4219,7 @@ export default function AdminPortal({ onNavigate }) {
             {/* TAB: VISITORS DETAILS (3-MINUTE SITE ENGAGEMENT REGISTRY) */}
             {activeTab === 'visitors' && (
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                
+
                 {/* HEADER */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
                   <div>
@@ -4964,11 +4367,10 @@ export default function AdminPortal({ onNavigate }) {
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <span className="font-black text-sm text-brand-charcoal">{vis.name || 'Site Visitor'}</span>
-                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                                      vis.status === 'CONVERTED' ? 'bg-purple-100 text-purple-800' :
-                                      vis.status === 'QUALIFIED' ? 'bg-emerald-100 text-emerald-800' :
-                                      vis.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                                    }`}>
+                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${vis.status === 'CONVERTED' ? 'bg-purple-100 text-purple-800' :
+                                        vis.status === 'QUALIFIED' ? 'bg-emerald-100 text-emerald-800' :
+                                          vis.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                                      }`}>
                                       {vis.status || 'NEW'}
                                     </span>
                                     <span className="text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
@@ -5115,10 +4517,9 @@ export default function AdminPortal({ onNavigate }) {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-extrabold text-sm text-brand-charcoal">{enq.customerName || enq.name}</span>
-                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                                  enq.status === 'CLOSED' ? 'bg-gray-200 text-gray-700' :
-                                  enq.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
-                                }`}>
+                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${enq.status === 'CLOSED' ? 'bg-gray-200 text-gray-700' :
+                                    enq.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                                  }`}>
                                   {enq.status || 'NEW'}
                                 </span>
                               </div>
@@ -5208,11 +4609,10 @@ export default function AdminPortal({ onNavigate }) {
                     <button
                       key={st}
                       onClick={() => setCrmStageFilter(st)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold whitespace-nowrap transition-all ${
-                        crmStageFilter === st
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold whitespace-nowrap transition-all ${crmStageFilter === st
                           ? 'bg-brand-charcoal text-brand-yellow shadow'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       {st.replace('_', ' ')}
                     </button>
@@ -5337,13 +4737,12 @@ export default function AdminPortal({ onNavigate }) {
                             <span className="font-black text-sm text-brand-charcoal">{fup.customerName}</span>
                             <span className="text-gray-400">•</span>
                             <span className="font-bold text-xs text-gray-700">{fup.propertyTitle}</span>
-                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
-                              fup.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-                            }`}>
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${fup.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                              }`}>
                               {fup.status}
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center gap-3 text-xs text-gray-600 font-medium">
                             <span className="flex items-center gap-1 text-brand-charcoal font-extrabold">
                               <Calendar className="w-3.5 h-3.5 text-brand-yellow" />
@@ -5365,11 +4764,10 @@ export default function AdminPortal({ onNavigate }) {
                         <div className="flex items-center gap-2 self-end md:self-auto">
                           <button
                             onClick={() => handleToggleFollowUpStatus(fup.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                              fup.status === 'COMPLETED'
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${fup.status === 'COMPLETED'
                                 ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                 : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
-                            }`}
+                              }`}
                           >
                             {fup.status === 'COMPLETED' ? 'Mark Scheduled' : 'Mark Completed'}
                           </button>
@@ -5418,7 +4816,7 @@ export default function AdminPortal({ onNavigate }) {
                         onClick={() => {
                           if (window.confirm('Are you sure you want to clear all activity audit logs?')) {
                             setActivityLogs([]);
-                            try { localStorage.removeItem('easeland_admin_activity_logs'); } catch(e){}
+                            try { localStorage.removeItem('easeland_admin_activity_logs'); } catch (e) { }
                           }
                         }}
                         className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-3 py-1.5 rounded-xl border border-red-200 transition-colors"
@@ -5648,11 +5046,10 @@ export default function AdminPortal({ onNavigate }) {
                         setSuspensionDays(preset.d);
                         setSuspensionHours(preset.h);
                       }}
-                      className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${
-                        suspensionDays === preset.d && suspensionHours === preset.h
+                      className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${suspensionDays === preset.d && suspensionHours === preset.h
                           ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow'
                           : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                      }`}
+                        }`}
                     >
                       {preset.label}
                     </button>
@@ -5817,11 +5214,10 @@ export default function AdminPortal({ onNavigate }) {
                 {['NEW', 'SITE_VISIT', 'DOCUMENT_AUDIT', 'ADVANCE_PAID', 'DEAL_CLOSED'].map((stg) => (
                   <div
                     key={stg}
-                    className={`p-1.5 rounded-lg border ${
-                      selectedDealForDossier.stage === stg
+                    className={`p-1.5 rounded-lg border ${selectedDealForDossier.stage === stg
                         ? 'bg-brand-yellow text-brand-charcoal border-brand-yellow font-extrabold shadow'
                         : 'bg-white/10 text-gray-300 border-white/10'
-                    }`}
+                      }`}
                   >
                     {stg.replace('_', ' ')}
                   </div>
