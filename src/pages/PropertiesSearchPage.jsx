@@ -35,19 +35,22 @@ export function matchesSearchFilters(p, searchState = {}) {
     const pType = String(p.propertyType || p.type || '').toUpperCase();
     const pCat = String(p.category || p.title || '').toUpperCase();
     const targetType = String(searchState.propertyType).toUpperCase();
+    const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
     if (targetType === 'OPEN_PLOT' || targetType === 'PLOT') {
-      const isPlot = pType.includes('PLOT') || pCat.includes('PLOT') || pCat.includes('LAND');
+      if (isCommercialProp) return false;
+      const isPlot = pType.includes('PLOT') || pType.includes('LAND') || pCat.includes('PLOT') || pCat.includes('LAND');
       if (!isPlot) return false;
     } else if (targetType === 'HOUSE' || targetType === 'VILLA') {
+      if (isCommercialProp) return false;
       const isHouse = pType.includes('HOUSE') || pType.includes('VILLA') || pCat.includes('HOUSE') || pCat.includes('VILLA') || pCat.includes('HOME');
       if (!isHouse) return false;
     } else if (targetType === 'APARTMENT' || targetType === 'FLAT') {
+      if (isCommercialProp) return false;
       const isApt = pType.includes('APARTMENT') || pType.includes('FLAT') || pCat.includes('APARTMENT') || pCat.includes('FLAT');
       if (!isApt) return false;
     } else if (targetType === 'COMMERCIAL') {
-      const isComm = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
-      if (!isComm) return false;
+      if (!isCommercialProp) return false;
     }
   }
 
@@ -56,15 +59,19 @@ export function matchesSearchFilters(p, searchState = {}) {
     const pType = String(p.propertyType || p.type || '').toUpperCase();
     const pCat = String(p.category || p.title || '').toUpperCase();
     const catStr = String(searchState.category).toLowerCase();
+    const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
     if (catStr.includes('plot')) {
+      if (isCommercialProp) return false;
       if (!pType.includes('PLOT') && !pCat.includes('PLOT') && !pCat.includes('LAND')) return false;
     } else if (catStr.includes('house') || catStr.includes('villa')) {
+      if (isCommercialProp) return false;
       if (!pType.includes('HOUSE') && !pType.includes('VILLA') && !pCat.includes('HOUSE') && !pCat.includes('VILLA')) return false;
     } else if (catStr.includes('apartment') || catStr.includes('flat')) {
+      if (isCommercialProp) return false;
       if (!pType.includes('APARTMENT') && !pType.includes('FLAT') && !pCat.includes('APARTMENT') && !pCat.includes('FLAT')) return false;
     } else if (catStr.includes('commercial')) {
-      if (!pType.includes('COMMERCIAL') && !pCat.includes('COMMERCIAL') && !pCat.includes('OFFICE') && !pCat.includes('SHOP')) return false;
+      if (!isCommercialProp) return false;
     } else if (catStr.includes('rent')) {
       if (!pType.includes('RENT') && !pCat.includes('RENT') && !String(p.purpose || '').toUpperCase().includes('RENT')) return false;
     }

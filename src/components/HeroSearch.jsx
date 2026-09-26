@@ -71,9 +71,21 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
 
   const triggerSearch = (textQuery, currentPurpose, currentCategory, extraData = {}) => {
     const parsedNL = parseNaturalLanguageQuery(textQuery);
+
+    let propType = 'ALL';
+    let purp = currentPurpose === 'buy' ? 'SALE' : (currentPurpose === 'rent' ? 'RENT' : currentPurpose);
+
+    const catStr = String(currentCategory || '').toLowerCase();
+    if (catStr.includes('plot') || catStr === 'open plots') propType = 'OPEN_PLOT';
+    else if (catStr.includes('house') || catStr.includes('villa') || catStr === 'houses') propType = 'HOUSE';
+    else if (catStr.includes('apartment') || catStr.includes('flat') || catStr === 'apartments') propType = 'APARTMENT';
+    else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
+
     onSearch({
       query: textQuery,
-      purpose: currentPurpose === 'buy' ? 'SALE' : (currentPurpose === 'rent' ? 'RENT' : currentPurpose),
+      purpose: purp,
+      propertyType: propType,
       category: currentCategory,
       ...parsedNL,
       ...extraData
