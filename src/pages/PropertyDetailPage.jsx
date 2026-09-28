@@ -93,7 +93,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           { type: 'transit_station', label: 'Transit & Transport' },
           { type: 'supermarket', label: 'Shopping & Market' },
           { type: 'shopping_mall', label: 'Shopping & Market' },
-          { type: 'store', label: 'Shopping & Market' }
+          { type: 'point_of_interest', label: 'Landmark & Service' }
         ];
 
         const searchPromises = categoriesToSearch.map(cat => {
@@ -101,7 +101,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
             service.nearbySearch(
               {
                 location: targetLatLng,
-                radius: 3000,
+                radius: 8000,
                 type: cat.type
               },
               (results, status) => {
@@ -119,16 +119,14 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           const flattened = allCategoryResults.flat().filter(p => p && p.name && p.geometry?.location);
 
           if (flattened.length === 0) {
-            const cityName = propObj?.location?.city || propObj?.location?.locality || propObj?.location?.district || propObj?.city || 'this area';
-            service.textSearch(
+            service.nearbySearch(
               {
                 location: targetLatLng,
-                radius: 5000,
-                query: `hospitals schools banks near ${cityName}`
+                radius: 10000
               },
-              (textResults, textStatus) => {
-                if (textStatus === gMaps.places.PlacesServiceStatus.OK && Array.isArray(textResults)) {
-                  const textMapped = textResults.slice(0, 6).map(place => {
+              (generalResults, generalStatus) => {
+                if (generalStatus === gMaps.places.PlacesServiceStatus.OK && Array.isArray(generalResults)) {
+                  const generalMapped = generalResults.slice(0, 6).map(place => {
                     const placeLoc = place.geometry.location;
                     const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
                       ? gMaps.geometry.spherical.computeDistanceBetween(targetLatLng, placeLoc)
@@ -143,7 +141,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                       rating: place.rating || null
                     };
                   });
-                  return resolve(textMapped);
+                  return resolve(generalMapped);
                 }
                 resolve([]);
               }
@@ -947,39 +945,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
               </div>
             </div>
 
-            {/* WHAT'S NEARBY INFRASTRUCTURE */}
-            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-extrabold text-brand-charcoal">What's Nearby</h3>
-                <span className="text-[10px] font-extrabold uppercase bg-brand-charcoal text-brand-yellow px-2.5 py-1 rounded">
-                  Google Places API Verified
-                </span>
-              </div>
-
-              {nearbyLoading ? (
-                <div className="text-xs text-gray-400 font-bold py-4 animate-pulse">
-                  Detecting nearby hospitals, schools, banks, and transit from Google Places...
-                </div>
-              ) : nearbyPlaces.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {nearbyPlaces.map((place, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
-                      <div className="pr-2">
-                        <span className="font-bold text-gray-800 block line-clamp-1">{place.name}</span>
-                        <span className="text-[10px] text-gray-400 capitalize font-semibold">{place.type}</span>
-                      </div>
-                      <span className="font-extrabold text-brand-charcoal bg-white px-2.5 py-1 rounded-md border border-gray-200 shrink-0">
-                        {place.distance}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-500 font-medium py-2">
-                  No nearby places detected within 10 km of property coordinates via Google Places API.
-                </p>
-              )}
-            </div>
 
             {/* CONFIDENTIAL DOCUMENTS PRIVACY NOTICE */}
             <div className="bg-brand-charcoal text-white rounded-2xl p-6 border border-white/10 shadow-md">
