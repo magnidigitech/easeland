@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { X, Lock, Mail, Phone, User, ArrowRight, ShieldCheck, Check, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import TwoFactorModal from './TwoFactorModal';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialIntent = null }) {
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [pending2FAData, setPending2FAData] = useState(null);
+
   if (!isOpen) return null;
 
   const { loginUser, registerUser, loginWithGoogle, sendPasswordReset } = useAuth();
@@ -133,6 +137,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       setLoading(false);
       if (!result.success) {
         setError(result.error);
+        return;
+      }
+
+      if (result.requires2FA) {
+        setPending2FAData(result);
+        setShow2FAModal(true);
         return;
       }
 
@@ -444,6 +454,20 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         </form>
 
       </div>
+
+      {show2FAModal && (
+        <TwoFactorModal
+          isOpen={show2FAModal}
+          onClose={() => setShow2FAModal(false)}
+          userEmail={pending2FAData?.email || formData.email}
+          userPhone={pending2FAData?.phone || ''}
+          onVerifySuccess={() => {
+            setShow2FAModal(false);
+            if (onAuthSuccess) onAuthSuccess(pending2FAData?.user, initialIntent);
+            onClose();
+          }}
+        />
+      )}
 
     </div>
   );

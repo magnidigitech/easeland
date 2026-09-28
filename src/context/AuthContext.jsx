@@ -14,6 +14,7 @@ import {
   updateOwnProfile,
   updateCommunicationPreferences
 } from '../firebase/userService.js';
+import { checkAndTriggerSecurityAlert } from '../firebase/securityService.js';
 
 const AuthContext = createContext({
   user: null,
@@ -228,18 +229,21 @@ export function AuthProvider({ children }) {
   const loginUser = async (email, password) => {
     const lowerEmail = (email || '').toLowerCase().trim();
     const result = await apiLoginUser(email, password);
+
+    let loggedInUser = null;
+    let userProfileData = null;
+
     if (result.success && result.user) {
-      await reloadProfile(result.user.uid);
-      return result;
-    }
-
-    // Check if email matches admin email
-    const dedicatedAdminEmail = (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim();
-    const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
-    const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
-
-    if (lowerEmail === dedicatedAdminEmail || lowerEmail === 'admin@easeland.in') {
-      const adminUser = {
+      loggedInUser = result.user;
+      const pRes = await getCurrentUserProfile(result.user.uid);
+      if (pRes.success && pRes.profile) {
+        userProfileData = pRes.profile;
+      }
+    } else if (lowerEmail === (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim() || lowerEmail === 'admin@easeland.in') {
+      const dedicatedAdminEmail = (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim();
+      const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
+      const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
+      loggedInUser = {
         uid: 'admin_uid_001',
         email: dedicatedAdminEmail,
         displayName: dedicatedAdminName,
@@ -248,7 +252,7 @@ export function AuthProvider({ children }) {
         phoneNumber: dedicatedAdminPhone,
         emailVerified: true
       };
-      const adminProfile = {
+      userProfileData = {
         uid: 'admin_uid_001',
         displayName: dedicatedAdminName,
         name: dedicatedAdminName,
@@ -261,14 +265,8 @@ export function AuthProvider({ children }) {
         ownerVerificationState: 'VERIFIED',
         accountStatus: 'ACTIVE'
       };
-      setUser(adminUser);
-      setProfile(adminProfile);
       try { localStorage.setItem('easeland_admin_authenticated', 'true'); } catch(e){}
-      return { success: true, user: adminUser };
-    }
-
-    // Default registration/auth fallback for local dev when Firebase API key is unconfigured
-    if (!result.success && (
+    } else if (!result.success && (
       result.error?.includes('api-key-not-valid') ||
       result.error?.includes('invalid-api-key') ||
       result.error?.includes('user-not-found') ||
@@ -276,7 +274,7 @@ export function AuthProvider({ children }) {
     )) {
       const mockUid = 'user_' + Math.abs(lowerEmail.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0));
       const storedUserObj = JSON.parse(localStorage.getItem('easeland_user_profile_' + mockUid) || '{}');
-      const mockUser = {
+      loggedInUser = {
         uid: mockUid,
         email: lowerEmail,
         displayName: storedUserObj.displayName || storedUserObj.name || lowerEmail.split('@')[0] || 'EaseLand User',
@@ -285,7 +283,7 @@ export function AuthProvider({ children }) {
         phoneNumber: storedUserObj.phone || storedUserObj.phoneNumber || '',
         emailVerified: true
       };
-      const mockProfile = {
+      userProfileData = {
         uid: mockUid,
         displayName: storedUserObj.displayName || storedUserObj.name || lowerEmail.split('@')[0] || 'EaseLand User',
         name: storedUserObj.name || storedUserObj.displayName || lowerEmail.split('@')[0] || 'EaseLand User',
@@ -299,9 +297,26 @@ export function AuthProvider({ children }) {
         accountStatus: 'ACTIVE',
         ...storedUserObj
       };
-      setUser(mockUser);
-      setProfile(mockProfile);
-      return { success: true, user: mockUser };
+    }
+
+    if (loggedInUser && userProfileData) {
+      // 1. Check 2FA Security Preference
+      const has2FA = userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA ?? false;
+      
+      // 2. Check Security Alerts Preference
+      const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
+      if (hasAlerts) {
+        checkAndTriggerSecurityAlert(loggedInUser.uid, lowerEmail, userProfileData.security || userProfileData.communicationPreferences);
+      }
+
+      setUser(loggedInUser);
+      setProfile(userProfileData);
+
+      if (has2FA) {
+        return { success: true, requires2FA: true, user: loggedInUser, email: lowerEmail, phone: loggedInUser.phone };
+      }
+
+      return { success: true, user: loggedInUser };
     }
 
     return result;
