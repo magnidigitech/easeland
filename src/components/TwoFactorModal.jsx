@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Lock, RefreshCw, X, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
-import { verify2FAOtp, generate2FAOtp } from '../firebase/securityService.js';
+import { ShieldCheck, Lock, RefreshCw, X, AlertCircle, CheckCircle2, ArrowRight, Mail } from 'lucide-react';
+import { verify2FAOtp, generate2FAOtp, send2FAEmailOtp } from '../firebase/securityService.js';
 
 export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userEmail = '', userPhone = '' }) {
   if (!isOpen) return null;
@@ -17,11 +17,14 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     useRef(null), useRef(null), useRef(null)
   ];
 
-  // Initialize 2FA Code on open
+  // Initialize 2FA Code on open & dispatch email
   useEffect(() => {
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
     setActiveCodeHint(code);
+    if (userEmail) {
+      send2FAEmailOtp(userEmail, code);
+    }
     
     // Timer countdown
     const interval = setInterval(() => {
@@ -69,6 +72,9 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
     setActiveCodeHint(code);
+    if (userEmail) {
+      send2FAEmailOtp(userEmail, code);
+    }
     setResendCountdown(30);
     setError(null);
     setDigits(['', '', '', '', '', '']);

@@ -7,6 +7,7 @@ import PropertyDetailsView from './components/PropertyDetailsView';
 import PropertyDetailPage from './pages/PropertyDetailPage';
 import AuthModal from './components/AuthModal';
 import ProfileSettingsModal from './components/ProfileSettingsModal';
+import TwoFactorModal from './components/TwoFactorModal';
 import VisitorLeadModal from './components/VisitorLeadModal';
 import BuyInfoPage from './pages/BuyInfoPage';
 import RentInfoPage from './pages/RentInfoPage';
@@ -57,7 +58,7 @@ const getInitialPageState = () => {
 };
 
 export default function App() {
-  const { user: authUser, profile: authProfile, loading: authLoading, logoutUser } = useAuth();
+  const { user: authUser, profile: authProfile, loading: authLoading, logoutUser, pending2FASession, complete2FASession, cancel2FASession } = useAuth();
   const [initialPageState] = useState(getInitialPageState);
   const [activePage, setActivePage] = useState(initialPageState.page);
 
@@ -1149,6 +1150,14 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* TWO FACTOR OTP VERIFICATION MODAL */}
+      <TwoFactorModal
+        isOpen={!!pending2FASession}
+        userEmail={pending2FASession?.email || ''}
+        onVerifySuccess={complete2FASession}
+        onClose={cancel2FASession}
+      />
 
     </div>
   );

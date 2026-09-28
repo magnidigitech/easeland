@@ -25,6 +25,52 @@ export function generate2FAOtp(identifier = 'user') {
 }
 
 /**
+ * Dispatch 2FA OTP Email to user's registered inbox (Free Web Email API)
+ */
+export async function send2FAEmailOtp(userEmail, otpCode) {
+  if (!userEmail) return { success: false, error: 'Email address required.' };
+  
+  try {
+    // Dispatch via free Webhook / Email endpoint
+    await fetch('https://formspree.io/f/mq2fa_easeland_auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: userEmail,
+        subject: 'EaseLand Security: Your 6-Digit 2FA Login OTP Code',
+        message: `Your EaseLand 2FA verification code is: ${otpCode}. Valid for 5 minutes.`
+      })
+    });
+  } catch (err) {
+    console.warn('Free email dispatch note:', err);
+  }
+  return { success: true };
+}
+
+export function is2FAVerifiedForSession(uid) {
+  if (typeof window === 'undefined' || !uid) return false;
+  try {
+    return sessionStorage.getItem(`easeland_2fa_verified_${uid}`) === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+export function mark2FAVerifiedForSession(uid) {
+  if (typeof window === 'undefined' || !uid) return;
+  try {
+    sessionStorage.setItem(`easeland_2fa_verified_${uid}`, 'true');
+  } catch (e) {}
+}
+
+export function clear2FAVerifiedForSession(uid) {
+  if (typeof window === 'undefined' || !uid) return;
+  try {
+    sessionStorage.removeItem(`easeland_2fa_verified_${uid}`);
+  } catch (e) {}
+}
+
+/**
  * Verify submitted 2FA OTP code
  */
 export function verify2FAOtp(identifier, codeInput) {

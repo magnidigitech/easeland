@@ -14,11 +14,17 @@ import {
   updateOwnProfile,
   updateCommunicationPreferences
 } from '../firebase/userService.js';
-import { checkAndTriggerSecurityAlert } from '../firebase/securityService.js';
+import {
+  checkAndTriggerSecurityAlert,
+  is2FAVerifiedForSession,
+  mark2FAVerifiedForSession,
+  clear2FAVerifiedForSession
+} from '../firebase/securityService.js';
 
 const AuthContext = createContext({
   user: null,
   profile: null,
+  pending2FASession: null,
   loading: true,
   isAuthenticated: false,
   registerUser: async () => {},
@@ -27,12 +33,15 @@ const AuthContext = createContext({
   sendPasswordReset: async () => {},
   sendEmailVerification: async () => {},
   updateProfileData: async () => {},
-  updatePreferencesData: async () => {}
+  updatePreferencesData: async () => {},
+  complete2FASession: () => {},
+  cancel2FASession: () => {}
 });
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [pending2FASession, setPending2FASession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Helper to load user's Firestore profile
@@ -104,37 +113,41 @@ export function AuthProvider({ children }) {
                         currentUser.email?.includes('admin') ||
                         localStorage.getItem('easeland_admin_authenticated') === 'true';
 
-        setUser({
-          ...currentUser,
-          role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
-        });
-
         const res = await getCurrentUserProfile(currentUser.uid);
-        if (res.success) {
-          const profRole = (isAdmin || res.profile?.role === 'ADMIN' || res.profile?.adminRole) ? 'ADMIN' : (res.profile?.role || 'USER');
-          setProfile({
-            ...res.profile,
-            role: profRole,
-            adminRole: profRole === 'ADMIN',
-            capabilities: profRole === 'ADMIN' ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (res.profile?.capabilities || ['CUSTOMER', 'OWNER'])
+        const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
+        const userProfileData = res.success ? { ...res.profile, ...storedProfile } : storedProfile;
+
+        const has2FA = userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA ?? false;
+        const isVerified = is2FAVerifiedForSession(currentUser.uid);
+
+        if (has2FA && !isVerified) {
+          // Block active login state until 2FA OTP is verified
+          setUser(null);
+          setProfile(null);
+          setPending2FASession({
+            user: {
+              ...currentUser,
+              role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
+            },
+            profile: {
+              ...userProfileData,
+              role: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? 'ADMIN' : (userProfileData?.role || 'USER'),
+              adminRole: isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole
+            },
+            email: currentUser.email || userProfileData?.email || '',
+            phone: currentUser.phoneNumber || userProfileData?.phone || ''
           });
         } else {
-          const newProfileData = {
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || (isAdmin ? 'EaseLand Admin' : 'EaseLand User'),
-            email: currentUser.email || '',
-            phone: currentUser.phoneNumber || '',
-            role: isAdmin ? 'ADMIN' : 'USER',
-            adminRole: isAdmin,
-            accountStatus: 'ACTIVE',
-            capabilities: isAdmin ? ['ADMIN', 'CUSTOMER', 'OWNER'] : ['CUSTOMER', 'OWNER'],
-            ownerVerificationState: isAdmin ? 'VERIFIED' : 'NOT_VERIFIED'
-          };
-          try {
-            await createUserProfile(currentUser.uid, newProfileData);
-          } catch(e) {}
+          setPending2FASession(null);
+          setUser({
+            ...currentUser,
+            role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
+          });
           setProfile({
-            uid: currentUser.uid,
-            ...newProfileData
+            ...userProfileData,
+            role: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? 'ADMIN' : (userProfileData?.role || 'USER'),
+            adminRole: isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole,
+            capabilities: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (userProfileData?.capabilities || ['CUSTOMER', 'OWNER'])
           });
         }
       } else {
@@ -142,6 +155,7 @@ export function AuthProvider({ children }) {
         if (!isHydrated) {
           setUser(null);
           setProfile(null);
+          setPending2FASession(null);
         }
       }
       setLoading(false);
@@ -302,6 +316,7 @@ export function AuthProvider({ children }) {
     if (loggedInUser && userProfileData) {
       // 1. Check 2FA Security Preference
       const has2FA = userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA ?? false;
+      const isVerified = is2FAVerifiedForSession(loggedInUser.uid);
       
       // 2. Check Security Alerts Preference
       const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
@@ -309,12 +324,20 @@ export function AuthProvider({ children }) {
         checkAndTriggerSecurityAlert(loggedInUser.uid, lowerEmail, userProfileData.security || userProfileData.communicationPreferences);
       }
 
-      setUser(loggedInUser);
-      setProfile(userProfileData);
-
-      if (has2FA) {
+      if (has2FA && !isVerified) {
+        setUser(null);
+        setProfile(null);
+        setPending2FASession({
+          user: loggedInUser,
+          profile: userProfileData,
+          email: lowerEmail,
+          phone: loggedInUser.phone
+        });
         return { success: true, requires2FA: true, user: loggedInUser, email: lowerEmail, phone: loggedInUser.phone };
       }
+
+      setUser(loggedInUser);
+      setProfile(userProfileData);
 
       return { success: true, user: loggedInUser };
     }
@@ -487,18 +510,27 @@ export function AuthProvider({ children }) {
       };
 
       const has2FA = userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA ?? false;
+      const isVerified = is2FAVerifiedForSession(result.user.uid);
       const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
 
       if (hasAlerts) {
         checkAndTriggerSecurityAlert(result.user.uid, result.user.email, userProfileData.security || userProfileData.communicationPreferences);
       }
 
-      setUser(result.user);
-      setProfile(userProfileData);
-
-      if (has2FA) {
+      if (has2FA && !isVerified) {
+        setUser(null);
+        setProfile(null);
+        setPending2FASession({
+          user: result.user,
+          profile: userProfileData,
+          email: result.user.email,
+          phone: result.user.phoneNumber
+        });
         return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
       }
+
+      setUser(result.user);
+      setProfile(userProfileData);
 
       return { success: true, user: result.user };
     }
