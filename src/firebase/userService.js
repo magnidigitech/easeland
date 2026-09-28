@@ -137,10 +137,11 @@ export async function updateCommunicationPreferences(uid, preferences) {
   try {
     if (!uid) return { success: false, error: 'UID required' };
     const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
+      security: preferences,
       communicationPreferences: preferences,
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
     return { success: true };
   } catch (error) {
     console.error(`Error updating preferences for ${uid}:`, error);
