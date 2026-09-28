@@ -11,34 +11,79 @@ import { db } from './config.js';
 import { getPublicPropertyById } from './propertyService.js';
 import { formatFirestoreError } from './userService.js';
 
+const triggerWishlistEvent = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('easeland-wishlist-updated'));
+  }
+};
+
 /**
- * Add property to user's saved wishlist subcollection
+ * Add property to user's saved wishlist subcollection and local store
  */
 export async function addWishlistProperty(uid, propertyId) {
   try {
-    if (!uid || !propertyId) return { success: false, error: 'UID and Property ID are required.' };
-    const wishRef = doc(db, 'users', uid, 'wishlist', propertyId);
-    await setDoc(wishRef, {
-      propertyId,
-      savedAt: serverTimestamp()
-    });
+    if (!propertyId) return { success: false, error: 'Property ID is required.' };
+
+    if (uid) {
+      const wishRef = doc(db, 'users', uid, 'wishlist', String(propertyId));
+      await setDoc(wishRef, {
+        propertyId: String(propertyId),
+        savedAt: serverTimestamp()
+      });
+    }
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      if (!stored.includes(String(propertyId))) {
+        stored.push(String(propertyId));
+        localStorage.setItem('easeland_saved_wishlist_ids', JSON.stringify(stored));
+      }
+    } catch (e) {}
+
+    triggerWishlistEvent();
     return { success: true };
   } catch (error) {
-    return { success: false, error: formatFirestoreError(error) };
+    // Even if Firestore fails, maintain local state
+    try {
+      const stored = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      if (!stored.includes(String(propertyId))) {
+        stored.push(String(propertyId));
+        localStorage.setItem('easeland_saved_wishlist_ids', JSON.stringify(stored));
+      }
+    } catch (e) {}
+    triggerWishlistEvent();
+    return { success: true };
   }
 }
 
 /**
- * Remove property from user's saved wishlist subcollection
+ * Remove property from user's saved wishlist subcollection and local store
  */
 export async function removeWishlistProperty(uid, propertyId) {
   try {
-    if (!uid || !propertyId) return { success: false, error: 'UID and Property ID are required.' };
-    const wishRef = doc(db, 'users', uid, 'wishlist', propertyId);
-    await deleteDoc(wishRef);
+    if (!propertyId) return { success: false, error: 'Property ID is required.' };
+
+    if (uid) {
+      const wishRef = doc(db, 'users', uid, 'wishlist', String(propertyId));
+      await deleteDoc(wishRef);
+    }
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      const updated = stored.filter(id => id !== String(propertyId));
+      localStorage.setItem('easeland_saved_wishlist_ids', JSON.stringify(updated));
+    } catch (e) {}
+
+    triggerWishlistEvent();
     return { success: true };
   } catch (error) {
-    return { success: false, error: formatFirestoreError(error) };
+    try {
+      const stored = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      const updated = stored.filter(id => id !== String(propertyId));
+      localStorage.setItem('easeland_saved_wishlist_ids', JSON.stringify(updated));
+    } catch (e) {}
+    triggerWishlistEvent();
+    return { success: true };
   }
 }
 
@@ -47,10 +92,19 @@ export async function removeWishlistProperty(uid, propertyId) {
  */
 export async function isPropertyWishlisted(uid, propertyId) {
   try {
-    if (!uid || !propertyId) return false;
-    const wishRef = doc(db, 'users', uid, 'wishlist', propertyId);
-    const snap = await getDoc(wishRef);
-    return snap.exists();
+    if (!propertyId) return false;
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      if (stored.includes(String(propertyId))) return true;
+    } catch (e) {}
+
+    if (uid) {
+      const wishRef = doc(db, 'users', uid, 'wishlist', String(propertyId));
+      const snap = await getDoc(wishRef);
+      return snap.exists();
+    }
+    return false;
   } catch (error) {
     return false;
   }
@@ -61,20 +115,33 @@ export async function isPropertyWishlisted(uid, propertyId) {
  */
 export async function getUserWishlist(uid) {
   try {
-    if (!uid) return { success: false, error: 'UID is required.' };
-    const wishColRef = collection(db, 'users', uid, 'wishlist');
-    const snap = await getDocs(wishColRef);
-    const propertyIds = snap.docs.map(doc => doc.id);
+    let propertyIds = [];
+    if (uid) {
+      const wishColRef = collection(db, 'users', uid, 'wishlist');
+      const snap = await getDocs(wishColRef);
+      propertyIds = snap.docs.map(doc => doc.id);
+    }
+
+    try {
+      const localIds = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      const combined = new Set([...propertyIds, ...localIds]);
+      propertyIds = Array.from(combined);
+    } catch (e) {}
+
     return { success: true, propertyIds };
   } catch (error) {
-    return { success: false, error: formatFirestoreError(error) };
+    try {
+      const localIds = JSON.parse(localStorage.getItem('easeland_saved_wishlist_ids') || '[]');
+      return { success: true, propertyIds: localIds };
+    } catch (e) {
+      return { success: false, error: formatFirestoreError(error) };
+    }
   }
 }
 
 /**
  * Get full public representations for all saved wishlist properties.
  * Respects public marketplace visibility (LIVE && isPublished).
- * Provides safe non-sensitive fallback for unavailable/archived properties without leaking private details.
  */
 export async function getUserWishlistProperties(uid) {
   try {
@@ -92,17 +159,11 @@ export async function getUserWishlistProperties(uid) {
           isAvailable: true
         };
       }
-      return {
-        propertyId,
-        isAvailable: false,
-        title: 'This property is no longer publicly available',
-        priceDisplay: 'N/A',
-        location: null,
-        media: []
-      };
+      return null;
     });
 
-    const properties = await Promise.all(propertyPromises);
+    const results = await Promise.all(propertyPromises);
+    const properties = results.filter(Boolean);
     return { success: true, properties };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };

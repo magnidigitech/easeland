@@ -22,6 +22,7 @@ import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
+import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings } from 'lucide-react';
 
 const getInitialPageState = () => {
@@ -126,9 +127,38 @@ export default function App() {
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [activePropertyId, setActivePropertyId] = useState(initialPageState.propId);
+  const [wishlistProperties, setWishlistProperties] = useState([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [faqOpenIndex, setFaqOpenIndex] = useState(null);
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
+
+  // Real-time Wishlist Refresh Handler across Firestore & Local Storage
+  const refreshWishlist = async () => {
+    const uid = currentUser?.uid || currentUser?.id;
+    try {
+      const res = await getUserWishlistProperties(uid);
+      if (res && res.success && Array.isArray(res.properties)) {
+        setWishlistProperties(res.properties);
+        setWishlistCount(res.properties.length);
+      } else {
+        setWishlistProperties([]);
+        setWishlistCount(0);
+      }
+    } catch (err) {
+      setWishlistProperties([]);
+      setWishlistCount(0);
+    }
+  };
+
+  useEffect(() => {
+    refreshWishlist();
+
+    const handleWishlistUpdated = () => refreshWishlist();
+    window.addEventListener('easeland-wishlist-updated', handleWishlistUpdated);
+    return () => {
+      window.removeEventListener('easeland-wishlist-updated', handleWishlistUpdated);
+    };
+  }, [currentUser]);
 
   // General Contact Us Form State
   const [generalContact, setGeneralContact] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -163,7 +193,7 @@ export default function App() {
 
     const merged = deduplicateProperties([...pgProperties, ...fsProperties, ...localData]);
     setProperties(merged);
-    setWishlistCount(mockApi.getWishlist().length);
+    refreshWishlist();
   };
 
   const changeActivePage = (pageName, propId = null) => {
@@ -900,7 +930,7 @@ export default function App() {
           <UserDashboard
             user={currentUser}
             properties={properties}
-            wishlist={mockApi.getWishlist()}
+            wishlist={wishlistProperties}
             onWishlistToggle={handleWishlistToggle}
             onNavigate={(page, propId) => changeActivePage(page, propId)}
             onPostProperty={handlePostPropertyClick}
@@ -910,24 +940,71 @@ export default function App() {
         {/* WISHLIST VIEW */}
         {activePage === 'wishlist' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <h2 className="text-2xl font-extrabold text-brand-charcoal mb-6">My Saved Wishlist Properties</h2>
-            {mockApi.getWishlist().length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 text-gray-500">
+            <h2 className="text-2xl font-extrabold text-brand-charcoal mb-6">My Saved Wishlist Properties ({wishlistProperties.length})</h2>
+            {wishlistProperties.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 text-gray-500 shadow-sm">
                 <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="text-base font-bold text-brand-charcoal">No saved properties yet</h3>
-                <button onClick={() => changeActivePage('map')} className="mt-4 bg-brand-yellow text-brand-charcoal font-bold text-xs px-4 py-2.5 rounded-xl">
+                <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">Explore verified properties on our interactive map and tap the heart icon to save your favorites.</p>
+                <button onClick={() => changeActivePage('map')} className="mt-5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-5 py-3 rounded-xl shadow-md border border-yellow-400/40 transition-all">
                   Explore Map to Save Properties
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {mockApi.getWishlist().map((prop) => (
-                  <div key={prop.id} onClick={() => handleSelectProperty(prop)} className="bg-white rounded-2xl border p-4 cursor-pointer shadow-sm">
-                    <img src={prop.photos?.[0]} alt="" className="w-full h-40 object-cover rounded-xl mb-3" />
-                    <h3 className="text-sm font-bold line-clamp-1">{prop.title}</h3>
-                    <span className="text-sm font-extrabold text-emerald-700 block mt-1">{prop.priceDisplay}</span>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {wishlistProperties.map((prop) => {
+                  const pId = prop.propertyId || prop.id;
+                  const firstPhoto = prop.photos?.[0] || prop.media?.[0]?.url || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+                  return (
+                    <div key={pId} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                      <div>
+                        <div className="relative h-48 w-full bg-gray-100">
+                          <img src={firstPhoto} alt={prop.title} className="w-full h-full object-cover" />
+                          <span className="absolute top-3 left-3 bg-slate-900/90 text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-slate-700">
+                            {prop.propertyType || prop.type || 'Property'}
+                          </span>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await removeWishlistProperty(currentUser?.uid, pId);
+                              refreshWishlist();
+                            }}
+                            className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-rose-500 rounded-full shadow-md transition-all border border-gray-100"
+                            title="Remove from Wishlist"
+                          >
+                            <Heart className="w-4 h-4 fill-rose-500" />
+                          </button>
+                        </div>
+                        <div className="p-5">
+                          <span className="text-xs text-brand-yellow font-extrabold uppercase tracking-wider block mb-1">
+                            {prop.purpose === 'RENT' ? 'For Rent' : 'For Sale'} • Ref: {prop.referenceId || `EL-PROP-${pId}`}
+                          </span>
+                          <h3 className="text-base font-extrabold text-slate-900 line-clamp-1">{prop.title}</h3>
+                          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 font-medium">
+                            <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span>{prop.location?.locality || prop.location?.city || prop.location?.district || 'India'}, {prop.location?.state || ''}</span>
+                          </p>
+                          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] text-gray-400 block font-bold uppercase">Listed Price</span>
+                              <span className="text-base font-extrabold text-emerald-700">{prop.priceDisplay || `Rs. ${prop.price}`}</span>
+                            </div>
+                            <span className="text-xs font-bold text-slate-700">{prop.areaDisplay || (prop.area ? `${prop.area} sq ft` : '')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
+                        <button
+                          onClick={() => changeActivePage('property-detail', pId)}
+                          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1"
+                        >
+                          <span>View Property Details</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
