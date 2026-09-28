@@ -203,10 +203,16 @@ export async function approvePropertyVerification(propertyId, adminUid, adminNam
       if (snap.exists()) propData = snap.data();
     } catch (e) {}
 
+    const pendingEdits = propData.pendingReauditData || {};
+
     const updatedPayload = {
       ...propData,
+      ...pendingEdits,
       propertyId,
       id: propertyId,
+      hasPendingEdits: false,
+      reAuditStatus: null,
+      pendingReauditData: null,
       listingStatus: ListingStatus.LIVE,
       status: ListingStatus.LIVE,
       isPlatformVerified: true,

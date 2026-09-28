@@ -827,7 +827,11 @@ export default function UserDashboard({
 
                   <div className="divide-y divide-gray-100">
                     {userProperties.map((prop) => (
-                      <div key={prop.id} className="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div
+                        key={prop.id}
+                        onClick={() => onNavigate && onNavigate('property/' + (prop.propertyId || prop.id))}
+                        className="py-4 px-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition-all rounded-xl border border-transparent hover:border-gray-200/80 group"
+                      >
                         <div className="flex items-center gap-4">
                           <img
                             src={prop.image || prop.photos?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80'}
@@ -836,27 +840,30 @@ export default function UserDashboard({
                               e.target.onerror = null;
                               e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
                             }}
-                            className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
+                            className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"
                           />
                           <div>
-                            <h3 className="font-extrabold text-sm text-brand-charcoal">{prop.title}</h3>
+                            <h3 className="font-extrabold text-sm text-brand-charcoal group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
+                              <span>{prop.title}</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700" />
+                            </h3>
                             <p className="text-xs text-gray-500 font-medium flex items-center gap-2 mt-0.5">
-                              <MapPin className="w-3.5 h-3.5" />
+                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
                               <span>{prop.location}</span>
                               <span>•</span>
-                              <span className="font-bold text-brand-charcoal">{prop.price}</span>
+                              <span className="font-bold text-emerald-700">{prop.price}</span>
                             </p>
                           </div>
                         </div>
 
-                        <div>
-                          {prop.status === 'APPROVED' && (
+                        <div className="flex items-center gap-3">
+                          {(prop.status === 'APPROVED' || prop.status === 'LIVE') && (
                             <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               Live & Verified
                             </span>
                           )}
-                          {prop.status === 'PENDING' && (
+                          {(prop.status === 'PENDING' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
                             <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                               <Clock className="w-3 h-3 text-blue-600" />
                               Under Review
@@ -868,6 +875,17 @@ export default function UserDashboard({
                               Action Required
                             </span>
                           )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
+                            }}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-brand-charcoal hover:text-brand-yellow text-gray-800 text-xs font-bold rounded-lg flex items-center gap-1 transition-all shrink-0 cursor-pointer shadow-2xs"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Listing</span>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -957,7 +975,10 @@ export default function UserDashboard({
                       <div key={prop.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
 
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                          <div className="flex items-center gap-4">
+                          <div
+                            onClick={() => onNavigate && onNavigate('property/' + (prop.propertyId || prop.id))}
+                            className="flex items-center gap-4 cursor-pointer group"
+                          >
                             <img
                               src={prop.image || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80'}
                               alt={prop.title}
@@ -965,7 +986,7 @@ export default function UserDashboard({
                                 e.target.onerror = null;
                                 e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
                               }}
-                              className="w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm"
+                              className="w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"
                             />
                             <div>
                               <div className="flex items-center gap-2">
@@ -974,7 +995,10 @@ export default function UserDashboard({
                                 </span>
                                 <span className="text-xs font-semibold text-gray-500">• Ref: {prop.referenceId}</span>
                               </div>
-                              <h3 className="font-extrabold text-base text-brand-charcoal mt-1">{prop.title}</h3>
+                              <h3 className="font-extrabold text-base text-brand-charcoal mt-1 group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
+                                <span>{prop.title}</span>
+                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-amber-700" />
+                              </h3>
                               <p className="text-xs text-gray-500 font-medium flex items-center gap-2 mt-0.5">
                                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                                 <span>{prop.location}</span>
@@ -1059,7 +1083,7 @@ export default function UserDashboard({
                               (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW')
                                 ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
                                 : ((prop.status === 'LIVE' || prop.status === 'APPROVED')
-                                    ? 'Property audited and verified live on marketplace. Edit locked after verification.'
+                                    ? 'Property audited and verified live on marketplace. Click "Edit Listing" anytime to update details (new changes will submit for re-audit while old details remain live).'
                                     : 'Property draft created. Complete all steps to submit for verification.')
                             )}
                           </span>
@@ -1074,22 +1098,40 @@ export default function UserDashboard({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
+                            {/* VIEW LISTING BUTTON */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
+                              }}
+                              className="px-3 py-1.5 bg-gray-100 hover:bg-brand-charcoal hover:text-brand-yellow text-gray-800 rounded-lg flex items-center gap-1 font-bold shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View Listing</span>
+                            </button>
+
                             {/* DRAFT */}
                             {prop.status === 'DRAFT' && (
                               <button
-                                onClick={() => onPostProperty(prop.id || prop.propertyId)}
-                                className="px-3 py-1.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-navy rounded-lg flex items-center gap-1 font-bold shadow-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPostProperty(prop.id || prop.propertyId);
+                                }}
+                                className="px-3 py-1.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-navy rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer"
                               >
                                 <Edit className="w-3.5 h-3.5 text-brand-navy" />
                                 <span>Resume Draft</span>
                               </button>
                             )}
 
-                            {/* PENDING VERIFICATION & UNDER REVIEW (EDIT ALLOWED BEFORE AUDIT DONE) */}
+                            {/* PENDING VERIFICATION & UNDER REVIEW */}
                             {(prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
                               <button
-                                onClick={() => onPostProperty(prop.id || prop.propertyId)}
-                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPostProperty(prop.id || prop.propertyId);
+                                }}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
                                 title="Update property details, files, or media before admin audit completes"
                               >
                                 <Edit className="w-3.5 h-3.5 text-white" />
@@ -1097,23 +1139,37 @@ export default function UserDashboard({
                               </button>
                             )}
 
-                            {/* CHANGES REQUIRED (ADMIN REQUESTED CHANGES) */}
+                            {/* CHANGES REQUIRED */}
                             {prop.status === 'CHANGES_REQUIRED' && (
                               <button
-                                onClick={() => onPostProperty(prop.id || prop.propertyId)}
-                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPostProperty(prop.id || prop.propertyId);
+                                }}
+                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
                                 <span>Fix & Resubmit</span>
                               </button>
                             )}
 
-                            {/* LIVE / APPROVED (AUDIT DONE - EDIT NOT AVAILABLE) */}
+                            {/* LIVE / APPROVED (AUDIT DONE - EDIT ALWAYS AVAILABLE FOR RE-AUDIT WORKFLOW) */}
                             {(prop.status === 'LIVE' || prop.status === 'APPROVED') && (
                               <>
                                 <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPostProperty(prop.id || prop.propertyId);
+                                  }}
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
+                                  title="Edit property details. New changes will be submitted for Admin re-audit while existing live details remain published."
+                                >
+                                  <Edit className="w-3.5 h-3.5 text-white" />
+                                  <span>Edit Listing</span>
+                                </button>
+                                <button
                                   onClick={() => handleOwnerPropertyAction('UNAVAILABLE', prop)}
-                                  className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1 font-bold"
+                                  className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1 font-bold cursor-pointer"
                                 >
                                   <Clock className="w-3.5 h-3.5 text-orange-600" />
                                   <span>Pause</span>

@@ -562,25 +562,47 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
       console.warn('Property fetch warning prior to submission:', e);
     }
 
-    const mergedData = {
-      ...propData,
-      ...(formData || {}),
-      ownerId: propData.ownerId || ownerId,
-      listingStatus: ListingStatus.PENDING_VERIFICATION,
-      isPublished: false
-    };
+    const isAlreadyLive = propData.listingStatus === ListingStatus.LIVE || propData.status === ListingStatus.LIVE || propData.isPublished || propData.isPlatformVerified;
 
-    const derived = computeDerivedPropertyFields(mergedData);
+    let publicPayload = {};
 
-    const publicPayload = {
-      ...mergedData,
-      ...derived,
-      listingStatus: ListingStatus.PENDING_VERIFICATION,
-      status: ListingStatus.PENDING_VERIFICATION,
-      isPublished: false,
-      submittedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    if (isAlreadyLive && formData) {
+      // Re-Audit Workflow: Keep existing live data published on site while staging new edits for Admin verification
+      publicPayload = {
+        ...propData,
+        hasPendingEdits: true,
+        reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+        pendingReauditData: {
+          ...formData,
+          updatedAt: new Date().toISOString()
+        },
+        listingStatus: ListingStatus.LIVE,
+        status: ListingStatus.LIVE,
+        isPublished: true,
+        isPlatformVerified: true,
+        updatedAt: new Date().toISOString()
+      };
+    } else {
+      const mergedData = {
+        ...propData,
+        ...(formData || {}),
+        ownerId: propData.ownerId || ownerId,
+        listingStatus: ListingStatus.PENDING_VERIFICATION,
+        isPublished: false
+      };
+
+      const derived = computeDerivedPropertyFields(mergedData);
+
+      publicPayload = {
+        ...mergedData,
+        ...derived,
+        listingStatus: ListingStatus.PENDING_VERIFICATION,
+        status: ListingStatus.PENDING_VERIFICATION,
+        isPublished: false,
+        submittedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
 
     // 1. ALWAYS sync directly to PostgreSQL Server API (/api/properties)
     await syncPropertyToPostgres(publicPayload);
@@ -593,18 +615,6 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         id: propertyId,
         propertyId,
         referenceId: publicPayload.referenceId || `EL-PROP-${propertyId}`,
-        title: publicPayload.title || 'Submitted Property',
-        price: publicPayload.price || 0,
-        priceDisplay: publicPayload.priceDisplay || `Rs. ${publicPayload.price || 0}`,
-        area: publicPayload.area || 0,
-        areaDisplay: publicPayload.areaDisplay || `${publicPayload.area || 0} sq ft`,
-        location: publicPayload.location || {},
-        propertyType: publicPayload.propertyType || 'OPEN_PLOT',
-        purpose: publicPayload.purpose || 'SALE',
-        listingStatus: ListingStatus.PENDING_VERIFICATION,
-        status: ListingStatus.PENDING_VERIFICATION,
-        isPlatformVerified: false,
-        isPublished: false,
         ownerId,
         ownerPrivateEmail: publicPayload.ownerPrivateEmail || '',
         createdAt: publicPayload.createdAt || new Date().toISOString()
