@@ -745,11 +745,10 @@ export default function UniversalMapEngine({
                           e.stopPropagation();
                           onSelectProperty(prop);
                         }}
-                        className="w-full mt-3 bg-brand-charcoal hover:bg-amber-400 font-extrabold text-xs py-2.5 rounded-xl shadow-md transition-all duration-200 flex items-center justify-center gap-1.5 border border-transparent hover:border-amber-300 cursor-pointer"
-                        style={{ color: '#ffffff' }}
+                        className="w-full mt-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer group"
                       >
-                        <span className="font-black tracking-wide drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.85)]" style={{ color: '#ffffff' }}>View Property Details</span>
-                        <ChevronRight className="w-4 h-4 shrink-0" style={{ color: '#ffffff' }} />
+                        <span className="font-bold tracking-wide">View Property Details</span>
+                        <ChevronRight className="w-4 h-4 shrink-0 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
                       </button>
                     </div>
                   </div>
