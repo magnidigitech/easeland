@@ -535,7 +535,7 @@ export default function App() {
   }));
 
   return (
-    <div className={`min-h-screen bg-brand-offwhite text-brand-charcoal font-sans flex flex-col ${(activePage === 'map' || activePage === 'properties') ? 'h-screen max-h-screen overflow-hidden' : ''}`}>
+    <div className="min-h-screen bg-brand-offwhite text-brand-charcoal font-sans flex flex-col">
       
       {/* NAVBAR */}
       <Navbar

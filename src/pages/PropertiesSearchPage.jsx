@@ -367,10 +367,10 @@ export default function PropertiesSearchPage({
   }, [searchState]);
 
   return (
-    <div className="flex-1 min-h-0 w-full flex flex-col font-sans text-brand-charcoal overflow-hidden bg-brand-offwhite">
+    <div className="w-full flex flex-col font-sans text-brand-charcoal bg-brand-offwhite">
 
       {/* SEARCH HEADER & NAVIGATION BAR */}
-      <div className="bg-brand-charcoal text-white border-b border-gray-800 shrink-0 z-30 shadow-md">
+      <div className="sticky top-20 z-40 bg-brand-charcoal text-white border-b border-gray-800 shrink-0 shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
 
           {/* Quick Search Controls */}
@@ -451,7 +451,7 @@ export default function PropertiesSearchPage({
       )}
 
       {/* MAIN CONTENT AREA: MAP IS THE MAIN VIEWPORT (100% SCREEN), PROPERTY LIST IN SIDEBAR */}
-      <div className="flex-1 w-full relative overflow-hidden min-h-0">
+      <div className="w-full h-[calc(100vh-148px)] relative overflow-hidden shrink-0">
         <UniversalMapEngine
           hideSidePanel={false}
           properties={properties}
