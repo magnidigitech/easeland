@@ -61,11 +61,104 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   const [enquirySubmitted, setEnquirySubmitted] = useState(false);
   const [enquiryError, setEnquiryError] = useState(null);
 
-  // Google Maps & Nearby State
-  const mapContainerRef = useRef(null);
-  const googleMapRef = useRef(null);
-  const [nearbyPlaces, setNearbyPlaces] = useState([]);
-  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const formatPlaceCategory = (types) => {
+    if (!Array.isArray(types)) return 'Landmark';
+    if (types.some(t => t.includes('hospital') || t.includes('doctor') || t.includes('health') || t.includes('pharmacy'))) return 'Hospital & Health';
+    if (types.some(t => t.includes('school') || t.includes('university') || t.includes('education'))) return 'School & Education';
+    if (types.some(t => t.includes('transit') || t.includes('bus') || t.includes('train') || t.includes('subway'))) return 'Transit & Transport';
+    if (types.some(t => t.includes('bank') || t.includes('atm') || t.includes('finance'))) return 'Bank & ATM';
+    if (types.some(t => t.includes('shopping') || t.includes('store') || t.includes('supermarket') || t.includes('mall'))) return 'Shopping & Market';
+    if (types.some(t => t.includes('park') || t.includes('gym') || t.includes('stadium'))) return 'Park & Recreation';
+    return types[0]?.replace(/_/g, ' ') || 'Point of Interest';
+  };
+
+  const fetchRealNearbyPlacesFromGoogle = (gMaps, map, pyLocation, propObj) => {
+    return new Promise((resolve) => {
+      try {
+        if (!gMaps || !gMaps.places) return resolve([]);
+        const targetLatLng = pyLocation.lat && pyLocation.lng ? new gMaps.LatLng(pyLocation.lat, pyLocation.lng) : pyLocation;
+        const service = new gMaps.places.PlacesService(map || document.createElement('div'));
+
+        service.nearbySearch(
+          {
+            location: targetLatLng,
+            radius: 3500
+          },
+          (results, status) => {
+            if (status === gMaps.places.PlacesServiceStatus.OK && Array.isArray(results) && results.length > 0) {
+              const mapped = results
+                .filter(p => p && p.name && p.geometry?.location)
+                .map(place => {
+                  const placeLoc = place.geometry.location;
+                  const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
+                    ? gMaps.geometry.spherical.computeDistanceBetween(targetLatLng, placeLoc)
+                    : 0;
+                  const distStr = distMeters > 0
+                    ? (distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`)
+                    : 'Nearby';
+                  return {
+                    name: place.name,
+                    distance: distStr,
+                    distMeters: distMeters,
+                    type: formatPlaceCategory(place.types),
+                    rating: place.rating || null
+                  };
+                })
+                .sort((a, b) => a.distMeters - b.distMeters);
+
+              const seen = new Set();
+              const uniquePlaces = [];
+              for (const item of mapped) {
+                const key = item.name.toLowerCase().trim();
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  uniquePlaces.push(item);
+                }
+                if (uniquePlaces.length >= 6) break;
+              }
+
+              if (uniquePlaces.length > 0) {
+                return resolve(uniquePlaces);
+              }
+            }
+
+            const cityName = propObj?.location?.city || propObj?.location?.locality || propObj?.location?.district || propObj?.city || 'this area';
+            service.textSearch(
+              {
+                location: targetLatLng,
+                radius: 10000,
+                query: `hospitals schools banks transit near ${cityName}`
+              },
+              (textResults, textStatus) => {
+                if (textStatus === gMaps.places.PlacesServiceStatus.OK && Array.isArray(textResults) && textResults.length > 0) {
+                  const textMapped = textResults.slice(0, 6).map(place => {
+                    const placeLoc = place.geometry.location;
+                    const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
+                      ? gMaps.geometry.spherical.computeDistanceBetween(targetLatLng, placeLoc)
+                      : 0;
+                    const distStr = distMeters > 0
+                      ? (distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`)
+                      : 'Nearby';
+                    return {
+                      name: place.name,
+                      distance: distStr,
+                      type: formatPlaceCategory(place.types),
+                      rating: place.rating || null
+                    };
+                  });
+                  return resolve(textMapped);
+                }
+                resolve([]);
+              }
+            );
+          }
+        );
+      } catch (e) {
+        console.warn('Google Places fetch error:', e);
+        resolve([]);
+      }
+    });
+  };
 
   const getOwnerPhone = () => {
     return property?.ownerPublicPhone || property?.ownerPrivatePhone || property?.ownerPhone || property?.ownerContact || property?.owner?.phone || property?.phone || '';
@@ -236,42 +329,24 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           map.fitBounds(bounds, { padding: 40 });
         }
 
-        // Fetch Google Places Nearby Infrastructure
-        if (gMaps.places) {
-          setNearbyLoading(true);
-          const service = new gMaps.places.PlacesService(map);
-          const pyLocation = new gMaps.LatLng(mapPos.lat, mapPos.lng);
-
-          service.nearbySearch(
-            {
-              location: pyLocation,
-              radius: 3500,
-              type: ['hospital', 'school', 'transit_station', 'shopping_mall', 'bank']
-            },
-            (results, status) => {
-              setNearbyLoading(false);
-              if (status === gMaps.places.PlacesServiceStatus.OK && results) {
-                const mapped = results.slice(0, 6).map(place => {
-                  const placeLoc = place.geometry.location;
-                  const distMeters = gMaps.geometry
-                    ? gMaps.geometry.spherical.computeDistanceBetween(pyLocation, placeLoc)
-                    : 0;
-                  const distStr = distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`;
-                  return {
-                    name: place.name,
-                    distance: distStr,
-                    type: place.types?.[0]?.replace('_', ' ') || 'place',
-                    rating: place.rating || null
-                  };
-                });
-                setNearbyPlaces(mapped);
-              }
-            }
-          );
-        }
+        // Fetch Google Places Nearby Infrastructure automatically
+        setNearbyLoading(true);
+        fetchRealNearbyPlacesFromGoogle(gMaps, map, mapPos, property)
+          .then(places => {
+            setNearbyPlaces(places);
+          })
+          .catch(err => {
+            console.warn('Google Places load error:', err);
+            setNearbyPlaces([]);
+          })
+          .finally(() => {
+            setNearbyLoading(false);
+          });
       })
       .catch(err => {
         console.warn('Google Maps JS SDK load error on detail page:', err);
+        setNearbyLoading(false);
+        setNearbyPlaces([]);
       });
   }, [property]);
 
@@ -841,17 +916,19 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-extrabold text-brand-charcoal">What's Nearby</h3>
                 <span className="text-[10px] font-extrabold uppercase bg-brand-charcoal text-brand-yellow px-2.5 py-1 rounded">
-                  Google Places API
+                  Google Places API Verified
                 </span>
               </div>
 
               {nearbyLoading ? (
-                <div className="text-xs text-gray-400 font-bold py-4 animate-pulse">Calculating nearby hospitals, schools, and transit...</div>
+                <div className="text-xs text-gray-400 font-bold py-4 animate-pulse">
+                  Detecting nearby hospitals, schools, banks, and transit from Google Places...
+                </div>
               ) : nearbyPlaces.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {nearbyPlaces.map((place, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
-                      <div>
+                      <div className="pr-2">
                         <span className="font-bold text-gray-800 block line-clamp-1">{place.name}</span>
                         <span className="text-[10px] text-gray-400 capitalize font-semibold">{place.type}</span>
                       </div>
@@ -862,8 +939,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 font-medium">
-                  Nearby infrastructure data is available around property location coordinates via Google Maps.
+                <p className="text-xs text-gray-500 font-medium py-2">
+                  No nearby places detected within 10 km of property coordinates via Google Places API.
                 </p>
               )}
             </div>

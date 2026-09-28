@@ -25,41 +25,116 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
-  // Fetch real nearby places using Google Places Service if available
-  useEffect(() => {
-    if (window.google && window.google.maps && window.google.maps.places && property.location?.lat) {
+  const formatPlaceCategory = (types) => {
+    if (!Array.isArray(types)) return 'Landmark';
+    if (types.some(t => t.includes('hospital') || t.includes('doctor') || t.includes('health') || t.includes('pharmacy'))) return 'Hospital & Health';
+    if (types.some(t => t.includes('school') || t.includes('university') || t.includes('education'))) return 'School & Education';
+    if (types.some(t => t.includes('transit') || t.includes('bus') || t.includes('train') || t.includes('subway'))) return 'Transit & Transport';
+    if (types.some(t => t.includes('bank') || t.includes('atm') || t.includes('finance'))) return 'Bank & ATM';
+    if (types.some(t => t.includes('shopping') || t.includes('store') || t.includes('supermarket') || t.includes('mall'))) return 'Shopping & Market';
+    if (types.some(t => t.includes('park') || t.includes('gym') || t.includes('stadium'))) return 'Park & Recreation';
+    return types[0]?.replace(/_/g, ' ') || 'Point of Interest';
+  };
+
+  const fetchRealNearbyPlacesFromGoogle = (gMaps, pyLocation, propObj) => {
+    return new Promise((resolve) => {
       try {
+        if (!gMaps || !gMaps.places) return resolve([]);
         const dummyElement = document.createElement('div');
-        const service = new window.google.maps.places.PlacesService(dummyElement);
-        const propLocation = new window.google.maps.LatLng(property.location.lat, property.location.lng);
+        const service = new gMaps.places.PlacesService(dummyElement);
 
         service.nearbySearch(
           {
-            location: propLocation,
-            radius: 3000,
-            type: ['hospital', 'school', 'transit_station', 'shopping_mall', 'bank']
+            location: pyLocation,
+            radius: 3500
           },
           (results, status) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-              const mapped = results.slice(0, 6).map((place) => {
-                // Calculate distance in km
-                const placeLoc = place.geometry.location;
-                const distMeters = window.google.maps.geometry.spherical.computeDistanceBetween(propLocation, placeLoc);
-                const distStr = distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`;
+            if (status === gMaps.places.PlacesServiceStatus.OK && Array.isArray(results) && results.length > 0) {
+              const mapped = results
+                .filter(p => p && p.name && p.geometry?.location)
+                .map(place => {
+                  const placeLoc = place.geometry.location;
+                  const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
+                    ? gMaps.geometry.spherical.computeDistanceBetween(pyLocation, placeLoc)
+                    : 0;
+                  const distStr = distMeters > 0
+                    ? (distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`)
+                    : 'Nearby';
+                  return {
+                    name: place.name,
+                    distance: distStr,
+                    distMeters: distMeters,
+                    type: formatPlaceCategory(place.types),
+                    rating: place.rating || null
+                  };
+                })
+                .sort((a, b) => a.distMeters - b.distMeters);
 
-                return {
-                  name: place.name,
-                  distance: distStr,
-                  type: place.types?.[0]?.replace('_', ' ') || 'landmark'
-                };
-              });
-              setGoogleNearbyPlaces(mapped);
+              const seen = new Set();
+              const uniquePlaces = [];
+              for (const item of mapped) {
+                const key = item.name.toLowerCase().trim();
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  uniquePlaces.push(item);
+                }
+                if (uniquePlaces.length >= 6) break;
+              }
+
+              if (uniquePlaces.length > 0) {
+                return resolve(uniquePlaces);
+              }
             }
+
+            const cityName = propObj?.location?.city || propObj?.location?.locality || propObj?.location?.district || propObj?.city || 'this area';
+            service.textSearch(
+              {
+                location: pyLocation,
+                radius: 10000,
+                query: `hospitals schools banks transit near ${cityName}`
+              },
+              (textResults, textStatus) => {
+                if (textStatus === gMaps.places.PlacesServiceStatus.OK && Array.isArray(textResults) && textResults.length > 0) {
+                  const textMapped = textResults.slice(0, 6).map(place => {
+                    const placeLoc = place.geometry.location;
+                    const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
+                      ? gMaps.geometry.spherical.computeDistanceBetween(pyLocation, placeLoc)
+                      : 0;
+                    const distStr = distMeters > 0
+                      ? (distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`)
+                      : 'Nearby';
+                    return {
+                      name: place.name,
+                      distance: distStr,
+                      type: formatPlaceCategory(place.types),
+                      rating: place.rating || null
+                    };
+                  });
+                  return resolve(textMapped);
+                }
+                resolve([]);
+              }
+            );
           }
         );
-      } catch (err) {
-        console.warn('Google Places Nearby Search fallback:', err);
+      } catch (e) {
+        console.warn('Google Places fetch error:', e);
+        resolve([]);
       }
+    });
+  };
+
+  // Fetch real nearby places using Google Places Service automatically
+  useEffect(() => {
+    if (!property) return;
+    if (window.google && window.google.maps && window.google.maps.places) {
+      const lat = Number(property.location?.lat ?? property.lat ?? 16.3067);
+      const lng = Number(property.location?.lng ?? property.lng ?? 80.4365);
+      const pyLocation = new window.google.maps.LatLng(lat, lng);
+
+      fetchRealNearbyPlacesFromGoogle(window.google.maps, pyLocation, property)
+        .then(places => setGoogleNearbyPlaces(places))
+        .catch(() => setGoogleNearbyPlaces([]));
     }
   }, [property]);
 
@@ -79,7 +154,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
     setEnquirySubmitted(true);
   };
 
-  const displayNearby = googleNearbyPlaces.length > 0 ? googleNearbyPlaces : property.nearbyPlaces || [];
+  const displayNearby = googleNearbyPlaces;
 
   return (
     <div className="min-h-screen bg-brand-offwhite pb-20">
