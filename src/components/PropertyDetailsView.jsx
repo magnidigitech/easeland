@@ -25,10 +25,11 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
-  const formatPlaceCategory = (types) => {
+  const formatPlaceCategory = (types, defaultLabel) => {
+    if (defaultLabel) return defaultLabel;
     if (!Array.isArray(types)) return 'Landmark';
     if (types.some(t => t.includes('hospital') || t.includes('doctor') || t.includes('health') || t.includes('pharmacy'))) return 'Hospital & Health';
-    if (types.some(t => t.includes('school') || t.includes('university') || t.includes('education'))) return 'School & Education';
+    if (types.some(t => t.includes('school') || t.includes('university') || t.includes('education') || t.includes('college'))) return 'School & Education';
     if (types.some(t => t.includes('transit') || t.includes('bus') || t.includes('train') || t.includes('subway'))) return 'Transit & Transport';
     if (types.some(t => t.includes('bank') || t.includes('atm') || t.includes('finance'))) return 'Bank & ATM';
     if (types.some(t => t.includes('shopping') || t.includes('store') || t.includes('supermarket') || t.includes('mall'))) return 'Shopping & Market';
@@ -43,58 +44,48 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
         const dummyElement = document.createElement('div');
         const service = new gMaps.places.PlacesService(dummyElement);
 
-        service.nearbySearch(
-          {
-            location: pyLocation,
-            radius: 3500
-          },
-          (results, status) => {
-            if (status === gMaps.places.PlacesServiceStatus.OK && Array.isArray(results) && results.length > 0) {
-              const mapped = results
-                .filter(p => p && p.name && p.geometry?.location)
-                .map(place => {
-                  const placeLoc = place.geometry.location;
-                  const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
-                    ? gMaps.geometry.spherical.computeDistanceBetween(pyLocation, placeLoc)
-                    : 0;
-                  const distStr = distMeters > 0
-                    ? (distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`)
-                    : 'Nearby';
-                  return {
-                    name: place.name,
-                    distance: distStr,
-                    distMeters: distMeters,
-                    type: formatPlaceCategory(place.types),
-                    rating: place.rating || null
-                  };
-                })
-                .sort((a, b) => a.distMeters - b.distMeters);
+        const categoriesToSearch = [
+          { type: 'hospital', label: 'Hospital & Health' },
+          { type: 'school', label: 'School & College' },
+          { type: 'bank', label: 'Bank & ATM' },
+          { type: 'transit_station', label: 'Transit & Transport' },
+          { type: 'supermarket', label: 'Shopping & Market' },
+          { type: 'shopping_mall', label: 'Shopping & Market' },
+          { type: 'store', label: 'Shopping & Market' }
+        ];
 
-              const seen = new Set();
-              const uniquePlaces = [];
-              for (const item of mapped) {
-                const key = item.name.toLowerCase().trim();
-                if (!seen.has(key)) {
-                  seen.add(key);
-                  uniquePlaces.push(item);
+        const searchPromises = categoriesToSearch.map(cat => {
+          return new Promise((resCat) => {
+            service.nearbySearch(
+              {
+                location: pyLocation,
+                radius: 3000,
+                type: cat.type
+              },
+              (results, status) => {
+                if (status === gMaps.places.PlacesServiceStatus.OK && Array.isArray(results)) {
+                  resCat(results.map(r => ({ ...r, _categoryLabel: cat.label })));
+                } else {
+                  resCat([]);
                 }
-                if (uniquePlaces.length >= 6) break;
               }
+            );
+          });
+        });
 
-              if (uniquePlaces.length > 0) {
-                return resolve(uniquePlaces);
-              }
-            }
+        Promise.all(searchPromises).then(allCategoryResults => {
+          const flattened = allCategoryResults.flat().filter(p => p && p.name && p.geometry?.location);
 
+          if (flattened.length === 0) {
             const cityName = propObj?.location?.city || propObj?.location?.locality || propObj?.location?.district || propObj?.city || 'this area';
             service.textSearch(
               {
                 location: pyLocation,
-                radius: 10000,
-                query: `hospitals schools banks transit near ${cityName}`
+                radius: 5000,
+                query: `hospitals schools banks near ${cityName}`
               },
               (textResults, textStatus) => {
-                if (textStatus === gMaps.places.PlacesServiceStatus.OK && Array.isArray(textResults) && textResults.length > 0) {
+                if (textStatus === gMaps.places.PlacesServiceStatus.OK && Array.isArray(textResults)) {
                   const textMapped = textResults.slice(0, 6).map(place => {
                     const placeLoc = place.geometry.location;
                     const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
@@ -106,7 +97,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                     return {
                       name: place.name,
                       distance: distStr,
-                      type: formatPlaceCategory(place.types),
+                      type: formatPlaceCategory(place.types, null),
                       rating: place.rating || null
                     };
                   });
@@ -115,8 +106,47 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                 resolve([]);
               }
             );
+            return;
           }
-        );
+
+          const processed = flattened.map(place => {
+            const placeLoc = place.geometry.location;
+            const distMeters = (gMaps.geometry && gMaps.geometry.spherical)
+              ? gMaps.geometry.spherical.computeDistanceBetween(pyLocation, placeLoc)
+              : 0;
+            const distStr = distMeters > 0
+              ? (distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`)
+              : 'Nearby';
+            return {
+              name: place.name,
+              distance: distStr,
+              distMeters: distMeters,
+              type: formatPlaceCategory(place.types, place._categoryLabel),
+              rating: place.rating || null
+            };
+          }).sort((a, b) => a.distMeters - b.distMeters);
+
+          const seenNames = new Set();
+          const finalPlaces = [];
+          for (const item of processed) {
+            const key = item.name.toLowerCase().trim();
+            if (!seenNames.has(key)) {
+              seenNames.add(key);
+              finalPlaces.push({
+                name: item.name,
+                distance: item.distance,
+                type: item.type,
+                rating: item.rating
+              });
+            }
+            if (finalPlaces.length >= 6) break;
+          }
+
+          resolve(finalPlaces);
+        }).catch(err => {
+          console.warn('Google Places Promise.all error:', err);
+          resolve([]);
+        });
       } catch (e) {
         console.warn('Google Places fetch error:', e);
         resolve([]);
