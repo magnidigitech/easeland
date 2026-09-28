@@ -73,7 +73,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
   const getEaselandWhatsAppUrl = () => {
     const phone = '916300691560';
-    const msg = `Hi EaseLand Concierge, I am interested in property "${property?.title || 'Listing'}" (Ref: ${property?.referenceId || ''}) listed on EaseLand. Please assist me with property details and scheduling.`;
+    const msg = `Hi EaseLand Team, I am interested in property "${property?.title || 'Listing'}" (Ref: ${property?.referenceId || ''}) listed on EaseLand. Please assist me with property details and scheduling.`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -885,17 +885,17 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           <div className="space-y-6">
             <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-20 space-y-5">
               
-              {/* EASELAND MEDIATION & CONCIERGE SUMMARY */}
+              {/* EASELAND SUPPORT CARD */}
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                 <div className="w-12 h-12 rounded-xl bg-brand-yellow text-brand-charcoal font-black text-lg flex items-center justify-center shadow-md shrink-0">
                   <ShieldCheck className="w-6 h-6 text-brand-charcoal" />
                 </div>
                 <div>
                   <span className="text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    EaseLand Official Mediator
+                    Official EaseLand Support
                   </span>
-                  <h4 className="text-base font-extrabold text-brand-charcoal mt-0.5">EaseLand Concierge</h4>
-                  <span className="text-xs text-gray-500 font-semibold">Official Platform Mediation & Support</span>
+                  <h4 className="text-base font-extrabold text-brand-charcoal mt-0.5">EaseLand Team</h4>
+                  <span className="text-xs text-gray-500 font-semibold">Property & Customer Support</span>
                 </div>
               </div>
 
@@ -928,7 +928,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                 </div>
 
                 <p className="text-[10px] text-gray-500 text-center font-medium leading-normal">
-                  EaseLand mediates all buyer-owner interactions for 100% verified, private & secure property transactions.
+                  EaseLand assists all buyer and owner connections for 100% verified, private, and secure property deals.
                 </p>
               </div>
 
