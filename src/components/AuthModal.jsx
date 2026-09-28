@@ -426,6 +426,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
               const res = await loginWithGoogle();
               setLoading(false);
               if (res.success) {
+                if (res.requires2FA) {
+                  setPending2FAData(res);
+                  setShow2FAModal(true);
+                  return;
+                }
                 if (onAuthSuccess) onAuthSuccess(res.user, initialIntent);
                 onClose();
               } else {

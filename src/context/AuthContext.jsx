@@ -468,17 +468,39 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = async () => {
     const result = await apiLoginWithGoogle();
     if (result.success && result.user) {
-      const pRes = await getCurrentUserProfile(result.user.uid);
-      if (!pRes.success) {
+      let pRes = await getCurrentUserProfile(result.user.uid);
+      if (!pRes.success || !pRes.profile) {
         try {
           await createUserProfile(result.user.uid, {
             displayName: result.user.displayName || 'EaseLand User',
             email: result.user.email || '',
             phone: result.user.phoneNumber || ''
           });
+          pRes = await getCurrentUserProfile(result.user.uid);
         } catch(e) {}
       }
-      await reloadProfile(result.user.uid);
+
+      const userProfileData = pRes.profile || {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName
+      };
+
+      const has2FA = userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA ?? false;
+      const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
+
+      if (hasAlerts) {
+        checkAndTriggerSecurityAlert(result.user.uid, result.user.email, userProfileData.security || userProfileData.communicationPreferences);
+      }
+
+      setUser(result.user);
+      setProfile(userProfileData);
+
+      if (has2FA) {
+        return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
+      }
+
+      return { success: true, user: result.user };
     }
     return result;
   };
