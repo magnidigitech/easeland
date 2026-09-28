@@ -62,12 +62,49 @@ export const applySiteTheme = (themeConfig) => {
   }
 };
 
+const FAKE_PROP_IDS = new Set([
+  'prop-101', 'prop-102', 'prop-103', 'prop-104', 'prop-105', 'prop-106', 'prop-107', 'prop-108',
+  'EL-PROP-1001', 'EL-PROP-1002', 'EL-PROP-1003', 'EL-PROP-1004', 'EL-PROP-1005', 'EL-PROP-1006'
+]);
+
+const FAKE_TITLES_LOWER = [
+  'corner open plot near inner ring road',
+  'spacious 2 bhk rental apartment in indiranagar',
+  'east facing residential land plot',
+  'luxury 4 bhk independent villa',
+  '3 bhk modern apartment in whitefield',
+  'prime gachibowli open plot for villa',
+  'demo property',
+  'sample property'
+];
+
+export const isFakeProperty = (p) => {
+  if (!p) return true;
+  const pId = String(p.id || p.propertyId || '').toLowerCase().trim();
+  if (FAKE_PROP_IDS.has(pId) || pId.startsWith('prop-10') || pId.startsWith('el-prop-100') || pId.startsWith('mock-')) {
+    return true;
+  }
+  const title = String(p.title || '').toLowerCase().trim();
+  if (FAKE_TITLES_LOWER.some(t => title.includes(t))) {
+    return true;
+  }
+  const ownerEmail = String(p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || '').toLowerCase().trim();
+  if (ownerEmail === 'testowner@easeland.in') {
+    return true;
+  }
+  const ownerName = String(p.ownerPublicName || p.owner?.name || '').toLowerCase().trim();
+  if (ownerName === 'demo owner') {
+    return true;
+  }
+  return false;
+};
+
 // Bulletproof Deduplication Algorithm across all properties (Zero Duplicate Law)
 export const deduplicateProperties = (items) => {
   if (!Array.isArray(items)) return [];
 
   // Priority sort: newly created/updated properties take priority over static mocks
-  const sorted = [...items].sort((a, b) => {
+  const sorted = [...items].filter(p => !isFakeProperty(p)).sort((a, b) => {
     if (a.createdAt && b.createdAt) return new Date(b.createdAt) - new Date(a.createdAt);
     if (a.createdAt && !b.createdAt) return -1;
     if (!a.createdAt && b.createdAt) return 1;
@@ -77,7 +114,7 @@ export const deduplicateProperties = (items) => {
   const result = [];
 
   for (const item of sorted) {
-    if (!item) continue;
+    if (!item || isFakeProperty(item)) continue;
 
     const isDuplicate = result.some(existing => {
       // 1. Same ID check
@@ -109,7 +146,7 @@ export const deduplicateProperties = (items) => {
 };
 
 // Storage state (Clean and overwrite stale localStorage duplicates)
-let rawProperties = getStoredData('easeland_properties', INITIAL_PROPERTIES);
+let rawProperties = (getStoredData('easeland_properties', INITIAL_PROPERTIES) || []).filter(p => !isFakeProperty(p));
 let properties = deduplicateProperties(rawProperties).map(p => {
   if (!p) return p;
   const isPhotoUrl = (m) => {
@@ -140,8 +177,29 @@ let properties = deduplicateProperties(rawProperties).map(p => {
     ...p,
     photos: combinedPhotos
   };
-});
+}).filter(p => !isFakeProperty(p));
+
 setStoredData('easeland_properties', properties);
+
+// Scrub all local storage keys containing property arrays
+if (typeof window !== 'undefined') {
+  try {
+    const keysToClean = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+    keysToClean.forEach(key => {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(item => {
+            if (typeof item === 'string') return !FAKE_PROP_IDS.has(item) && !item.startsWith('prop-10') && !item.startsWith('EL-PROP-100');
+            return !isFakeProperty(item);
+          });
+          localStorage.setItem(key, JSON.stringify(cleaned));
+        }
+      }
+    });
+  } catch (e) {}
+}
 
 let enquiries = getStoredData('easeland_enquiries', INITIAL_ENQUIRIES);
 let deals = getStoredData('easeland_deals', INITIAL_DEALS);
@@ -528,7 +586,7 @@ export const mockApi = {
         });
       }
     } catch (e) {}
-    return [...properties, ...localProps].find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) || null;
+    return [...properties, ...localProps].filter(p => !isFakeProperty(p)).find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) || null;
   },
 
   // -------------------------------------------------------------
@@ -580,8 +638,8 @@ export const mockApi = {
       freshProps.unshift(targetProp);
     }
 
-    properties = freshProps;
-    setStoredData('easeland_properties', freshProps);
+    properties = freshProps.filter(p => !isFakeProperty(p));
+    setStoredData('easeland_properties', properties);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: targetProp }));
@@ -615,7 +673,7 @@ export const mockApi = {
 
     const allPropsMap = new Map();
     [...properties, ...localProps].forEach(p => {
-      if (!p) return;
+      if (!p || isFakeProperty(p)) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
       if (pId) {
         allPropsMap.set(pId, { ...(allPropsMap.get(pId) || {}), ...p });
@@ -630,12 +688,12 @@ export const mockApi = {
       }
     } catch (e) {}
 
-    const mergedProps = Array.from(allPropsMap.values()).filter(p => p && !deletedIds.includes(String(p.id || p.propertyId)));
+    const mergedProps = Array.from(allPropsMap.values()).filter(p => p && !isFakeProperty(p) && !deletedIds.includes(String(p.id || p.propertyId)));
 
     const isAdmin = targetEmail === 'admin@easeland.in' || targetEmail.includes('admin') || targetId === 'admin_uid_001' || targetId === 'admin-101';
 
     return mergedProps.filter(p => {
-      if (!p) return false;
+      if (!p || isFakeProperty(p)) return false;
       const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy || '').toLowerCase().trim();
       const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
 
@@ -653,7 +711,7 @@ export const mockApi = {
       prop.status = 'PENDING_VERIFICATION';
       prop.listingStatus = 'PENDING_VERIFICATION';
       prop.verificationStatus = 'Pending Admin Verification';
-      setStoredData('easeland_properties', currentProps);
+      setStoredData('easeland_properties', currentProps.filter(p => !isFakeProperty(p)));
     }
     return prop;
   },
@@ -670,7 +728,7 @@ export const mockApi = {
 
     // 2. Remove from stored easeland_properties in localStorage
     const currentProps = getStoredData('easeland_properties', properties);
-    const updatedProps = currentProps.filter(p => p && String(p.id) !== pIdStr && String(p.propertyId) !== pIdStr);
+    const updatedProps = currentProps.filter(p => p && !isFakeProperty(p) && String(p.id) !== pIdStr && String(p.propertyId) !== pIdStr);
     setStoredData('easeland_properties', updatedProps);
 
     // 3. Track deleted ID in localStorage to prevent re-hydration
@@ -679,7 +737,7 @@ export const mockApi = {
         const rawUserProps = localStorage.getItem('easeland_user_properties');
         if (rawUserProps) {
           const parsed = JSON.parse(rawUserProps);
-          const updatedUserProps = parsed.filter(p => p && String(p.id || p.propertyId) !== pIdStr);
+          const updatedUserProps = parsed.filter(p => p && !isFakeProperty(p) && String(p.id || p.propertyId) !== pIdStr);
           localStorage.setItem('easeland_user_properties', JSON.stringify(updatedUserProps));
         }
 
@@ -711,7 +769,7 @@ export const mockApi = {
 
     const currentProps = getStoredData('easeland_properties', properties);
     return currentProps.filter(p => {
-      if (!p) return false;
+      if (!p || isFakeProperty(p)) return false;
       const pId = String(p.id || p.propertyId || '');
       if (deletedIds.includes(pId)) return false;
 
@@ -741,14 +799,14 @@ export const mockApi = {
     const combined = [...properties, ...localProps];
     const candidateMap = new Map();
     combined.forEach(p => {
-      if (!p) return;
+      if (!p || isFakeProperty(p)) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
       if (pId && !deletedIds.includes(pId)) {
         const existing = candidateMap.get(pId) || {};
         candidateMap.set(pId, { ...existing, ...p });
       }
     });
-    return Array.from(candidateMap.values());
+    return Array.from(candidateMap.values()).filter(p => !isFakeProperty(p));
   },
 
   approvePropertyAdmin: (propertyId, notes = 'Approved by Admin') => {
