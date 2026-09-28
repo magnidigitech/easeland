@@ -367,7 +367,7 @@ export default function PropertiesSearchPage({
   }, [searchState]);
 
   return (
-    <div className="h-[calc(100vh-64px)] w-full flex flex-col font-sans text-brand-charcoal overflow-hidden bg-brand-offwhite">
+    <div className="flex-1 min-h-0 w-full flex flex-col font-sans text-brand-charcoal overflow-hidden bg-brand-offwhite">
 
       {/* SEARCH HEADER & NAVIGATION BAR */}
       <div className="bg-brand-charcoal text-white border-b border-gray-800 shrink-0 z-30 shadow-md">
