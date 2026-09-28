@@ -19,17 +19,10 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
 
   const [enquirySubmitted, setEnquirySubmitted] = useState(false);
 
-  const getOwnerPhone = () => {
-    return property?.ownerPublicPhone || property?.ownerPrivatePhone || property?.ownerPhone || property?.ownerContact || property?.owner?.phone || property?.phone || '';
-  };
-
-  const getOwnerWhatsAppUrl = () => {
-    const rawPhone = getOwnerPhone();
-    const cleanDigits = String(rawPhone).replace(/\D/g, '');
-    const fullPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
-    const ownerName = property?.owner?.name || property?.ownerPublicName || property?.ownerName || 'Owner';
-    const msg = `Hi ${ownerName}, I am interested in your property "${property?.title || 'Listing'}" listed on EaseLand.`;
-    return fullPhone ? `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}` : '#';
+  const getEaselandWhatsAppUrl = () => {
+    const phone = '916300691560';
+    const msg = `Hi EaseLand Concierge, I am interested in property "${property?.title || 'Listing'}" (Ref: ${property?.referenceId || ''}) listed on EaseLand. Please assist me with property details and scheduling.`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
   // Fetch real nearby places using Google Places Service if available
@@ -385,62 +378,50 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
           {/* RIGHT 1 COLUMN: DIRECT OWNER ENQUIRY FORM */}
           <div className="space-y-6">
             
-            {/* DIRECT OWNER CONTACT CARD */}
-            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-24">
+            {/* EASELAND MEDIATION CONTACT CARD */}
+            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-24 space-y-5">
               
-              <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-5">
-                <div className="w-12 h-12 rounded-xl bg-brand-yellow text-brand-charcoal font-black text-lg flex items-center justify-center">
-                  {property.owner?.name?.charAt(0) || 'O'}
+              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div className="w-12 h-12 rounded-xl bg-brand-yellow text-brand-charcoal font-black text-lg flex items-center justify-center shadow-md shrink-0">
+                  <ShieldCheck className="w-6 h-6 text-brand-charcoal" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    Verified Owner Listing
+                  <span className="text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    EaseLand Official Mediator
                   </span>
-                  <h4 className="text-base font-bold text-brand-charcoal">{property.owner?.name}</h4>
-                  <span className="text-xs text-gray-400 font-medium">Direct Property Owner</span>
+                  <h4 className="text-base font-extrabold text-brand-charcoal mt-0.5">EaseLand Concierge</h4>
+                  <span className="text-xs text-gray-500 font-semibold">Official Platform Mediation & Support</span>
                 </div>
               </div>
 
-              {/* DIRECT OWNER CONTACT OPTIONS */}
+              {/* CONTACT EASELAND OPTIONS */}
               <div className="space-y-4 pt-2">
                 <h4 className="text-sm font-extrabold text-brand-charcoal">
-                  Interested in this Property? Contact Owner
+                  Interested in this Property? Contact EaseLand
                 </h4>
 
                 <div className="space-y-3">
                   <a
-                    href={getOwnerWhatsAppUrl()}
+                    href={getEaselandWhatsAppUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <MessageCircle className="w-5 h-5 fill-current" />
-                    <span>WhatsApp Owner</span>
+                    <span>WhatsApp EaseLand (+91 6300691560)</span>
                   </a>
 
-                  {getOwnerPhone() ? (
-                    <a
-                      href={`tel:${getOwnerPhone()}`}
-                      className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
-                    >
-                      <Phone className="w-5 h-5 text-brand-yellow" />
-                      <span>Call Owner ({getOwnerPhone()})</span>
-                    </a>
-                  ) : (
-                    <a
-                      href={getOwnerWhatsAppUrl()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
-                    >
-                      <Phone className="w-5 h-5 text-brand-yellow" />
-                      <span>Call Owner</span>
-                    </a>
-                  )}
+                  <a
+                    href="tel:6300691560"
+                    className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
+                  >
+                    <Phone className="w-5 h-5 text-brand-yellow" />
+                    <span>Call EaseLand (+91 6300691560)</span>
+                  </a>
                 </div>
 
-                <p className="text-[10px] text-gray-400 text-center font-medium">
-                  No agents or brokers. Direct contact with verified property owner.
+                <p className="text-[10px] text-gray-500 text-center font-medium leading-normal">
+                  EaseLand mediates all buyer-owner interactions for 100% verified, private & secure property transactions.
                 </p>
               </div>
 
