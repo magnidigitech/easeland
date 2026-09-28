@@ -36,9 +36,18 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
 
   // Security Form State
   const [securityData, setSecurityData] = useState({
-    emailAlerts: profile?.preferences?.emailAlerts ?? true,
-    smsAlerts: profile?.preferences?.smsAlerts ?? true
+    newPassword: '',
+    confirmPassword: '',
+    enable2FA: profile?.security?.enable2FA ?? false,
+    loginAlerts: profile?.security?.loginAlerts ?? true
   });
+
+  const passLengthValid = securityData.newPassword.length >= 8;
+  const passUpperValid = /[A-Z]/.test(securityData.newPassword);
+  const passLowerValid = /[a-z]/.test(securityData.newPassword);
+  const passDigitValid = /[0-9]/.test(securityData.newPassword);
+  const passSymbolValid = /[!@#$%^&*]/.test(securityData.newPassword);
+  const passIsStrong = passLengthValid && passUpperValid && passLowerValid && passDigitValid && passSymbolValid;
 
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
@@ -80,26 +89,44 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     setTimeout(() => setSuccessMsg(null), 3500);
   };
 
-  const handleSavePreferences = async (e) => {
+  const handleSaveSecurity = async (e) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
-    setLoading(true);
-    const result = await updatePreferencesData({
-      emailAlerts: securityData.emailAlerts,
-      smsAlerts: securityData.smsAlerts
-    });
-
-    setLoading(false);
-    if (!result.success) {
-      setError(result.error);
-      return;
+    if (securityData.newPassword) {
+      if (!passIsStrong) {
+        setError('New password must meet all complexity requirements');
+        return;
+      }
+      if (securityData.newPassword !== securityData.confirmPassword) {
+        setError('New password and confirm password do not match');
+        return;
+      }
     }
 
-    if (onUserUpdated) onUserUpdated();
-    setSuccessMsg('Communication preferences updated successfully!');
-    setTimeout(() => setSuccessMsg(null), 3500);
+    setLoading(true);
+    try {
+      const result = await updatePreferencesData({
+        enable2FA: securityData.enable2FA,
+        loginAlerts: securityData.loginAlerts,
+        ...(securityData.newPassword ? { passwordUpdated: true } : {})
+      });
+
+      setLoading(false);
+      if (result && !result.success) {
+        setError(result.error || 'Failed to update security settings');
+        return;
+      }
+
+      if (onUserUpdated) onUserUpdated();
+      setSuccessMsg('Security settings updated successfully!');
+      setSecurityData(prev => ({ ...prev, newPassword: '', confirmPassword: '' }));
+      setTimeout(() => setSuccessMsg(null), 3500);
+    } catch (err) {
+      setLoading(false);
+      setError('An error occurred while updating security settings');
+    }
   };
 
   return (

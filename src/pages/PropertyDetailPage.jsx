@@ -61,6 +61,12 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   const [enquirySubmitted, setEnquirySubmitted] = useState(false);
   const [enquiryError, setEnquiryError] = useState(null);
 
+  // Google Maps & Nearby State
+  const mapContainerRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+
   const formatPlaceCategory = (types) => {
     if (!Array.isArray(types)) return 'Landmark';
     if (types.some(t => t.includes('hospital') || t.includes('doctor') || t.includes('health') || t.includes('pharmacy'))) return 'Hospital & Health';
