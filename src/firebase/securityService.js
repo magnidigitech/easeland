@@ -33,7 +33,7 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
   console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
 
   try {
-    // Dispatch real email to userEmail via FormSubmit AJAX API
+    // 100% Dynamic Email Dispatch for any user email address
     await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(userEmail)}`, {
       method: 'POST',
       headers: {
@@ -43,6 +43,7 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
       body: JSON.stringify({
         _subject: `EaseLand Security: Your 6-Digit 2FA Verification Code [${otpCode}]`,
         _template: 'table',
+        _captcha: 'false',
         email: userEmail,
         verification_code: otpCode,
         message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}. This code is valid for 5 minutes. Do not share this code with anyone.`
