@@ -121,22 +121,11 @@ export function AuthProvider({ children }) {
         const isVerified = is2FAVerifiedForSession(currentUser.uid);
 
         if (has2FA && !isVerified) {
-          // Block active login state until 2FA OTP is verified
+          // Do not interrupt initial page load with 2FA modal. Clear background unverified session cleanly.
           setUser(null);
           setProfile(null);
-          setPending2FASession({
-            user: {
-              ...currentUser,
-              role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
-            },
-            profile: {
-              ...userProfileData,
-              role: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? 'ADMIN' : (userProfileData?.role || 'USER'),
-              adminRole: isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole
-            },
-            email: currentUser.email || userProfileData?.email || '',
-            phone: currentUser.phoneNumber || userProfileData?.phone || ''
-          });
+          setPending2FASession(null);
+          apiLogoutUser().catch(() => {});
         } else {
           setPending2FASession(null);
           setUser({
