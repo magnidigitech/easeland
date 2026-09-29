@@ -9,6 +9,7 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
   const [loading, setLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
   const [activeCodeHint, setActiveCodeHint] = useState('');
+  const [showBackupCode, setShowBackupCode] = useState(false);
   
   const inputRefs = [
     useRef(null), useRef(null), useRef(null),
@@ -195,22 +196,47 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
               </div>
             )}
 
-            {/* RESEND LINK */}
-            <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span>Didn't receive the code?</span>
-              <button
-                type="button"
-                onClick={handleResendOtp}
-                disabled={resendCountdown > 0}
-                className={`font-black flex items-center gap-1 ${
-                  resendCountdown > 0
-                    ? 'text-slate-400 cursor-not-allowed'
-                    : 'text-amber-600 hover:text-amber-700 cursor-pointer underline'
-                }`}
-              >
-                <RefreshCw className={`w-3 h-3 ${resendCountdown > 0 ? 'animate-spin' : ''}`} />
-                <span>{resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend Code'}</span>
-              </button>
+            {/* RESEND AND REVEAL CODE OPTIONS */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                <span>Didn't receive the email?</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowBackupCode(!showBackupCode)}
+                    className="text-slate-700 hover:text-slate-950 font-bold underline cursor-pointer"
+                  >
+                    {showBackupCode ? 'Hide Code' : 'Reveal OTP Code'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={resendCountdown > 0}
+                    className={`font-black flex items-center gap-1 ${
+                      resendCountdown > 0
+                        ? 'text-slate-400 cursor-not-allowed'
+                        : 'text-amber-600 hover:text-amber-700 cursor-pointer underline'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3 h-3 ${resendCountdown > 0 ? 'animate-spin' : ''}`} />
+                    <span>{resendCountdown > 0 ? `Resend (${resendCountdown}s)` : 'Resend Email'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {showBackupCode && activeCodeHint && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center space-y-1 animate-in fade-in">
+                  <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
+                    Backup Verification Code
+                  </span>
+                  <span className="text-xl font-mono font-black text-amber-950 tracking-widest block">
+                    {activeCodeHint}
+                  </span>
+                  <span className="text-[10px] text-amber-700 font-medium block">
+                    Enter these 6 digits above to complete your 2FA login.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* ACTION BUTTONS */}
