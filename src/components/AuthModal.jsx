@@ -150,7 +150,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in">
       
       <div className={`bg-white w-full ${mode === 'register' ? 'max-w-lg' : 'max-w-md'} rounded-2xl shadow-2xl border border-brand-bordergray overflow-hidden transition-all duration-200`}>
         
