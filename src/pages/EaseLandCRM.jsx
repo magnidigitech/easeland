@@ -250,16 +250,31 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     });
   }, [leads, searchQuery, leadScoreFilter, selectedAgent]);
 
+  // List of all valid CRM Kanban stages
+  const kanbanStages = useMemo(() => [
+    CrmDealStages.NEW,
+    CrmDealStages.CONTACTED,
+    CrmDealStages.SITE_VISIT,
+    CrmDealStages.DOCUMENT_AUDIT,
+    CrmDealStages.PRICE_NEGOTIATION,
+    CrmDealStages.TOKEN_ADVANCE,
+    CrmDealStages.REGISTRATION_PENDING,
+    CrmDealStages.CLOSED_WON
+  ], []);
+
   // Stage Multi-Select Toggle Handler
   const handleToggleStageFilter = (stKey) => {
     if (selectedStageFilters.length === 0) {
+      // Unchecking stKey when all were selected leaves all except stKey
+      setSelectedStageFilters(kanbanStages.filter(k => k !== stKey));
+    } else if (selectedStageFilters.includes('NONE')) {
       setSelectedStageFilters([stKey]);
     } else if (selectedStageFilters.includes(stKey)) {
       const updated = selectedStageFilters.filter(k => k !== stKey);
-      setSelectedStageFilters(updated);
+      setSelectedStageFilters(updated.length === 0 ? ['NONE'] : updated);
     } else {
-      const updated = [...selectedStageFilters, stKey];
-      if (updated.length === kanbanStages.length) {
+      const updated = [...selectedStageFilters.filter(k => k !== 'NONE'), stKey];
+      if (updated.length >= kanbanStages.length) {
         setSelectedStageFilters([]);
       } else {
         setSelectedStageFilters(updated);
@@ -268,10 +283,17 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   };
 
   const handleSelectAllStages = () => {
-    setSelectedStageFilters([]);
+    if (selectedStageFilters.length === 0 || (selectedStageFilters.length === kanbanStages.length && !selectedStageFilters.includes('NONE'))) {
+      setSelectedStageFilters(['NONE']);
+    } else {
+      setSelectedStageFilters([]);
+    }
   };
 
   const getStageFilterLabel = () => {
+    if (selectedStageFilters.includes('NONE')) {
+      return 'No Stages Selected (0)';
+    }
     if (selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) {
       return `All Stages (${deals.length})`;
     }
@@ -291,15 +313,15 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         deal.ownerName?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStage =
-        selectedStageFilters.length === 0 ||
-        selectedStageFilters.length === kanbanStages.length ||
+        selectedStageFilters.length === 0 ? true :
+        selectedStageFilters.includes('NONE') ? false :
         selectedStageFilters.includes(deal.stage);
 
       const matchesAgent = selectedAgent === 'ALL' || deal.assignedAgent === selectedAgent;
 
       return matchesSearch && matchesStage && matchesAgent;
     });
-  }, [deals, searchQuery, selectedStageFilters, selectedAgent]);
+  }, [deals, searchQuery, selectedStageFilters, selectedAgent, kanbanStages]);
 
   // Filtered Visits
   const filteredVisits = useMemo(() => {
@@ -429,17 +451,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     }
   };
 
-  // Pipeline Stages for Kanban
-  const kanbanStages = [
-    CrmDealStages.NEW,
-    CrmDealStages.CONTACTED,
-    CrmDealStages.SITE_VISIT,
-    CrmDealStages.DOCUMENT_AUDIT,
-    CrmDealStages.PRICE_NEGOTIATION,
-    CrmDealStages.TOKEN_ADVANCE,
-    CrmDealStages.REGISTRATION_PENDING,
-    CrmDealStages.CLOSED_WON
-  ];
+
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
@@ -730,11 +742,11 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                             className="flex items-center gap-2 text-xs font-black text-slate-800 hover:text-amber-600 transition-colors cursor-pointer"
                           >
                             <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
-                              selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length
+                              (selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && !selectedStageFilters.includes('NONE')
                                 ? 'bg-amber-500 border-amber-500 text-slate-950'
                                 : 'border-slate-300 bg-white'
                             }`}>
-                              {(selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && (
+                              {((selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && !selectedStageFilters.includes('NONE')) && (
                                 <Check className="w-3 h-3 stroke-[3]" />
                               )}
                             </div>
@@ -751,9 +763,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                         <div className="max-h-64 overflow-y-auto space-y-0.5 pr-0.5">
                           {kanbanStages.map((st) => {
                             const count = deals.filter(d => d.stage === st).length;
-                            const isChecked = selectedStageFilters.length === 0 || 
-                                              selectedStageFilters.length === kanbanStages.length || 
-                                              selectedStageFilters.includes(st);
+                            const isChecked = !selectedStageFilters.includes('NONE') && 
+                                              (selectedStageFilters.length === 0 || 
+                                               selectedStageFilters.length === kanbanStages.length || 
+                                               selectedStageFilters.includes(st));
                             return (
                               <button
                                 key={st}
