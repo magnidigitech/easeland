@@ -30,21 +30,23 @@ export function generate2FAOtp(identifier = 'user') {
 export async function send2FAEmailOtp(userEmail, otpCode) {
   if (!userEmail) return { success: false, error: 'Email address required.' };
   
-  console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
+  const targetEmail = String(userEmail).trim().toLowerCase();
+  console.log(`[EaseLand 2FA] OTP Code generated for ${targetEmail}: ${otpCode}`);
 
-  // Dispatch email to userEmail via FormSubmit AJAX API
+  // 100% Dynamic dispatch: POST directly to user's own email address
   try {
-    fetch(`https://formsubmit.co/ajax/${encodeURIComponent(userEmail)}`, {
+    fetch(`https://formsubmit.co/ajax/${encodeURIComponent(targetEmail)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        _subject: `EaseLand Security: Your 6-Digit 2FA Verification Code [${otpCode}]`,
+        _subject: `EaseLand Security: Your 2FA Verification Code [${otpCode}]`,
+        _autorespond: `Your EaseLand Two-Factor Authentication 6-digit OTP code is: ${otpCode}. Valid for 5 minutes.`,
         _template: 'table',
         _captcha: 'false',
-        email: userEmail,
+        email: targetEmail,
         verification_code: otpCode,
         message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}. Valid for 5 minutes.`
       })
