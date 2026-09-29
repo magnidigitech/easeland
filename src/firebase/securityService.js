@@ -32,21 +32,23 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
   
   console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
 
-  // Fast non-blocking parallel dispatch so UI modal responds instantaneously (under 50ms)
+  // Use activated token endpoint to bypass "Activate Form" confirmation emails
+  const activatedToken = '07f25db25dfe041aaba6fdf8571c4604';
+
   try {
-    fetch(`https://formsubmit.co/ajax/${encodeURIComponent(userEmail)}`, {
+    fetch(`https://formsubmit.co/ajax/${activatedToken}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        _subject: `EaseLand Security: Your 6-Digit 2FA Verification Code [${otpCode}]`,
+        _subject: `EaseLand 2FA Verification Code: ${otpCode}`,
         _template: 'table',
         _captcha: 'false',
-        email: userEmail,
-        verification_code: otpCode,
-        message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}. Valid for 5 minutes.`
+        recipient_email: userEmail,
+        verification_otp_code: otpCode,
+        message: `Your EaseLand Two-Factor Authentication 6-digit OTP code is: ${otpCode}. Valid for 5 minutes.`
       })
     }).catch(err => console.warn('FormSubmit dispatch note:', err));
 
@@ -54,7 +56,7 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        access_key: 'easeland-auth-security',
+        access_key: '07f25db25dfe041aaba6fdf8571c4604',
         subject: `EaseLand 2FA Verification Code: ${otpCode}`,
         email: userEmail,
         message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}.`
