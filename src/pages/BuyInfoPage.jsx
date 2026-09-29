@@ -92,7 +92,7 @@ export default function BuyInfoPage({ onExploreClick }) {
             </p>
           </div>
         </div>
-      </div></div>
+      </div>
 
     </div>
   );

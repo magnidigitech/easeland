@@ -92,7 +92,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
             </p>
           </div>
         </div>
-      </div>v>
+      </div>
 
     </div>
   );
