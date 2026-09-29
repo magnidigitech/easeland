@@ -19,9 +19,15 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
   useEffect(() => {
     if (!isOpen) return;
 
+    // Reset inputs & status states for fresh 2FA attempt
+    setDigits(['', '', '', '', '', '']);
+    setError(null);
+    setSuccess(false);
+    setLoading(false);
+    setResendCountdown(30);
+
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
-    setActiveCodeHint(code);
     if (userEmail) {
       send2FAEmailOtp(userEmail, code);
     }
