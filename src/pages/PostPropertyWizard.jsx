@@ -515,13 +515,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 Ref: {referenceId}
               </span>
             )}
-            <span className="text-xs font-black uppercase tracking-wider text-brand-navy bg-brand-yellow px-3.5 py-1 rounded-full shadow-sm">
+            <span className="text-xs font-black uppercase tracking-wider text-teal-950 bg-teal-400 px-3.5 py-1 rounded-full shadow-sm border border-teal-300">
               Step {step} of 8
             </span>
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-black text-brand-navy tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           List Your Property on EaseLand
         </h1>
         <p className="text-xs text-slate-600 font-semibold mt-1">
@@ -531,7 +531,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         {/* STEPPER PROGRESS BAR */}
         <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-4">
           <div
-            className="bg-brand-yellow h-full transition-all duration-300"
+            className="bg-teal-500 h-full transition-all duration-300"
             style={{ width: `${(step / 8) * 100}%` }}
           ></div>
         </div>
