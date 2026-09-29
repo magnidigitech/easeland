@@ -36,7 +36,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
   const [securityData, setSecurityData] = useState({
     newPassword: '',
     confirmPassword: '',
-    enable2FA: profile?.security?.enable2FA ?? profile?.communicationPreferences?.enable2FA ?? false,
+    enable2FA: profile?.security?.enable2FA ?? profile?.communicationPreferences?.enable2FA ?? true,
     loginAlerts: profile?.security?.loginAlerts ?? profile?.communicationPreferences?.loginAlerts ?? true
   });
 
