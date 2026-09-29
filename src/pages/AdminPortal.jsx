@@ -259,7 +259,7 @@ export default function AdminPortal({ onNavigate }) {
   const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
   const [auditRemovedItemKeys, setAuditRemovedItemKeys] = useState(new Set());
 
-  // 3-Minute Site Visitor Leads (PostgreSQL /api/visitors)
+  // 1-Minute Site Visitor Leads (PostgreSQL /api/visitors)
   const [visitorLeads, setVisitorLeads] = useState([]);
   const [visitorLoading, setVisitorLoading] = useState(false);
   const [visitorSearchQuery, setVisitorSearchQuery] = useState('');
@@ -4150,7 +4150,7 @@ export default function AdminPortal({ onNavigate }) {
               </div>
             )}
 
-            {/* TAB: VISITORS DETAILS (3-MINUTE SITE ENGAGEMENT REGISTRY) */}
+            {/* TAB: VISITORS DETAILS (1-MINUTE SITE ENGAGEMENT REGISTRY) */}
             {activeTab === 'visitors' && (
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
 
@@ -4162,14 +4162,14 @@ export default function AdminPortal({ onNavigate }) {
                         <UserCheck className="w-4 h-4 text-amber-600" />
                       </div>
                       <h3 className="text-lg font-black text-brand-charcoal">
-                        Visitors Details &amp; 3-Min Lead Registry
+                        Visitors Details &amp; 1-Min Lead Registry
                       </h3>
                       <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                         PostgreSQL Live
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 font-medium mt-1">
-                      Prospective buyers captured via engagement popup after browsing the site for at least 3 minutes.
+                      Prospective buyers captured via engagement popup after browsing the site for at least 1 minute.
                     </p>
                   </div>
 
@@ -4220,7 +4220,7 @@ export default function AdminPortal({ onNavigate }) {
 
                   <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 block">Avg Site Engagement</span>
-                    <span className="text-2xl font-black text-purple-900">3+ Mins</span>
+                    <span className="text-2xl font-black text-purple-900">1+ Min</span>
                     <span className="text-[10px] text-purple-600 block mt-0.5 font-semibold">High purchase intent</span>
                   </div>
                 </div>
@@ -4274,7 +4274,7 @@ export default function AdminPortal({ onNavigate }) {
                         <h4 className="font-extrabold text-sm text-gray-700">No Visitor Leads Matching Filter</h4>
                         <p className="text-xs text-gray-400">
                           {visitorLeads.length === 0
-                            ? 'New user leads will appear here automatically when users browse the site for over 3 minutes.'
+                            ? 'New user leads will appear here automatically when users browse the site for over 1 minute.'
                             : 'Try adjusting your search query or status filter.'}
                         </p>
                       </div>
@@ -4286,7 +4286,7 @@ export default function AdminPortal({ onNavigate }) {
                       {filtered.map((vis) => {
                         const rawPhone = (vis.phone || '').replace(/[^0-9]/g, '');
                         const waPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-                        const durationMins = Math.round((vis.stayDurationSeconds || 180) / 60);
+                        const durationMins = Math.max(1, Math.round((vis.stayDurationSeconds || 60) / 60));
 
                         return (
                           <div

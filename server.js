@@ -247,7 +247,7 @@ async function initPgDb() {
       );
     `);
 
-    // 5. Site Visitors Table (3-Minute Engaged Visitors)
+    // 5. Site Visitors Table (1-Minute Engaged Visitors)
     await client.query(`
       CREATE TABLE IF NOT EXISTS site_visitors (
         visitor_id VARCHAR(100) PRIMARY KEY,
@@ -256,8 +256,8 @@ async function initPgDb() {
         email VARCHAR(255),
         preferred_property_type VARCHAR(100),
         preferred_location TEXT,
-        stay_duration_seconds INTEGER DEFAULT 180,
-        source VARCHAR(100) DEFAULT '3_MIN_ENGAGEMENT_POPUP',
+        stay_duration_seconds INTEGER DEFAULT 60,
+        source VARCHAR(100) DEFAULT '1_MIN_ENGAGEMENT_POPUP',
         status VARCHAR(50) DEFAULT 'NEW',
         notes TEXT,
         raw_data JSONB,
@@ -903,10 +903,10 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
 });
 
 // ============================================================================
-// SITE VISITORS API ENDPOINTS (3-Minute Engaged Visitors)
+// SITE VISITORS API ENDPOINTS (1-Minute Engaged Visitors)
 // ============================================================================
 
-// Submit 3-Minute Site Visitor Lead to PostgreSQL DB
+// Submit 1-Minute Site Visitor Lead to PostgreSQL DB
 app.post('/api/visitors', async (req, res) => {
   try {
     const visitorData = req.body || {};
@@ -922,10 +922,10 @@ app.post('/api/visitors', async (req, res) => {
       email: (visitorData.email || '').trim(),
       preferredPropertyType: visitorData.preferredPropertyType || 'Open Plots',
       preferredLocation: visitorData.preferredLocation || 'Amaravati / Guntur',
-      stayDurationSeconds: Number(visitorData.stayDurationSeconds) || 180,
-      source: visitorData.source || '3_MIN_ENGAGEMENT_POPUP',
+      stayDurationSeconds: Number(visitorData.stayDurationSeconds) || 60,
+      source: visitorData.source || '1_MIN_ENGAGEMENT_POPUP',
       status: visitorData.status || 'NEW',
-      notes: visitorData.notes || 'Browsed site for over 3 minutes and submitted lead popup.',
+      notes: visitorData.notes || 'Browsed site for over 1 minute and submitted lead popup.',
       createdAt: visitorData.createdAt || nowIso,
       updatedAt: nowIso
     };

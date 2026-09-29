@@ -17,7 +17,7 @@ export default function VisitorLeadModal({ currentUser }) {
     location: 'Amaravati / Guntur Region'
   });
 
-  // Track 3-Minute (180s) on-site engagement
+  // Track 1-Minute (60s) on-site engagement
   useEffect(() => {
     // If user is already registered with contact details, skip prompt
     if (currentUser?.phone && currentUser?.phone.length >= 10) {
@@ -50,8 +50,8 @@ export default function VisitorLeadModal({ currentUser }) {
           sessionStorage.setItem('easeland_visitor_active_seconds', next.toString());
         } catch (e) {}
 
-        // Trigger at exactly 3 minutes (180 seconds)
-        if (next >= 180) {
+        // Trigger at exactly 1 minute (60 seconds)
+        if (next >= 60) {
           // Verify flags before popping up
           const alreadySubmitted = localStorage.getItem('easeland_visitor_submitted') === 'true';
           const alreadyDismissed = sessionStorage.getItem('easeland_visitor_dismissed') === 'true';
@@ -65,7 +65,7 @@ export default function VisitorLeadModal({ currentUser }) {
       });
     }, 1000);
 
-    // Provide a developer/testing hook to trigger instantly without waiting 3 mins
+    // Provide a developer/testing hook to trigger instantly without waiting
     if (typeof window !== 'undefined') {
       window.triggerVisitorLeadModal = () => setIsOpen(true);
     }
@@ -105,7 +105,7 @@ export default function VisitorLeadModal({ currentUser }) {
         email: (formData.email || '').trim(),
         preferredPropertyType: formData.propertyType,
         preferredLocation: formData.location,
-        stayDurationSeconds: Math.max(secondsOnSite, 180)
+        stayDurationSeconds: Math.max(secondsOnSite, 60)
       });
 
       if (res.success) {
@@ -159,7 +159,7 @@ export default function VisitorLeadModal({ currentUser }) {
             <div className="pt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-full border border-emerald-200">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                Saved to PostgreSQL & Verified Registry
+                Saved to PostgreSQL &amp; Verified Registry
               </span>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function VisitorLeadModal({ currentUser }) {
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-300 text-amber-900 rounded-full text-[11px] font-black uppercase tracking-wider">
                 <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                <span>3+ Mins Active On Site • Free VIP Assistance</span>
+                <span>1+ Min Active On Site • Free VIP Assistance</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-brand-navy tracking-tight">
                 Looking for the Right Land Plot in AP?

@@ -1,6 +1,6 @@
 /**
  * EaseLand Site Visitor Lead Service
- * Handles capturing, fetching, and updating engaged 3-minute site visitor leads
+ * Handles capturing, fetching, and updating engaged 1-minute site visitor leads
  * Saves to PostgreSQL Database via /api/visitors REST endpoint + LocalStorage fallback.
  */
 import { createCrmLead, CrmLeadSources, CrmLeadScores } from './crmService.js';
@@ -26,7 +26,7 @@ const setStoredVisitors = (visitors) => {
 };
 
 /**
- * Submit a visitor lead (captured from 3-minute site engagement popup)
+ * Submit a visitor lead (captured from 1-minute site engagement popup)
  * Persists to PostgreSQL via /api/visitors
  */
 export async function submitVisitorLead(visitorData) {
@@ -42,10 +42,10 @@ export async function submitVisitorLead(visitorData) {
       email: (visitorData.email || '').trim(),
       preferredPropertyType: visitorData.preferredPropertyType || 'Open Plots',
       preferredLocation: visitorData.preferredLocation || 'Amaravati / Guntur',
-      stayDurationSeconds: Number(visitorData.stayDurationSeconds) || 180,
-      source: visitorData.source || '3_MIN_ENGAGEMENT_POPUP',
+      stayDurationSeconds: Number(visitorData.stayDurationSeconds) || 60,
+      source: visitorData.source || '1_MIN_ENGAGEMENT_POPUP',
       status: 'NEW',
-      notes: visitorData.notes || 'Stayed on site for over 3 minutes and filled visitor engagement modal.',
+      notes: visitorData.notes || 'Stayed on site for over 1 minute and filled visitor engagement modal.',
       createdAt: nowIso,
       updatedAt: nowIso
     };
@@ -208,7 +208,7 @@ export async function convertVisitorToCrmLead(visitor) {
       preferredPropertyType: visitor.preferredPropertyType || 'Open Plots',
       preferredLocation: visitor.preferredLocation || 'Amaravati / Guntur',
       budgetMax: 0,
-      notes: `Converted from 3-Minute Site Visitor Lead (Browsed for ${Math.round((visitor.stayDurationSeconds || 180) / 60)} mins). ${visitor.notes || ''}`
+      notes: `Converted from 1-Minute Site Visitor Lead (Browsed for ${Math.max(1, Math.round((visitor.stayDurationSeconds || 60) / 60))} mins). ${visitor.notes || ''}`
     };
 
     const crmResult = await createCrmLead(leadPayload);
