@@ -720,11 +720,6 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     <div className="flex items-center gap-1.5">
                       <Filter className="w-3.5 h-3.5 text-amber-500" />
                       <span>{getStageFilterLabel()}</span>
-                      {selectedStageFilters.length > 0 && selectedStageFilters.length < kanbanStages.length && (
-                        <span className="bg-amber-400 text-slate-950 text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
-                          {selectedStageFilters.length}
-                        </span>
-                      )}
                     </div>
                     <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${isStageDropdownOpen ? 'rotate-180 text-amber-600' : ''}`} />
                   </button>
