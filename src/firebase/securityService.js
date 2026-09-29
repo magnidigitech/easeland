@@ -32,8 +32,8 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
   
   console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
 
-  // Use activated token endpoint for easeland.in to bypass "Activate Form" confirmation emails
-  const activatedToken = '46418b4daa69e5fc741b55a4411f6b32';
+  // Use activated token endpoint to bypass "Activate Form" confirmation emails
+  const activatedToken = '07f25db25dfe041aaba6fdf8571c4604';
 
   try {
     fetch(`https://formsubmit.co/ajax/${activatedToken}`, {
@@ -56,7 +56,7 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        access_key: '46418b4daa69e5fc741b55a4411f6b32',
+        access_key: '07f25db25dfe041aaba6fdf8571c4604',
         subject: `EaseLand 2FA Verification Code: ${otpCode}`,
         email: userEmail,
         message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}.`
