@@ -1159,6 +1159,9 @@ export default function App() {
         onClose={cancel2FASession}
       />
 
+      {/* ENGAGEMENT VISITOR LEAD POPUP MODAL (1-MIN ENGAGEMENT FOR UNAUTHENTICATED VISITORS) */}
+      <VisitorLeadModal currentUser={currentUser} />
+
     </div>
   );
 }

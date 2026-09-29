@@ -17,10 +17,10 @@ export default function VisitorLeadModal({ currentUser }) {
     location: 'Amaravati / Guntur Region'
   });
 
-  // Track 1-Minute (60s) on-site engagement
+  // Track 1-Minute (60s) on-site engagement for unauthenticated visitors
   useEffect(() => {
-    // If user is already registered with contact details, skip prompt
-    if (currentUser?.phone && currentUser?.phone.length >= 10) {
+    // If user is logged in, skip lead modal prompt
+    if (currentUser?.uid || currentUser?.id || (currentUser?.phone && currentUser?.phone.length >= 10)) {
       return;
     }
 
@@ -104,7 +104,7 @@ export default function VisitorLeadModal({ currentUser }) {
         phone: cleanPhone,
         email: (formData.email || '').trim(),
         preferredPropertyType: formData.propertyType,
-        preferredLocation: formData.location,
+        preferredLocation: (formData.location || '').trim() || 'Amaravati / Guntur Region',
         stayDurationSeconds: Math.max(secondsOnSite, 60)
       });
 
@@ -126,7 +126,7 @@ export default function VisitorLeadModal({ currentUser }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-md animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-md animate-in fade-in duration-300">
       <div 
         className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-amber-300/60 overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
@@ -211,7 +211,7 @@ export default function VisitorLeadModal({ currentUser }) {
                 {/* PHONE */}
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-wider text-gray-700 mb-1">
-                    Phone / WhatsApp *
+                    Mobile Number *
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
@@ -227,18 +227,18 @@ export default function VisitorLeadModal({ currentUser }) {
                 </div>
               </div>
 
-              {/* EMAIL */}
+              {/* LOCATION ADDRESS (OPTIONAL) */}
               <div>
                 <label className="block text-[11px] font-extrabold uppercase tracking-wider text-gray-700 mb-1">
-                  Email Address <span className="text-gray-400 font-normal">(Optional)</span>
+                  Location Address <span className="text-gray-400 font-normal">(Optional)</span>
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                  <MapPin className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   <input
-                    type="email"
-                    placeholder="name@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    type="text"
+                    placeholder="e.g. Guntur, Vijayawada, Amaravati, Mangalagiri..."
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
                   />
                 </div>
@@ -248,7 +248,7 @@ export default function VisitorLeadModal({ currentUser }) {
                 {/* PROPERTY TYPE */}
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-wider text-gray-700 mb-1">
-                    Property Type
+                    Property Type <span className="text-gray-400 font-normal">(Optional)</span>
                   </label>
                   <div className="relative">
                     <Building className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
@@ -267,25 +267,20 @@ export default function VisitorLeadModal({ currentUser }) {
                   </div>
                 </div>
 
-                {/* PREFERRED LOCATION */}
+                {/* EMAIL */}
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-wider text-gray-700 mb-1">
-                    Preferred Location
+                    Email Address <span className="text-gray-400 font-normal">(Optional)</span>
                   </label>
                   <div className="relative">
-                    <MapPin className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                    <select
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white cursor-pointer"
-                    >
-                      <option value="Amaravati / Guntur Region">Amaravati / Guntur Region</option>
-                      <option value="Vijayawada / Krishna Region">Vijayawada / Krishna Region</option>
-                      <option value="Mangalagiri Highway Corridor">Mangalagiri Highway Corridor</option>
-                      <option value="Tenali / Rural Guntur">Tenali / Rural Guntur</option>
-                      <option value="Hyderabad / Telangana">Hyderabad / Telangana</option>
-                      <option value="Other AP Locations">Other AP Locations</option>
-                    </select>
+                    <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                    <input
+                      type="email"
+                      placeholder="name@example.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
+                    />
                   </div>
                 </div>
               </div>
