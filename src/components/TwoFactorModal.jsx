@@ -8,7 +8,6 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
-  const [activeCodeHint, setActiveCodeHint] = useState('');
   
   const inputRefs = [
     useRef(null), useRef(null), useRef(null),
@@ -28,7 +27,6 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
 
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
-    setActiveCodeHint(code);
     if (userEmail) {
       send2FAEmailOtp(userEmail, code);
     }
@@ -80,7 +78,6 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     if (resendCountdown > 0) return;
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
-    setActiveCodeHint(code);
     if (userEmail) {
       send2FAEmailOtp(userEmail, code);
     }
@@ -165,12 +162,6 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
             <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
               Check your inbox for <strong>{maskedTarget}</strong> and enter the 6-digit verification code below.
             </p>
-            {activeCodeHint && (
-              <div className="mt-1 pt-1.5 border-t border-emerald-200/60 text-[11px] font-bold text-emerald-900 flex items-center justify-center gap-1.5">
-                <span>Verification Code:</span>
-                <span className="font-mono bg-white px-2 py-0.5 rounded text-emerald-950 border border-emerald-300 font-black tracking-widest">{activeCodeHint}</span>
-              </div>
-            )}
           </div>
 
           {/* OTP PIN INPUT BOXES */}
