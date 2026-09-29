@@ -107,21 +107,20 @@ export function AuthProvider({ children }) {
     };
 
     // Listen for Firebase Auth state changes and restore session
-    const unsubscribe = subscribeToAuthState(async (currentUser) => {
+    const unsubscribe = subscribeToAuthState((currentUser) => {
       if (currentUser) {
         const isAdmin = currentUser.email === 'admin@easeland.in' ||
                         currentUser.email?.includes('admin') ||
                         localStorage.getItem('easeland_admin_authenticated') === 'true';
 
-        const res = await getCurrentUserProfile(currentUser.uid);
+        // Synchronous profile hydration from local storage for 0ms instant UI response
         const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
-        const userProfileData = res.success ? { ...res.profile, ...storedProfile } : storedProfile;
+        const userProfileData = storedProfile;
 
         const has2FA = (userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA) !== false;
         const isVerified = is2FAVerifiedForSession(currentUser.uid);
 
         if (has2FA && !isVerified) {
-          // Block active login state until 2FA OTP is verified
           setUser(null);
           setProfile(null);
           setPending2FASession({
@@ -150,6 +149,14 @@ export function AuthProvider({ children }) {
             capabilities: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (userProfileData?.capabilities || ['CUSTOMER', 'OWNER'])
           });
         }
+        setLoading(false);
+
+        // Background asynchronous Firestore profile sync (non-blocking)
+        getCurrentUserProfile(currentUser.uid).then(res => {
+          if (res.success && res.profile) {
+            setProfile(prev => prev ? { ...prev, ...res.profile } : res.profile);
+          }
+        }).catch(e => console.warn('Background profile sync note:', e));
       } else {
         const isHydrated = syncAdminSession();
         if (!isHydrated) {
@@ -157,8 +164,8 @@ export function AuthProvider({ children }) {
           setProfile(null);
           setPending2FASession(null);
         }
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     const handleAdminUpdated = () => {
