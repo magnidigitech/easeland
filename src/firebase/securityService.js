@@ -32,36 +32,23 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
   
   console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
 
-  // Use activated token endpoint to bypass "Activate Form" confirmation emails
-  const activatedToken = '07f25db25dfe041aaba6fdf8571c4604';
-
+  // Dispatch email to userEmail via FormSubmit AJAX API
   try {
-    fetch(`https://formsubmit.co/ajax/${activatedToken}`, {
+    fetch(`https://formsubmit.co/ajax/${encodeURIComponent(userEmail)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        _subject: `EaseLand 2FA Verification Code: ${otpCode}`,
+        _subject: `EaseLand Security: Your 6-Digit 2FA Verification Code [${otpCode}]`,
         _template: 'table',
         _captcha: 'false',
-        recipient_email: userEmail,
-        verification_otp_code: otpCode,
-        message: `Your EaseLand Two-Factor Authentication 6-digit OTP code is: ${otpCode}. Valid for 5 minutes.`
+        email: userEmail,
+        verification_code: otpCode,
+        message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}. Valid for 5 minutes.`
       })
     }).catch(err => console.warn('FormSubmit dispatch note:', err));
-
-    fetch(`https://api.web3forms.com/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        access_key: '07f25db25dfe041aaba6fdf8571c4604',
-        subject: `EaseLand 2FA Verification Code: ${otpCode}`,
-        email: userEmail,
-        message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}.`
-      })
-    }).catch(err => console.warn('Web3Forms dispatch note:', err));
   } catch (err) {
     console.warn('Email dispatch note:', err);
   }
