@@ -86,6 +86,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const [selectedStageFilters, setSelectedStageFilters] = useState([]);
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
+  const [matchmakerSearchQuery, setMatchmakerSearchQuery] = useState('');
+  const [isMatchmakerDropdownOpen, setIsMatchmakerDropdownOpen] = useState(false);
 
   // Modals
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
@@ -93,6 +95,35 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const [isScheduleVisitModalOpen, setIsScheduleVisitModalOpen] = useState(false);
   const [selectedDealForDossier, setSelectedDealForDossier] = useState(null);
   const [activeLeadForMatching, setActiveLeadForMatching] = useState(null);
+
+  // Deduplicated Leads for Matchmaker (Zero Duplicates, Scalable to 1,000+ Buyers)
+  const uniqueMatchmakerLeads = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const lead of leads) {
+      if (!lead) continue;
+      const cleanPhone = (lead.phone || '').trim().replace(/[^0-9]/g, '');
+      const cleanName = (lead.name || '').toLowerCase().trim();
+      const key = cleanPhone.length >= 10 ? cleanPhone : (cleanName || lead.id);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(lead);
+      }
+    }
+    return result;
+  }, [leads]);
+
+  const matchmakerFilteredLeads = useMemo(() => {
+    const q = matchmakerSearchQuery.toLowerCase().trim();
+    if (!q) return uniqueMatchmakerLeads;
+    return uniqueMatchmakerLeads.filter(l =>
+      (l.name || '').toLowerCase().includes(q) ||
+      (l.phone || '').includes(q) ||
+      (l.email || '').toLowerCase().includes(q) ||
+      (l.preferredLocation || '').toLowerCase().includes(q) ||
+      (l.preferredPropertyType || '').toLowerCase().includes(q)
+    );
+  }, [uniqueMatchmakerLeads, matchmakerSearchQuery]);
 
   // Form State: New Lead
   const [newLeadForm, setNewLeadForm] = useState({
@@ -1140,26 +1171,129 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                 </p>
               </div>
 
-              {/* SELECT LEAD PICKER */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500">Selected Buyer:</span>
-                <select
-                  value={activeLeadForMatching?.id || ''}
-                  onChange={(e) => {
-                    const found = leads.find(l => l.id === e.target.value);
-                    setActiveLeadForMatching(found || null);
-                  }}
-                  className="bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+              {/* SEARCHABLE BUYER SELECTION COMBOBOX */}
+              <div className="relative w-full sm:w-80">
+                <div 
+                  onClick={() => setIsMatchmakerDropdownOpen(!isMatchmakerDropdownOpen)}
+                  className="bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2 flex items-center justify-between cursor-pointer transition-all shadow-xs"
                 >
-                  <option value="">
-                    {leads.length === 0 ? 'No registered buyers found (0 leads)...' : 'Select a prospective buyer...'}
-                  </option>
-                  {leads.map(l => (
-                    <option key={l.id} value={l.id}>{l.name} ({l.preferredLocation || 'Any Location'})</option>
-                  ))}
-                </select>
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-6 h-6 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shrink-0">
+                      {(activeLeadForMatching?.name || 'B')[0].toUpperCase()}
+                    </div>
+                    <span className="text-xs font-black text-slate-900 truncate">
+                      {activeLeadForMatching ? activeLeadForMatching.name : 'Select Buyer...'}
+                    </span>
+                    {activeLeadForMatching?.preferredLocation && (
+                      <span className="text-[10px] text-slate-500 font-bold truncate">
+                        ({activeLeadForMatching.preferredLocation})
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${isMatchmakerDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
+
+                {/* FLOATING SEARCHABLE BUYER POPOVER */}
+                {isMatchmakerDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-full sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden space-y-2 p-3 animate-in fade-in duration-150">
+                    {/* SEARCH INPUT */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Search 1,000+ buyers (name, phone, city)..."
+                        value={matchmakerSearchQuery}
+                        onChange={(e) => setMatchmakerSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between px-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                      <span>Matching Buyers ({matchmakerFilteredLeads.length})</span>
+                      {matchmakerSearchQuery && (
+                        <button 
+                          type="button"
+                          onClick={() => setMatchmakerSearchQuery('')}
+                          className="text-amber-600 hover:underline"
+                        >
+                          Clear Search
+                        </button>
+                      )}
+                    </div>
+
+                    {/* SCROLLABLE BUYERS LIST */}
+                    <div className="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                      {matchmakerFilteredLeads.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                          No buyers found matching "{matchmakerSearchQuery}"
+                        </div>
+                      ) : (
+                        matchmakerFilteredLeads.map(l => (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveLeadForMatching(l);
+                              setIsMatchmakerDropdownOpen(false);
+                            }}
+                            className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                              activeLeadForMatching?.id === l.id
+                                ? 'bg-amber-100/70 border border-amber-300 text-slate-950 font-black'
+                                : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              <div className="w-7 h-7 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
+                                {(l.name || 'B')[0].toUpperCase()}
+                              </div>
+                              <div className="truncate">
+                                <span className="font-extrabold block truncate">{l.name}</span>
+                                <span className="text-[10px] text-slate-500 block truncate font-medium">
+                                  {l.phone ? l.phone + ' • ' : ''}{l.preferredLocation || 'Any Location'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase shrink-0 ${
+                              l.score === 'HOT' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {l.score || 'HOT'}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* QUICK BUYER SELECTION PILLS BAR */}
+            {uniqueMatchmakerLeads.length > 0 && (
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center gap-2 overflow-x-auto custom-scrollbar">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0 px-1">
+                  Quick Select Buyer ({uniqueMatchmakerLeads.length}):
+                </span>
+                {uniqueMatchmakerLeads.map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setActiveLeadForMatching(l)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                      activeLeadForMatching?.id === l.id
+                        ? 'bg-slate-900 text-amber-400 shadow-sm ring-2 ring-amber-400'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>{l.name}</span>
+                    {l.preferredLocation && (
+                      <span className="text-[10px] opacity-70 font-semibold">({l.preferredLocation.split('/')[0].trim()})</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* MATCH RESULTS SECTION */}
             {!activeLeadForMatching ? (
