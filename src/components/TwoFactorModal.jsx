@@ -3,8 +3,6 @@ import { ShieldCheck, Lock, RefreshCw, X, AlertCircle, CheckCircle2, ArrowRight,
 import { verify2FAOtp, generate2FAOtp, send2FAEmailOtp } from '../firebase/securityService.js';
 
 export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userEmail = '', userPhone = '' }) {
-  if (!isOpen) return null;
-
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -19,6 +17,8 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
 
   // Initialize 2FA Code on open & dispatch email
   useEffect(() => {
+    if (!isOpen) return;
+
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
     setActiveCodeHint(code);
@@ -35,7 +35,9 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     setTimeout(() => inputRefs[0]?.current?.focus(), 150);
 
     return () => clearInterval(interval);
-  }, [userEmail, userPhone]);
+  }, [isOpen, userEmail, userPhone]);
+
+  if (!isOpen) return null;
 
   const handleDigitChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;

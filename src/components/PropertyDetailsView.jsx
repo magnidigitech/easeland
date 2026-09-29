@@ -3,9 +3,7 @@ import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLe
 import { mockApi } from '../services/mockApi';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
-  if (!property) return null;
-
-  const [activeMedia, setActiveMedia] = useState(property.photos?.[0] || '');
+  const [activeMedia, setActiveMedia] = useState(property?.photos?.[0] || '');
   const [activeMediaType, setActiveMediaType] = useState('image');
   const [googleNearbyPlaces, setGoogleNearbyPlaces] = useState([]);
 
@@ -14,10 +12,12 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
     name: '',
     email: '',
     phone: '',
-    message: `Hello, I am interested in your property "${property.title}". Please get in touch for a site visit.`
+    message: `Hello, I am interested in your property "${property?.title || 'Listing'}". Please get in touch for a site visit.`
   });
 
   const [enquirySubmitted, setEnquirySubmitted] = useState(false);
+
+  if (!property) return null;
 
   const getEaselandWhatsAppUrl = () => {
     const phone = '916300691560';

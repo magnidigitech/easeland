@@ -4,13 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import TwoFactorModal from './TwoFactorModal';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialIntent = null }) {
-  const [show2FAModal, setShow2FAModal] = useState(false);
-  const [pending2FAData, setPending2FAData] = useState(null);
-
-  if (!isOpen) return null;
-
   const { loginUser, registerUser, loginWithGoogle, sendPasswordReset } = useAuth();
 
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [pending2FAData, setPending2FAData] = useState(null);
   const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot'
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -27,6 +24,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  if (!isOpen) return null;
 
   // Live Password Validation Checks
   const passLengthValid = formData.password.length >= 8;

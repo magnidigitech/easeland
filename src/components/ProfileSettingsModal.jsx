@@ -3,8 +3,6 @@ import { X, User, Mail, Phone, Lock, ShieldCheck, Check, AlertCircle, Eye, EyeOf
 import { useAuth } from '../context/AuthContext';
 
 export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated }) {
-  if (!isOpen) return null;
-
   const { user, profile, updateProfileData, updatePreferencesData } = useAuth();
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'security'
@@ -42,18 +40,20 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     loginAlerts: profile?.security?.loginAlerts ?? profile?.communicationPreferences?.loginAlerts ?? true
   });
 
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
   const passLengthValid = securityData.newPassword.length >= 8;
   const passUpperValid = /[A-Z]/.test(securityData.newPassword);
   const passLowerValid = /[a-z]/.test(securityData.newPassword);
   const passDigitValid = /[0-9]/.test(securityData.newPassword);
   const passSymbolValid = /[!@#$%^&*]/.test(securityData.newPassword);
   const passIsStrong = passLengthValid && passUpperValid && passLowerValid && passDigitValid && passSymbolValid;
-
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [error, setError] = useState(null);
-  const [successMsg, setSuccessMsg] = useState(null);
-  const [loading, setLoading] = useState(false);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
