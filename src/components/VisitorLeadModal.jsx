@@ -14,7 +14,7 @@ export default function VisitorLeadModal({ currentUser }) {
     phone: '',
     email: '',
     propertyType: 'Open Plots',
-    location: 'Amaravati / Guntur Region'
+    location: ''
   });
 
   // Track 1-Minute (60s) on-site engagement for unauthenticated visitors
@@ -104,7 +104,7 @@ export default function VisitorLeadModal({ currentUser }) {
         phone: cleanPhone,
         email: (formData.email || '').trim(),
         preferredPropertyType: formData.propertyType,
-        preferredLocation: (formData.location || '').trim() || 'Amaravati / Guntur Region',
+        preferredLocation: (formData.location || '').trim(),
         stayDurationSeconds: Math.max(secondsOnSite, 60)
       });
 
