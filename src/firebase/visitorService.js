@@ -3,7 +3,7 @@
  * Handles capturing, fetching, and updating engaged 1-minute site visitor leads
  * Saves to PostgreSQL Database via /api/visitors REST endpoint + LocalStorage fallback.
  */
-import { createCrmLead, CrmLeadSources, CrmLeadScores } from './crmService.js';
+import { createCrmDeal, createCrmLead, CrmLeadSources, CrmLeadScores, CrmDealStages } from './crmService.js';
 
 const STORAGE_KEY = 'easeland_visitors';
 
@@ -199,19 +199,19 @@ export async function deleteVisitorLead(visitorId) {
  */
 export async function convertVisitorToCrmLead(visitor) {
   try {
-    const leadPayload = {
-      name: visitor.name || 'Site Visitor',
-      phone: visitor.phone || '',
-      email: visitor.email || '',
-      source: CrmLeadSources.WEBSITE_ENQUIRY,
-      score: CrmLeadScores.HOT,
-      preferredPropertyType: visitor.preferredPropertyType || 'Open Plots',
-      preferredLocation: visitor.preferredLocation || 'Amaravati / Guntur',
-      budgetMax: 0,
+    const dealPayload = {
+      customerName: visitor.name || 'Site Visitor',
+      customerPhone: visitor.phone || '',
+      customerEmail: visitor.email || '',
+      propertyTitle: `${visitor.preferredPropertyType || 'Plot'} Inquiry (${visitor.preferredLocation || 'AP Region'})`,
+      propertyLocation: visitor.preferredLocation || 'Amaravati / Guntur Region',
+      stage: CrmDealStages.NEW,
+      dealValue: 2000000,
+      dealValueDisplay: 'Rs. 20.0 Lakhs',
       notes: `Converted from 1-Minute Site Visitor Lead (Browsed for ${Math.max(1, Math.round((visitor.stayDurationSeconds || 60) / 60))} mins). ${visitor.notes || ''}`
     };
 
-    const crmResult = await createCrmLead(leadPayload);
+    const crmResult = await createCrmDeal(dealPayload);
     if (crmResult.success) {
       await updateVisitorStatus(visitor.id || visitor.visitorId, 'CONVERTED', 'Converted to CRM Deal Pipeline');
     }

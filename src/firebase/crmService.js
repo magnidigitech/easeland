@@ -367,6 +367,58 @@ export async function syncDealsToLeads() {
   return syncedCount;
 }
 
+export async function syncVisitorLeadsToDeals() {
+  let visitorLeads = [];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('easeland_visitors');
+      if (stored) {
+        visitorLeads = JSON.parse(stored);
+      }
+    }
+  } catch (e) {}
+
+  if (!Array.isArray(visitorLeads) || visitorLeads.length === 0) {
+    return 0;
+  }
+
+  const existingDeals = await getCrmDeals();
+  const existingPhones = new Set(existingDeals.map(d => d.customerPhone).filter(Boolean));
+  const existingNames = new Set(existingDeals.map(d => (d.customerName || '').toLowerCase().trim()));
+
+  let syncedCount = 0;
+  for (const vis of visitorLeads) {
+    if (vis && (vis.status === 'CONVERTED' || vis.status === 'QUALIFIED')) {
+      const name = vis.name || 'Site Visitor';
+      const phone = vis.phone || '';
+      const cleanName = name.toLowerCase().trim();
+
+      if ((phone && existingPhones.has(phone)) || (name && existingNames.has(cleanName))) {
+        continue;
+      }
+
+      const dealPayload = {
+        customerName: name,
+        customerPhone: phone,
+        customerEmail: vis.email || '',
+        propertyTitle: `${vis.preferredPropertyType || 'Plot'} Inquiry (${vis.preferredLocation || 'AP Region'})`,
+        propertyLocation: vis.preferredLocation || 'Amaravati / Guntur Region',
+        stage: CrmDealStages.NEW,
+        dealValue: 2000000,
+        dealValueDisplay: 'Rs. 20.0 Lakhs',
+        notes: `Converted from 1-Minute Site Visitor Lead. ${vis.notes || ''}`
+      };
+
+      await createCrmDeal(dealPayload);
+      if (phone) existingPhones.add(phone);
+      existingNames.add(cleanName);
+      syncedCount++;
+    }
+  }
+
+  return syncedCount;
+}
+
 export async function createCrmDeal(dealData) {
   const dealId = 'deal-' + Date.now().toString().slice(-6);
   const nowIso = new Date().toISOString();

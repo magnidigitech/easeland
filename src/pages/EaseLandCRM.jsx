@@ -57,7 +57,8 @@ import {
   formatAmountInWords,
   numToWordsIndian,
   syncFromLiveEnquiries,
-  syncDealsToLeads
+  syncDealsToLeads,
+  syncVisitorLeadsToDeals
 } from '../firebase/crmService.js';
 import { mockApi } from '../services/mockApi.js';
 
@@ -148,9 +149,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const loadCrmData = async (showLoadingState = true) => {
     if (showLoadingState) setLoading(true);
     try {
-      // Auto-sync real platform inquiries and deal buyers into CRM leads
+      // Auto-sync real platform inquiries, deal buyers, and visitor leads into CRM
       await syncFromLiveEnquiries();
       await syncDealsToLeads();
+      await syncVisitorLeadsToDeals();
 
       const [leadsData, dealsData, visitsData, analyticsData] = await Promise.all([
         getCrmLeads(),
