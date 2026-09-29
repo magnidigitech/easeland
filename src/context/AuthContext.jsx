@@ -537,9 +537,31 @@ export function AuthProvider({ children }) {
     return result;
   };
 
+  const complete2FASession = () => {
+    if (!pending2FASession) return;
+    const { user: targetUser, profile: targetProfile } = pending2FASession;
+    if (targetUser?.uid) {
+      mark2FAVerifiedForSession(targetUser.uid);
+    }
+    setUser(targetUser);
+    setProfile(targetProfile);
+    setPending2FASession(null);
+  };
+
+  const cancel2FASession = () => {
+    if (pending2FASession?.user?.uid) {
+      clear2FAVerifiedForSession(pending2FASession.user.uid);
+    }
+    setPending2FASession(null);
+    setUser(null);
+    setProfile(null);
+    apiLogoutUser().catch(() => {});
+  };
+
   const value = {
     user,
     profile,
+    pending2FASession,
     loading,
     isAuthenticated: !!user,
     registerUser,
@@ -551,7 +573,9 @@ export function AuthProvider({ children }) {
     sendEmailVerification,
     updateProfileData,
     updatePreferencesData,
-    reloadProfile
+    reloadProfile,
+    complete2FASession,
+    cancel2FASession
   };
 
   return (
