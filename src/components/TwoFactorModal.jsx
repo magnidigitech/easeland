@@ -149,20 +149,16 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
             </strong>
           </div>
 
-          {/* SIMULATION OTP BANNER */}
-          {activeCodeHint && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center space-y-1">
-              <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
-                Free Security Demo Verification Code
-              </span>
-              <span className="text-lg font-black tracking-widest text-amber-950 font-mono">
-                {activeCodeHint}
-              </span>
-              <p className="text-[10px] text-amber-700 font-medium">
-                Use this 6-digit code above to complete your 2FA verification.
-              </p>
+          {/* EMAIL DISPATCH CONFIRMATION BOX */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center space-y-1">
+            <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-xs font-bold">
+              <Mail className="w-4 h-4 text-emerald-600" />
+              <span>OTP Sent to Your Email</span>
             </div>
-          )}
+            <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
+              Check your inbox for <strong>{maskedTarget}</strong> and enter the 6-digit verification code below.
+            </p>
+          </div>
 
           {/* OTP PIN INPUT BOXES */}
           <form onSubmit={handleSubmit} className="space-y-6">

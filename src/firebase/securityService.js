@@ -30,6 +30,8 @@ export function generate2FAOtp(identifier = 'user') {
 export async function send2FAEmailOtp(userEmail, otpCode) {
   if (!userEmail) return { success: false, error: 'Email address required.' };
   
+  console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
+
   try {
     // Dispatch via free Webhook / Email endpoint
     await fetch('https://formspree.io/f/mq2fa_easeland_auth', {
