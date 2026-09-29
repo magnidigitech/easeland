@@ -140,8 +140,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       }
 
       if (result.requires2FA) {
-        setPending2FAData(result);
-        setShow2FAModal(true);
+        onClose();
         return;
       }
 
@@ -426,8 +425,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
               setLoading(false);
               if (res.success) {
                 if (res.requires2FA) {
-                  setPending2FAData(res);
-                  setShow2FAModal(true);
+                  onClose();
                   return;
                 }
                 if (onAuthSuccess) onAuthSuccess(res.user, initialIntent);

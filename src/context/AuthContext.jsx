@@ -395,9 +395,23 @@ export function AuthProvider({ children }) {
   };
 
   const logoutUser = async () => {
+    if (user?.uid) {
+      clear2FAVerifiedForSession(user.uid);
+    }
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.startsWith('easeland_2fa_verified_')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      }
+    } catch(e) {}
+
     const result = await apiLogoutUser();
     setUser(null);
     setProfile(null);
+    setPending2FASession(null);
     try { localStorage.removeItem('easeland_admin_authenticated'); } catch(e){}
     return result;
   };
