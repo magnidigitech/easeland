@@ -33,18 +33,23 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
   console.log(`[EaseLand 2FA] OTP Code generated for ${userEmail}: ${otpCode}`);
 
   try {
-    // Dispatch via free Webhook / Email endpoint
-    await fetch('https://formspree.io/f/mq2fa_easeland_auth', {
+    // Dispatch real email to userEmail via FormSubmit AJAX API
+    await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(userEmail)}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
+        _subject: `EaseLand Security: Your 6-Digit 2FA Verification Code [${otpCode}]`,
+        _template: 'table',
         email: userEmail,
-        subject: 'EaseLand Security: Your 6-Digit 2FA Login OTP Code',
-        message: `Your EaseLand 2FA verification code is: ${otpCode}. Valid for 5 minutes.`
+        verification_code: otpCode,
+        message: `Your EaseLand Two-Factor Authentication OTP code is: ${otpCode}. This code is valid for 5 minutes. Do not share this code with anyone.`
       })
     });
   } catch (err) {
-    console.warn('Free email dispatch note:', err);
+    console.warn('Email dispatch note:', err);
   }
   return { success: true };
 }
