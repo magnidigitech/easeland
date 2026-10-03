@@ -409,7 +409,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
         </div>
 
         {/* TWO COLUMN CONTENT LAYOUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           
           {/* LEFT 2 COLUMNS: SPECIFICATIONS, AMENITIES, NEARBY, DESCRIPTION */}
           <div className="lg:col-span-2 space-y-8">
@@ -503,10 +503,10 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
           </div>
 
           {/* RIGHT 1 COLUMN: DIRECT OWNER ENQUIRY FORM */}
-          <div className="space-y-6 pb-28">
+          <div className="space-y-6 sticky top-28">
             
             {/* EASELAND MEDIATION CONTACT CARD */}
-            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-28 space-y-5">
+            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg space-y-5">
               
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                 <div className="w-12 h-12 rounded-xl bg-brand-yellow text-brand-charcoal font-black text-lg flex items-center justify-center shadow-md shrink-0">
