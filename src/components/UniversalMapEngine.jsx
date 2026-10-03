@@ -5,7 +5,7 @@ import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Lay
 import DynamicFilterPanel from './DynamicFilterPanel';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
-import { getCategoryBadgeLabel } from '../utils/categoryUtils';
+import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -672,11 +672,11 @@ export default function UniversalMapEngine({
                 >
                   <div className="relative h-44 bg-gray-100 overflow-hidden">
                     <img
-                      src={prop.photos?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
+                      src={getFirstUploadedImage(prop)}
                       alt={prop.title}
                       onError={(e) => {
                         e.target.onerror = null;
-                        e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+                        e.target.src = getCategoryFallbackImage(prop);
                       }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -973,11 +973,11 @@ export default function UniversalMapEngine({
             </div>
 
             <img
-              src={selectedPropertyPreview.photos?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
+              src={getFirstUploadedImage(selectedPropertyPreview)}
               alt={selectedPropertyPreview.title}
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+                e.target.src = getCategoryFallbackImage(selectedPropertyPreview);
               }}
               className="w-full h-32 object-cover rounded-xl mb-3"
             />

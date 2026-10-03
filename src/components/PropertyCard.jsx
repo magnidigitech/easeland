@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Heart, MapPin, Bed, Bath, Maximize2, Sparkles, Building, ArrowUpRight } from 'lucide-react';
 import { Purpose, PropertyType } from '../firebase/schema.js';
-import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
+import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils.js';
 
 /**
  * EaseLand Marketplace Property Card Component
@@ -31,7 +31,7 @@ export default function PropertyCard({
     property.location?.state
   ].filter(Boolean).join(', ') || property.location?.city || property.location?.state || 'Pan-India';
 
-  const thumbnail = property.approvedThumbnail || property.media?.[0]?.publicUrl || property.media?.[0]?.url || null;
+  const thumbnail = getFirstUploadedImage(property);
 
   const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(propertyType);
   const bedrooms = Number(property.bedroomsNum || property.bedrooms || property.specs?.bedrooms) || 0;
@@ -55,19 +55,16 @@ export default function PropertyCard({
     >
       {/* Image Container */}
       <div className="relative aspect-[16/10] w-full bg-slate-950 overflow-hidden">
-        {thumbnail ? (
-          <img
-            src={thumbnail}
-            alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900 p-4">
-            <Building className="w-10 h-10 mb-2 opacity-50 text-amber-400" />
-            <span className="text-xs font-semibold text-slate-400">No Image Available</span>
-          </div>
-        )}
+        <img
+          src={thumbnail}
+          alt={title}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = getCategoryFallbackImage(property);
+          }}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+          loading="lazy"
+        />
 
         {/* Top Overlay Badges */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">

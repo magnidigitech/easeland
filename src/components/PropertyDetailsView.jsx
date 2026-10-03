@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLeft, Send, Sparkles, Phone, MessageCircle } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
+import { getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils.js';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
-  const [activeMedia, setActiveMedia] = useState(property?.photos?.[0] || '');
+  const [activeMedia, setActiveMedia] = useState(getFirstUploadedImage(property));
   const [activeMediaType, setActiveMediaType] = useState('image');
   const [googleNearbyPlaces, setGoogleNearbyPlaces] = useState([]);
+
+  useEffect(() => {
+    if (property) {
+      setActiveMedia(getFirstUploadedImage(property));
+    }
+  }, [property]);
 
   // Direct Owner Enquiry Form State
   const [enquiryForm, setEnquiryForm] = useState({
@@ -270,11 +277,11 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
           <div className="relative w-full h-[380px] sm:h-[500px] bg-brand-charcoal rounded-xl overflow-hidden flex items-center justify-center">
             {activeMediaType === 'image' && (
               <img
-                src={activeMedia || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'}
+                src={activeMedia || getFirstUploadedImage(property)}
                 alt={property.title}
                 onError={(e) => {
                   e.target.onerror = null;
-                  e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
+                  e.target.src = getCategoryFallbackImage(property);
                 }}
                 className="w-full h-full object-cover"
               />
@@ -321,11 +328,11 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                 }`}
               >
                 <img
-                  src={photo || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80'}
+                  src={(typeof photo === 'string' ? photo : (photo?.publicUrl || photo?.url)) || getFirstUploadedImage(property)}
                   alt=""
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+                    e.target.src = getCategoryFallbackImage(property);
                   }}
                   className="w-full h-full object-cover"
                 />

@@ -23,6 +23,7 @@ import {
 import { getPublicPropertyById } from '../firebase/propertyService.js';
 import { loadGoogleMapsScript, extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider.js';
 import { getApplicableSpecificationFields, CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
+import { getCategoryFallbackImage } from '../utils/categoryUtils.js';
 import { createEnquiry } from '../firebase/enquiryService.js';
 import { isPropertyWishlisted, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -529,33 +530,22 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     return item.url || item.publicUrl || item.mediaUrl || item.photoUrl || item.src || null;
   };
 
-  // Helper for category-based curated architectural fallback images
-  const getCategoryFallbackImage = (type) => {
-    const t = String(type || '').toUpperCase();
-    if (t.includes('PLOT') || t.includes('LAND')) {
-      return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80';
-    }
-    if (t.includes('COMMERCIAL')) {
-      return 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80';
-    }
-    if (t.includes('APARTMENT') || t.includes('FLAT')) {
-      return 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
-  };
-
-  const defaultCategoryFallback = getCategoryFallbackImage(property?.propertyType);
+  const defaultCategoryFallback = getCategoryFallbackImage(property);
 
   // Extract raw media from all possible property fields
-  const rawMediaList = (Array.isArray(property.media) && property.media.length > 0)
-    ? property.media
-    : ((Array.isArray(property.publicApprovedMedia) && property.publicApprovedMedia.length > 0)
-      ? property.publicApprovedMedia
-      : ((Array.isArray(property.photos) && property.photos.length > 0)
-        ? property.photos
-        : ((Array.isArray(property.images) && property.images.length > 0)
-          ? property.images
-          : (property.imageUrl || property.coverImage || property.photoUrl ? [property.imageUrl || property.coverImage || property.photoUrl] : []))));
+  const mediaSources = [
+    property.approvedThumbnail,
+    property.image,
+    ...(Array.isArray(property.photos) ? property.photos : []),
+    ...(Array.isArray(property.media) ? property.media : []),
+    ...(Array.isArray(property.publicApprovedMedia) ? property.publicApprovedMedia : []),
+    ...(Array.isArray(property.images) ? property.images : []),
+    property.imageUrl,
+    property.coverImage,
+    property.photoUrl
+  ].filter(Boolean);
+
+  const rawMediaList = mediaSources.length > 0 ? mediaSources : [];
 
   // Normalize raw media objects
   const parsedMediaList = rawMediaList.map(item => {

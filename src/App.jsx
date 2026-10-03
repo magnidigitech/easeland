@@ -24,6 +24,7 @@ import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searc
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
+import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings } from 'lucide-react';
 
 const getInitialPageState = () => {
@@ -689,11 +690,11 @@ export default function App() {
                         >
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
                             <img
-                              src={prop.photos?.[0] || prop.media?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
+                              src={getFirstUploadedImage(prop)}
                               alt={prop.title}
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+                                e.target.src = getCategoryFallbackImage(prop);
                               }}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
@@ -955,12 +956,20 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {wishlistProperties.map((prop) => {
                   const pId = prop.propertyId || prop.id;
-                  const firstPhoto = prop.photos?.[0] || prop.media?.[0]?.url || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+                  const firstPhoto = getFirstUploadedImage(prop);
                   return (
                     <div key={pId} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
                       <div>
                         <div className="relative h-48 w-full bg-gray-100">
-                          <img src={firstPhoto} alt={prop.title} className="w-full h-full object-cover" />
+                          <img
+                            src={firstPhoto}
+                            alt={prop.title}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getCategoryFallbackImage(prop);
+                            }}
+                            className="w-full h-full object-cover"
+                          />
                           <span className="absolute top-3 left-3 bg-slate-900/90 text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-slate-700">
                             {prop.propertyType || prop.type || 'Property'}
                           </span>

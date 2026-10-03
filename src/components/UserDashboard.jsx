@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
+import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils.js';
 import {
   LayoutDashboard,
   Building2,
@@ -284,11 +284,7 @@ export default function UserDashboard({
       }
     }
 
-    const thumbImage = (Array.isArray(p.publicApprovedMedia) && p.publicApprovedMedia.length > 0)
-      ? p.publicApprovedMedia[0].url
-      : (Array.isArray(p.media) && p.media.length > 0)
-        ? (typeof p.media[0] === 'string' ? p.media[0] : (p.media[0].url || p.media[0].mediaUrl))
-        : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+    const thumbImage = getFirstUploadedImage(p);
 
     const statusVal = (p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.isPublished || p.isPlatformVerified)
       ? 'LIVE'
@@ -835,11 +831,11 @@ export default function UserDashboard({
                       >
                         <div className="flex items-center gap-4">
                           <img
-                            src={prop.image || prop.photos?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80'}
+                            src={getFirstUploadedImage(prop)}
                             alt={prop.title}
                             onError={(e) => {
                               e.target.onerror = null;
-                              e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+                              e.target.src = getCategoryFallbackImage(prop);
                             }}
                             className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"
                           />
@@ -981,11 +977,11 @@ export default function UserDashboard({
                             className="flex items-center gap-4 cursor-pointer group"
                           >
                             <img
-                              src={prop.image || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80'}
+                              src={getFirstUploadedImage(prop)}
                               alt={prop.title}
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+                                e.target.src = getCategoryFallbackImage(prop);
                               }}
                               className="w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"
                             />
@@ -1273,11 +1269,7 @@ export default function UserDashboard({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {wishlistProperties.map((prop) => {
                       const pId = prop.id || prop.propertyId;
-                      const thumb = (Array.isArray(prop.publicApprovedMedia) && prop.publicApprovedMedia.length > 0)
-                        ? prop.publicApprovedMedia[0].url
-                        : (Array.isArray(prop.media) && prop.media.length > 0)
-                          ? (typeof prop.media[0] === 'string' ? prop.media[0] : (prop.media[0].url || prop.media[0].mediaUrl))
-                          : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+                      const thumb = getFirstUploadedImage(prop);
 
                       let displayPrice = prop.priceDisplay;
                       if (!displayPrice && prop.price) {
@@ -1299,7 +1291,7 @@ export default function UserDashboard({
                               className="w-full h-44 object-cover"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80';
+                                e.target.src = getCategoryFallbackImage(prop);
                               }}
                             />
                             <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider text-brand-yellow bg-brand-charcoal/90 backdrop-blur px-2.5 py-1 rounded-md">
