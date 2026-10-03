@@ -506,7 +506,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
           <div className="space-y-6">
             
             {/* EASELAND MEDIATION CONTACT CARD */}
-            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-28 mt-2 space-y-5">
+            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-36 space-y-5">
               
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                 <div className="w-12 h-12 rounded-xl bg-brand-yellow text-brand-charcoal font-black text-lg flex items-center justify-center shadow-md shrink-0">
