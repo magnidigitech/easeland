@@ -23,7 +23,7 @@ import {
 import { getPublicPropertyById } from '../firebase/propertyService.js';
 import { loadGoogleMapsScript, extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider.js';
 import { getApplicableSpecificationFields, CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
-import { getCategoryFallbackImage } from '../utils/categoryUtils.js';
+import { getCategoryFallbackImage, getPropertyMediaList } from '../utils/categoryUtils.js';
 import { createEnquiry } from '../firebase/enquiryService.js';
 import { isPropertyWishlisted, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -523,51 +523,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     );
   }
 
-  // Helper to extract media URL string from string or media object
-  const getMediaUrl = (item) => {
-    if (!item) return null;
-    if (typeof item === 'string') return item.trim() || null;
-    return item.url || item.publicUrl || item.mediaUrl || item.photoUrl || item.src || null;
-  };
-
-  const defaultCategoryFallback = getCategoryFallbackImage(property);
-
-  // Extract raw media from all possible property fields
-  const mediaSources = [
-    property.approvedThumbnail,
-    property.image,
-    ...(Array.isArray(property.photos) ? property.photos : []),
-    ...(Array.isArray(property.media) ? property.media : []),
-    ...(Array.isArray(property.publicApprovedMedia) ? property.publicApprovedMedia : []),
-    ...(Array.isArray(property.images) ? property.images : []),
-    property.imageUrl,
-    property.coverImage,
-    property.photoUrl
-  ].filter(Boolean);
-
-  const rawMediaList = mediaSources.length > 0 ? mediaSources : [];
-
-  // Normalize raw media objects
-  const parsedMediaList = rawMediaList.map(item => {
-    if (typeof item === 'string') {
-      return { url: item, publicUrl: item, mediaType: 'PHOTO', caption: property.title };
-    }
-    const url = getMediaUrl(item);
-    return {
-      ...item,
-      url: url || item.embedUrl || item.url || defaultCategoryFallback,
-      publicUrl: item.publicUrl || url || defaultCategoryFallback,
-      embedUrl: item.embedUrl || (url && (url.includes('youtube.com') || url.includes('youtu.be')) ? url : null),
-      mediaType: item.mediaType || item.type || (item.embedUrl ? 'WALKTHROUGH_VIDEO' : 'PHOTO'),
-      caption: item.caption || item.name || property.title
-    };
-  }).filter(item => Boolean(item.url || item.embedUrl || item.publicUrl));
-
-  // Fallback if zero photos exist in payload
-  const mediaList = parsedMediaList.length > 0
-    ? parsedMediaList
-    : [{ url: defaultCategoryFallback, publicUrl: defaultCategoryFallback, mediaType: 'PHOTO', caption: `${property.title} - Overview` }];
-
+  const mediaList = getPropertyMediaList(property);
   const activeMedia = mediaList[activeMediaIndex] || mediaList[0] || null;
 
   // Applicable specs

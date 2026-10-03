@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLeft, Send, Sparkles, Phone, MessageCircle } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
-import { getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils.js';
+import { getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList } from '../utils/categoryUtils.js';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
+  const mediaList = getPropertyMediaList(property);
   const [activeMedia, setActiveMedia] = useState(getFirstUploadedImage(property));
   const [activeMediaType, setActiveMediaType] = useState('image');
   const [googleNearbyPlaces, setGoogleNearbyPlaces] = useState([]);
@@ -314,22 +315,22 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
 
           {/* MEDIA THUMBNAILS & CONTROLS */}
           <div className="flex items-center gap-3 overflow-x-auto pb-2">
-            {property.photos?.map((photo, idx) => (
+            {mediaList.map((mItem, idx) => (
               <button
                 key={idx}
                 onClick={() => {
-                  setActiveMedia(photo);
+                  setActiveMedia(mItem.url);
                   setActiveMediaType('image');
                 }}
                 className={`relative w-24 h-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
-                  activeMedia === photo && activeMediaType === 'image'
+                  activeMedia === mItem.url && activeMediaType === 'image'
                     ? 'border-brand-yellow ring-2 ring-brand-yellow/50'
                     : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
               >
                 <img
-                  src={(typeof photo === 'string' ? photo : (photo?.publicUrl || photo?.url)) || getFirstUploadedImage(property)}
-                  alt=""
+                  src={mItem.url}
+                  alt={mItem.caption || ''}
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = getCategoryFallbackImage(property);

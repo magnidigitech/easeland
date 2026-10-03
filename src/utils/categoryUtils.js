@@ -87,64 +87,102 @@ export function getCategoryFallbackImage(property) {
 }
 
 /**
- * Safely extracts the FIRST uploaded image from any property payload.
- * Priority:
- * 1. Approved Thumbnail
- * 2. First photo object/string in photos array
- * 3. First media object/string in media array
- * 4. First image in documents array
- * 5. Distinct Category Fallback Image
+ * Safely extracts a DEDUPLICATED list of all uploaded property media.
+ * Returns an array of normalized media objects: [{ url, publicUrl, mediaType, caption }]
+ * Guarantees zero duplicate URLs in galleries across all property payload variants.
  */
-export function getFirstUploadedImage(property) {
+export function getPropertyMediaList(property) {
   if (!property) {
-    return getCategoryFallbackImage(null);
+    const fallback = getCategoryFallbackImage(null);
+    return [{ url: fallback, publicUrl: fallback, mediaType: 'PHOTO', caption: 'Property Image' }];
   }
 
-  // 1. Direct approved thumbnail / image property
-  if (typeof property.approvedThumbnail === 'string' && property.approvedThumbnail.trim()) {
-    return property.approvedThumbnail.trim();
-  }
-  if (typeof property.image === 'string' && property.image.trim()) {
-    return property.image.trim();
-  }
+  const title = property.title || 'Property Image';
+  const fallback = getCategoryFallbackImage(property);
+  const seenUrls = new Set();
+  const mediaList = [];
 
-  // 2. Photos array (Check all items for valid URL/string)
-  if (Array.isArray(property.photos) && property.photos.length > 0) {
-    for (const p of property.photos) {
-      if (!p) continue;
-      if (typeof p === 'string' && p.trim()) return p.trim();
-      if (typeof p === 'object') {
-        const u = p.publicUrl || p.url || p.fileUrl || p.path;
-        if (u && typeof u === 'string' && u.trim()) return u.trim();
+  const addMediaItem = (item) => {
+    if (!item) return;
+    let url = null;
+    let caption = title;
+    let mediaType = 'PHOTO';
+    let embedUrl = null;
+
+    if (typeof item === 'string') {
+      url = item.trim();
+    } else if (typeof item === 'object') {
+      url = item.publicUrl || item.url || item.mediaUrl || item.fileUrl || item.photoUrl || item.src || item.path;
+      caption = item.caption || item.name || title;
+      mediaType = item.mediaType || item.type || (item.embedUrl ? 'WALKTHROUGH_VIDEO' : 'PHOTO');
+      embedUrl = item.embedUrl || null;
+    }
+
+    if (!url || typeof url !== 'string') return;
+    url = url.trim();
+    if (!url) return;
+
+    // Deduplicate by URL
+    if (!seenUrls.has(url)) {
+      seenUrls.add(url);
+      mediaList.push({
+        url,
+        publicUrl: url,
+        embedUrl,
+        mediaType,
+        caption
+      });
+    }
+  };
+
+  // 1. Process main media arrays in order of priority
+  const arraysToProcess = [
+    property.photos,
+    property.media,
+    property.publicApprovedMedia,
+    property.images
+  ];
+
+  for (const arr of arraysToProcess) {
+    if (Array.isArray(arr) && arr.length > 0) {
+      for (const item of arr) {
+        addMediaItem(item);
       }
     }
   }
 
-  // 3. Media array (Check all items for valid URL/string)
-  if (Array.isArray(property.media) && property.media.length > 0) {
-    for (const m of property.media) {
-      if (!m) continue;
-      if (typeof m === 'string' && m.trim()) return m.trim();
-      if (typeof m === 'object') {
-        const u = m.publicUrl || m.url || m.fileUrl || m.path;
-        if (u && typeof u === 'string' && u.trim()) return u.trim();
-      }
-    }
-  }
+  // 2. Process thumbnail / single image fields (only added if URL wasn't in array)
+  addMediaItem(property.approvedThumbnail);
+  addMediaItem(property.image);
+  addMediaItem(property.imageUrl);
+  addMediaItem(property.coverImage);
+  addMediaItem(property.photoUrl);
 
-  // 4. Documents / PropertyDocuments array
+  // 3. Process documents if image files exist
   const docs = Array.isArray(property.documents)
     ? property.documents
     : (Array.isArray(property.propertyDocuments) ? property.propertyDocuments : []);
   for (const d of docs) {
     if (!d) continue;
-    if (typeof d === 'string' && d.trim() && /\.(jpg|jpeg|png|webp|svg)/i.test(d)) return d.trim();
-    if (typeof d === 'object') {
+    if (typeof d === 'string' && /\.(jpg|jpeg|png|webp|svg)/i.test(d)) addMediaItem(d);
+    else if (typeof d === 'object') {
       const u = d.publicUrl || d.url || d.fileUrl || d.path;
-      if (u && typeof u === 'string' && /\.(jpg|jpeg|png|webp|svg)/i.test(u)) return u.trim();
+      if (u && typeof u === 'string' && /\.(jpg|jpeg|png|webp|svg)/i.test(u)) addMediaItem(d);
     }
   }
 
-  // 5. Distinct Category Fallback
-  return getCategoryFallbackImage(property);
+  // 4. Fallback if zero valid unique media found
+  if (mediaList.length === 0) {
+    return [{ url: fallback, publicUrl: fallback, mediaType: 'PHOTO', caption: `${title} - Overview` }];
+  }
+
+  return mediaList;
+}
+
+/**
+ * Safely extracts the FIRST uploaded image from any property payload.
+ */
+export function getFirstUploadedImage(property) {
+  const list = getPropertyMediaList(property);
+  return list[0]?.url || getCategoryFallbackImage(property);
 }
