@@ -37,40 +37,7 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
     const res = await fetch('/api/send-2fa-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        using: ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail', 'urn:ietf:params:jmap:submission'],
-        methodCalls: [
-          ['Email/set', {
-            accountId: 'b',
-            create: {
-              m1: {
-                mailboxIds: { 'd': true },
-                from: [{ name: 'EaseLand Security', email: 'admin@easeland.in' }],
-                to: [{ email: targetEmail }],
-                subject: `EaseLand Security: Your 2FA Verification Code [${otpCode}]`,
-                bodyValues: {
-                  b1: {
-                    value: `<div style="font-family: Arial, sans-serif; padding: 24px; background-color: #0f172a; color: #ffffff; border-radius: 12px;">
-                      <h2 style="color: #f59e0b; margin: 0 0 12px 0;">EaseLand Security Verification</h2>
-                      <p style="font-size: 15px; color: #e2e8f0;">Your 6-digit Two-Factor Authentication code is:</p>
-                      <div style="font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #0f172a; background-color: #f59e0b; padding: 14px 28px; border-radius: 8px; display: inline-block; margin: 16px 0;">${otpCode}</div>
-                      <p style="font-size: 13px; color: #94a3b8; margin-top: 16px;">This code is valid for 5 minutes. Sent officially from <strong>admin@easeland.in</strong> on EaseLand MailServer.</p>
-                    </div>`,
-                    contentType: 'text/html'
-                  }
-                },
-                htmlBody: [{ partId: 'b1', type: 'text/html' }]
-              }
-            }
-          }, 'c1'],
-          ['EmailSubmission/set', {
-            accountId: 'b',
-            create: {
-              s1: { emailId: '#m1', identityId: 'b' }
-            }
-          }, 'c2']
-        ]
-      })
+      body: JSON.stringify({ email: targetEmail, otpCode })
     });
     const data = await res.json();
     console.log('[EaseLand 2FA] MailServer dispatch result:', data);
