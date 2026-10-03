@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLeft, Send, Sparkles, Phone, MessageCircle } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
-import { getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList } from '../utils/categoryUtils.js';
+import { getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList, getVideoThumbnailUrl } from '../utils/categoryUtils.js';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
   const mediaList = getPropertyMediaList(property);
@@ -343,24 +343,66 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
             {property.videoUrl && (
               <button
                 onClick={() => setActiveMediaType('video')}
-                className={`w-28 h-20 rounded-lg bg-brand-charcoal text-white shrink-0 flex flex-col items-center justify-center gap-1 border-2 transition-all ${
-                  activeMediaType === 'video' ? 'border-brand-yellow' : 'opacity-70 hover:opacity-100'
+                className={`relative w-28 h-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                  activeMediaType === 'video'
+                    ? 'border-brand-yellow ring-2 ring-brand-yellow/50'
+                    : 'border-transparent opacity-80 hover:opacity-100'
                 }`}
               >
-                <Video className="w-5 h-5 text-brand-yellow" />
-                <span className="text-[10px] font-bold">Walkthrough</span>
+                <video
+                  src={`${property.videoUrl}#t=0.1`}
+                  preload="metadata"
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover pointer-events-none"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <img
+                  src={getVideoThumbnailUrl(property.videoUrl, property)}
+                  alt=""
+                  className="w-full h-full object-cover opacity-80 absolute inset-0 -z-10"
+                />
+                <div className="absolute inset-0 bg-slate-950/40 flex flex-col items-center justify-center gap-1">
+                  <div className="w-7 h-7 rounded-full bg-brand-yellow text-brand-charcoal flex items-center justify-center shadow-md">
+                    <Video className="w-3.5 h-3.5 fill-current" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-white drop-shadow">Walkthrough</span>
+                </div>
               </button>
             )}
 
             {property.droneVideoUrl && (
               <button
                 onClick={() => setActiveMediaType('drone')}
-                className={`w-28 h-20 rounded-lg bg-brand-charcoal text-white shrink-0 flex flex-col items-center justify-center gap-1 border-2 transition-all ${
-                  activeMediaType === 'drone' ? 'border-brand-yellow' : 'opacity-70 hover:opacity-100'
+                className={`relative w-28 h-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                  activeMediaType === 'drone'
+                    ? 'border-brand-yellow ring-2 ring-brand-yellow/50'
+                    : 'border-transparent opacity-80 hover:opacity-100'
                 }`}
               >
-                <Plane className="w-5 h-5 text-brand-yellow" />
-                <span className="text-[10px] font-bold">Drone View</span>
+                <video
+                  src={`${property.droneVideoUrl}#t=0.1`}
+                  preload="metadata"
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover pointer-events-none"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <img
+                  src={getVideoThumbnailUrl(property.droneVideoUrl, property)}
+                  alt=""
+                  className="w-full h-full object-cover opacity-80 absolute inset-0 -z-10"
+                />
+                <div className="absolute inset-0 bg-slate-950/40 flex flex-col items-center justify-center gap-1">
+                  <div className="w-7 h-7 rounded-full bg-brand-yellow text-brand-charcoal flex items-center justify-center shadow-md">
+                    <Plane className="w-3.5 h-3.5 fill-current" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-white drop-shadow">Drone View</span>
+                </div>
               </button>
             )}
           </div>

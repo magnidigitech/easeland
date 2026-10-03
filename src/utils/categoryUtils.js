@@ -186,3 +186,32 @@ export function getFirstUploadedImage(property) {
   const list = getPropertyMediaList(property);
   return list[0]?.url || getCategoryFallbackImage(property);
 }
+
+/**
+ * Resolves a thumbnail image URL for video items (YouTube poster, video poster, or property photo).
+ */
+export function getVideoThumbnailUrl(item, property) {
+  const fallback = getFirstUploadedImage(property);
+  if (!item) return fallback;
+
+  const url = typeof item === 'string' ? item : (item.url || item.publicUrl || item.embedUrl || item.src || '');
+  if (!url) return fallback;
+
+  if (url.includes('youtube.com/embed/')) {
+    const id = url.split('/embed/')[1]?.split('?')[0]?.split('&')[0];
+    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+  } else if (url.includes('youtu.be/')) {
+    const id = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
+    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+  } else if (url.includes('youtube.com/watch')) {
+    const match = url.match(/v=([^&]+)/);
+    if (match && match[1]) return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
+  }
+
+  if (typeof item === 'object') {
+    if (item.poster) return item.poster;
+    if (item.thumbnail) return item.thumbnail;
+  }
+
+  return fallback;
+}

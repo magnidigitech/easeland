@@ -23,7 +23,7 @@ import {
 import { getPublicPropertyById } from '../firebase/propertyService.js';
 import { loadGoogleMapsScript, extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider.js';
 import { getApplicableSpecificationFields, CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
-import { getCategoryFallbackImage, getPropertyMediaList } from '../utils/categoryUtils.js';
+import { getCategoryFallbackImage, getPropertyMediaList, getVideoThumbnailUrl } from '../utils/categoryUtils.js';
 import { createEnquiry } from '../firebase/enquiryService.js';
 import { isPropertyWishlisted, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -717,11 +717,34 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                   }`}
                 >
                   {item.mediaType === 'WALKTHROUGH_VIDEO' || item.mediaType === 'DRONE_VIDEO' ? (
-                    <div className="w-full h-full bg-brand-charcoal text-white flex flex-col items-center justify-center gap-1">
-                      {item.mediaType === 'DRONE_VIDEO' ? <Plane className="w-5 h-5 text-brand-yellow" /> : <Video className="w-5 h-5 text-brand-yellow" />}
-                      <span className="text-[9px] font-extrabold uppercase">
-                        {item.mediaType === 'DRONE_VIDEO' ? 'Drone' : 'Video'}
-                      </span>
+                    <div className="relative w-full h-full bg-slate-950 overflow-hidden group">
+                      {item.url && !item.embedUrl ? (
+                        <video
+                          src={`${item.url}#t=0.1`}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover pointer-events-none"
+                        />
+                      ) : (
+                        <img
+                          src={getVideoThumbnailUrl(item, property)}
+                          alt=""
+                          className="w-full h-full object-cover opacity-80"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 p-1">
+                        <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md border border-white/40">
+                          {item.mediaType === 'DRONE_VIDEO' ? (
+                            <Plane className="w-3.5 h-3.5 fill-current" />
+                          ) : (
+                            <Video className="w-3.5 h-3.5 fill-current" />
+                          )}
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-white drop-shadow">
+                          {item.mediaType === 'DRONE_VIDEO' ? 'Drone' : 'Video'}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <img
