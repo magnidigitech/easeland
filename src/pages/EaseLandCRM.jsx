@@ -314,8 +314,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
 
       const matchesStage =
         selectedStageFilters.length === 0 ? true :
-        selectedStageFilters.includes('NONE') ? false :
-        selectedStageFilters.includes(deal.stage);
+          selectedStageFilters.includes('NONE') ? false :
+            selectedStageFilters.includes(deal.stage);
 
       const matchesAgent = selectedAgent === 'ALL' || deal.assignedAgent === selectedAgent;
 
@@ -455,14 +455,14 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      
+
       {/* ------------------------------------------------------------- */}
       {/* 1. TOP STUDIO HEADER (NAVY & GOLD ENTERPRISE SUITE)          */}
       {/* ------------------------------------------------------------- */}
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 text-white shadow-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between py-3.5 gap-4">
-            
+
             {/* BRAND & STUDIO BADGE */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-lg">
@@ -485,7 +485,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
 
             {/* QUICK ACTIONS & REDIRECTIONS */}
             <div className="flex items-center gap-2.5 flex-wrap">
-              
+
               {/* AGENT FILTER SELECTOR */}
               <div className="relative">
                 <button
@@ -506,9 +506,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                       <button
                         type="button"
                         onClick={() => { setSelectedAgent('ALL'); setIsAgentDropdownOpen(false); }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                          selectedAgent === 'ALL' ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'
-                        }`}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${selectedAgent === 'ALL' ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'
+                          }`}
                       >
                         <span>All Team Portfolio</span>
                         {selectedAgent === 'ALL' && <Check className="w-3.5 h-3.5 text-slate-950" />}
@@ -521,9 +520,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                           key={ag.id}
                           type="button"
                           onClick={() => { setSelectedAgent(ag.name); setIsAgentDropdownOpen(false); }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                            selectedAgent === ag.name ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'
-                          }`}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${selectedAgent === ag.name ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'
+                            }`}
                         >
                           <span>{ag.name}</span>
                           {selectedAgent === ag.name && <Check className="w-3.5 h-3.5 text-slate-950" />}
@@ -581,8 +579,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
           {/* ------------------------------------------------------------- */}
           <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1 border-t border-slate-800">
             {(() => {
-              const activeMatchCount = activeLeadForMatching 
-                ? matchPropertiesForLead(activeLeadForMatching, availableProperties).length 
+              const activeMatchCount = activeLeadForMatching
+                ? matchPropertiesForLead(activeLeadForMatching, availableProperties).length
                 : 0;
 
               return [
@@ -642,7 +640,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {/* TOP KPI PERFORMANCE CARDS (Always visible) */}
         {analytics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            
+
             <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-xl bg-amber-100/70 border border-amber-300/80 flex items-center justify-center shrink-0">
                 <Briefcase className="w-6 h-6 text-amber-700 stroke-[2.2]" />
@@ -695,7 +693,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {/* ------------------------------------------------------------- */}
         {activeTab === 'pipeline' && (
           <div className="space-y-4">
-            
+
             {/* SUB-HEADER & QUICK ACTIONS */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -728,7 +726,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsStageDropdownOpen(false)}></div>
                       <div className="absolute right-0 mt-1.5 w-72 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 select-none">
-                        
+
                         {/* POPOVER HEADER WITH SELECT ALL CHECKBOX */}
                         <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
                           <button
@@ -736,11 +734,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                             onClick={handleSelectAllStages}
                             className="flex items-center gap-2 text-xs font-black text-slate-800 hover:text-amber-600 transition-colors cursor-pointer"
                           >
-                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
-                              (selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && !selectedStageFilters.includes('NONE')
+                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${(selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && !selectedStageFilters.includes('NONE')
                                 ? 'bg-amber-500 border-amber-500 text-slate-950'
                                 : 'border-slate-300 bg-white'
-                            }`}>
+                              }`}>
                               {((selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length) && !selectedStageFilters.includes('NONE')) && (
                                 <Check className="w-3 h-3 stroke-[3]" />
                               )}
@@ -758,32 +755,29 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                         <div className="max-h-64 overflow-y-auto space-y-0.5 pr-0.5">
                           {kanbanStages.map((st) => {
                             const count = deals.filter(d => d.stage === st).length;
-                            const isChecked = !selectedStageFilters.includes('NONE') && 
-                                              (selectedStageFilters.length === 0 || 
-                                               selectedStageFilters.length === kanbanStages.length || 
-                                               selectedStageFilters.includes(st));
+                            const isChecked = !selectedStageFilters.includes('NONE') &&
+                              (selectedStageFilters.length === 0 ||
+                                selectedStageFilters.length === kanbanStages.length ||
+                                selectedStageFilters.includes(st));
                             return (
                               <button
                                 key={st}
                                 type="button"
                                 onClick={() => handleToggleStageFilter(st)}
-                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer group ${
-                                  isChecked ? 'bg-amber-50/80 text-slate-900 font-extrabold' : 'text-slate-600 hover:bg-slate-100'
-                                }`}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer group ${isChecked ? 'bg-amber-50/80 text-slate-900 font-extrabold' : 'text-slate-600 hover:bg-slate-100'
+                                  }`}
                               >
                                 <div className="flex items-center gap-2.5">
-                                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
-                                    isChecked
+                                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${isChecked
                                       ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-xs'
                                       : 'border-slate-300 bg-white group-hover:border-amber-400'
-                                  }`}>
+                                    }`}>
                                     {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                                   </div>
                                   <span>{CrmStageLabels[st] || st}</span>
                                 </div>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
-                                  isChecked ? 'bg-amber-200/70 text-amber-900' : 'bg-slate-100 text-slate-400'
-                                }`}>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${isChecked ? 'bg-amber-200/70 text-amber-900' : 'bg-slate-100 text-slate-400'
+                                  }`}>
                                   {count}
                                 </span>
                               </button>
@@ -969,7 +963,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                                   <span className="text-slate-500 font-bold truncate max-w-[65px]" title={deal.assignedAgent}>
                                     {deal.assignedAgent?.split(' ')[0]}
                                   </span>
-                                  
+
                                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <button
                                       onClick={() => handleTriggerWhatsApp(deal.customerPhone, deal.customerName, deal.propertyTitle)}
@@ -986,7 +980,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
-                                    
+
                                     {/* STAGE ADVANCER DROPDOWN */}
                                     <select
                                       value={deal.stage}
@@ -1019,7 +1013,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {/* ------------------------------------------------------------- */}
         {activeTab === 'leads' && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
@@ -1087,7 +1081,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   ) : (
                     filteredLeads.map((lead) => (
                       <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors">
-                        
+
                         <td className="py-3.5 px-4">
                           <span className="font-black text-sm text-slate-900 block">{lead.name}</span>
                           <span className="text-[11px] text-slate-500 block">{lead.phone || 'No phone'}</span>
@@ -1098,8 +1092,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                           <div className="space-y-1">
                             <span className={'inline-block text-[10px] font-black px-2 py-0.5 rounded-full ' +
                               (lead.score === CrmLeadScores.HOT ? 'bg-red-100 text-red-700 border border-red-200' :
-                               lead.score === CrmLeadScores.WARM ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                               'bg-blue-100 text-blue-800 border border-blue-200')
+                                lead.score === CrmLeadScores.WARM ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                  'bg-blue-100 text-blue-800 border border-blue-200')
                             }>
                               {lead.score} LEAD
                             </span>
@@ -1167,7 +1161,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {/* ------------------------------------------------------------- */}
         {activeTab === 'matchmaker' && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
-            
+
             <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
@@ -1181,7 +1175,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
 
               {/* SEARCHABLE BUYER SELECTION COMBOBOX */}
               <div className="relative w-full sm:w-80">
-                <div 
+                <div
                   onClick={() => setIsMatchmakerDropdownOpen(!isMatchmakerDropdownOpen)}
                   className="bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2 flex items-center justify-between cursor-pointer transition-all shadow-xs"
                 >
@@ -1220,7 +1214,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     <div className="flex items-center justify-between px-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
                       <span>Matching Buyers ({matchmakerFilteredLeads.length})</span>
                       {matchmakerSearchQuery && (
-                        <button 
+                        <button
                           type="button"
                           onClick={() => setMatchmakerSearchQuery('')}
                           className="text-amber-600 hover:underline"
@@ -1245,11 +1239,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                               setActiveLeadForMatching(l);
                               setIsMatchmakerDropdownOpen(false);
                             }}
-                            className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
-                              activeLeadForMatching?.id === l.id
+                            className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${activeLeadForMatching?.id === l.id
                                 ? 'bg-amber-100/70 border border-amber-300 text-slate-950 font-black'
                                 : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2.5 truncate">
                               <div className="w-7 h-7 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
@@ -1263,9 +1256,8 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                               </div>
                             </div>
 
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase shrink-0 ${
-                              l.score === 'HOT' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
-                            }`}>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase shrink-0 ${l.score === 'HOT' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
+                              }`}>
                               {l.score || 'HOT'}
                             </span>
                           </button>
@@ -1288,11 +1280,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     key={l.id}
                     type="button"
                     onClick={() => setActiveLeadForMatching(l)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                      activeLeadForMatching?.id === l.id
+                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${activeLeadForMatching?.id === l.id
                         ? 'bg-slate-900 text-amber-400 shadow-sm ring-2 ring-amber-400'
                         : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <span>{l.name}</span>
                     {l.preferredLocation && (
@@ -1337,7 +1328,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
               </div>
             ) : (
               <div className="space-y-6">
-                
+
                 {/* ACTIVE BUYER PROFILE SUMMARY */}
                 <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -1377,12 +1368,12 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                       {matched.map(({ property, matchScore }) => (
                         <div key={property.id || property.propertyId} className="bg-white rounded-2xl border border-slate-200 hover:border-amber-400 p-4 shadow-sm hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
                           <div className="space-y-2">
-                            
+
                             <div className="flex items-center justify-between">
                               <span className={'px-2.5 py-1 rounded-full text-[10px] font-black ' +
                                 (matchScore >= 80 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                                 matchScore >= 60 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                                 'bg-blue-100 text-blue-800 border border-blue-300')
+                                  matchScore >= 60 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                                    'bg-blue-100 text-blue-800 border border-blue-300')
                               }>
                                 {matchScore}% Criteria Match
                               </span>
@@ -1446,7 +1437,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {/* ------------------------------------------------------------- */}
         {activeTab === 'visits' && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
@@ -1477,13 +1468,13 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                 filteredVisits.map((visit) => (
                   <div key={visit.id} className="p-5 bg-white rounded-2xl border border-slate-200 hover:border-amber-400 shadow-sm transition-all space-y-3 flex flex-col justify-between">
                     <div className="space-y-2.5">
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="font-black text-sm text-slate-900">{visit.customerName}</span>
                         <span className={'text-[10px] font-black px-2.5 py-0.5 rounded-full ' +
                           (visit.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
-                           visit.status === 'SCHEDULED' ? 'bg-amber-100 text-amber-800' :
-                           'bg-slate-100 text-slate-700')
+                            visit.status === 'SCHEDULED' ? 'bg-amber-100 text-amber-800' :
+                              'bg-slate-100 text-slate-700')
                         }>
                           {visit.status}
                         </span>
@@ -1568,7 +1559,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
         {/* ------------------------------------------------------------- */}
         {activeTab === 'overview' && analytics && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             {/* PORTFOLIO AGENTS DIRECTORY */}
             <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
               <h4 className="text-base font-black text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -1630,7 +1621,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
       {isNewLeadModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
-            
+
             <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black">
@@ -1644,7 +1635,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             </div>
 
             <form onSubmit={handleCreateLeadSubmit} className="p-6 space-y-4">
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
@@ -1786,7 +1777,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
       {isNewDealModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
-            
+
             <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black">
@@ -1800,7 +1791,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             </div>
 
             <form onSubmit={handleCreateDealSubmit} className="p-6 space-y-4">
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Buyer Name *</label>
@@ -1902,7 +1893,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
       {isScheduleVisitModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
-            
+
             <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black">
@@ -1916,7 +1907,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             </div>
 
             <form onSubmit={handleScheduleVisitSubmit} className="p-6 space-y-4">
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Customer / Buyer Name *</label>
@@ -2030,7 +2021,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
       {selectedDealForDossier && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
-            
+
             <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black">
@@ -2047,7 +2038,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             </div>
 
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
-              
+
               {/* STAGE & FINANCIALS BANNER */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div>
