@@ -128,17 +128,17 @@ export default function VisitorLeadModal({ currentUser }) {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-md animate-in fade-in duration-300">
       <div 
-        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-amber-300/60 overflow-hidden relative"
+        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-amber-300/60 overflow-hidden relative max-h-[90dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* TOP ACCENT BRAND BAR */}
-        <div className="h-2 bg-gradient-to-r from-brand-navy via-brand-yellow to-brand-navy" />
+        <div className="h-2 bg-gradient-to-r from-brand-navy via-brand-yellow to-brand-navy shrink-0" />
 
         {/* CLOSE BUTTON */}
         <button
           type="button"
           onClick={handleDismiss}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors z-10"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors z-20"
           aria-label="Close popup"
         >
           <X className="w-5 h-5" />
@@ -146,7 +146,7 @@ export default function VisitorLeadModal({ currentUser }) {
 
         {submitted ? (
           /* SUCCESS STATE */
-          <div className="p-8 text-center space-y-4">
+          <div className="p-6 sm:p-8 text-center space-y-4 overflow-y-auto">
             <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-inner">
               <CheckCircle2 className="w-9 h-9" />
             </div>
@@ -165,9 +165,9 @@ export default function VisitorLeadModal({ currentUser }) {
           </div>
         ) : (
           /* LEAD FORM STATE */
-          <div className="p-6 sm:p-8 space-y-5">
+          <div className="p-5 sm:p-8 space-y-5 overflow-y-auto max-h-[calc(90dvh-16px)]">
             {/* HEADER BADGE & TITLE */}
-            <div className="space-y-2">
+            <div className="space-y-2 pr-8">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-300 text-amber-900 rounded-full text-[11px] font-black uppercase tracking-wider">
                 <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                 <span>1+ Min Active On Site • Free VIP Assistance</span>

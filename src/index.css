@@ -20,6 +20,18 @@
 }
 
 @layer base {
+  html, body {
+    min-height: 100dvh;
+  }
+  .min-h-screen {
+    min-height: 100dvh !important;
+  }
+  .h-screen {
+    height: 100dvh !important;
+  }
+  .max-h-screen {
+    max-height: 100dvh !important;
+  }
   body {
     background-color: #f8fafc;
     background-image: 
