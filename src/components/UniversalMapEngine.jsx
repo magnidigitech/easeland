@@ -880,34 +880,33 @@ export default function UniversalMapEngine({
         {/* LEAFLET MAP CANVAS */}
         <div ref={mapContainerRef} className="w-full h-full z-0 min-h-[300px]"></div>
 
-        {/* TOP-RIGHT CORNER MAP LEGEND SIDE STRIP & DRAWER */}
-        <div className="absolute top-16 right-4 z-20 flex flex-col items-end select-none">
+        {/* MAP PRICE LEGEND RIGHT EDGE SIDE STRIP TAB & SLIDE-OUT DRAWER */}
+        <div className="absolute top-24 right-0 z-30 flex flex-col items-end select-none">
           {!isLegendOpen ? (
             <button
               onClick={() => setIsLegendOpen(true)}
-              className="bg-slate-950/90 hover:bg-slate-900 text-amber-400 border border-slate-700 shadow-2xl px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-black backdrop-blur-md transition-all transform hover:scale-105 cursor-pointer"
-              title="Click to view Map Price Legend"
+              className="bg-slate-950/95 hover:bg-slate-900 text-amber-400 border-y border-l border-amber-400/50 shadow-2xl py-3 px-2.5 rounded-l-2xl flex items-center gap-1.5 text-xs font-black backdrop-blur-md transition-all transform hover:-translate-x-1 cursor-pointer group"
+              title="Click to open Map Price Legend"
             >
-              <Compass className="w-4 h-4 text-amber-400" />
-              <span>Map Legend</span>
+              <Compass className="w-4 h-4 text-amber-400 group-hover:rotate-45 transition-transform" />
+              <span className="text-[10px] font-extrabold tracking-widest uppercase text-amber-300">
+                Legend
+              </span>
             </button>
           ) : (
-            <div className="bg-slate-950 text-white p-3.5 rounded-2xl border border-slate-700 shadow-2xl w-64 max-w-[calc(100vw-50px)] animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-black text-amber-400">
+            <div className="bg-slate-950/95 text-white p-4 rounded-l-3xl border-y border-l border-slate-700 shadow-2xl w-72 max-w-[calc(100vw-20px)] animate-in slide-in-from-right duration-300 backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-400">
                   <Compass className="w-4 h-4 text-amber-400" />
                   <span>Map Price Legend</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider hidden sm:inline">Color Guide</span>
-                  <button
-                    onClick={() => setIsLegendOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                    aria-label="Close Map Legend"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => setIsLegendOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                  aria-label="Close Map Legend"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
               <div className="space-y-2.5 text-xs font-bold">
