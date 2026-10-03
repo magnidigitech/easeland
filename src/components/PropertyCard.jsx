@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Heart, MapPin, Bed, Bath, Maximize2, Sparkles, Building, ArrowUpRight } from 'lucide-react';
 import { Purpose, PropertyType } from '../firebase/schema.js';
+import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
 
 /**
  * EaseLand Marketplace Property Card Component
@@ -75,7 +76,7 @@ export default function PropertyCard({
               {purpose === 'RENT' ? 'FOR RENT' : purpose === 'LEASE' ? 'FOR LEASE' : 'FOR SALE'}
             </span>
             <span className="px-2.5 py-1 text-[11px] font-bold bg-slate-900 text-slate-200 rounded-lg shadow-sm border border-slate-700">
-              {propertyType.replace(/_/g, ' ')}
+              {getCategoryBadgeLabel(property)}
             </span>
           </div>
 

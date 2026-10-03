@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
 import {
   LayoutDashboard,
   Building2,
@@ -1302,7 +1303,7 @@ export default function UserDashboard({
                               }}
                             />
                             <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider text-brand-yellow bg-brand-charcoal/90 backdrop-blur px-2.5 py-1 rounded-md">
-                              {prop.propertyType || prop.type || 'OPEN_PLOT'}
+                              {getCategoryBadgeLabel(prop)}
                             </span>
                           </div>
                           <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">

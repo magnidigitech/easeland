@@ -5,6 +5,7 @@ import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Lay
 import DynamicFilterPanel from './DynamicFilterPanel';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
+import { getCategoryBadgeLabel } from '../utils/categoryUtils';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -687,8 +688,8 @@ export default function UniversalMapEngine({
                       </span>
                     </div>
 
-                    <div className="absolute top-3 right-3 bg-slate-900 text-amber-400 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 shadow-sm">
-                      {prop.category}
+                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md backdrop-blur-sm">
+                      {getCategoryBadgeLabel(prop)}
                     </div>
 
                     <button
@@ -710,12 +711,15 @@ export default function UniversalMapEngine({
                     <div>
                       <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold mb-1">
                         <span>{prop.location?.locality || prop.location?.city || 'India'}</span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={`px-2 py-0.5 rounded font-extrabold text-[10px] border ${getBoundaryStyle(prop).badgeClass}`}>
                             {getBoundaryStyle(prop).typeLabel}
                           </span>
-                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold text-[10px]">
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-emerald-200/60">
                             Direct Owner
+                          </span>
+                          <span className="text-sky-800 bg-sky-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-sky-200">
+                            {getCategoryBadgeLabel(prop)}
                           </span>
                         </div>
                       </div>
