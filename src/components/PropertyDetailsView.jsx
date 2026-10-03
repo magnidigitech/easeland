@@ -409,7 +409,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
         </div>
 
         {/* TWO COLUMN CONTENT LAYOUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-48">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
           
           {/* LEFT 2 COLUMNS: SPECIFICATIONS, AMENITIES, NEARBY, DESCRIPTION */}
           <div className="lg:col-span-2 space-y-8">

@@ -540,7 +540,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   ].filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-brand-offwhite pb-24">
+    <div className="min-h-screen bg-brand-offwhite pb-8">
       
       {/* TOP NAVIGATION BAR */}
       <div className="bg-brand-charcoal text-white py-3.5 px-4 sm:px-6 lg:px-8 border-b border-white/10 shadow-sm">
@@ -764,7 +764,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         </div>
 
         {/* TWO COLUMN GRID CONTENT */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-48">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
           
           {/* LEFT 2 COLUMNS: VERIFIED INFO, SPECS, AMENITIES, NEARBY, DESCRIPTION */}
           <div className="lg:col-span-2 space-y-8">
