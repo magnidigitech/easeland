@@ -406,10 +406,15 @@ export function AuthProvider({ children }) {
       clear2FAVerifiedForSession(user.uid);
     }
     try {
-      if (typeof sessionStorage !== 'undefined') {
-        Object.keys(sessionStorage).forEach(key => {
+      if (typeof window !== 'undefined') {
+        Object.keys(sessionStorage || {}).forEach(key => {
           if (key.startsWith('easeland_2fa_verified_')) {
             sessionStorage.removeItem(key);
+          }
+        });
+        Object.keys(localStorage || {}).forEach(key => {
+          if (key.startsWith('easeland_2fa_verified_')) {
+            localStorage.removeItem(key);
           }
         });
       }

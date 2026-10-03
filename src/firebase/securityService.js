@@ -51,7 +51,10 @@ export async function send2FAEmailOtp(userEmail, otpCode) {
 export function is2FAVerifiedForSession(uid) {
   if (typeof window === 'undefined' || !uid) return false;
   try {
-    return sessionStorage.getItem(`easeland_2fa_verified_${uid}`) === 'true';
+    return (
+      sessionStorage.getItem(`easeland_2fa_verified_${uid}`) === 'true' ||
+      localStorage.getItem(`easeland_2fa_verified_${uid}`) === 'true'
+    );
   } catch (e) {
     return false;
   }
@@ -61,6 +64,7 @@ export function mark2FAVerifiedForSession(uid) {
   if (typeof window === 'undefined' || !uid) return;
   try {
     sessionStorage.setItem(`easeland_2fa_verified_${uid}`, 'true');
+    localStorage.setItem(`easeland_2fa_verified_${uid}`, 'true');
   } catch (e) {}
 }
 
@@ -68,6 +72,7 @@ export function clear2FAVerifiedForSession(uid) {
   if (typeof window === 'undefined' || !uid) return;
   try {
     sessionStorage.removeItem(`easeland_2fa_verified_${uid}`);
+    localStorage.removeItem(`easeland_2fa_verified_${uid}`);
   } catch (e) {}
 }
 
