@@ -553,7 +553,7 @@ export default function UniversalMapEngine({
       
       {/* LEFT PROPERTY LIST CONTAINER (Fixed Width 380px/400px Collapsible Side Panel) */}
       {!hideSidePanel && (
-        <div className={`w-full md:w-[380px] lg:w-[400px] flex-shrink-0 h-full bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg transition-all duration-300 ease-in-out ${
+        <div className={`w-full md:w-[380px] lg:w-[400px] flex-shrink-0 h-full bg-white border-r border-gray-200 flex flex-col z-[35] md:z-10 shadow-lg transition-all duration-300 ease-in-out ${
           isSidePanelOpen ? 'ml-0' : '-ml-[100%] md:-ml-[380px] lg:-ml-[400px]'
         }`}>
           
@@ -639,7 +639,7 @@ export default function UniversalMapEngine({
           </div>
 
           {/* PROPERTY LIST CARDS */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4 pb-20">
             {filters?.cleared ? (
               <div className="text-center py-12 px-6 text-gray-500">
                 <MapPin className="w-12 h-12 text-brand-yellow mx-auto mb-3" />
@@ -665,10 +665,10 @@ export default function UniversalMapEngine({
                 <div
                   key={prop.id}
                   onClick={() => setSelectedPropertyPreview(prop)}
-                  className={`group bg-white rounded-xl border transition-all cursor-pointer overflow-hidden flex flex-col ${
+                  className={`group bg-white rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col mx-0.5 sm:mx-0 shadow-sm hover:shadow-md ${
                     selectedPropertyPreview?.id === prop.id
                       ? 'border-brand-yellow ring-2 ring-brand-yellow/30 shadow-lg'
-                      : 'border-gray-200 hover:border-brand-yellow hover:shadow-md'
+                      : 'border-gray-200 hover:border-brand-yellow'
                   }`}
                 >
                   <div className="relative h-44 bg-gray-100 overflow-hidden">
@@ -881,7 +881,7 @@ export default function UniversalMapEngine({
         <div ref={mapContainerRef} className="w-full h-full z-0 min-h-[300px]"></div>
 
         {/* TOP-RIGHT CORNER MAP LEGEND SIDE STRIP & DRAWER */}
-        <div className="absolute top-4 right-16 z-30 flex flex-col items-end select-none">
+        <div className="absolute top-16 right-4 z-20 flex flex-col items-end select-none">
           {!isLegendOpen ? (
             <button
               onClick={() => setIsLegendOpen(true)}
