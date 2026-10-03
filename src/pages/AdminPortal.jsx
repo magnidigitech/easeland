@@ -3873,7 +3873,7 @@ export default function AdminPortal({ onNavigate }) {
                 className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4"
                 onClick={() => setEnlargedMediaUrl(null)}
               >
-                <div className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="relative max-w-5xl w-full max-h-[90dvh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
                   <button
                     onClick={() => setEnlargedMediaUrl(null)}
                     className="absolute -top-12 right-0 bg-white/20 hover:bg-white/40 text-white rounded-full p-2 text-xs font-bold transition-all cursor-pointer"
@@ -3883,7 +3883,7 @@ export default function AdminPortal({ onNavigate }) {
                   <img
                     src={enlargedMediaUrl}
                     alt="Enlarged property photo"
-                    className="max-w-full max-h-[85vh] object-contain rounded-2xl border-2 border-slate-700 shadow-2xl"
+                    className="max-w-full max-h-[85dvh] object-contain rounded-2xl border-2 border-slate-700 shadow-2xl"
                   />
                 </div>
               </div>
@@ -4808,7 +4808,7 @@ export default function AdminPortal({ onNavigate }) {
       {/* MODAL 3: CHECK DEAL DETAILS & DOSSIER */}
       {selectedDealForDossier && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 max-h-[90dvh] overflow-y-auto">
             {/* HEADER */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>

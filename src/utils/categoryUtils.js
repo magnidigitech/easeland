@@ -122,6 +122,23 @@ export function getPropertyMediaList(property) {
     url = url.trim();
     if (!url) return;
 
+    const lowerUrl = url.toLowerCase();
+    if (
+      mediaType === 'WALKTHROUGH_VIDEO' ||
+      mediaType === 'DRONE_VIDEO' ||
+      mediaType === 'VIDEO' ||
+      lowerUrl.includes('youtube.com') ||
+      lowerUrl.includes('youtu.be') ||
+      lowerUrl.endsWith('.mp4') ||
+      lowerUrl.endsWith('.webm') ||
+      lowerUrl.endsWith('.mov')
+    ) {
+      if (mediaType === 'PHOTO') mediaType = 'WALKTHROUGH_VIDEO';
+      if (!embedUrl && (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be'))) {
+        embedUrl = url;
+      }
+    }
+
     // Deduplicate by URL
     if (!seenUrls.has(url)) {
       seenUrls.add(url);

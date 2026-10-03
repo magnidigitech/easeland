@@ -451,7 +451,7 @@ export default function PropertiesSearchPage({
       )}
 
       {/* MAIN CONTENT AREA: MAP IS THE MAIN VIEWPORT (100% SCREEN), PROPERTY LIST IN SIDEBAR */}
-      <div className="w-full h-[calc(100vh-148px)] relative overflow-hidden shrink-0">
+      <div className="w-full h-[calc(100dvh-148px)] relative overflow-hidden shrink-0">
         <UniversalMapEngine
           hideSidePanel={false}
           properties={properties}

@@ -835,7 +835,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
             <div className={
               isSingleViewport
                 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 w-full pb-4"
-                : "flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100vh-250px)]"
+                : "flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100dvh-250px)]"
             }>
               {kanbanStages
                 .filter(st => selectedStageFilters.length === 0 || selectedStageFilters.length === kanbanStages.length || selectedStageFilters.includes(st))
@@ -899,7 +899,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                       {/* DEAL CARDS CONTAINER (SCROLLABLE VERTICALLY TO FILL SPACE) */}
                       <div className={
                         "p-2.5 space-y-2.5 flex-1 overflow-y-auto custom-scrollbar " +
-                        (isSingleViewport ? "max-h-[220px]" : "max-h-[calc(100vh-320px)]")
+                        (isSingleViewport ? "max-h-[220px]" : "max-h-[calc(100dvh-320px)]")
                       }>
                         {stageDeals.length === 0 ? (
                           <div className={
@@ -2020,7 +2020,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
       {/* ------------------------------------------------------------- */}
       {selectedDealForDossier && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[90dvh] flex flex-col">
 
             <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white shrink-0">
               <div className="flex items-center gap-3">

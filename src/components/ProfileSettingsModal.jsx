@@ -132,7 +132,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in">
       
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90dvh]">
         
         {/* HEADER */}
         <div className="bg-brand-charcoal text-white p-6 relative">
