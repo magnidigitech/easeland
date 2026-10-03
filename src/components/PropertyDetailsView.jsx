@@ -503,7 +503,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
           </div>
 
           {/* RIGHT 1 COLUMN: DIRECT OWNER ENQUIRY FORM */}
-          <div className="space-y-6">
+          <div className="space-y-6 pb-28">
             
             {/* EASELAND MEDIATION CONTACT CARD */}
             <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-28 space-y-5">

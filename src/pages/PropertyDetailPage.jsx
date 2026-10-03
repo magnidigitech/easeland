@@ -929,7 +929,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           </div>
 
           {/* RIGHT COLUMN: DIRECT OWNER ENQUIRY CTA FORM */}
-          <div className="space-y-6">
+          <div className="space-y-6 pb-28">
             <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-28 space-y-5">
               
               {/* EASELAND SUPPORT CARD */}
