@@ -117,8 +117,8 @@ export function AuthProvider({ children }) {
         const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
         const userProfileData = storedProfile;
 
-        const has2FA = false;
-        const isVerified = true;
+        const has2FA = (userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA) !== false;
+        const isVerified = is2FAVerifiedForSession(currentUser.uid);
 
         if (has2FA && !isVerified) {
           setUser(null);
@@ -321,9 +321,9 @@ export function AuthProvider({ children }) {
     }
 
     if (loggedInUser && userProfileData) {
-      // 1. Check 2FA Security Preference (Disabled by default)
-      const has2FA = false;
-      const isVerified = true;
+      // 1. Check 2FA Security Preference (Enabled by default for all accounts)
+      const has2FA = (userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA) !== false;
+      const isVerified = is2FAVerifiedForSession(loggedInUser.uid);
       
       // 2. Check Security Alerts Preference
       const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
@@ -530,8 +530,8 @@ export function AuthProvider({ children }) {
         displayName: result.user.displayName
       };
 
-      const has2FA = false;
-      const isVerified = true;
+      const has2FA = (userProfileData?.security?.enable2FA ?? userProfileData?.communicationPreferences?.enable2FA) !== false;
+      const isVerified = is2FAVerifiedForSession(result.user.uid);
       const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
 
       if (hasAlerts) {
