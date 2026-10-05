@@ -198,9 +198,9 @@ export default function App() {
     refreshWishlist();
   };
 
-  const changeActivePage = (pageName, propId = null) => {
+  const changeActivePage = (pageName, propIdOrFilters = null) => {
     let resolvedPage = pageName;
-    let resolvedPropId = propId;
+    let resolvedPropId = typeof propIdOrFilters === 'string' ? propIdOrFilters : null;
 
     if (typeof pageName === 'string') {
       if (pageName.startsWith('property/')) {
@@ -210,6 +210,12 @@ export default function App() {
         resolvedPage = 'property-detail';
         resolvedPropId = pageName.replace('property-detail/', '');
       }
+    }
+
+    let activeFilterState = { ...filters };
+    if ((resolvedPage === 'map' || resolvedPage === 'properties') && propIdOrFilters && typeof propIdOrFilters === 'object') {
+      activeFilterState = { ...filters, ...propIdOrFilters, cleared: false };
+      setFilters(activeFilterState);
     }
 
     setActivePage(resolvedPage);
@@ -224,9 +230,8 @@ export default function App() {
       if (resolvedPage === 'property-detail' && resolvedPropId) {
         targetPath = `/property/${resolvedPropId}`;
       } else if (resolvedPage === 'map' || resolvedPage === 'properties') {
-        const queryParams = searchStateToUrlParams(filters);
-        const searchString = queryParams.toString();
-        targetPath = searchString ? `/properties?${searchString}` : '/properties';
+        const targetSearch = searchStateToUrlParams(activeFilterState);
+        targetPath = targetSearch || '/properties';
       } else if (resolvedPage === 'admin') {
         targetPath = '/admin';
       } else if (resolvedPage === 'buy') {
@@ -893,8 +898,8 @@ export default function App() {
         )}
 
         {/* INFORMATIONAL PAGES */}
-        {activePage === 'buy' && <BuyInfoPage onExploreClick={() => changeActivePage('map')} />}
-        {activePage === 'rent' && <RentInfoPage onExploreClick={() => changeActivePage('map')} />}
+        {activePage === 'buy' && <BuyInfoPage onExploreClick={(targetFilter) => changeActivePage('map', targetFilter || { purpose: 'SALE' })} />}
+        {activePage === 'rent' && <RentInfoPage onExploreClick={(targetFilter) => changeActivePage('map', targetFilter || { purpose: 'RENT' })} />}
         {activePage === 'sell' && <SellInfoPage onPostPropertyClick={handlePostPropertyClick} />}
 
         {/* PRIVACY POLICY PAGE */}
