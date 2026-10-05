@@ -104,12 +104,7 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
     if (res.success) {
       setSuccessMsg('Document removed successfully.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      const updatedRes = await getPropertyDocuments(propertyId, ownerId);
-      if (updatedRes.success) {
-        const cleanDocs = filterOutTarget(updatedRes.documents || []);
-        setDocuments(cleanDocs);
-        if (onUpdateDocuments) onUpdateDocuments(cleanDocs);
-      }
+      // Local state & formData.documents are already filtered - no re-fetch needed
     } else {
       setErrorMsg(res.error || 'Failed to remove document.');
       fetchDocuments();
