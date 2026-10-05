@@ -779,11 +779,7 @@ export default function UniversalMapEngine({
           </button>
         )}
 
-        {/* LIVE REAL-TIME MAP ZOOM LEVEL BADGE */}
-        <div className="absolute top-4 right-14 z-20 bg-brand-charcoal/90 backdrop-blur-md text-white border border-white/20 rounded-xl px-3.5 py-1.5 shadow-xl flex items-center gap-2 text-xs font-mono font-bold select-none">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Active Zoom: <strong className="text-brand-yellow text-sm font-black">{currentZoom}</strong> / 22</span>
-        </div>
+
 
         {/* AUTHENTIC GOOGLE MAPS FLOATING BOTTOM-LEFT LAYER BAR (SPREADS ON HOVER) */}
         <div
