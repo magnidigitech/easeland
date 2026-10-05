@@ -716,16 +716,11 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
         <div className="relative rounded-2xl overflow-hidden border-2 border-slate-300 shadow-md">
           <div ref={mapContainerRef} className="h-72 w-full z-10" />
 
-          {/* Hint Overlay Banner */}
-          <div className="absolute top-3 left-3 right-3 z-20 pointer-events-none">
-            <div className="bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-bold px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-lg flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-brand-yellow">
-                <Target className="w-4 h-4 text-brand-yellow animate-pulse" />
-                Click map or drag the pin to mark property position
-              </span>
-              <span className="font-mono text-[10px] text-slate-300">
-                {lat.toFixed(4)}, {lng.toFixed(4)}
-              </span>
+          {/* Compact Hint Overlay Pill */}
+          <div className="absolute top-3 right-3 z-20 pointer-events-none">
+            <div className="bg-slate-900/90 backdrop-blur-md text-amber-400 text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-700/80 shadow-md flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
+              <span>Click map or drag pin to set location</span>
             </div>
           </div>
 
