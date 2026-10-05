@@ -525,10 +525,13 @@ export default function AdminPortal({ onNavigate }) {
         }
       });
       let deletedIds = [];
+      let submittedIds = [];
       try {
         if (typeof window !== 'undefined') {
           const rawDeleted = localStorage.getItem('easeland_deleted_properties');
           if (rawDeleted) deletedIds = JSON.parse(rawDeleted).map(String);
+          const rawSub = localStorage.getItem('easeland_submitted_properties');
+          if (rawSub) submittedIds = JSON.parse(rawSub).map(String);
         }
       } catch (e) { }
 
@@ -549,11 +552,19 @@ export default function AdminPortal({ onNavigate }) {
 
       queue = allMergedProps.filter(p => {
         if (!p) return false;
+        const pId = String(p.id || p.propertyId || p.referenceId || '');
         const st = String(p.status || p.listingStatus || '').toUpperCase();
         const lst = String(p.listingStatus || '').toUpperCase();
+
         const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
         const isClosed = st === 'REJECTED' || st === 'DELETED' || st === 'REJECTED_CLOSED' || st === 'CLOSED' || st === 'ARCHIVED' || lst === 'REJECTED' || lst === 'DELETED' || lst === 'REJECTED_CLOSED' || lst === 'CLOSED' || lst === 'ARCHIVED';
-        return !isLive && !isClosed;
+
+        if (isLive || isClosed) return false;
+
+        const isDraft = st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true;
+        const isExplicitlySubmitted = submittedIds.includes(pId) || Boolean(p.submittedAt) || st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED';
+
+        return isExplicitlySubmitted && !isDraft;
       });
     } catch (e1) {
       console.warn('Error loading verification queue:', e1);

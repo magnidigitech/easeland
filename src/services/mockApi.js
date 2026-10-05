@@ -760,10 +760,13 @@ export const mockApi = {
   // -------------------------------------------------------------
   getVerificationQueue: () => {
     let deletedIds = [];
+    let submittedIds = [];
     try {
       if (typeof window !== 'undefined') {
         const raw = localStorage.getItem('easeland_deleted_properties');
-        if (raw) deletedIds = JSON.parse(raw);
+        if (raw) deletedIds = JSON.parse(raw).map(String);
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) submittedIds = JSON.parse(rawSub).map(String);
       }
     } catch (e) {}
 
@@ -774,7 +777,10 @@ export const mockApi = {
       if (deletedIds.includes(pId)) return false;
 
       const st = (p.status || p.listingStatus || '').toUpperCase();
-      return ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING', 'SUBMITTED', 'DRAFT', 'CHANGES_REQUIRED', 'NOT_VERIFIED'].includes(st);
+      const isDraft = st === 'DRAFT' || p.isDraft === true;
+      const isExplicitlySubmitted = submittedIds.includes(pId) || Boolean(p.submittedAt) || ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING', 'SUBMITTED', 'CHANGES_REQUIRED'].includes(st);
+
+      return isExplicitlySubmitted && !isDraft;
     });
   },
 
