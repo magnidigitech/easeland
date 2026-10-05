@@ -278,11 +278,11 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     const latLngPoints = vertices.map(v => [v.lat, v.lng]);
 
-    // Draw vertex interactive markers (Draggable pins with removal popups)
+    // Draw vertex interactive markers (Banana Yellow pin with Navy Blue text)
     vertices.forEach((v, idx) => {
       const customDivIcon = L.divIcon({
         className: 'custom-boundary-pin',
-        html: `<div title="Drag to adjust vertex ${idx + 1}" style="background-color: #F59E0B; color: #1E293B; border: 2px solid #FFFFFF; font-weight: 900; font-size: 10px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.4); cursor: move;">${idx + 1}</div>`,
+        html: `<div title="Drag to adjust vertex ${idx + 1}" style="background-color: #FFE135; color: #000080; border: 2px solid #000080; font-weight: 900; font-size: 11px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); cursor: move;">${idx + 1}</div>`,
         iconSize: [22, 22],
         iconAnchor: [11, 11]
       });
@@ -305,7 +305,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
       marker.bindPopup(`
         <div style="font-family: system-ui, sans-serif; padding: 4px; text-align: center;">
-          <div style="font-weight: 800; font-size: 11px; margin-bottom: 4px; color: #1E293B;">Node #${idx + 1}</div>
+          <div style="font-weight: 800; font-size: 11px; margin-bottom: 4px; color: #000080;">Node #${idx + 1}</div>
           <button id="del-node-${idx}" style="background: #EF4444; color: white; border: none; padding: 4px 10px; font-weight: 700; font-size: 10px; border-radius: 6px; cursor: pointer;">Remove Node</button>
         </div>
       `);
@@ -320,7 +320,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       });
     });
 
-    // Render Mid-point '+' splitters between consecutive vertices to insert new nodes easily
+    // Render Mid-point '+' splitters (Navy Blue pin with Banana Yellow symbol)
     if (vertices.length >= 2) {
       for (let i = 0; i < vertices.length; i++) {
         const current = vertices[i];
@@ -334,7 +334,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
         const midIcon = L.divIcon({
           className: 'custom-midpoint-pin',
-          html: `<div title="Click to add curve node here" style="background-color: #3B82F6; color: #FFFFFF; border: 1.5px solid #FFFFFF; font-weight: 900; font-size: 11px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); opacity: 0.85; cursor: pointer;">+</div>`,
+          html: `<div title="Click to add curve node here" style="background-color: #000080; color: #FFE135; border: 1.5px solid #FFE135; font-weight: 900; font-size: 11px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); opacity: 0.9; cursor: pointer;">+</div>`,
           iconSize: [16, 16],
           iconAnchor: [8, 8]
         });
@@ -350,11 +350,11 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       }
     }
 
-    // Draw polygon line / area
+    // Draw polygon line / area (Banana Yellow outline & fill)
     if (latLngPoints.length >= 2) {
       const polygon = L.polygon(latLngPoints, {
-        color: '#F59E0B',
-        fillColor: '#F59E0B',
+        color: '#FFE135',
+        fillColor: '#FFE135',
         fillOpacity: 0.35,
         weight: 3,
         dashArray: latLngPoints.length < 3 ? '6, 6' : undefined

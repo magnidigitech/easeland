@@ -3,20 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --brand-yellow: #eab308;
-  --brand-yellow-hover: #ca8a04;
-  --brand-navy: #0b2545;
-  --brand-navy-light: #1e3a8a;
+  --brand-yellow: #FFE135;
+  --brand-yellow-hover: #F7D02C;
+  --brand-navy: #000080;
+  --brand-navy-light: #1A1A99;
   --brand-blue: #38bdf8;
   --brand-font: 'Plus Jakarta Sans', sans-serif;
   
-  --metallic-dark: #071026;
-  --metallic-steel: #0b2545;
-  --metallic-titanium: #1e3a8a;
+  --metallic-dark: #000080;
+  --metallic-steel: #000080;
+  --metallic-titanium: #1A1A99;
   --metallic-slate: #1e293b;
   --metallic-chrome: #cbd5e1;
-  --metallic-gold: #eab308;
-  --metallic-gold-light: #fef08a;
+  --metallic-gold: #FFE135;
+  --metallic-gold-light: #FFF599;
 }
 
 @layer base {

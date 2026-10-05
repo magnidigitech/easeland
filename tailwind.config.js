@@ -19,12 +19,12 @@ export default {
           amber: '#f59e0b',
         },
         brand: {
-          yellow: '#eab308', // Normal Yellow
-          yellowHover: '#ca8a04', // Normal Yellow Hover
-          navy: '#0b2545', // Classic Deep Navy Blue
-          navyLight: '#1e3a8a', // Rich Navy Blue Accent
-          forest: '#0b2545',
-          forestLight: '#1e3a8a',
+          yellow: '#FFE135', // Banana Yellow
+          yellowHover: '#F7D02C', // Banana Yellow Hover
+          navy: '#000080', // Deep Navy Blue
+          navyLight: '#1A1A99', // Navy Blue Accent
+          forest: '#000080',
+          forestLight: '#1A1A99',
           offwhite: '#ffffff',
           softgray: '#f8fafc',
           cardbg: '#ffffff',
