@@ -256,19 +256,22 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     }
   } catch (e) {}
 
-  // Deduplicate docs by URL or docId to eliminate duplicates across data sources
+  // Deduplicate docs by URL or Name to eliminate duplicates across data sources
   const seenKeys = new Set();
   const normalizedDocs = [];
 
   docs.forEach(d => {
     if (!d) return;
-    const urlStr = d.publicUrl || d.url || d.storagePath || '';
-    const nameStr = d.documentName || d.name || d.fileName || '';
-    const docIdStr = String(d.docId || d.mediaId || d.id || '');
-    const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (docIdStr ? docIdStr.toLowerCase() : nameStr.toLowerCase());
+    const urlStr = (d.publicUrl || d.url || d.storagePath || '').trim();
+    const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
+    const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
 
-    if (!key || seenKeys.has(key)) return;
-    seenKeys.add(key);
+    const dedupKey = (urlStr && urlStr !== '#')
+      ? urlStr.toLowerCase()
+      : (nameStr ? nameStr.toLowerCase() : docIdStr.toLowerCase());
+
+    if (!dedupKey || seenKeys.has(dedupKey)) return;
+    seenKeys.add(dedupKey);
 
     const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
     const docType = d.documentType || d.type || 'TITLE_DEED';
@@ -304,26 +307,28 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
 
     let docIdStr = '';
     let docUrlStr = '';
+    let docNameStr = '';
 
     if (typeof docTarget === 'object' && docTarget !== null) {
-      docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim();
-      docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim();
+      docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim().toLowerCase();
+      docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim().toLowerCase();
+      docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim().toLowerCase();
     } else {
-      docIdStr = String(docTarget).trim();
+      docIdStr = String(docTarget).trim().toLowerCase();
     }
 
-    const targetKeys = [docIdStr, docUrlStr].filter(k => k && k !== '#');
-
-    // Helper to check if a doc object matches target keys
+    // Helper to check if a doc object matches any target identifier or name
     const isDocMatch = (d) => {
       if (!d) return false;
-      const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
-      const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
+      const dId = String(d.docId || d.mediaId || d.id || '').trim().toLowerCase();
+      const dUrl = String(d.publicUrl || d.url || d.storagePath || '').trim().toLowerCase();
+      const dName = String(d.documentName || d.name || d.fileName || d.title || '').trim().toLowerCase();
 
-      return targetKeys.some(k => {
-        const lowerK = k.toLowerCase();
-        return (dId && dId === lowerK) || (dUrl && dUrl === lowerK);
-      });
+      if (docIdStr && dId && dId === docIdStr) return true;
+      if (docUrlStr && docUrlStr !== '#' && dUrl && dUrl === docUrlStr) return true;
+      if (docNameStr && dName && dName === docNameStr) return true;
+
+      return false;
     };
 
     // 2. Remove from local storage keys
