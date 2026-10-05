@@ -241,7 +241,7 @@ export function normalizeDocString(s) {
  * Get confidential property documents (Accessible ONLY by Owner or Admin)
  */
 export async function getPropertyDocuments(propertyId, ownerId) {
-  let docs = [];
+  let rawDocs = null;
 
   // Clear stale blacklist in browser if present
   try {
@@ -250,46 +250,52 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     }
   } catch (e) {}
 
-  // 1. Try local storage backup
-  try {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          docs = parsed.filter(d => d && (d.propertyId === propertyId || !d.propertyId));
-        }
-      }
-    }
-  } catch (e) {}
-
-  // 2. Try Firestore non-blockingly
-  try {
-    const q = query(
-      collection(db, 'propertyDocuments'),
-      where('propertyId', '==', propertyId)
-    );
-    const snap = await getDocs(q);
-    const fsDocs = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-    if (Array.isArray(fsDocs) && fsDocs.length > 0) {
-      docs = [...docs, ...fsDocs];
-    }
-  } catch (fsErr) {
-    console.warn('Firestore propertyDocuments query note:', fsErr.message);
-  }
-
-  // 3. Try PostgreSQL property record /api/properties/:id
+  // 1. Primary Source: Backend PostgreSQL / Express API
   try {
     if (propertyId) {
       const res = await fetch(`/api/properties/${propertyId}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.property && Array.isArray(data.property.documents)) {
-          docs = [...docs, ...data.property.documents];
+          rawDocs = data.property.documents;
         }
       }
     }
   } catch (e) {}
+
+  // 2. Secondary Fallback: Firestore propertyDocuments collection
+  if (!rawDocs || rawDocs.length === 0) {
+    try {
+      const q = query(
+        collection(db, 'propertyDocuments'),
+        where('propertyId', '==', propertyId)
+      );
+      const snap = await getDocs(q);
+      const fsDocs = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+      if (Array.isArray(fsDocs) && fsDocs.length > 0) {
+        rawDocs = fsDocs;
+      }
+    } catch (fsErr) {
+      console.warn('Firestore propertyDocuments query note:', fsErr.message);
+    }
+  }
+
+  // 3. Tertiary Fallback: Local Storage Backup
+  if (!rawDocs || rawDocs.length === 0) {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            rawDocs = parsed.filter(d => d && (d.propertyId === propertyId || !d.propertyId));
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  const docs = Array.isArray(rawDocs) ? rawDocs : [];
 
   // Deduplicate docs by normalized Name / Filename so only 1 copy per document is shown
   const seenKeys = new Set();
