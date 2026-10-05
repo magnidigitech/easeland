@@ -157,7 +157,7 @@ export async function uploadConfidentialPropertyDocument({
       size: file.size
     };
 
-    // Sync documents array to properties document & PostgreSQL (Merging, not overwriting)
+    // Sync documents array to properties document & PostgreSQL (Replacing old matching entries cleanly)
     try {
       let existingDocs = [];
       try {
@@ -167,7 +167,17 @@ export async function uploadConfidentialPropertyDocument({
         }
       } catch (e) {}
 
-      const updatedDocsArray = [...existingDocs.filter(d => d && (d.docId || d.id) !== docId), docItemObj];
+      const normNew = normalizeDocString(documentName || file.name);
+      const filteredExisting = existingDocs.filter(d => {
+        if (!d) return false;
+        const dId = String(d.docId || d.id || d.mediaId || '');
+        if (dId && dId === docId) return false;
+        const dName = String(d.documentName || d.name || d.fileName || '');
+        const normD = normalizeDocString(dName);
+        return normD !== normNew;
+      });
+
+      const updatedDocsArray = [...filteredExisting, docItemObj];
 
       const propRef = doc(db, 'properties', propertyId);
       try {
@@ -176,7 +186,15 @@ export async function uploadConfidentialPropertyDocument({
         if (propSnap.exists() && Array.isArray(propSnap.data().documents)) {
           currentFsDocs = propSnap.data().documents;
         }
-        const mergedFsDocs = [...currentFsDocs.filter(d => d && (d.docId || d.id) !== docId), docItemObj];
+        const mergedFsDocs = [...currentFsDocs.filter(d => {
+          if (!d) return false;
+          const dId = String(d.docId || d.id || d.mediaId || '');
+          if (dId && dId === docId) return false;
+          const dName = String(d.documentName || d.name || d.fileName || '');
+          const normD = normalizeDocString(dName);
+          return normD !== normNew;
+        }), docItemObj];
+
         await setDoc(propRef, {
           documents: mergedFsDocs,
           updatedAt: serverTimestamp()
@@ -208,6 +226,18 @@ export async function uploadConfidentialPropertyDocument({
 }
 
 /**
+ * Helper to normalize document name/filename string for comparison (removes extensions & special characters)
+ */
+export function normalizeDocString(s) {
+  if (!s) return '';
+  return String(s)
+    .toLowerCase()
+    .trim()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
  * Get confidential property documents (Accessible ONLY by Owner or Admin)
  */
 export async function getPropertyDocuments(propertyId, ownerId) {
@@ -223,7 +253,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
   // 1. Try local storage backup
   try {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`easeland_docs_${propertyId}`) || localStorage.getItem('easeland_user_documents');
+      const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
@@ -240,7 +270,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
       where('propertyId', '==', propertyId)
     );
     const snap = await getDocs(q);
-    const fsDocs = snap.docs.map(doc => doc.data());
+    const fsDocs = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
     if (Array.isArray(fsDocs) && fsDocs.length > 0) {
       docs = [...docs, ...fsDocs];
     }
@@ -271,7 +301,8 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
     const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
 
-    const dedupKey = (nameStr || urlStr || docIdStr).toLowerCase();
+    const normName = normalizeDocString(nameStr);
+    const dedupKey = normName || (urlStr.toLowerCase() !== '#' ? urlStr.toLowerCase() : '') || docIdStr.toLowerCase();
 
     if (!dedupKey || seenKeys.has(dedupKey)) return;
     seenKeys.add(dedupKey);
@@ -317,22 +348,28 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
     if (typeof docTarget === 'object' && docTarget !== null) {
       docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim().toLowerCase();
       docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim().toLowerCase();
-      docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim().toLowerCase();
+      docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim();
       docStoragePath = String(docTarget.storagePath || '').trim();
     } else {
       docIdStr = String(docTarget).trim().toLowerCase();
     }
+
+    const normTargetName = normalizeDocString(docNameStr);
 
     // Helper to check if a doc object matches any target identifier or name
     const isDocMatch = (d) => {
       if (!d) return false;
       const dId = String(d.docId || d.mediaId || d.id || '').trim().toLowerCase();
       const dUrl = String(d.publicUrl || d.url || d.storagePath || '').trim().toLowerCase();
-      const dName = String(d.documentName || d.name || d.fileName || d.title || '').trim().toLowerCase();
+      const dName = String(d.documentName || d.name || d.fileName || d.title || '').trim();
 
-      if (docIdStr && dId && dId === docIdStr) return true;
-      if (docUrlStr && docUrlStr !== '#' && dUrl && dUrl === docUrlStr) return true;
-      if (docNameStr && dName && dName === docNameStr) return true;
+      if (docIdStr && dId && !docIdStr.startsWith('doc-') && dId === docIdStr) return true;
+      if (docUrlStr && docUrlStr !== '#' && dUrl && (dUrl === docUrlStr || dUrl.includes(docUrlStr) || docUrlStr.includes(dUrl))) return true;
+
+      if (normTargetName && dName) {
+        const normD = normalizeDocString(dName);
+        if (normD && normTargetName === normD) return true;
+      }
 
       return false;
     };
@@ -368,7 +405,7 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
 
     // 3. Remove from Firestore propertyDocuments collection (Delete by ID and matching query)
     try {
-      if (docIdStr) {
+      if (docIdStr && !docIdStr.startsWith('doc-')) {
         try {
           await deleteDoc(doc(db, 'propertyDocuments', docIdStr));
         } catch (e) {}
@@ -406,6 +443,7 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
           if (stored) {
             const parsed = JSON.parse(stored);
             remainingDocs = parsed.filter(d => !isDocMatch(d));
+            localStorage.setItem(`easeland_docs_${propertyId}`, JSON.stringify(remainingDocs));
           }
         }
       } catch (e) {}
@@ -434,6 +472,14 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
         const { syncPropertyToPostgres } = await import('./propertyService.js');
         await syncPropertyToPostgres({ propertyId, id: propertyId, documents: remainingDocs });
       } catch (pgErr) {}
+
+      try {
+        await fetch(`/api/properties/${propertyId}/documents`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ docId: docIdStr, name: docNameStr, fileName: docNameStr })
+        });
+      } catch (apiErr) {}
     }
 
     return { success: true };

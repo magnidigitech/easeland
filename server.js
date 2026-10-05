@@ -84,20 +84,22 @@ function saveLocalProperty(p) {
   const pId = p.propertyId || p.id;
   const existing = localPropsMap.get(pId) || {};
 
-  const mergedMedia = [
-    ...(Array.isArray(existing.media) ? existing.media : []),
-    ...(Array.isArray(p.media) ? p.media : []),
-    ...(Array.isArray(p.photos) ? p.photos : [])
-  ];
+  const finalMedia = Array.isArray(p.media)
+    ? p.media
+    : (Array.isArray(existing.media) ? existing.media : []);
 
-  const mergedDocs = [
-    ...(Array.isArray(existing.documents) ? existing.documents : []),
-    ...(Array.isArray(p.documents) ? p.documents : []),
-    ...(Array.isArray(p.propertyDocuments) ? p.propertyDocuments : [])
-  ];
+  const finalPhotos = Array.isArray(p.photos)
+    ? p.photos
+    : (Array.isArray(existing.photos) ? existing.photos : []);
+
+  const finalDocs = Array.isArray(p.documents)
+    ? p.documents
+    : (Array.isArray(p.propertyDocuments)
+      ? p.propertyDocuments
+      : (Array.isArray(existing.documents) ? existing.documents : []));
 
   const seenMedia = new Set();
-  const cleanMedia = mergedMedia.filter(m => {
+  const cleanMedia = finalMedia.filter(m => {
     if (!m) return false;
     const key = typeof m === 'string' ? m : (m.publicUrl || m.url || m.mediaId);
     if (!key || seenMedia.has(key)) return false;
@@ -106,9 +108,9 @@ function saveLocalProperty(p) {
   });
 
   const seenDocs = new Set();
-  const cleanDocs = mergedDocs.filter(d => {
+  const cleanDocs = finalDocs.filter(d => {
     if (!d) return false;
-    const key = typeof d === 'string' ? d : (d.url || d.docId || d.name);
+    const key = typeof d === 'string' ? d : (d.url || d.docId || d.name || d.documentName || d.fileName);
     if (!key || seenDocs.has(key)) return false;
     seenDocs.add(key);
     return true;
@@ -122,9 +124,9 @@ function saveLocalProperty(p) {
     location: p.location || existing.location || null,
     boundary: p.boundary || p.ownerSubmittedBoundary || existing.boundary || existing.ownerSubmittedBoundary || null,
     ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || existing.ownerSubmittedBoundary || existing.boundary || null,
-    media: cleanMedia.length > 0 ? cleanMedia : (p.media || existing.media || []),
-    photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (existing.photos || []),
-    documents: cleanDocs.length > 0 ? cleanDocs : (p.documents || existing.documents || []),
+    media: cleanMedia,
+    photos: finalPhotos,
+    documents: cleanDocs,
     videoUrl: p.videoUrl || existing.videoUrl || null,
     videoLink: p.videoLink || existing.videoLink || null,
     embeddedVideoUrl: p.embeddedVideoUrl || existing.embeddedVideoUrl || null,
@@ -437,13 +439,24 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
           const docObj = {
             docId: mediaId,
             name: req.file.originalname,
+            documentName: req.file.originalname,
+            fileName: req.file.originalname,
             type: 'DOCUMENT',
             url: publicUrl,
+            publicUrl: publicUrl,
             size: req.file.size,
+            fileSize: req.file.size,
             isDocument: true
           };
           const existingDocs = Array.isArray(existingProp.documents) ? existingProp.documents : [];
-          existingProp.documents = [...existingDocs, docObj];
+          const normNew = req.file.originalname.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+          const filteredDocs = existingDocs.filter(d => {
+            if (!d) return false;
+            const dName = String(d.name || d.documentName || d.fileName || '');
+            const normD = dName.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+            return normD !== normNew && (d.docId || d.id || d.mediaId) !== mediaId;
+          });
+          existingProp.documents = [...filteredDocs, docObj];
         } else {
           const mediaObj = {
             mediaId,
@@ -639,6 +652,36 @@ app.delete('/api/properties/:id', async (req, res) => {
     return res.json({ success: true, message: 'Property deleted successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message || 'Delete failed' });
+  }
+});
+
+// API Endpoint: Remove Document from Property Listing
+app.delete('/api/properties/:id/documents', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const { docId, name, fileName } = req.body || {};
+    const existingProp = localPropsMap.get(targetId);
+    if (existingProp && Array.isArray(existingProp.documents)) {
+      const targetName = String(name || fileName || docId || '').trim();
+      const normTarget = targetName.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+
+      existingProp.documents = existingProp.documents.filter(d => {
+        if (!d) return false;
+        const dId = String(d.docId || d.id || d.mediaId || '').trim().toLowerCase();
+        if (docId && dId && dId === String(docId).trim().toLowerCase()) return false;
+
+        const dName = String(d.documentName || d.name || d.fileName || d.title || '').trim();
+        const normD = dName.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+        if (normTarget && normD && normTarget === normD) return false;
+
+        return true;
+      });
+
+      saveLocalProperty(existingProp);
+    }
+    return res.json({ success: true, message: 'Document removed from server property.' });
+  } catch (err) {
+    return res.json({ success: true });
   }
 });
 
