@@ -280,36 +280,83 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
           </label>
         </div>
 
+        {/* EXPLICIT COVER PHOTO SELECTION BAR */}
+        {photos.length > 1 && (
+          <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 text-amber-600 fill-amber-500 shrink-0" />
+              <div>
+                <span className="block text-xs font-bold text-amber-950">Cover Photo Selection</span>
+                <span className="block text-[11px] text-amber-800 font-medium">Choose which image appears as the main thumbnail on property cards and search results.</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs font-bold text-amber-900 shrink-0">Selected Cover:</span>
+              <select
+                value={photos.find(p => p.isPrimary)?.mediaId || (photos[0] && photos[0].mediaId) || ''}
+                onChange={(e) => handleSetPrimary(e.target.value)}
+                className="w-full sm:w-auto p-2 bg-white border border-amber-300 rounded-lg text-xs font-extrabold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer shadow-sm"
+              >
+                {photos.map((photo, idx) => (
+                  <option key={photo.mediaId || idx} value={photo.mediaId}>
+                    Photo #{idx + 1} {photo.isPrimary ? '★ (Cover Photo)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* PHOTO GRID */}
         {photos.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-2">
             {photos.map((photo, idx) => (
-              <div key={photo.mediaId || idx} className="relative group bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col justify-between">
-                <div className="relative aspect-video bg-gray-100 overflow-hidden">
+              <div
+                key={photo.mediaId || idx}
+                className={`relative group bg-white rounded-xl border-2 transition-all ${
+                  photo.isPrimary ? 'border-amber-400 ring-2 ring-amber-100 shadow-md' : 'border-gray-200 hover:border-amber-300'
+                } overflow-hidden flex flex-col justify-between`}
+              >
+                {/* Clickable Image Thumbnail to set as Cover Photo */}
+                <div
+                  onClick={() => handleSetPrimary(photo.mediaId)}
+                  className="relative aspect-video bg-gray-100 overflow-hidden cursor-pointer group/img"
+                  title="Click to set as Cover Photo"
+                >
                   <img
                     src={photo.publicUrl || photo.url}
                     alt={photo.fileName || `Photo #${idx + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
                   />
-                  {photo.isPrimary && (
-                    <span className="absolute top-2 left-2 bg-brand-yellow text-brand-charcoal text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-current" /> Cover Photo
+
+                  {photo.isPrimary ? (
+                    <span className="absolute top-2 left-2 bg-amber-400 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-md shadow-md flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-slate-950" /> Cover Photo
+                    </span>
+                  ) : (
+                    <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-md opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> Click to Set Cover
                     </span>
                   )}
 
-                  <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
+                  <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded">
                     #{idx + 1}
                   </span>
                 </div>
 
-                <div className="p-2 bg-white flex items-center justify-between gap-1 border-t border-gray-100">
-                  {!photo.isPrimary && (
+                <div className="p-2.5 bg-white flex items-center justify-between gap-1 border-t border-gray-100">
+                  {photo.isPrimary ? (
+                    <span className="text-[11px] font-extrabold text-amber-900 bg-amber-100 px-2 py-1 rounded-md flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> Primary Cover
+                    </span>
+                  ) : (
                     <button
                       type="button"
                       onClick={() => handleSetPrimary(photo.mediaId)}
-                      className="text-[10px] font-bold text-gray-600 hover:text-brand-charcoal hover:bg-gray-100 px-2 py-1 rounded"
+                      className="text-[11px] font-extrabold text-slate-700 hover:text-amber-900 bg-slate-100 hover:bg-amber-100 border border-slate-200 hover:border-amber-300 px-2.5 py-1 rounded-md flex items-center gap-1 transition-all"
                     >
-                      Set Cover
+                      <Star className="w-3 h-3 text-amber-500" /> Set as Cover
                     </button>
                   )}
 
@@ -318,7 +365,8 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
                       type="button"
                       disabled={idx === 0}
                       onClick={() => handleMovePhoto(idx, -1)}
-                      className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                      title="Move Left"
+                      className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30 rounded hover:bg-gray-100"
                     >
                       <ArrowUp className="w-3.5 h-3.5" />
                     </button>
@@ -327,7 +375,8 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
                       type="button"
                       disabled={idx === photos.length - 1}
                       onClick={() => handleMovePhoto(idx, 1)}
-                      className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                      title="Move Right"
+                      className="p-1 text-gray-500 hover:text-gray-800 disabled:opacity-30 rounded hover:bg-gray-100"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
                     </button>
@@ -335,6 +384,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
                     <button
                       type="button"
                       onClick={() => handleRemoveMedia(photo.mediaId)}
+                      title="Delete Photo"
                       className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
