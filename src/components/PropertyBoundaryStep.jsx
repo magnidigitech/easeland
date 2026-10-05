@@ -68,6 +68,12 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   // Freehand Pencil Trace Refs
   const isTracingRef = useRef(false);
   const tracePointsRef = useRef([]);
+  const verticesRef = useRef(vertices);
+
+  // Keep verticesRef in sync with latest vertices state
+  useEffect(() => {
+    verticesRef.current = vertices;
+  }, [vertices]);
 
   // Map Leaflet Refs
   const mapContainerRef = useRef(null);
@@ -127,12 +133,20 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     if (drawMode === 'freehand') {
       map.dragging.disable();
+      map.touchZoom.disable();
+      map.doubleClickZoom.disable();
+      map.scrollWheelZoom.disable();
+      map.boxZoom.disable();
+      if (map.tap) map.tap.disable();
 
       const handleMouseDown = (e) => {
-        if (e.originalEvent && e.originalEvent.button !== 0 && e.originalEvent.touches?.length !== 1) return;
+        if (e.originalEvent && e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
         isTracingRef.current = true;
-        tracePointsRef.current = [{ lat: e.latlng.lat, lng: e.latlng.lng }];
-        setVertices([{ lat: e.latlng.lat, lng: e.latlng.lng }]);
+        const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
+        // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
+        const initial = [...verticesRef.current, newPt];
+        tracePointsRef.current = initial;
+        setVertices(initial);
       };
 
       const handleMouseMove = (e) => {
@@ -140,7 +154,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         const pts = tracePointsRef.current;
         const last = pts[pts.length - 1];
         const dist = map.distance([last.lat, last.lng], [e.latlng.lat, e.latlng.lng]);
-        if (dist > 2.5) { // Sample point every 2.5 meters for smooth amoeba curves
+        if (dist > 2.0) { // Sample point every 2 meters for smooth curves
           const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
           pts.push(newPt);
           tracePointsRef.current = pts;
@@ -151,7 +165,6 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       const handleMouseUp = () => {
         if (isTracingRef.current) {
           isTracingRef.current = false;
-          map.dragging.enable();
           // Auto-smooth freehand trace into clean, draggable organic nodes upon release!
           if (tracePointsRef.current.length > 5) {
             const smoothed = simplifyPoints(tracePointsRef.current, 0.000015);
@@ -160,11 +173,17 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         }
       };
 
-      map.on('mousedown', handleMouseDown);
-      map.on('mousemove', handleMouseMove);
-      map.on('mouseup', handleMouseUp);
+      map.on('mousedown touchstart', handleMouseDown);
+      map.on('mousemove touchmove', handleMouseMove);
+      map.on('mouseup touchend', handleMouseUp);
     } else {
       map.dragging.enable();
+      map.touchZoom.enable();
+      map.doubleClickZoom.enable();
+      map.scrollWheelZoom.enable();
+      map.boxZoom.enable();
+      if (map.tap) map.tap.enable();
+
       map.on('click', (e) => {
         const newPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
         setVertices(prev => [...prev, newPoint]);
@@ -586,14 +605,19 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
         {/* INTERACTIVE LEAFLET MAP CANVAS */}
         <div className="relative rounded-2xl border-2 border-brand-charcoal/20 overflow-hidden shadow-lg">
-          <div ref={mapContainerRef} className="h-96 w-full z-10 bg-slate-900" />
+          <div
+            ref={mapContainerRef}
+            className={`h-96 w-full z-10 bg-slate-900 ${
+              drawMode === 'freehand' ? 'touch-none select-none' : 'touch-auto'
+            }`}
+          />
 
           {/* MAP FLOATING INSTRUCTION BADGE */}
           <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10 max-w-md">
             {drawMode === 'freehand' ? (
               <>
                 <Edit3 className="w-3.5 h-3.5 text-brand-yellow animate-pulse shrink-0" />
-                <span>Amoeba Pencil: Trace outline. On release, line auto-smooths into draggable nodes & '+' handles!</span>
+                <span>Amoeba Pencil: Trace outline. Touch again to pick up where left off without losing points!</span>
               </>
             ) : (
               <>
@@ -601,6 +625,26 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
                 <span>Click map to drop pins, drag orange pins to reposition, or click '+' handles to split curves.</span>
               </>
             )}
+          </div>
+
+          {/* FLOATING MAP ZOOM IN / ZOOM OUT CONTROLS */}
+          <div className="absolute top-14 left-3 z-20 flex flex-col bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => mapInstanceRef.current?.zoomIn()}
+              className="w-8 h-8 flex items-center justify-center font-black text-gray-800 hover:bg-amber-100 text-base transition-colors"
+              title="Zoom In Map"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => mapInstanceRef.current?.zoomOut()}
+              className="w-8 h-8 flex items-center justify-center font-black text-gray-800 hover:bg-amber-100 text-base border-t border-gray-200 transition-colors"
+              title="Zoom Out Map"
+            >
+              −
+            </button>
           </div>
 
           {/* MAP ACTION CONTROLS FLOATING BAR */}
