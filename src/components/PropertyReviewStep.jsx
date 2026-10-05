@@ -438,12 +438,14 @@ export default function PropertyReviewStep({
         ) : documents.length > 0 ? (
           <div className="space-y-2">
             {documents.map((docItem) => (
-              <div key={docItem.docId} className="p-3 bg-amber-50/50 border border-amber-200 rounded-xl flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-amber-700" />
-                  <span className="font-extrabold text-brand-charcoal">{docItem.documentName}</span>
+              <div key={docItem.docId} className="p-3 bg-amber-50/50 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-xs min-w-0">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <FileText className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span className="font-extrabold text-brand-charcoal truncate min-w-0" title={docItem.documentName}>
+                    {docItem.documentName}
+                  </span>
                 </div>
-                <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-md border border-amber-200 shrink-0 whitespace-nowrap">
                   {docItem.documentType} • STRICTLY PRIVATE
                 </span>
               </div>
