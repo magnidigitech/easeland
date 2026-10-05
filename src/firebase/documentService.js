@@ -279,25 +279,54 @@ export async function getPropertyDocuments(propertyId, ownerId) {
 /**
  * Remove confidential property document (Storage file + Firestore metadata)
  */
-export async function removeConfidentialPropertyDocument(docId, propertyId, ownerId) {
+export async function removeConfidentialPropertyDocument(docTarget, propertyId, ownerId) {
   try {
-    if (!docId) {
-      return { success: false, error: 'Document ID is required.' };
+    if (!docTarget) {
+      return { success: false, error: 'Document target or ID is required.' };
     }
 
-    const docIdStr = String(docId).trim();
+    // Extract all identifiers (ID, URL, Name, File Name)
+    let docIdStr = '';
+    let docUrlStr = '';
+    let docNameStr = '';
 
-    // 1. Record deleted document key in local storage to prevent re-hydration
+    if (typeof docTarget === 'object' && docTarget !== null) {
+      docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim();
+      docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim();
+      docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim();
+    } else {
+      docIdStr = String(docTarget).trim();
+    }
+
+    const keysToBlacklist = [docIdStr, docUrlStr, docNameStr].filter(k => k && k !== '#');
+
+    // 1. Record all deleted document keys in local storage to prevent re-hydration during getPropertyDocuments
     try {
       if (typeof window !== 'undefined') {
         const rawDel = localStorage.getItem('easeland_deleted_documents') || '[]';
         const parsedDel = JSON.parse(rawDel);
-        if (!parsedDel.includes(docIdStr.toLowerCase())) {
-          parsedDel.push(docIdStr.toLowerCase());
-          localStorage.setItem('easeland_deleted_documents', JSON.stringify(parsedDel));
-        }
+        keysToBlacklist.forEach(k => {
+          const lowerK = k.toLowerCase();
+          if (!parsedDel.includes(lowerK)) {
+            parsedDel.push(lowerK);
+          }
+        });
+        localStorage.setItem('easeland_deleted_documents', JSON.stringify(parsedDel));
       }
     } catch (e) {}
+
+    // Helper to check if a doc object matches any blacklisted key
+    const isDocMatch = (d) => {
+      if (!d) return false;
+      const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
+      const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
+      const dName = String(d.documentName || d.name || d.fileName || d.title || '').toLowerCase();
+
+      return keysToBlacklist.some(k => {
+        const lowerK = k.toLowerCase();
+        return (dId && dId === lowerK) || (dUrl && dUrl === lowerK) || (dName && dName === lowerK);
+      });
+    };
 
     // 2. Remove from local storage keys
     try {
@@ -310,11 +339,7 @@ export async function removeConfidentialPropertyDocument(docId, propertyId, owne
           if (stored) {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed)) {
-              const updated = parsed.filter(d => {
-                if (!d) return false;
-                const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
-                return dId !== docIdStr.toLowerCase() && d.docId !== docId;
-              });
+              const updated = parsed.filter(d => !isDocMatch(d));
               localStorage.setItem(key, JSON.stringify(updated));
             }
           }
@@ -323,11 +348,13 @@ export async function removeConfidentialPropertyDocument(docId, propertyId, owne
     } catch (e) {}
 
     // 3. Remove from Firestore propertyDocuments collection
-    try {
-      const docRef = doc(db, 'propertyDocuments', docIdStr);
-      await deleteDoc(docRef);
-    } catch (fsErr) {
-      console.warn('Firestore document delete note:', fsErr.message);
+    if (docIdStr) {
+      try {
+        const docRef = doc(db, 'propertyDocuments', docIdStr);
+        await deleteDoc(docRef);
+      } catch (fsErr) {
+        console.warn('Firestore document delete note:', fsErr.message);
+      }
     }
 
     // 4. Remove from target property's documents array in memory, mockApi, PostgreSQL, and Firestore
@@ -336,11 +363,7 @@ export async function removeConfidentialPropertyDocument(docId, propertyId, owne
         const { mockApi } = await import('../services/mockApi.js');
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj && Array.isArray(pObj.documents)) {
-          pObj.documents = pObj.documents.filter(d => {
-            if (!d) return false;
-            const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
-            return dId !== docIdStr.toLowerCase();
-          });
+          pObj.documents = pObj.documents.filter(d => !isDocMatch(d));
         }
       } catch (mErr) {}
 
@@ -349,11 +372,7 @@ export async function removeConfidentialPropertyDocument(docId, propertyId, owne
         const propSnap = await getDoc(propRef);
         if (propSnap.exists()) {
           const currentDocs = propSnap.data().documents || [];
-          const updatedDocs = currentDocs.filter(d => {
-            if (!d) return false;
-            const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
-            return dId !== docIdStr.toLowerCase();
-          });
+          const updatedDocs = currentDocs.filter(d => !isDocMatch(d));
           await setDoc(propRef, { documents: updatedDocs, updatedAt: serverTimestamp() }, { merge: true });
         }
       } catch (pFsErr) {}

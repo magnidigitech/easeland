@@ -3,7 +3,7 @@ import { Lock, FileText, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, S
 import { DocumentType, VerificationStatus } from '../firebase/schema.js';
 import { uploadConfidentialPropertyDocument, getPropertyDocuments, removeConfidentialPropertyDocument } from '../firebase/documentService.js';
 
-export default function PropertyDocumentStep({ propertyId, ownerId }) {
+export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocuments }) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -21,7 +21,9 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
     setLoading(true);
     const res = await getPropertyDocuments(propertyId, ownerId);
     if (res.success) {
-      setDocuments(res.documents || []);
+      const docList = res.documents || [];
+      setDocuments(docList);
+      if (onUpdateDocuments) onUpdateDocuments(docList);
     } else {
       setErrorMsg(res.error);
     }
@@ -58,7 +60,7 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
       setSuccessMsg('Confidential document uploaded. Saved securely for Admin verification.');
       setCustomDocName('');
       setTimeout(() => setSuccessMsg(null), 3000);
-      fetchDocuments();
+      await fetchDocuments();
     } else {
       setErrorMsg(result.error);
     }
@@ -66,10 +68,13 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
 
   // Handle Document Removal
   const handleRemoveDocument = async (docTarget) => {
-    const targetId = typeof docTarget === 'object'
-      ? (docTarget.docId || docTarget.mediaId || docTarget.id || docTarget.publicUrl || docTarget.url || docTarget.documentName || docTarget.name)
-      : docTarget;
+    if (!docTarget) return;
 
+    const docId = typeof docTarget === 'object' ? (docTarget.docId || docTarget.mediaId || docTarget.id) : docTarget;
+    const docUrl = typeof docTarget === 'object' ? (docTarget.publicUrl || docTarget.url || docTarget.storagePath) : null;
+    const docName = typeof docTarget === 'object' ? (docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title) : null;
+
+    const targetId = docId || docUrl || docName;
     if (!targetId) {
       console.warn('Cannot delete document: target document ID is missing');
       return;
@@ -78,21 +83,36 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
     setErrorMsg(null);
 
     // 0ms immediate UI state update
-    const targetIdStr = String(targetId).toLowerCase();
-    setDocuments(prev => prev.filter(d => {
-      if (!d) return false;
-      const dId = String(d.docId || d.mediaId || d.id || d.publicUrl || d.url || d.documentName || d.name || '').toLowerCase();
-      return dId !== targetIdStr;
-    }));
+    setDocuments(prev => {
+      const updated = prev.filter(d => {
+        if (!d) return false;
+        const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
+        const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
+        const dName = String(d.documentName || d.name || d.fileName || d.title || '').toLowerCase();
 
-    const res = await removeConfidentialPropertyDocument(targetId, propertyId, ownerId);
+        if (docId && dId && dId === String(docId).toLowerCase()) return false;
+        if (docUrl && dUrl && dUrl === String(docUrl).toLowerCase()) return false;
+        if (docName && dName && dName === String(docName).toLowerCase()) return false;
+        if (targetId && (dId === String(targetId).toLowerCase() || dUrl === String(targetId).toLowerCase() || dName === String(targetId).toLowerCase())) return false;
+
+        return true;
+      });
+      if (onUpdateDocuments) onUpdateDocuments(updated);
+      return updated;
+    });
+
+    const res = await removeConfidentialPropertyDocument(docTarget, propertyId, ownerId);
     if (res.success) {
       setSuccessMsg('Document removed successfully.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      await fetchDocuments();
+      const updatedRes = await getPropertyDocuments(propertyId, ownerId);
+      if (updatedRes.success) {
+        setDocuments(updatedRes.documents || []);
+        if (onUpdateDocuments) onUpdateDocuments(updatedRes.documents || []);
+      }
     } else {
       setErrorMsg(res.error || 'Failed to remove document.');
-      await fetchDocuments();
+      fetchDocuments();
     }
   };
 
@@ -193,7 +213,7 @@ export default function PropertyDocumentStep({ propertyId, ownerId }) {
             <label className="block text-xs font-bold text-gray-700 mb-1">Document Title (Optional)</label>
             <input
               type="text"
-              placeholder="e.g. EC Certificate 2024-2025"
+              placeholder="Enter Document Title"
               value={customDocName}
               onChange={(e) => setCustomDocName(e.target.value)}
               className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
