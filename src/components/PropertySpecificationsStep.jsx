@@ -86,7 +86,7 @@ export default function PropertySpecificationsStep({
               <label className="block text-xs font-bold text-gray-700 mb-1">Approach Road Width</label>
               <input
                 type="text"
-                placeholder="e.g. 40 Feet Blacktop Road"
+                placeholder="Enter Approach Road Width"
                 value={specsData.roadWidth || ''}
                 onChange={(e) => handleFieldChange('roadWidth', e.target.value)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
@@ -118,7 +118,7 @@ export default function PropertySpecificationsStep({
               <input
                 type="number"
                 min={0}
-                placeholder="e.g. 3"
+                placeholder="Enter Bedrooms"
                 value={specsData.bedrooms ?? ''}
                 onChange={(e) => handleFieldChange('bedrooms', e.target.value ? Math.max(0, parseInt(e.target.value)) : null)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
@@ -133,7 +133,7 @@ export default function PropertySpecificationsStep({
               <input
                 type="number"
                 min={0}
-                placeholder="e.g. 3"
+                placeholder="Enter Bathrooms"
                 value={specsData.bathrooms ?? ''}
                 onChange={(e) => handleFieldChange('bathrooms', e.target.value ? Math.max(0, parseInt(e.target.value)) : null)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
@@ -148,7 +148,7 @@ export default function PropertySpecificationsStep({
               <input
                 type="number"
                 min={0}
-                placeholder="e.g. 2"
+                placeholder="Enter Balconies"
                 value={specsData.balconies ?? ''}
                 onChange={(e) => handleFieldChange('balconies', e.target.value ? Math.max(0, parseInt(e.target.value)) : null)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
@@ -197,7 +197,7 @@ export default function PropertySpecificationsStep({
               <input
                 type="number"
                 min={0}
-                placeholder="e.g. 4"
+                placeholder="Enter Floor Number"
                 value={specsData.floorNumber ?? ''}
                 onChange={(e) => handleFieldChange('floorNumber', e.target.value ? parseInt(e.target.value) : null)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
@@ -211,7 +211,7 @@ export default function PropertySpecificationsStep({
               <input
                 type="number"
                 min={1}
-                placeholder="e.g. 5"
+                placeholder="Enter Total Floors"
                 value={specsData.totalFloors ?? ''}
                 onChange={(e) => handleFieldChange('totalFloors', e.target.value ? parseInt(e.target.value) : null)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"

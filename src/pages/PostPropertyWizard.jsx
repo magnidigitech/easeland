@@ -672,7 +672,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                     type="text"
                     value={formData.otherPropertyType || ''}
                     onChange={(e) => setFormData({ ...formData, otherPropertyType: e.target.value })}
-                    placeholder="Specify property type (e.g. Farmhouse, Penthouse, Warehouse, PG, etc.)"
+                    placeholder="Enter Property Type"
                     className={`w-full p-3.5 bg-white border ${
                       fieldErrors.otherPropertyType ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'
                     } rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-navy placeholder:text-gray-400 shadow-sm`}
@@ -709,7 +709,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               <input
                 type="text"
                 required
-                placeholder="e.g. MD Plot or Premium 200 Sq Yds Plot"
+                placeholder="Enter Property Title"
                 value={formData.title}
                 onChange={(e) => {
                   setFormData({ ...formData, title: e.target.value });
@@ -735,7 +735,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 <input
                   type="number"
                   required
-                  placeholder="e.g. 1000000"
+                  placeholder="Enter your price"
                   value={formData.price}
                   onChange={(e) => {
                     setFormData({ ...formData, price: e.target.value });
@@ -765,7 +765,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 <input
                   type="number"
                   required
-                  placeholder="e.g. 500"
+                  placeholder="Enter Total Area"
                   value={formData.area}
                   onChange={(e) => {
                     setFormData({ ...formData, area: e.target.value });
@@ -829,7 +829,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               <textarea
                 rows={4}
                 required
-                placeholder="Describe key features, surroundings, approach road, and highlights..."
+                placeholder="Enter Property Description"
                 value={formData.description}
                 onChange={(e) => {
                   setFormData({ ...formData, description: e.target.value });
