@@ -132,15 +132,11 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     map.off('mouseup');
 
     if (drawMode === 'freehand') {
-      map.dragging.disable();
-      map.touchZoom.disable();
-      map.doubleClickZoom.disable();
-      map.scrollWheelZoom.disable();
-      map.boxZoom.disable();
-      if (map.tap) map.tap.disable();
-
       const handleMouseDown = (e) => {
-        if (e.originalEvent && e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
+        if (e.originalEvent) {
+          if (e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
+          if (e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+        }
         isTracingRef.current = true;
         const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
         // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
@@ -151,6 +147,9 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
       const handleMouseMove = (e) => {
         if (!isTracingRef.current) return;
+        if (e.originalEvent) {
+          if (e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+        }
         const pts = tracePointsRef.current;
         const last = pts[pts.length - 1];
         const dist = map.distance([last.lat, last.lng], [e.latlng.lat, e.latlng.lng]);
@@ -162,8 +161,11 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         }
       };
 
-      const handleMouseUp = () => {
+      const handleMouseUp = (e) => {
         if (isTracingRef.current) {
+          if (e && e.originalEvent && e.originalEvent.stopPropagation) {
+            e.originalEvent.stopPropagation();
+          }
           isTracingRef.current = false;
           // Auto-smooth freehand trace into clean, draggable organic nodes upon release!
           if (tracePointsRef.current.length > 5) {
@@ -177,13 +179,6 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       map.on('mousemove touchmove', handleMouseMove);
       map.on('mouseup touchend', handleMouseUp);
     } else {
-      map.dragging.enable();
-      map.touchZoom.enable();
-      map.doubleClickZoom.enable();
-      map.scrollWheelZoom.enable();
-      map.boxZoom.enable();
-      if (map.tap) map.tap.enable();
-
       map.on('click', (e) => {
         const newPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
         setVertices(prev => [...prev, newPoint]);
@@ -640,9 +635,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
           <div className="relative">
             <div
               ref={mapContainerRef}
-              className={`h-96 w-full z-10 bg-slate-900 ${
-                drawMode === 'freehand' ? 'touch-none select-none' : 'touch-auto'
-              }`}
+              className="h-96 w-full z-10 bg-slate-900"
             />
 
             {/* FLOATING MAP ZOOM IN / ZOOM OUT CONTROLS */}
