@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ShieldCheck, MapPin, Navigation, Upload, Trash2, Plus, CheckCircle2, AlertCircle, RefreshCw, Layers, Compass, Play, Pause, Square, FileText, Undo, Maximize2, Map as MapIcon } from 'lucide-react';
+import { ShieldCheck, MapPin, Navigation, Upload, Trash2, Plus, CheckCircle2, AlertCircle, RefreshCw, Layers, Compass, Play, Pause, Square, FileText, Undo, Maximize2, Map as MapIcon, Edit3, PenTool, FileCode } from 'lucide-react';
 import { BoundarySource, BoundaryStatus } from '../firebase/schema.js';
 import { validateBoundaryPolygon, calculateApproximatePolygonAreaSqFt } from '../firebase/boundaryService.js';
 
@@ -15,10 +15,15 @@ L.Icon.Default.mergeOptions({
 
 export default function PropertyBoundaryStep({ propertyLocation, boundaryData, onSaveBoundary, onSkipBoundary }) {
   const [method, setMethod] = useState('DRAW'); // 'DRAW', 'GPS', 'MAP_DOC'
+  const [drawMode, setDrawMode] = useState('click'); // 'click' (point-by-point) or 'freehand' (pencil trace for amoeba shapes)
   const [vertices, setVertices] = useState(boundaryData?.vertices || []);
   const [source, setSource] = useState(boundaryData?.source || BoundarySource.DRAWN_ON_MAP);
   const [docRefName, setDocRefName] = useState(boundaryData?.confidentialDocRef?.name || '');
   const [mapType, setMapType] = useState('satellite'); // 'satellite', 'street'
+
+  // Freehand Pencil Trace Refs
+  const isTracingRef = useRef(false);
+  const tracePointsRef = useRef([]);
 
   // Map Leaflet Refs
   const mapContainerRef = useRef(null);
@@ -65,14 +70,56 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
       tileLayerRef.current = tileLayer;
       markersLayerGroupRef.current = L.layerGroup().addTo(map);
+      mapInstanceRef.current = map;
+    }
 
-      // Interactive Click Event to Drop Boundary Polygon Vertices
+    const map = mapInstanceRef.current;
+
+    // Remove previous listeners
+    map.off('click');
+    map.off('mousedown');
+    map.off('mousemove');
+    map.off('mouseup');
+
+    if (drawMode === 'freehand') {
+      map.dragging.disable();
+
+      const handleMouseDown = (e) => {
+        if (e.originalEvent && e.originalEvent.button !== 0 && e.originalEvent.touches?.length !== 1) return;
+        isTracingRef.current = true;
+        tracePointsRef.current = [{ lat: e.latlng.lat, lng: e.latlng.lng }];
+        setVertices([{ lat: e.latlng.lat, lng: e.latlng.lng }]);
+      };
+
+      const handleMouseMove = (e) => {
+        if (!isTracingRef.current) return;
+        const pts = tracePointsRef.current;
+        const last = pts[pts.length - 1];
+        const dist = map.distance([last.lat, last.lng], [e.latlng.lat, e.latlng.lng]);
+        if (dist > 2.5) { // Sample point every 2.5 meters for smooth amoeba curves
+          const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
+          pts.push(newPt);
+          tracePointsRef.current = pts;
+          setVertices([...pts]);
+        }
+      };
+
+      const handleMouseUp = () => {
+        if (isTracingRef.current) {
+          isTracingRef.current = false;
+          map.dragging.enable();
+        }
+      };
+
+      map.on('mousedown', handleMouseDown);
+      map.on('mousemove', handleMouseMove);
+      map.on('mouseup', handleMouseUp);
+    } else {
+      map.dragging.enable();
       map.on('click', (e) => {
         const newPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
         setVertices(prev => [...prev, newPoint]);
       });
-
-      mapInstanceRef.current = map;
     }
 
     // Invalidate map size to render cleanly
@@ -88,7 +135,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         mapInstanceRef.current = null;
       }
     };
-  }, [method, centerLat, centerLng]);
+  }, [method, centerLat, centerLng, drawMode]);
 
   // Update Tile Layer when mapType changes (Satellite vs Street)
   useEffect(() => {
@@ -127,13 +174,15 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     const latLngPoints = vertices.map(v => [v.lat, v.lng]);
 
-    // Draw vertex numbered markers
+    // Draw vertex numbered markers (Show step numbers in click mode or spaced markers in freehand)
+    const markerStep = vertices.length > 40 ? Math.ceil(vertices.length / 20) : 1;
     vertices.forEach((v, idx) => {
+      if (idx % markerStep !== 0 && idx !== vertices.length - 1) return;
       const customDivIcon = L.divIcon({
         className: 'custom-boundary-pin',
-        html: `<div style="background-color: #F59E0B; color: #1E293B; border: 2px solid #FFFFFF; font-weight: 900; font-size: 11px; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">${idx + 1}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        html: `<div style="background-color: #F59E0B; color: #1E293B; border: 2px solid #FFFFFF; font-weight: 900; font-size: 10px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">${idx + 1}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       });
       L.marker([v.lat, v.lng], { icon: customDivIcon }).addTo(markersLayerGroupRef.current);
     });
@@ -151,6 +200,61 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       polygonLayerRef.current = polygon;
     }
   }, [vertices]);
+
+  // Handle Boundary File Import (GeoJSON, KML, GPX)
+  const handleBoundaryFileImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorMsg(null);
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target.result;
+        let parsedCoords = [];
+
+        if (file.name.endsWith('.json') || file.name.endsWith('.geojson')) {
+          const json = JSON.parse(text);
+          const feature = json.features?.[0] || json;
+          const geom = feature.geometry || feature;
+          let coords = geom.coordinates || [];
+          if (Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
+            coords = coords[0];
+          }
+          parsedCoords = coords.map(c => ({ lat: Number(c[1]), lng: Number(c[0]) })).filter(pt => !isNaN(pt.lat) && !isNaN(pt.lng));
+        } else if (file.name.endsWith('.kml') || file.name.endsWith('.gpx') || file.name.endsWith('.xml')) {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(text, 'text/xml');
+          const coordNodes = xmlDoc.getElementsByTagName('coordinates');
+          if (coordNodes.length > 0) {
+            const rawStr = coordNodes[0].textContent.trim();
+            const pairs = rawStr.split(/\s+/);
+            parsedCoords = pairs.map(p => {
+              const parts = p.split(',');
+              return { lat: parseFloat(parts[1]), lng: parseFloat(parts[0]) };
+            }).filter(pt => !isNaN(pt.lat) && !isNaN(pt.lng));
+          }
+        }
+
+        if (parsedCoords.length >= 3) {
+          setVertices(parsedCoords);
+          setSuccessMsg(`Successfully imported ${parsedCoords.length} boundary points from survey file "${file.name}".`);
+          setTimeout(() => setSuccessMsg(null), 4000);
+          if (mapInstanceRef.current) {
+            const bounds = L.latLngBounds(parsedCoords.map(v => [v.lat, v.lng]));
+            mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30] });
+          }
+        } else {
+          setErrorMsg('Could not parse at least 3 valid polygon coordinates from file. Please ensure it is a valid GeoJSON or KML polygon file.');
+        }
+      } catch (err) {
+        setErrorMsg('Error reading boundary file: ' + err.message);
+      }
+    };
+
+    reader.readAsText(file);
+  };
 
   // Add vertex manually (e.g. Map click or coordinate input)
   const handleAddVertex = (latVal, lngVal) => {
@@ -193,54 +297,6 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     }
   };
 
-  // GPS-Assisted Session Handlers
-  const startGpsSession = () => {
-    if (!navigator.geolocation) {
-      setErrorMsg('Geolocation is not supported by your browser.');
-      return;
-    }
-    setErrorMsg(null);
-    setGpsActive(true);
-    setGpsPaused(false);
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const newVertex = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setGpsLog(prev => [...prev, newVertex]);
-        setVertices(prev => [...prev, newVertex]);
-      },
-      (err) => {
-        setErrorMsg(`GPS Capture Error: ${err.message}`);
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-    );
-  };
-
-  const pauseGpsSession = () => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    setGpsPaused(true);
-  };
-
-  const stopGpsSession = () => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    setGpsActive(false);
-    setGpsPaused(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
   // Save & Submit Boundary Submission
   const handleConfirmSubmission = () => {
     if (vertices.length > 0) {
@@ -273,7 +329,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
             Property Boundary Capture (Optional)
           </h3>
           <p className="text-xs text-gray-500 font-medium mt-0.5">
-            Capture parcel vertices for land/plot boundaries using the interactive satellite map or GPS.
+            Capture parcel vertices for land/plot boundaries using the interactive satellite map, freehand pencil trace, or KML/GeoJSON survey files.
           </p>
         </div>
 
@@ -300,40 +356,82 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         </div>
       )}
 
-      {/* METHOD A: INTERACTIVE MAP POLYGON DRAWER (ONLY ACTIVE METHOD) */}
+      {/* METHOD A: INTERACTIVE MAP POLYGON DRAWER */}
       <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
         
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-brand-yellow" />
-              <span>Draw on Interactive Map</span>
+              <span>Draw & Capture Land Boundary</span>
             </h4>
             <span className="text-[11px] text-gray-500 font-medium block mt-0.5">
-              Click anywhere on the map tiles below to drop plot boundary points & draw land polygon.
+              Select your preferred drawing tool below for standard plots, amoeba-like irregular shapes, or survey files.
             </span>
           </div>
 
-          {/* MAP TILE LAYER SWITCHER */}
-          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
-            <button
-              type="button"
-              onClick={() => setMapType('satellite')}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
-                mapType === 'satellite' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Satellite
-            </button>
-            <button
-              type="button"
-              onClick={() => setMapType('street')}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
-                mapType === 'street' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Street Map
-            </button>
+          {/* DRAWING TOOLKITS & TILE LAYER SWITCHER */}
+          <div className="flex flex-wrap items-center gap-2">
+            
+            {/* DRAWING MODE TOGGLE */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setDrawMode('click')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 ${
+                  drawMode === 'click' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                title="Point-by-Point Polygon Mode"
+              >
+                <MapPin className="w-3 h-3" />
+                <span>Points</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrawMode('freehand')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 ${
+                  drawMode === 'freehand' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                title="Freehand Pencil Mode for Amoeba / Irregular Shapes"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Amoeba Pencil</span>
+              </button>
+            </div>
+
+            {/* GEOJSON / KML IMPORT BUTTON */}
+            <label className="cursor-pointer px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition-colors shadow-sm shrink-0">
+              <Upload className="w-3.5 h-3.5 text-amber-700" />
+              <span>Import KML / GeoJSON</span>
+              <input
+                type="file"
+                accept=".kml,.geojson,.json,.gpx,.xml"
+                onChange={handleBoundaryFileImport}
+                className="hidden"
+              />
+            </label>
+
+            {/* MAP TILE LAYER SWITCHER */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
+              <button
+                type="button"
+                onClick={() => setMapType('satellite')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                  mapType === 'satellite' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Satellite
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapType('street')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                  mapType === 'street' ? 'bg-brand-charcoal text-brand-yellow' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Street Map
+              </button>
+            </div>
           </div>
         </div>
 
@@ -343,8 +441,17 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
           {/* MAP FLOATING INSTRUCTION BADGE */}
           <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10">
-            <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce" />
-            <span>Click on map to drop boundary points</span>
+            {drawMode === 'freehand' ? (
+              <>
+                <Edit3 className="w-3.5 h-3.5 text-brand-yellow animate-pulse" />
+                <span>Amoeba Mode: Click & Drag across map to trace organic boundary</span>
+              </>
+            ) : (
+              <>
+                <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce" />
+                <span>Click on map to drop boundary points</span>
+              </>
+            )}
           </div>
 
           {/* MAP ACTION CONTROLS FLOATING BAR */}
