@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Search, CheckCircle2, AlertCircle, RefreshCw, Compass, Building, Map, ChevronDown, Edit3 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { MapPin, Navigation, Search, CheckCircle2, AlertCircle, RefreshCw, Compass, Building, Map, ChevronDown, Edit3, Layers, Target } from 'lucide-react';
 import { GeoPoint } from 'firebase/firestore';
 import { getCurrentDeviceLocation, reverseGeocodeLocation, searchLocationQuery } from '../services/locationProvider.js';
 import { encodeGeohash } from '../utils/geohash.js';
@@ -14,6 +16,12 @@ import {
 export default function PropertyLocationStep({ locationData, onLocationConfirmed }) {
   const [lat, setLat] = useState(locationData?.geoPoint?.latitude || locationData?.lat || 20.5937);
   const [lng, setLng] = useState(locationData?.geoPoint?.longitude || locationData?.lng || 78.9629);
+
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+  const tileLayerRef = useRef(null);
+  const [mapStyle, setMapStyle] = useState('roadmap');
 
   const [hierarchy, setHierarchy] = useState({
     country: locationData?.country || 'India',
@@ -57,6 +65,154 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
   // Compute live geohash
   const geohash = encodeGeohash(lat, lng, 9);
+
+  // Initialize Interactive Leaflet Mini Map Canvas
+  useEffect(() => {
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
+
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+    });
+
+    const map = L.map(mapContainerRef.current, {
+      center: [lat, lng],
+      zoom: (lat === 20.5937 && lng === 78.9629) ? 5 : 16,
+      zoomControl: true,
+      attributionControl: false
+    });
+
+    const tileUrl = mapStyle === 'satellite'
+      ? 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+      : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+
+    const tileLayer = L.tileLayer(tileUrl, {
+      maxZoom: 21,
+      subdomains: '0123'
+    }).addTo(map);
+
+    tileLayerRef.current = tileLayer;
+
+    const customMarkerIcon = L.divIcon({
+      className: 'custom-location-pin',
+      html: `
+        <div style="
+          width: 38px;
+          height: 38px;
+          background: #0f172a;
+          border: 3px solid #f59e0b;
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <div style="
+            width: 12px;
+            height: 12px;
+            background: #f59e0b;
+            border-radius: 50%;
+            transform: rotate(45deg);
+          "></div>
+        </div>
+      `,
+      iconSize: [38, 38],
+      iconAnchor: [19, 38]
+    });
+
+    const marker = L.marker([lat, lng], {
+      draggable: true,
+      icon: customMarkerIcon
+    }).addTo(map);
+
+    marker.bindPopup('Drag pin or click map to set exact property location');
+
+    const handlePinPositionChange = async (newLat, newLng) => {
+      setLat(newLat);
+      setLng(newLng);
+      setIsConfirmed(false);
+    };
+
+    marker.on('dragend', (e) => {
+      const pos = e.target.getLatLng();
+      handlePinPositionChange(pos.lat, pos.lng);
+    });
+
+    map.on('click', (e) => {
+      const clickedLat = e.latlng.lat;
+      const clickedLng = e.latlng.lng;
+      marker.setLatLng([clickedLat, clickedLng]);
+      handlePinPositionChange(clickedLat, clickedLng);
+    });
+
+    mapInstanceRef.current = map;
+    markerRef.current = marker;
+
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 250);
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update map view & marker when lat/lng state changes from external triggers
+  useEffect(() => {
+    if (mapInstanceRef.current && markerRef.current) {
+      mapInstanceRef.current.setView([lat, lng], Math.max(mapInstanceRef.current.getZoom(), 15));
+      markerRef.current.setLatLng([lat, lng]);
+    }
+  }, [lat, lng]);
+
+  // Auto-center map on entered address changes
+  useEffect(() => {
+    const parts = [
+      hierarchy.address,
+      hierarchy.locality,
+      hierarchy.mandal,
+      hierarchy.city,
+      hierarchy.district,
+      hierarchy.state,
+      'India'
+    ].filter(Boolean);
+
+    if (parts.length < 2) return;
+
+    const queryStr = parts.join(', ');
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchLocationQuery(queryStr);
+        if (results && results.length > 0) {
+          const top = results[0];
+          setLat(top.lat);
+          setLng(top.lng);
+        }
+      } catch (e) {}
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [hierarchy.state, hierarchy.district, hierarchy.city, hierarchy.mandal, hierarchy.locality, hierarchy.postalCode, hierarchy.address]);
+
+  // Dynamic Tile Layer style toggle
+  const handleMapStyleToggle = () => {
+    const nextStyle = mapStyle === 'roadmap' ? 'satellite' : 'roadmap';
+    setMapStyle(nextStyle);
+    if (tileLayerRef.current) {
+      const url = nextStyle === 'satellite'
+        ? 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+      tileLayerRef.current.setUrl(url);
+    }
+  };
 
   // Handlers for cascaded dropdown selections
   const handleStateChange = (val) => {
@@ -535,33 +691,64 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
               Spatial Coordinates & Geohash
             </h4>
           </div>
-          <span className="text-[11px] font-bold text-gray-500 font-mono">
-            Geohash: {geohash}
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleMapStyleToggle}
+              className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors"
+            >
+              <Layers className="w-3.5 h-3.5 text-brand-navy" />
+              <span>{mapStyle === 'roadmap' ? 'Satellite View' : 'Standard View'}</span>
+            </button>
+            <span className="text-[11px] font-bold text-gray-500 font-mono hidden sm:inline">
+              Geohash: {geohash}
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-xl text-xs font-mono">
-          <div><span className="text-gray-500 font-bold">Latitude:</span> {lat.toFixed(6)}</div>
-          <div><span className="text-gray-500 font-bold">Longitude:</span> {lng.toFixed(6)}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl text-xs font-mono border border-slate-200">
+          <div><span className="text-slate-500 font-bold">Latitude:</span> {lat.toFixed(6)}</div>
+          <div><span className="text-slate-500 font-bold">Longitude:</span> {lng.toFixed(6)}</div>
+          <div><span className="text-slate-500 font-bold">Geohash:</span> {geohash}</div>
         </div>
 
-        {/* MAP PREVIEW DISPLAY */}
-        <div className="h-48 bg-slate-900 rounded-xl relative overflow-hidden flex items-center justify-center border border-slate-700">
-          <div className="text-center text-slate-300 space-y-1">
-            <Map className="w-8 h-8 text-brand-yellow mx-auto animate-bounce" />
-            <span className="block text-xs font-bold">Location Pin Dropped</span>
-            <span className="block text-[10px] text-slate-400">Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}</span>
+        {/* INTERACTIVE LEAFLET MINI MAP CANVAS */}
+        <div className="relative rounded-2xl overflow-hidden border-2 border-slate-300 shadow-md">
+          <div ref={mapContainerRef} className="h-72 w-full z-10" />
+
+          {/* Hint Overlay Banner */}
+          <div className="absolute top-3 left-3 right-3 z-20 pointer-events-none">
+            <div className="bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-bold px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-lg flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-brand-yellow">
+                <Target className="w-4 h-4 text-brand-yellow animate-pulse" />
+                Click map or drag the pin to mark property position
+              </span>
+              <span className="font-mono text-[10px] text-slate-300">
+                {lat.toFixed(4)}, {lng.toFixed(4)}
+              </span>
+            </div>
           </div>
-          <div className="absolute bottom-2 right-2 bg-black/80 text-brand-yellow px-2 py-1 rounded text-[10px] font-mono">
-            GeoPoint ({lat.toFixed(4)}, {lng.toFixed(4)})
-          </div>
+
+          {/* Re-center button overlay */}
+          <button
+            type="button"
+            onClick={() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.setView([lat, lng], 17);
+              }
+            }}
+            className="absolute bottom-3 right-3 z-20 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs px-3 py-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-1.5 transition-colors"
+          >
+            <MapPin className="w-3.5 h-3.5 text-brand-navy" />
+            <span>Center on Pin</span>
+          </button>
         </div>
 
         {/* LOCATION CONFIRMATION ACTION */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100">
           <div>
             <span className="block text-xs font-bold text-brand-charcoal">
-              {hierarchy.locality ? `${hierarchy.locality}, ${hierarchy.city}` : hierarchy.city || 'Select Location'}
+              {hierarchy.locality ? `${hierarchy.locality}, ${hierarchy.city}` : hierarchy.city || 'Selected Location'}
             </span>
             <span className="block text-[11px] text-gray-500 font-medium">
               {hierarchy.state ? `${hierarchy.state}, India` : 'India'} {hierarchy.postalCode ? `— ${hierarchy.postalCode}` : ''}
