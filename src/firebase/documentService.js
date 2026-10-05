@@ -137,16 +137,10 @@ export async function uploadConfidentialPropertyDocument({
       console.warn('Firestore doc sync note:', fsErr.message);
     }
 
-    // Clean deleted blacklist in case an old key exists for this file/ID
+    // Clear any stale deleted documents key from local storage
     try {
       if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_documents');
-        if (rawDel) {
-          const parsedDel = JSON.parse(rawDel);
-          const keysToRemove = [docId, publicUrl, finalStoragePath, file.name, documentName].map(k => String(k || '').toLowerCase()).filter(Boolean);
-          const cleanedDel = parsedDel.filter(k => !keysToRemove.includes(k));
-          localStorage.setItem('easeland_deleted_documents', JSON.stringify(cleanedDel));
-        }
+        localStorage.removeItem('easeland_deleted_documents');
       }
     } catch (e) {}
 
@@ -214,11 +208,10 @@ export async function uploadConfidentialPropertyDocument({
 export async function getPropertyDocuments(propertyId, ownerId) {
   let docs = [];
 
-  let deletedDocKeysSet = new Set();
+  // Clear stale blacklist in browser if present
   try {
     if (typeof window !== 'undefined') {
-      const rawDel = localStorage.getItem('easeland_deleted_documents');
-      if (rawDel) JSON.parse(rawDel).forEach(k => deletedDocKeysSet.add(String(k).toLowerCase()));
+      localStorage.removeItem('easeland_deleted_documents');
     }
   } catch (e) {}
 
@@ -275,14 +268,6 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (docIdStr ? docIdStr.toLowerCase() : nameStr.toLowerCase());
 
     if (!key || seenKeys.has(key)) return;
-
-    // Filter out only if unique doc ID or unique URL was explicitly deleted
-    if (
-      (docIdStr && deletedDocKeysSet.has(docIdStr.toLowerCase())) ||
-      (urlStr && urlStr !== '#' && deletedDocKeysSet.has(urlStr.toLowerCase()))
-    ) {
-      return;
-    }
     seenKeys.add(key);
 
     const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
@@ -317,7 +302,6 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       return { success: false, error: 'Document target or ID is required.' };
     }
 
-    // Extract ONLY unique identifiers (ID, URL, storage path) - DO NOT blacklist generic names/titles
     let docIdStr = '';
     let docUrlStr = '';
 
@@ -328,30 +312,15 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       docIdStr = String(docTarget).trim();
     }
 
-    const keysToBlacklist = [docIdStr, docUrlStr].filter(k => k && k !== '#');
+    const targetKeys = [docIdStr, docUrlStr].filter(k => k && k !== '#');
 
-    // 1. Record deleted document unique keys in local storage
-    try {
-      if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_documents') || '[]';
-        const parsedDel = JSON.parse(rawDel);
-        keysToBlacklist.forEach(k => {
-          const lowerK = k.toLowerCase();
-          if (!parsedDel.includes(lowerK)) {
-            parsedDel.push(lowerK);
-          }
-        });
-        localStorage.setItem('easeland_deleted_documents', JSON.stringify(parsedDel));
-      }
-    } catch (e) {}
-
-    // Helper to check if a doc object matches any blacklisted key
+    // Helper to check if a doc object matches target keys
     const isDocMatch = (d) => {
       if (!d) return false;
       const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
       const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
 
-      return keysToBlacklist.some(k => {
+      return targetKeys.some(k => {
         const lowerK = k.toLowerCase();
         return (dId && dId === lowerK) || (dUrl && dUrl === lowerK);
       });
