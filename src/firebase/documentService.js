@@ -137,6 +137,19 @@ export async function uploadConfidentialPropertyDocument({
       console.warn('Firestore doc sync note:', fsErr.message);
     }
 
+    // Clean deleted blacklist in case an old key exists for this file/ID
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_documents');
+        if (rawDel) {
+          const parsedDel = JSON.parse(rawDel);
+          const keysToRemove = [docId, publicUrl, finalStoragePath, file.name, documentName].map(k => String(k || '').toLowerCase()).filter(Boolean);
+          const cleanedDel = parsedDel.filter(k => !keysToRemove.includes(k));
+          localStorage.setItem('easeland_deleted_documents', JSON.stringify(cleanedDel));
+        }
+      }
+    } catch (e) {}
+
     const docItemObj = {
       docId,
       name: documentName || file.name || 'Confidential Property Document',
@@ -145,31 +158,45 @@ export async function uploadConfidentialPropertyDocument({
       size: file.size
     };
 
-    // Sync documents array to properties document & PostgreSQL
+    // Sync documents array to properties document & PostgreSQL (Merging, not overwriting)
     try {
+      let existingDocs = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
+          if (stored) existingDocs = JSON.parse(stored);
+        }
+      } catch (e) {}
+
+      const updatedDocsArray = [...existingDocs.filter(d => d && (d.docId || d.id) !== docId), docItemObj];
+
       const propRef = doc(db, 'properties', propertyId);
       try {
+        const propSnap = await getDoc(propRef);
+        let currentFsDocs = [];
+        if (propSnap.exists() && Array.isArray(propSnap.data().documents)) {
+          currentFsDocs = propSnap.data().documents;
+        }
+        const mergedFsDocs = [...currentFsDocs.filter(d => d && (d.docId || d.id) !== docId), docItemObj];
         await setDoc(propRef, {
-          documents: [docItemObj],
+          documents: mergedFsDocs,
           updatedAt: serverTimestamp()
         }, { merge: true });
       } catch (e) {}
 
       const { syncPropertyToPostgres } = await import('./propertyService.js');
-      syncPropertyToPostgres({ propertyId, id: propertyId, documents: [docItemObj] });
+      syncPropertyToPostgres({ propertyId, id: propertyId, documents: updatedDocsArray });
 
       const { mockApi } = await import('../services/mockApi.js');
       const pObj = mockApi.getPropertyById(propertyId);
       if (pObj) {
-        pObj.documents = Array.isArray(pObj.documents) ? [...pObj.documents.filter(d => d.docId !== docId), docItemObj] : [docItemObj];
+        pObj.documents = updatedDocsArray;
       }
 
       // Local storage backup
       try {
         if (typeof window !== 'undefined') {
-          const stored = localStorage.getItem(`easeland_docs_${propertyId}`) || '[]';
-          const parsed = JSON.parse(stored);
-          localStorage.setItem(`easeland_docs_${propertyId}`, JSON.stringify([...parsed.filter(d => d.docId !== docId), docItemObj]));
+          localStorage.setItem(`easeland_docs_${propertyId}`, JSON.stringify(updatedDocsArray));
         }
       } catch (e) {}
     } catch (syncErr) {}
@@ -236,7 +263,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     }
   } catch (e) {}
 
-  // Deduplicate docs by URL or Name to eliminate duplicates across data sources
+  // Deduplicate docs by URL or docId to eliminate duplicates across data sources
   const seenKeys = new Set();
   const normalizedDocs = [];
 
@@ -245,10 +272,15 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     const urlStr = d.publicUrl || d.url || d.storagePath || '';
     const nameStr = d.documentName || d.name || d.fileName || '';
     const docIdStr = String(d.docId || d.mediaId || d.id || '');
-    const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (nameStr ? nameStr.toLowerCase() : docIdStr.toLowerCase());
+    const key = (urlStr && urlStr !== '#') ? urlStr.toLowerCase() : (docIdStr ? docIdStr.toLowerCase() : nameStr.toLowerCase());
 
     if (!key || seenKeys.has(key)) return;
-    if (deletedDocKeysSet.has(key) || deletedDocKeysSet.has(docIdStr.toLowerCase()) || deletedDocKeysSet.has(urlStr.toLowerCase()) || deletedDocKeysSet.has(nameStr.toLowerCase())) {
+
+    // Filter out only if unique doc ID or unique URL was explicitly deleted
+    if (
+      (docIdStr && deletedDocKeysSet.has(docIdStr.toLowerCase())) ||
+      (urlStr && urlStr !== '#' && deletedDocKeysSet.has(urlStr.toLowerCase()))
+    ) {
       return;
     }
     seenKeys.add(key);
@@ -285,22 +317,20 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       return { success: false, error: 'Document target or ID is required.' };
     }
 
-    // Extract all identifiers (ID, URL, Name, File Name)
+    // Extract ONLY unique identifiers (ID, URL, storage path) - DO NOT blacklist generic names/titles
     let docIdStr = '';
     let docUrlStr = '';
-    let docNameStr = '';
 
     if (typeof docTarget === 'object' && docTarget !== null) {
       docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim();
       docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim();
-      docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim();
     } else {
       docIdStr = String(docTarget).trim();
     }
 
-    const keysToBlacklist = [docIdStr, docUrlStr, docNameStr].filter(k => k && k !== '#');
+    const keysToBlacklist = [docIdStr, docUrlStr].filter(k => k && k !== '#');
 
-    // 1. Record all deleted document keys in local storage to prevent re-hydration during getPropertyDocuments
+    // 1. Record deleted document unique keys in local storage
     try {
       if (typeof window !== 'undefined') {
         const rawDel = localStorage.getItem('easeland_deleted_documents') || '[]';
@@ -320,11 +350,10 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       if (!d) return false;
       const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
       const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
-      const dName = String(d.documentName || d.name || d.fileName || d.title || '').toLowerCase();
 
       return keysToBlacklist.some(k => {
         const lowerK = k.toLowerCase();
-        return (dId && dId === lowerK) || (dUrl && dUrl === lowerK) || (dName && dName === lowerK);
+        return (dId && dId === lowerK) || (dUrl && dUrl === lowerK);
       });
     };
 

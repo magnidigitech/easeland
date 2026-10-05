@@ -72,9 +72,8 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
 
     const docId = typeof docTarget === 'object' ? (docTarget.docId || docTarget.mediaId || docTarget.id) : docTarget;
     const docUrl = typeof docTarget === 'object' ? (docTarget.publicUrl || docTarget.url || docTarget.storagePath) : null;
-    const docName = typeof docTarget === 'object' ? (docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title) : null;
 
-    const targetId = docId || docUrl || docName;
+    const targetId = docId || docUrl;
     if (!targetId) {
       console.warn('Cannot delete document: target document ID is missing');
       return;
@@ -88,12 +87,10 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
         if (!d) return false;
         const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
         const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
-        const dName = String(d.documentName || d.name || d.fileName || d.title || '').toLowerCase();
 
         if (docId && dId && dId === String(docId).toLowerCase()) return false;
         if (docUrl && dUrl && dUrl === String(docUrl).toLowerCase()) return false;
-        if (docName && dName && dName === String(docName).toLowerCase()) return false;
-        if (targetId && (dId === String(targetId).toLowerCase() || dUrl === String(targetId).toLowerCase() || dName === String(targetId).toLowerCase())) return false;
+        if (targetId && (dId === String(targetId).toLowerCase() || dUrl === String(targetId).toLowerCase())) return false;
 
         return true;
       });
