@@ -77,6 +77,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   const [formData, setFormData] = useState({
     title: '',
     propertyType: PropertyType.OPEN_PLOT,
+    otherPropertyType: '',
     purpose: Purpose.SALE,
     price: '',
     area: '',
@@ -102,6 +103,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             setFormData({
               title: p.title || '',
               propertyType: p.propertyType || PropertyType.OPEN_PLOT,
+              otherPropertyType: p.otherPropertyType || '',
               purpose: p.purpose || Purpose.SALE,
               price: p.price ? String(p.price) : '',
               area: p.area ? String(p.area) : '',
@@ -145,6 +147,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     setFormData({
       title: draft.title || '',
       propertyType: draft.propertyType || PropertyType.OPEN_PLOT,
+      otherPropertyType: draft.otherPropertyType || '',
       purpose: draft.purpose || Purpose.SALE,
       price: draft.price ? String(draft.price) : '',
       area: draft.area ? String(draft.area) : '',
@@ -235,6 +238,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       }
       if (!formData.propertyType) {
         errors.propertyType = 'Please select a property type (e.g. Open Plot, House, Villa).';
+      }
+      if (formData.propertyType === PropertyType.OTHER && (!formData.otherPropertyType || !formData.otherPropertyType.trim())) {
+        errors.otherPropertyType = 'Please mention what property type you are listing.';
       }
     } else if (step === 2) {
       if (!formData.title || formData.title.trim().length < 2) {
@@ -354,6 +360,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         },
         title: formData.title,
         propertyType: formData.propertyType,
+        otherPropertyType: formData.otherPropertyType || '',
         purpose: formData.purpose,
         price: priceNum,
         priceDisplay: getPriceDisplay(),
@@ -655,6 +662,29 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   </button>
                 ))}
               </div>
+
+              {formData.propertyType === PropertyType.OTHER && (
+                <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Mention Your Property Type *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.otherPropertyType || ''}
+                    onChange={(e) => setFormData({ ...formData, otherPropertyType: e.target.value })}
+                    placeholder="Specify property type (e.g. Farmhouse, Penthouse, Warehouse, PG, etc.)"
+                    className={`w-full p-3.5 bg-white border ${
+                      fieldErrors.otherPropertyType ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'
+                    } rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-navy placeholder:text-gray-400 shadow-sm`}
+                  />
+                  {fieldErrors.otherPropertyType && (
+                    <p className="text-xs text-red-600 font-bold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{fieldErrors.otherPropertyType}</span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

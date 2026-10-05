@@ -435,7 +435,11 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
                 <div className="p-3 bg-gray-50 rounded-xl">
                   <span className="text-gray-400 font-medium block">Property Type</span>
-                  <span className="text-sm font-bold text-brand-charcoal">{property.propertyType}</span>
+                  <span className="text-sm font-bold text-brand-charcoal">
+                    {property.propertyType === 'OTHER' && property.otherPropertyType
+                      ? `Other (${property.otherPropertyType})`
+                      : property.propertyType}
+                  </span>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl">
                   <span className="text-gray-400 font-medium block">Area / Size</span>

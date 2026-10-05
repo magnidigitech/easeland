@@ -258,7 +258,11 @@ export default function PropertyReviewStep({
 
           <div>
             <span className="block text-gray-500 font-bold mb-0.5">Type & Purpose</span>
-            <span className="font-extrabold text-brand-charcoal">{formData.propertyType} • {formData.purpose}</span>
+            <span className="font-extrabold text-brand-charcoal">
+              {formData.propertyType === 'OTHER' && formData.otherPropertyType
+                ? `Other (${formData.otherPropertyType})`
+                : formData.propertyType} • {formData.purpose}
+            </span>
           </div>
 
           <div>
