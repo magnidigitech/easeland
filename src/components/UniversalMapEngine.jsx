@@ -42,7 +42,7 @@ export default function UniversalMapEngine({
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
   // Google Maps Layers State
-  const [mapType, setMapType] = useState('default'); // 'default' (roadmap), 'satellite'
+  const [mapType, setMapType] = useState('satellite'); // 'satellite' by default, 'default' (roadmap)
   const [showLabels, setShowLabels] = useState(true); // Satellite labels toggle
   const [activeDetail, setActiveDetail] = useState(null); // null, 'terrain', 'traffic', 'transit', 'biking'
   const [mapModalOpen, setMapModalOpen] = useState(false);

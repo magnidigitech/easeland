@@ -52,7 +52,7 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
   const isBoundaryModeRef = useRef(isBoundaryMode);
 
   const [reverseGeocodedAddress, setReverseGeocodedAddress] = useState('');
-  const [activeMapStyle, setActiveMapStyle] = useState('googleRoadmap');
+  const [activeMapStyle, setActiveMapStyle] = useState('googleHybrid');
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
 
   // Sync isBoundaryMode state with ref to avoid stale closures in Leaflet map click handlers
@@ -73,7 +73,7 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
       attributionControl: false
     }).setView([coords.lat, coords.lng], 16);
 
-    const styleConfig = MAP_STYLES.googleRoadmap;
+    const styleConfig = MAP_STYLES.googleHybrid;
     const tileLayer = L.tileLayer(styleConfig.url, {
       maxZoom: styleConfig.maxZoom,
       maxNativeZoom: styleConfig.maxNativeZoom,

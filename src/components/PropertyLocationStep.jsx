@@ -21,7 +21,7 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
   const tileLayerRef = useRef(null);
-  const [mapStyle, setMapStyle] = useState('roadmap');
+  const [mapStyle, setMapStyle] = useState('satellite');
 
   const [hierarchy, setHierarchy] = useState({
     country: locationData?.country || 'India',
