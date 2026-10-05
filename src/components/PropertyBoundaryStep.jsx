@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ShieldCheck, MapPin, Navigation, Upload, Trash2, Plus, CheckCircle2, AlertCircle, RefreshCw, Layers, Compass, Play, Pause, Square, FileText, Undo, Maximize2, Map as MapIcon, Edit3, PenTool, FileCode } from 'lucide-react';
+import { ShieldCheck, MapPin, Navigation, Upload, Trash2, Plus, CheckCircle2, AlertCircle, RefreshCw, Layers, Compass, Play, Pause, Square, FileText, Undo, Maximize2, Map as MapIcon, Edit3, PenTool, FileCode, Sparkles } from 'lucide-react';
 import { BoundarySource, BoundaryStatus } from '../firebase/schema.js';
 import { validateBoundaryPolygon, calculateApproximatePolygonAreaSqFt } from '../firebase/boundaryService.js';
 
@@ -12,6 +12,50 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
+
+// Perpendicular distance calculation for Ramer-Douglas-Peucker line simplification
+function getSqSegDist(p, a, b) {
+  let x = a.lng, y = a.lat, dx = b.lng - x, dy = b.lat - y;
+  if (dx !== 0 || dy !== 0) {
+    let t = ((p.lng - x) * dx + (p.lat - y) * dy) / (dx * dx + dy * dy);
+    if (t > 1) {
+      x = b.lng;
+      y = b.lat;
+    } else if (t > 0) {
+      x += dx * t;
+      y += dy * t;
+    }
+  }
+  dx = p.lng - x;
+  dy = p.lat - y;
+  return dx * dx + dy * dy;
+}
+
+function simplifyRDP(points, sqTolerance) {
+  if (points.length <= 2) return points;
+  let maxSqDist = 0;
+  let index = 0;
+  const end = points.length - 1;
+  for (let i = 1; i < end; i++) {
+    const sqDist = getSqSegDist(points[i], points[0], points[end]);
+    if (sqDist > maxSqDist) {
+      index = i;
+      maxSqDist = sqDist;
+    }
+  }
+  if (maxSqDist > sqTolerance) {
+    const rec1 = simplifyRDP(points.slice(0, index + 1), sqTolerance);
+    const rec2 = simplifyRDP(points.slice(index), sqTolerance);
+    return rec1.slice(0, rec1.length - 1).concat(rec2);
+  }
+  return [points[0], points[end]];
+}
+
+function simplifyPoints(points, tolerance = 0.000015) {
+  if (points.length <= 3) return points;
+  const sqTolerance = tolerance * tolerance;
+  return simplifyRDP(points, sqTolerance);
+}
 
 export default function PropertyBoundaryStep({ propertyLocation, boundaryData, onSaveBoundary, onSkipBoundary }) {
   const [method, setMethod] = useState('DRAW'); // 'DRAW', 'GPS', 'MAP_DOC'
@@ -108,6 +152,11 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         if (isTracingRef.current) {
           isTracingRef.current = false;
           map.dragging.enable();
+          // Auto-smooth freehand trace into clean, draggable organic nodes upon release!
+          if (tracePointsRef.current.length > 5) {
+            const smoothed = simplifyPoints(tracePointsRef.current, 0.000015);
+            setVertices(smoothed);
+          }
         }
       };
 
@@ -156,7 +205,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     tileLayerRef.current = newLayer;
   }, [mapType]);
 
-  // Render Polygon Lines and Marker Pins whenever vertices array updates
+  // Render Polygon Lines, Draggable Markers, and Mid-Point Splitter Handles whenever vertices array updates
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -174,18 +223,77 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     const latLngPoints = vertices.map(v => [v.lat, v.lng]);
 
-    // Draw vertex numbered markers (Show step numbers in click mode or spaced markers in freehand)
-    const markerStep = vertices.length > 40 ? Math.ceil(vertices.length / 20) : 1;
+    // Draw vertex interactive markers (Draggable pins with removal popups)
     vertices.forEach((v, idx) => {
-      if (idx % markerStep !== 0 && idx !== vertices.length - 1) return;
       const customDivIcon = L.divIcon({
         className: 'custom-boundary-pin',
-        html: `<div style="background-color: #F59E0B; color: #1E293B; border: 2px solid #FFFFFF; font-weight: 900; font-size: 10px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">${idx + 1}</div>`,
+        html: `<div title="Drag to adjust vertex ${idx + 1}" style="background-color: #F59E0B; color: #1E293B; border: 2px solid #FFFFFF; font-weight: 900; font-size: 10px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.4); cursor: move;">${idx + 1}</div>`,
         iconSize: [22, 22],
         iconAnchor: [11, 11]
       });
-      L.marker([v.lat, v.lng], { icon: customDivIcon }).addTo(markersLayerGroupRef.current);
+
+      const marker = L.marker([v.lat, v.lng], {
+        icon: customDivIcon,
+        draggable: true
+      }).addTo(markersLayerGroupRef.current);
+
+      marker.on('dragend', (e) => {
+        const newPos = e.target.getLatLng();
+        setVertices(prev => {
+          const next = [...prev];
+          if (next[idx]) {
+            next[idx] = { lat: newPos.lat, lng: newPos.lng };
+          }
+          return next;
+        });
+      });
+
+      marker.bindPopup(`
+        <div style="font-family: system-ui, sans-serif; padding: 4px; text-align: center;">
+          <div style="font-weight: 800; font-size: 11px; margin-bottom: 4px; color: #1E293B;">Node #${idx + 1}</div>
+          <button id="del-node-${idx}" style="background: #EF4444; color: white; border: none; padding: 4px 10px; font-weight: 700; font-size: 10px; border-radius: 6px; cursor: pointer;">Remove Node</button>
+        </div>
+      `);
+
+      marker.on('popupopen', () => {
+        const btn = document.getElementById(`del-node-${idx}`);
+        if (btn) {
+          btn.onclick = () => {
+            setVertices(prev => prev.filter((_, i) => i !== idx));
+          };
+        }
+      });
     });
+
+    // Render Mid-point '+' splitters between consecutive vertices to insert new nodes easily
+    if (vertices.length >= 2) {
+      for (let i = 0; i < vertices.length; i++) {
+        const current = vertices[i];
+        const next = vertices[(i + 1) % vertices.length];
+        
+        // If drawing fewer than 3 points, don't close loop mid-point
+        if (i === vertices.length - 1 && vertices.length < 3) break;
+
+        const midLat = (current.lat + next.lat) / 2;
+        const midLng = (current.lng + next.lng) / 2;
+
+        const midIcon = L.divIcon({
+          className: 'custom-midpoint-pin',
+          html: `<div title="Click to add curve node here" style="background-color: #3B82F6; color: #FFFFFF; border: 1.5px solid #FFFFFF; font-weight: 900; font-size: 11px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); opacity: 0.85; cursor: pointer;">+</div>`,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+
+        const midMarker = L.marker([midLat, midLng], { icon: midIcon }).addTo(markersLayerGroupRef.current);
+        midMarker.on('click', () => {
+          setVertices(prev => {
+            const copy = [...prev];
+            copy.splice(i + 1, 0, { lat: midLat, lng: midLng });
+            return copy;
+          });
+        });
+      }
+    }
 
     // Draw polygon line / area
     if (latLngPoints.length >= 2) {
@@ -284,6 +392,36 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     setVertices([]);
     setGpsLog([]);
     setErrorMsg(null);
+  };
+
+  const handlePresetAmoeba = () => {
+    const numPoints = 8;
+    const radiusLat = 0.00025; // ~28 meters
+    const radiusLng = 0.00025 / Math.cos((centerLat * Math.PI) / 180);
+    const newPoints = [];
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i * 2 * Math.PI) / numPoints;
+      // organic wavy shape ratio
+      const organicFactor = 0.85 + Math.sin(i * 1.5) * 0.25;
+      const lat = centerLat + Math.sin(angle) * radiusLat * organicFactor;
+      const lng = centerLng + Math.cos(angle) * radiusLng * organicFactor;
+      newPoints.push({ lat, lng });
+    }
+    setVertices(newPoints);
+    if (mapInstanceRef.current) {
+      const bounds = L.latLngBounds(newPoints.map(v => [v.lat, v.lng]));
+      mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40] });
+    }
+    setSuccessMsg('Generated 8-node organic loop! Drag orange pins or click "+" handles to stretch out to your parcel.');
+    setTimeout(() => setSuccessMsg(null), 4000);
+  };
+
+  const handleSmoothCurve = () => {
+    if (vertices.length <= 4) return;
+    const smoothed = simplifyPoints(vertices, 0.00002);
+    setVertices(smoothed);
+    setSuccessMsg(`Smoothed curve down to ${smoothed.length} key nodes.`);
+    setTimeout(() => setSuccessMsg(null), 3000);
   };
 
   const handleRecenterMap = () => {
@@ -399,9 +537,20 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
               </button>
             </div>
 
+            {/* PRESET AMOEBA RING GENERATOR */}
+            <button
+              type="button"
+              onClick={handlePresetAmoeba}
+              className="px-2.5 py-1.5 text-[11px] font-extrabold rounded-xl transition-all flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-sm shrink-0"
+              title="Drop an editable 8-point organic loop around plot center"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Preset Amoeba Ring</span>
+            </button>
+
             {/* GEOJSON / KML IMPORT BUTTON */}
-            <label className="cursor-pointer px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition-colors shadow-sm shrink-0">
-              <Upload className="w-3.5 h-3.5 text-amber-700" />
+            <label className="cursor-pointer px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm shrink-0">
+              <Upload className="w-3.5 h-3.5 text-gray-600" />
               <span>Import KML / GeoJSON</span>
               <input
                 type="file"
@@ -440,22 +589,34 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
           <div ref={mapContainerRef} className="h-96 w-full z-10 bg-slate-900" />
 
           {/* MAP FLOATING INSTRUCTION BADGE */}
-          <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10">
+          <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10 max-w-md">
             {drawMode === 'freehand' ? (
               <>
-                <Edit3 className="w-3.5 h-3.5 text-brand-yellow animate-pulse" />
-                <span>Amoeba Mode: Click & Drag across map to trace organic boundary</span>
+                <Edit3 className="w-3.5 h-3.5 text-brand-yellow animate-pulse shrink-0" />
+                <span>Amoeba Pencil: Trace outline. On release, line auto-smooths into draggable nodes & '+' handles!</span>
               </>
             ) : (
               <>
-                <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce" />
-                <span>Click on map to drop boundary points</span>
+                <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce shrink-0" />
+                <span>Click map to drop pins, drag orange pins to reposition, or click '+' handles to split curves.</span>
               </>
             )}
           </div>
 
           {/* MAP ACTION CONTROLS FLOATING BAR */}
           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-gray-200">
+            {vertices.length > 4 && (
+              <button
+                type="button"
+                onClick={handleSmoothCurve}
+                title="Smooth out micro hand jitter into clean curve nodes"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors border border-indigo-200"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Smooth Jitter</span>
+              </button>
+            )}
+
             {vertices.length > 0 && (
               <>
                 <button
