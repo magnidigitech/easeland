@@ -69,6 +69,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   const isTracingRef = useRef(false);
   const tracePointsRef = useRef([]);
   const verticesRef = useRef(vertices);
+  const lastTapTimeRef = useRef(0);
   const [pencilSubMode, setPencilSubMode] = useState('draw'); // 'draw' (Trace Line) or 'pan' (Pan & Position Map)
   const pencilSubModeRef = useRef(pencilSubMode);
 
@@ -139,25 +140,38 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     if (drawMode === 'freehand') {
       const handleMouseDown = (e) => {
-        // If in 'pan' mode, or multi-touch (2 fingers), or shift/right click, DO NOT DRAW -> allow map pan!
+        // If in 'pan' mode, or multi-touch (2 fingers), or right click, DO NOT DRAW -> allow map pan!
         const isMultiTouch = e.originalEvent?.touches && e.originalEvent.touches.length > 1;
-        const isPanKey = e.originalEvent?.shiftKey || e.originalEvent?.button === 1 || e.originalEvent?.button === 2;
+        const isRightClick = e.originalEvent?.button === 1 || e.originalEvent?.button === 2;
         const isPanMode = pencilSubModeRef.current === 'pan';
 
-        if (isMultiTouch || isPanKey || isPanMode) {
+        if (isMultiTouch || isRightClick || isPanMode) {
           isTracingRef.current = false;
           return;
         }
 
         if (e.originalEvent && e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
-        if (e.originalEvent && e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
 
-        isTracingRef.current = true;
-        const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
-        // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
-        const initial = [...verticesRef.current, newPt];
-        tracePointsRef.current = initial;
-        setVertices(initial);
+        // Check double tap / double click timing (< 400ms)
+        const now = Date.now();
+        const timeDiff = now - lastTapTimeRef.current;
+        lastTapTimeRef.current = now;
+
+        // Double click/tap OR active trace -> Start drawing!
+        if (timeDiff < 400 || isTracingRef.current) {
+          if (e.originalEvent && e.originalEvent.stopPropagation) {
+            e.originalEvent.stopPropagation();
+          }
+          isTracingRef.current = true;
+          const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
+          // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
+          const initial = [...verticesRef.current, newPt];
+          tracePointsRef.current = initial;
+          setVertices(initial);
+        } else {
+          // Single click / single drag -> Allow map to pan naturally!
+          isTracingRef.current = false;
+        }
       };
 
       const handleMouseMove = (e) => {
