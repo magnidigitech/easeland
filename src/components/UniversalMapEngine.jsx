@@ -1178,7 +1178,7 @@ export default function UniversalMapEngine({
         filters={filters}
         setFilters={setFilters}
         onApplyFilters={() => {}}
-        totalCount={properties.length}
+        totalCount={displayProperties.length}
       />
 
     </div>

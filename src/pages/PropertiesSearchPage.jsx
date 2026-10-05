@@ -18,20 +18,24 @@ import {
 export function matchesSearchFilters(p, searchState = {}) {
   if (!p) return false;
 
-  // 1. Purpose filter (SALE vs RENT)
-  if (searchState.purpose && searchState.purpose !== 'ALL') {
+  // 1. Purpose filter (SALE vs RENT vs LEASE)
+  if (searchState.purpose && searchState.purpose !== 'ALL' && searchState.purpose !== 'ANY') {
     const pPurpose = String(p.purpose || 'SALE').toUpperCase();
     const targetPurpose = String(searchState.purpose).toUpperCase();
     if (targetPurpose === 'RENT') {
       const isRental = pPurpose.includes('RENT') || String(p.priceDisplay || '').toLowerCase().includes('month') || String(p.category || '').toLowerCase().includes('rental');
       if (!isRental) return false;
+    } else if (targetPurpose === 'LEASE') {
+      const isLease = pPurpose.includes('LEASE') || String(p.category || '').toLowerCase().includes('lease');
+      if (!isLease) return false;
     } else if (targetPurpose === 'SALE') {
-      if (pPurpose.includes('RENT') && !pPurpose.includes('SALE')) return false;
+      const isSale = pPurpose.includes('SALE') || pPurpose.includes('SELL') || (!pPurpose.includes('RENT') && !pPurpose.includes('LEASE'));
+      if (!isSale) return false;
     }
   }
 
   // 2. Property Type filter
-  if (searchState.propertyType && searchState.propertyType !== 'ALL') {
+  if (searchState.propertyType && searchState.propertyType !== 'ALL' && searchState.propertyType !== 'ANY') {
     const pType = String(p.propertyType || p.type || '').toUpperCase();
     const pCat = String(p.category || p.title || '').toUpperCase();
     const targetType = String(searchState.propertyType).toUpperCase();
@@ -51,6 +55,9 @@ export function matchesSearchFilters(p, searchState = {}) {
       if (!isApt) return false;
     } else if (targetType === 'COMMERCIAL') {
       if (!isCommercialProp) return false;
+    } else if (targetType === 'LAND' || targetType === 'AGRICULTURAL_LAND') {
+      const isLand = pType.includes('LAND') || pCat.includes('LAND') || pType.includes('AGRICULTURAL');
+      if (!isLand) return false;
     }
   }
 
@@ -77,7 +84,20 @@ export function matchesSearchFilters(p, searchState = {}) {
     }
   }
 
-  // 4. Search Query keyword token check
+  // 4. Location Search (City & Locality)
+  if (searchState.city && searchState.city.trim()) {
+    const cityTarget = searchState.city.trim().toLowerCase();
+    const pCity = String(p.location?.city || p.location?.district || p.location?.state || p.city || '').toLowerCase();
+    if (!pCity.includes(cityTarget)) return false;
+  }
+
+  if (searchState.locality && searchState.locality.trim()) {
+    const locTarget = searchState.locality.trim().toLowerCase();
+    const pLocality = String(p.location?.locality || p.locality || p.address || '').toLowerCase();
+    if (!pLocality.includes(locTarget)) return false;
+  }
+
+  // 5. Search Query keyword token check
   if (searchState.query && searchState.query.trim()) {
     const q = searchState.query.trim().toLowerCase();
     if (q !== 'near me') {
@@ -95,7 +115,7 @@ export function matchesSearchFilters(p, searchState = {}) {
     }
   }
 
-  // 5. Price range
+  // 6. Price range
   if (searchState.minPrice != null && searchState.minPrice !== '') {
     const price = Number(p.price) || 0;
     if (price > 0 && price < Number(searchState.minPrice)) return false;
@@ -103,6 +123,50 @@ export function matchesSearchFilters(p, searchState = {}) {
   if (searchState.maxPrice != null && searchState.maxPrice !== '') {
     const price = Number(p.price) || 0;
     if (price > 0 && price > Number(searchState.maxPrice)) return false;
+  }
+
+  // 7. Area range
+  const minAreaVal = searchState.minAreaSqFt || searchState.minArea;
+  if (minAreaVal != null && minAreaVal !== '') {
+    const area = Number(p.area || p.areaSqFt) || 0;
+    if (area > 0 && area < Number(minAreaVal)) return false;
+  }
+  const maxAreaVal = searchState.maxAreaSqFt || searchState.maxArea;
+  if (maxAreaVal != null && maxAreaVal !== '') {
+    const area = Number(p.area || p.areaSqFt) || 0;
+    if (area > 0 && area > Number(maxAreaVal)) return false;
+  }
+
+  // 8. Bedrooms / BHK
+  if (searchState.bedrooms && searchState.bedrooms !== 'ANY' && searchState.bedrooms !== 'ALL') {
+    const targetBhk = Number(searchState.bedrooms);
+    if (!isNaN(targetBhk) && targetBhk > 0) {
+      const pBhk = Number(p.bedrooms || p.bhk || p.specifications?.bedrooms || 0);
+      if (pBhk < targetBhk) return false;
+    }
+  }
+
+  // 9. Facing Direction
+  if (searchState.facing && searchState.facing !== 'ANY' && searchState.facing !== 'ALL') {
+    const targetFacing = String(searchState.facing).toUpperCase();
+    const pFacing = String(p.facing || p.specifications?.facing || '').toUpperCase();
+    if (pFacing && !pFacing.includes(targetFacing)) return false;
+  }
+
+  // 10. Furnishing Status
+  if (searchState.furnishing && searchState.furnishing !== 'ANY' && searchState.furnishing !== 'ALL') {
+    const targetFurnishing = String(searchState.furnishing).toUpperCase();
+    const pFurnishing = String(p.furnishing || p.furnishingStatus || p.specifications?.furnishing || '').toUpperCase();
+    if (pFurnishing && !pFurnishing.includes(targetFurnishing)) return false;
+  }
+
+  // 11. Amenities
+  if (Array.isArray(searchState.amenities) && searchState.amenities.length > 0) {
+    const pAmenities = (p.amenities || []).map(a => String(a).toLowerCase());
+    const hasAll = searchState.amenities.every(req =>
+      pAmenities.some(pa => pa.includes(String(req).toLowerCase()))
+    );
+    if (!hasAll) return false;
   }
 
   return true;
@@ -222,6 +286,22 @@ export default function PropertiesSearchPage({
       });
 
       const combined = deduplicateProperties(liveProperties);
+
+      // Sort properties based on sortBy selection
+      const sortBy = stateToUse.sortBy || 'newest';
+      combined.sort((a, b) => {
+        const priceA = Number(a.price) || 0;
+        const priceB = Number(b.price) || 0;
+        const areaA = Number(a.area || a.areaSqFt) || 0;
+        const areaB = Number(b.area || b.areaSqFt) || 0;
+
+        if (sortBy === 'price_asc') return priceA - priceB;
+        if (sortBy === 'price_desc') return priceB - priceA;
+        if (sortBy === 'area_asc') return areaA - areaB;
+        if (sortBy === 'area_desc') return areaB - areaA;
+        return 0; // Default: preserve search order
+      });
+
       setProperties(combined);
       setHasMore(false);
     } catch (err) {
