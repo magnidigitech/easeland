@@ -43,6 +43,8 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
       return;
     }
 
+    const docTitleToUse = customDocName.trim();
+    setCustomDocName('');
     setUploading(true);
     setErrorMsg(null);
 
@@ -51,14 +53,13 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
       ownerId,
       file,
       documentType,
-      documentName: customDocName.trim(),
+      documentName: docTitleToUse,
       onProgress: (pct) => setUploadProgress(pct)
     });
 
     setUploading(false);
     if (result.success) {
       setSuccessMsg('Confidential document uploaded. Saved securely for Admin verification.');
-      setCustomDocName('');
       setTimeout(() => setSuccessMsg(null), 3000);
       await fetchDocuments();
     } else {

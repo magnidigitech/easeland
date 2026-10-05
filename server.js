@@ -623,13 +623,18 @@ app.get('/api/properties/:id', async (req, res) => {
   const targetId = req.params.id;
   const localProp = localPropsMap.get(targetId);
 
+  let pgProp = null;
   try {
     const result = await pgPool.query('SELECT raw_data FROM properties WHERE property_id = $1;', [targetId]);
     if (result.rows.length > 0) {
-      const pgProp = result.rows[0].raw_data;
-      return res.json({ success: true, property: { ...localProp, ...pgProp } });
+      pgProp = result.rows[0].raw_data;
     }
   } catch (err) {}
+
+  if (localProp || pgProp) {
+    const property = { ...(pgProp || {}), ...(localProp || {}) };
+    return res.json({ success: true, property });
+  }
 
   return res.status(404).json({ success: false, error: 'Property not found.' });
 });
@@ -682,6 +687,13 @@ app.delete('/api/properties/:id/documents', async (req, res) => {
       });
 
       saveLocalProperty(existingProp);
+
+      try {
+        await pgPool.query(
+          'UPDATE properties SET raw_data = $1, updated_at = NOW() WHERE property_id = $2;',
+          [JSON.stringify(existingProp), targetId]
+        );
+      } catch (pgErr) {}
     }
     return res.json({ success: true, message: 'Document removed from server property.' });
   } catch (err) {
