@@ -62,6 +62,29 @@ export async function uploadConfidentialPropertyDocument({
       return { success: false, error: validation.error };
     }
 
+    // Disallow duplicate uploads with the exact same filename or title for the same property
+    try {
+      const existingRes = await getPropertyDocuments(propertyId, ownerId);
+      if (existingRes.success && Array.isArray(existingRes.documents)) {
+        const targetFileName = (file.name || '').trim().toLowerCase();
+        const targetDocTitle = (documentName || file.name || '').trim().toLowerCase();
+
+        const isDuplicate = existingRes.documents.some(d => {
+          if (!d) return false;
+          const dFile = String(d.fileName || d.name || d.documentName || '').trim().toLowerCase();
+          const dTitle = String(d.documentName || d.name || d.title || '').trim().toLowerCase();
+          return (targetFileName && dFile === targetFileName) || (targetDocTitle && dTitle === targetDocTitle);
+        });
+
+        if (isDuplicate) {
+          return {
+            success: false,
+            error: `A document named "${file.name}" has already been uploaded for this property.`
+          };
+        }
+      }
+    } catch (dupErr) {}
+
     const docRef = doc(collection(db, 'propertyDocuments'));
     const docId = docRef.id;
 
@@ -256,7 +279,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     }
   } catch (e) {}
 
-  // Deduplicate docs by URL or Name to eliminate duplicates across data sources
+  // Deduplicate docs by normalized Name / Filename so only 1 copy per document is shown
   const seenKeys = new Set();
   const normalizedDocs = [];
 
@@ -266,9 +289,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
     const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
     const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
 
-    const dedupKey = (urlStr && urlStr !== '#')
-      ? urlStr.toLowerCase()
-      : (nameStr ? nameStr.toLowerCase() : docIdStr.toLowerCase());
+    const dedupKey = (nameStr || urlStr || docIdStr).toLowerCase();
 
     if (!dedupKey || seenKeys.has(dedupKey)) return;
     seenKeys.add(dedupKey);
@@ -283,6 +304,7 @@ export async function getPropertyDocuments(propertyId, ownerId) {
       docId: d.docId || d.mediaId || d.id || `doc-${normalizedDocs.length + 1}`,
       documentName: docName,
       name: docName,
+      fileName: d.fileName || docName,
       documentType: docType,
       type: docType,
       fileSize: fileSizeNum,
