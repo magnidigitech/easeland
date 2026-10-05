@@ -81,19 +81,21 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
 
     setErrorMsg(null);
 
+    const filterOutTarget = (list) => (list || []).filter(d => {
+      if (!d) return false;
+      const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
+      const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
+
+      if (docId && dId && dId === String(docId).toLowerCase()) return false;
+      if (docUrl && dUrl && dUrl === String(docUrl).toLowerCase()) return false;
+      if (targetId && (dId === String(targetId).toLowerCase() || dUrl === String(targetId).toLowerCase())) return false;
+
+      return true;
+    });
+
     // 0ms immediate UI state update
     setDocuments(prev => {
-      const updated = prev.filter(d => {
-        if (!d) return false;
-        const dId = String(d.docId || d.mediaId || d.id || '').toLowerCase();
-        const dUrl = String(d.publicUrl || d.url || d.storagePath || '').toLowerCase();
-
-        if (docId && dId && dId === String(docId).toLowerCase()) return false;
-        if (docUrl && dUrl && dUrl === String(docUrl).toLowerCase()) return false;
-        if (targetId && (dId === String(targetId).toLowerCase() || dUrl === String(targetId).toLowerCase())) return false;
-
-        return true;
-      });
+      const updated = filterOutTarget(prev);
       if (onUpdateDocuments) onUpdateDocuments(updated);
       return updated;
     });
@@ -104,8 +106,9 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
       setTimeout(() => setSuccessMsg(null), 3000);
       const updatedRes = await getPropertyDocuments(propertyId, ownerId);
       if (updatedRes.success) {
-        setDocuments(updatedRes.documents || []);
-        if (onUpdateDocuments) onUpdateDocuments(updatedRes.documents || []);
+        const cleanDocs = filterOutTarget(updatedRes.documents || []);
+        setDocuments(cleanDocs);
+        if (onUpdateDocuments) onUpdateDocuments(cleanDocs);
       }
     } else {
       setErrorMsg(res.error || 'Failed to remove document.');

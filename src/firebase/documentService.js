@@ -345,23 +345,51 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       }
     } catch (e) {}
 
-    // 3. Remove from Firestore propertyDocuments collection
-    if (docIdStr) {
-      try {
-        const docRef = doc(db, 'propertyDocuments', docIdStr);
-        await deleteDoc(docRef);
-      } catch (fsErr) {
-        console.warn('Firestore document delete note:', fsErr.message);
+    // 3. Remove from Firestore propertyDocuments collection (Delete by ID and query match)
+    try {
+      if (docIdStr) {
+        try {
+          await deleteDoc(doc(db, 'propertyDocuments', docIdStr));
+        } catch (e) {}
       }
+      if (propertyId) {
+        try {
+          const q = query(collection(db, 'propertyDocuments'), where('propertyId', '==', propertyId));
+          const snap = await getDocs(q);
+          for (const dSnap of snap.docs) {
+            const dData = dSnap.data();
+            if (isDocMatch(dData) || dSnap.id === docIdStr) {
+              try {
+                await deleteDoc(dSnap.ref);
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+    } catch (fsErr) {
+      console.warn('Firestore document delete note:', fsErr.message);
     }
 
     // 4. Remove from target property's documents array in memory, mockApi, PostgreSQL, and Firestore
     if (propertyId) {
+      let remainingDocs = [];
+
+      try {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            remainingDocs = parsed.filter(d => !isDocMatch(d));
+          }
+        }
+      } catch (e) {}
+
       try {
         const { mockApi } = await import('../services/mockApi.js');
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj && Array.isArray(pObj.documents)) {
           pObj.documents = pObj.documents.filter(d => !isDocMatch(d));
+          if (remainingDocs.length === 0) remainingDocs = pObj.documents;
         }
       } catch (mErr) {}
 
@@ -371,13 +399,14 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
         if (propSnap.exists()) {
           const currentDocs = propSnap.data().documents || [];
           const updatedDocs = currentDocs.filter(d => !isDocMatch(d));
+          remainingDocs = updatedDocs;
           await setDoc(propRef, { documents: updatedDocs, updatedAt: serverTimestamp() }, { merge: true });
         }
       } catch (pFsErr) {}
 
       try {
         const { syncPropertyToPostgres } = await import('./propertyService.js');
-        syncPropertyToPostgres({ propertyId, id: propertyId, documents: [] });
+        await syncPropertyToPostgres({ propertyId, id: propertyId, documents: remainingDocs });
       } catch (pgErr) {}
     }
 
