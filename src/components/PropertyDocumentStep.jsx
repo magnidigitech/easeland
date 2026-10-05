@@ -257,29 +257,29 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
 
               return (
                 <div key={docItem.docId || idx} className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between gap-3 shadow-sm">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
-                    <div>
-                      <span className="block text-xs font-extrabold text-brand-charcoal">
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-xs font-extrabold text-brand-charcoal truncate" title={displayName}>
                         {displayName}
                       </span>
-                      <span className="block text-[10px] text-gray-500 font-semibold">
+                      <span className="block text-[10px] text-gray-500 font-semibold truncate">
                         Category: {displayType} • Size: {displaySize}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
                       {docItem.verificationStatus || 'PENDING'}
                     </span>
 
                     <button
                       type="button"
                       onClick={() => handleRemoveDocument(docItem)}
-                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                       title="Delete Document"
                     >
                       <Trash2 className="w-4 h-4" />
