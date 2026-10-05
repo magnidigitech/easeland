@@ -1,18 +1,4 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  deleteDoc,
-  query,
-  where,
-  serverTimestamp
-} from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from './config.js';
 import { VerificationStatus, DocumentType } from './schema.js';
-import { formatFirestoreError } from './userService.js';
 
 /**
  * Validate confidential document file
@@ -42,7 +28,7 @@ export function validateDocumentFile(file) {
 }
 
 /**
- * Upload confidential document file to Firebase Storage & save metadata in propertyDocuments
+ * Upload confidential document file to Hostinger PostgreSQL Storage API (/api/upload)
  */
 export async function uploadConfidentialPropertyDocument({
   propertyId,
@@ -62,22 +48,13 @@ export async function uploadConfidentialPropertyDocument({
       return { success: false, error: validation.error };
     }
 
-    // Automatically purge any previous/stale document record with the exact same filename or title to allow clean re-upload
-    try {
-      await removeConfidentialPropertyDocument({ fileName: file.name, documentName: documentName || file.name }, propertyId, ownerId);
-    } catch (purgeErr) {}
-
-    const docRef = doc(collection(db, 'propertyDocuments'));
-    const docId = docRef.id;
-
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `private_docs/properties/${propertyId}/${docId}_${sanitizedFileName}`;
-
-    // Upload document directly to Hostinger Coolify Storage API (/api/upload)
+    // Upload document directly to Hostinger PostgreSQL Storage API (/api/upload)
     const formData = new FormData();
     formData.append('file', file);
     formData.append('propertyId', propertyId);
     formData.append('ownerId', ownerId);
+    formData.append('documentType', documentType);
+    formData.append('documentName', documentName || file.name);
     formData.append('isDocument', 'true');
 
     const uploadResult = await new Promise((resolve, reject) => {
@@ -99,7 +76,7 @@ export async function uploadConfidentialPropertyDocument({
               if (onProgress) onProgress(100);
               resolve(resp);
             } else {
-              reject(new Error(resp.error || 'Hostinger document upload failed.'));
+              reject(new Error(resp.error || 'Document upload failed.'));
             }
           } catch (e) {
             reject(new Error('Invalid response from storage server.'));
@@ -109,118 +86,36 @@ export async function uploadConfidentialPropertyDocument({
         }
       };
 
-      xhr.onerror = () => reject(new Error('Network error uploading document to Hostinger storage server.'));
+      xhr.onerror = () => reject(new Error('Network error uploading document to server.'));
       xhr.ontimeout = () => reject(new Error('Document upload request timed out.'));
       xhr.timeout = 180000;
 
       xhr.send(formData);
     });
 
-    const finalStoragePath = uploadResult.relativePath || storagePath;
+    const docId = uploadResult.mediaId;
     const publicUrl = uploadResult.publicUrl;
 
     const docPayload = {
       docId,
       propertyId,
       ownerId,
-      documentName: documentName || file.name || 'Confidential Property Document',
+      documentName: documentName || file.name,
+      name: documentName || file.name,
       documentType,
+      type: documentType,
       fileName: file.name,
       contentType: file.type,
       fileSize: file.size,
-      storagePath: finalStoragePath, // Saved safely in private_docs path
+      size: file.size,
       publicUrl,
-      verificationStatus: VerificationStatus.PENDING,
-      adminFeedback: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-
-    try {
-      await setDoc(docRef, docPayload);
-    } catch (fsErr) {
-      console.warn('Firestore doc sync note:', fsErr.message);
-    }
-
-    // Clear any stale deleted documents key from local storage
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('easeland_deleted_documents');
-      }
-    } catch (e) {}
-
-    const docItemObj = {
-      docId,
-      name: documentName || file.name || 'Confidential Property Document',
-      type: documentType,
       url: publicUrl,
-      size: file.size
+      verificationStatus: VerificationStatus.PENDING
     };
-
-    // Sync documents array to properties document & PostgreSQL (Replacing old matching entries cleanly)
-    try {
-      let existingDocs = [];
-      try {
-        if (typeof window !== 'undefined') {
-          const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
-          if (stored) existingDocs = JSON.parse(stored);
-        }
-      } catch (e) {}
-
-      const normNew = normalizeDocString(documentName || file.name);
-      const filteredExisting = existingDocs.filter(d => {
-        if (!d) return false;
-        const dId = String(d.docId || d.id || d.mediaId || '');
-        if (dId && dId === docId) return false;
-        const dName = String(d.documentName || d.name || d.fileName || '');
-        const normD = normalizeDocString(dName);
-        return normD !== normNew;
-      });
-
-      const updatedDocsArray = [...filteredExisting, docItemObj];
-
-      const propRef = doc(db, 'properties', propertyId);
-      try {
-        const propSnap = await getDoc(propRef);
-        let currentFsDocs = [];
-        if (propSnap.exists() && Array.isArray(propSnap.data().documents)) {
-          currentFsDocs = propSnap.data().documents;
-        }
-        const mergedFsDocs = [...currentFsDocs.filter(d => {
-          if (!d) return false;
-          const dId = String(d.docId || d.id || d.mediaId || '');
-          if (dId && dId === docId) return false;
-          const dName = String(d.documentName || d.name || d.fileName || '');
-          const normD = normalizeDocString(dName);
-          return normD !== normNew;
-        }), docItemObj];
-
-        await setDoc(propRef, {
-          documents: mergedFsDocs,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      } catch (e) {}
-
-      const { syncPropertyToPostgres } = await import('./propertyService.js');
-      syncPropertyToPostgres({ propertyId, id: propertyId, documents: updatedDocsArray });
-
-      const { mockApi } = await import('../services/mockApi.js');
-      const pObj = mockApi.getPropertyById(propertyId);
-      if (pObj) {
-        pObj.documents = updatedDocsArray;
-      }
-
-      // Local storage backup
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`easeland_docs_${propertyId}`, JSON.stringify(updatedDocsArray));
-        }
-      } catch (e) {}
-    } catch (syncErr) {}
 
     return { success: true, docId, document: docPayload };
   } catch (error) {
-    console.warn('Document upload fallback note:', error);
+    console.warn('Document upload note:', error);
     return { success: false, error: error.message || 'Upload error' };
   }
 }
@@ -238,107 +133,63 @@ export function normalizeDocString(s) {
 }
 
 /**
- * Get confidential property documents (Accessible ONLY by Owner or Admin)
+ * Get confidential property documents (Exclusively from PostgreSQL property record /api/properties/:id)
  */
 export async function getPropertyDocuments(propertyId, ownerId) {
-  let rawDocs = null;
-
-  // Clear stale blacklist in browser if present
   try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('easeland_deleted_documents');
-    }
-  } catch (e) {}
+    if (!propertyId) return { success: true, documents: [] };
 
-  // 1. Primary Source: Backend PostgreSQL / Express API
-  try {
-    if (propertyId) {
-      const res = await fetch(`/api/properties/${propertyId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.property && Array.isArray(data.property.documents)) {
-          rawDocs = data.property.documents;
-        }
+    const res = await fetch(`/api/properties/${propertyId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.property && Array.isArray(data.property.documents)) {
+        const seenKeys = new Set();
+        const normalizedDocs = [];
+
+        data.property.documents.forEach(d => {
+          if (!d) return;
+          const urlStr = (d.publicUrl || d.url || d.storagePath || '').trim();
+          const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
+          const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
+
+          const normName = normalizeDocString(nameStr);
+          const dedupKey = normName || (urlStr.toLowerCase() !== '#' ? urlStr.toLowerCase() : '') || docIdStr.toLowerCase();
+
+          if (!dedupKey || seenKeys.has(dedupKey)) return;
+          seenKeys.add(dedupKey);
+
+          const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
+          const docType = d.documentType || d.type || 'TITLE_DEED';
+          const fileSizeNum = Number(d.fileSize || d.size) || 0;
+          const docUrl = urlStr || '#';
+
+          normalizedDocs.push({
+            ...d,
+            docId: d.docId || d.mediaId || d.id || `doc-${normalizedDocs.length + 1}`,
+            documentName: docName,
+            name: docName,
+            fileName: d.fileName || docName,
+            documentType: docType,
+            type: docType,
+            fileSize: fileSizeNum,
+            size: fileSizeNum,
+            publicUrl: docUrl,
+            url: docUrl,
+            verificationStatus: d.verificationStatus || 'PENDING'
+          });
+        });
+
+        return { success: true, documents: normalizedDocs };
       }
     }
-  } catch (e) {}
-
-  // 2. Secondary Fallback: Firestore propertyDocuments collection
-  if (!rawDocs || rawDocs.length === 0) {
-    try {
-      const q = query(
-        collection(db, 'propertyDocuments'),
-        where('propertyId', '==', propertyId)
-      );
-      const snap = await getDocs(q);
-      const fsDocs = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-      if (Array.isArray(fsDocs) && fsDocs.length > 0) {
-        rawDocs = fsDocs;
-      }
-    } catch (fsErr) {
-      console.warn('Firestore propertyDocuments query note:', fsErr.message);
-    }
+    return { success: true, documents: [] };
+  } catch (e) {
+    return { success: true, documents: [] };
   }
-
-  // 3. Tertiary Fallback: Local Storage Backup
-  if (!rawDocs || rawDocs.length === 0) {
-    try {
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            rawDocs = parsed.filter(d => d && (d.propertyId === propertyId || !d.propertyId));
-          }
-        }
-      }
-    } catch (e) {}
-  }
-
-  const docs = Array.isArray(rawDocs) ? rawDocs : [];
-
-  // Deduplicate docs by normalized Name / Filename so only 1 copy per document is shown
-  const seenKeys = new Set();
-  const normalizedDocs = [];
-
-  docs.forEach(d => {
-    if (!d) return;
-    const urlStr = (d.publicUrl || d.url || d.storagePath || '').trim();
-    const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
-    const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
-
-    const normName = normalizeDocString(nameStr);
-    const dedupKey = normName || (urlStr.toLowerCase() !== '#' ? urlStr.toLowerCase() : '') || docIdStr.toLowerCase();
-
-    if (!dedupKey || seenKeys.has(dedupKey)) return;
-    seenKeys.add(dedupKey);
-
-    const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
-    const docType = d.documentType || d.type || 'TITLE_DEED';
-    const fileSizeNum = Number(d.fileSize || d.size) || 0;
-    const docUrl = urlStr || '#';
-
-    normalizedDocs.push({
-      ...d,
-      docId: d.docId || d.mediaId || d.id || `doc-${normalizedDocs.length + 1}`,
-      documentName: docName,
-      name: docName,
-      fileName: d.fileName || docName,
-      documentType: docType,
-      type: docType,
-      fileSize: fileSizeNum,
-      size: fileSizeNum,
-      publicUrl: docUrl,
-      url: docUrl,
-      verificationStatus: d.verificationStatus || 'PENDING'
-    });
-  });
-
-  return { success: true, documents: normalizedDocs };
 }
 
 /**
- * Remove confidential property document (Storage file + Firestore metadata)
+ * Remove confidential property document (Exclusively from PostgreSQL backend server)
  */
 export async function removeConfidentialPropertyDocument(docTarget, propertyId, ownerId) {
   try {
@@ -347,150 +198,26 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
     }
 
     let docIdStr = '';
-    let docUrlStr = '';
     let docNameStr = '';
-    let docStoragePath = '';
 
     if (typeof docTarget === 'object' && docTarget !== null) {
-      docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim().toLowerCase();
-      docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim().toLowerCase();
+      docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim();
       docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim();
-      docStoragePath = String(docTarget.storagePath || '').trim();
     } else {
-      docIdStr = String(docTarget).trim().toLowerCase();
+      docIdStr = String(docTarget).trim();
     }
 
-    const normTargetName = normalizeDocString(docNameStr);
-
-    // Helper to check if a doc object matches any target identifier or name
-    const isDocMatch = (d) => {
-      if (!d) return false;
-      const dId = String(d.docId || d.mediaId || d.id || '').trim().toLowerCase();
-      const dUrl = String(d.publicUrl || d.url || d.storagePath || '').trim().toLowerCase();
-      const dName = String(d.documentName || d.name || d.fileName || d.title || '').trim();
-
-      if (docIdStr && dId && !docIdStr.startsWith('doc-') && dId === docIdStr) return true;
-      if (docUrlStr && docUrlStr !== '#' && dUrl && (dUrl === docUrlStr || dUrl.includes(docUrlStr) || docUrlStr.includes(dUrl))) return true;
-
-      if (normTargetName && dName) {
-        const normD = normalizeDocString(dName);
-        if (normD && normTargetName === normD) return true;
-      }
-
-      return false;
-    };
-
-    // 1. Delete actual file from Firebase Storage / Private Vault if storagePath is available
-    if (docStoragePath && !docStoragePath.startsWith('http')) {
-      try {
-        const fileRef = ref(storage, docStoragePath);
-        await deleteObject(fileRef);
-      } catch (sErr) {
-        console.warn('Storage file deletion note:', sErr.message);
-      }
-    }
-
-    // 2. Remove from Local Storage backups
-    try {
-      if (typeof window !== 'undefined') {
-        const keysToClean = ['easeland_user_documents'];
-        if (propertyId) keysToClean.push(`easeland_docs_${propertyId}`);
-
-        keysToClean.forEach(key => {
-          const stored = localStorage.getItem(key);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-              const updated = parsed.filter(d => !isDocMatch(d));
-              localStorage.setItem(key, JSON.stringify(updated));
-            }
-          }
-        });
-      }
-    } catch (e) {}
-
-    // 3. Remove from Firestore propertyDocuments collection (Delete by ID and matching query)
-    try {
-      if (docIdStr && !docIdStr.startsWith('doc-')) {
-        try {
-          await deleteDoc(doc(db, 'propertyDocuments', docIdStr));
-        } catch (e) {}
-      }
-      if (propertyId) {
-        try {
-          const q = query(collection(db, 'propertyDocuments'), where('propertyId', '==', propertyId));
-          const snap = await getDocs(q);
-          for (const dSnap of snap.docs) {
-            const dData = dSnap.data();
-            if (isDocMatch(dData) || dSnap.id === docIdStr) {
-              if (dData.storagePath) {
-                try {
-                  await deleteObject(ref(storage, dData.storagePath));
-                } catch (stErr) {}
-              }
-              try {
-                await deleteDoc(dSnap.ref);
-              } catch (e) {}
-            }
-          }
-        } catch (e) {}
-      }
-    } catch (fsErr) {
-      console.warn('Firestore document delete note:', fsErr.message);
-    }
-
-    // 4. Remove from property document array in Memory, Mock API, PostgreSQL, and Firestore
     if (propertyId) {
-      let remainingDocs = [];
-
-      try {
-        if (typeof window !== 'undefined') {
-          const stored = localStorage.getItem(`easeland_docs_${propertyId}`);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            remainingDocs = parsed.filter(d => !isDocMatch(d));
-            localStorage.setItem(`easeland_docs_${propertyId}`, JSON.stringify(remainingDocs));
-          }
-        }
-      } catch (e) {}
-
-      try {
-        const { mockApi } = await import('../services/mockApi.js');
-        const pObj = mockApi.getPropertyById(propertyId);
-        if (pObj && Array.isArray(pObj.documents)) {
-          pObj.documents = pObj.documents.filter(d => !isDocMatch(d));
-          remainingDocs = pObj.documents;
-        }
-      } catch (mErr) {}
-
-      try {
-        const propRef = doc(db, 'properties', propertyId);
-        const propSnap = await getDoc(propRef);
-        if (propSnap.exists()) {
-          const currentDocs = propSnap.data().documents || [];
-          const updatedDocs = currentDocs.filter(d => !isDocMatch(d));
-          remainingDocs = updatedDocs;
-          await setDoc(propRef, { documents: updatedDocs, updatedAt: serverTimestamp() }, { merge: true });
-        }
-      } catch (pFsErr) {}
-
-      try {
-        const { syncPropertyToPostgres } = await import('./propertyService.js');
-        await syncPropertyToPostgres({ propertyId, id: propertyId, documents: remainingDocs });
-      } catch (pgErr) {}
-
-      try {
-        await fetch(`/api/properties/${propertyId}/documents`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ docId: docIdStr, name: docNameStr, fileName: docNameStr })
-        });
-      } catch (apiErr) {}
+      await fetch(`/api/properties/${propertyId}/documents`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docId: docIdStr, name: docNameStr, fileName: docNameStr })
+      });
     }
 
     return { success: true };
   } catch (error) {
-    console.warn('Remove document error:', error);
+    console.warn('Remove document note:', error);
     return { success: true };
   }
 }

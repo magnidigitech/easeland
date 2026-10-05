@@ -436,20 +436,24 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       if (propertyId && propertyId !== 'common') {
         const existingProp = localPropsMap.get(propertyId) || { propertyId, id: propertyId };
         if (isDocument) {
+          const docType = req.body.documentType || 'TITLE_DEED';
+          const docTitle = req.body.documentName || req.file.originalname;
           const docObj = {
             docId: mediaId,
-            name: req.file.originalname,
-            documentName: req.file.originalname,
+            name: docTitle,
+            documentName: docTitle,
             fileName: req.file.originalname,
-            type: 'DOCUMENT',
+            documentType: docType,
+            type: docType,
             url: publicUrl,
             publicUrl: publicUrl,
             size: req.file.size,
             fileSize: req.file.size,
-            isDocument: true
+            isDocument: true,
+            verificationStatus: 'PENDING'
           };
           const existingDocs = Array.isArray(existingProp.documents) ? existingProp.documents : [];
-          const normNew = req.file.originalname.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+          const normNew = docTitle.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
           const filteredDocs = existingDocs.filter(d => {
             if (!d) return false;
             const dName = String(d.name || d.documentName || d.fileName || '');
