@@ -69,11 +69,17 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   const isTracingRef = useRef(false);
   const tracePointsRef = useRef([]);
   const verticesRef = useRef(vertices);
+  const [pencilSubMode, setPencilSubMode] = useState('draw'); // 'draw' (Trace Line) or 'pan' (Pan & Position Map)
+  const pencilSubModeRef = useRef(pencilSubMode);
 
-  // Keep verticesRef in sync with latest vertices state
+  // Keep refs in sync with state
   useEffect(() => {
     verticesRef.current = vertices;
   }, [vertices]);
+
+  useEffect(() => {
+    pencilSubModeRef.current = pencilSubMode;
+  }, [pencilSubMode]);
 
   // Map Leaflet Refs
   const mapContainerRef = useRef(null);
@@ -133,10 +139,19 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     if (drawMode === 'freehand') {
       const handleMouseDown = (e) => {
-        if (e.originalEvent) {
-          if (e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
-          if (e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+        // If in 'pan' mode, or multi-touch (2 fingers), or shift/right click, DO NOT DRAW -> allow map pan!
+        const isMultiTouch = e.originalEvent?.touches && e.originalEvent.touches.length > 1;
+        const isPanKey = e.originalEvent?.shiftKey || e.originalEvent?.button === 1 || e.originalEvent?.button === 2;
+        const isPanMode = pencilSubModeRef.current === 'pan';
+
+        if (isMultiTouch || isPanKey || isPanMode) {
+          isTracingRef.current = false;
+          return;
         }
+
+        if (e.originalEvent && e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
+        if (e.originalEvent && e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+
         isTracingRef.current = true;
         const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
         // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
@@ -147,8 +162,12 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
       const handleMouseMove = (e) => {
         if (!isTracingRef.current) return;
-        if (e.originalEvent) {
-          if (e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+        if (pencilSubModeRef.current === 'pan') {
+          isTracingRef.current = false;
+          return;
+        }
+        if (e.originalEvent && e.originalEvent.stopPropagation) {
+          e.originalEvent.stopPropagation();
         }
         const pts = tracePointsRef.current;
         const last = pts[pts.length - 1];
@@ -607,14 +626,45 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         <div className="rounded-2xl border-2 border-brand-charcoal overflow-hidden shadow-lg bg-slate-900">
           
           {/* MAP TOP INSTRUCTION HEADER */}
-          <div className="bg-brand-charcoal text-white px-4 py-2.5 flex items-center justify-between gap-3 text-xs font-bold border-b border-brand-yellow/30">
+          <div className="bg-brand-charcoal text-white px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs font-bold border-b border-brand-yellow/30">
             <div className="flex items-center gap-2">
               {drawMode === 'freehand' ? (
-                <>
-                  <Edit3 className="w-4 h-4 text-brand-yellow animate-pulse shrink-0" />
-                  <span className="text-brand-yellow font-extrabold uppercase tracking-wide">Amoeba Pencil Mode:</span>
-                  <span className="text-gray-200 font-medium">Trace parcel outline. Touch again to pick up where left off without losing points.</span>
-                </>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <Edit3 className="w-4 h-4 text-brand-yellow animate-pulse shrink-0" />
+                    <span className="text-brand-yellow font-extrabold uppercase tracking-wide">Amoeba Pencil:</span>
+                  </div>
+
+                  {/* SUB-MODE TOGGLE: DRAW VS PAN MAP */}
+                  <div className="flex items-center gap-1 bg-black/50 p-1 rounded-xl border border-amber-400/30">
+                    <button
+                      type="button"
+                      onClick={() => setPencilSubMode('draw')}
+                      className={`px-2.5 py-1 text-[11px] font-extrabold rounded-lg transition-all flex items-center gap-1 ${
+                        pencilSubMode === 'draw'
+                          ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
+                          : 'text-gray-300 hover:text-white'
+                      }`}
+                      title="1 Finger / Drag to trace parcel boundary"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>✏️ Trace Line</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPencilSubMode('pan')}
+                      className={`px-2.5 py-1 text-[11px] font-extrabold rounded-lg transition-all flex items-center gap-1 ${
+                        pencilSubMode === 'pan'
+                          ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
+                          : 'text-gray-300 hover:text-white'
+                      }`}
+                      title="Drag with finger/mouse to pan & position map freely"
+                    >
+                      <Compass className="w-3 h-3" />
+                      <span>✋ Pan & Position Map</span>
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <>
                   <MapPin className="w-4 h-4 text-brand-yellow animate-bounce shrink-0" />
