@@ -143,6 +143,73 @@ export function filterOutDummyItems(items) {
   });
 }
 
+export function getCleanPhone(phoneStr) {
+  if (!phoneStr) return '';
+  const digits = String(phoneStr).replace(/\D/g, '');
+  if (digits.length >= 10) {
+    return digits.slice(-10);
+  }
+  return digits;
+}
+
+export function deduplicateLeads(leads) {
+  if (!Array.isArray(leads)) return [];
+  const seen = new Set();
+  const result = [];
+
+  for (const item of leads) {
+    if (!item) continue;
+    const cleanPhone = getCleanPhone(item.phone || item.customerPhone);
+    const cleanName = String(item.name || item.customerName || '').toLowerCase().trim();
+    const key = cleanPhone ? cleanPhone : (cleanName && cleanName !== 'prospective buyer' && cleanName !== 'platform buyer' ? cleanName : item.id);
+
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+export function deduplicateDeals(deals) {
+  if (!Array.isArray(deals)) return [];
+  const seen = new Set();
+  const result = [];
+
+  for (const item of deals) {
+    if (!item) continue;
+    const cleanPhone = getCleanPhone(item.customerPhone || item.phone);
+    const cleanName = String(item.customerName || item.name || '').toLowerCase().trim();
+    const propTitle = String(item.propertyTitle || item.title || '').toLowerCase().trim();
+    const key = (cleanPhone && propTitle) ? `${cleanPhone}_${propTitle}` : (cleanName && propTitle ? `${cleanName}_${propTitle}` : item.id);
+
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+export function deduplicateVisits(visits) {
+  if (!Array.isArray(visits)) return [];
+  const seen = new Set();
+  const result = [];
+
+  for (const item of visits) {
+    if (!item) continue;
+    const cleanPhone = getCleanPhone(item.customerPhone || item.phone);
+    const date = String(item.visitDate || '').trim();
+    const key = (cleanPhone && date) ? `${cleanPhone}_${date}` : item.id;
+
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 // EaseLand Live Production Datasets — ZERO DUMMY DATA
 export const INITIAL_CRM_LEADS = [];
 export const INITIAL_CRM_DEALS = [];
@@ -169,13 +236,12 @@ export async function getCrmLeads() {
     leads = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
   }
 
-  // Purge any residual dummy data
+  // Purge any residual dummy data and deduplicate strictly
   const filtered = filterOutDummyItems(leads);
-  if (filtered.length !== leads.length) {
-    setStored('easeland_crm_leads', filtered, true);
-  }
+  const deduplicated = deduplicateLeads(filtered);
+  setStored('easeland_crm_leads', deduplicated, true);
 
-  return filtered;
+  return deduplicated;
 }
 
 /**
@@ -241,6 +307,34 @@ export async function clearAllCrmData() {
 }
 
 export async function createCrmLead(leadData) {
+  const cleanPhone = getCleanPhone(leadData.phone);
+  const cleanName = String(leadData.name || '').toLowerCase().trim();
+
+  const current = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
+  const existingIndex = current.findIndex(l => {
+    const lPhone = getCleanPhone(l.phone);
+    const lName = String(l.name || '').toLowerCase().trim();
+    if (cleanPhone && lPhone && cleanPhone === lPhone) return true;
+    if (cleanName && lName && cleanName === lName && cleanName !== 'prospective buyer' && cleanName !== 'platform buyer') return true;
+    return false;
+  });
+
+  if (existingIndex !== -1) {
+    const existing = current[existingIndex];
+    const updatedLead = {
+      ...existing,
+      ...leadData,
+      phone: leadData.phone || existing.phone,
+      email: leadData.email || existing.email,
+      notes: leadData.notes ? (existing.notes ? `${existing.notes} | ${leadData.notes}` : leadData.notes) : existing.notes,
+      updatedAt: new Date().toISOString()
+    };
+    current[existingIndex] = updatedLead;
+    const deduplicated = deduplicateLeads(current);
+    setStored('easeland_crm_leads', deduplicated);
+    return { success: true, lead: updatedLead, isUpdate: true };
+  }
+
   const leadId = 'lead-' + Date.now().toString().slice(-6);
   const nowIso = new Date().toISOString();
   const payload = {
@@ -271,8 +365,7 @@ export async function createCrmLead(leadData) {
     });
   } catch (e) {}
 
-  const current = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
-  const updated = [payload, ...current.filter(l => l.id !== leadId)];
+  const updated = deduplicateLeads([payload, ...current]);
   setStored('easeland_crm_leads', updated);
 
   return { success: true, lead: payload };

@@ -58,7 +58,10 @@ import {
   numToWordsIndian,
   syncFromLiveEnquiries,
   syncDealsToLeads,
-  syncVisitorLeadsToDeals
+  syncVisitorLeadsToDeals,
+  deduplicateLeads,
+  deduplicateDeals,
+  deduplicateVisits
 } from '../firebase/crmService.js';
 import { mockApi } from '../services/mockApi.js';
 
@@ -233,9 +236,10 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     }
   }, []);
 
-  // Filtered Leads
+  // Filtered Leads (Zero Duplicates guaranteed)
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
+    const cleanLeads = deduplicateLeads(leads);
+    return cleanLeads.filter((lead) => {
       const matchesSearch =
         searchQuery === '' ||
         lead.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
