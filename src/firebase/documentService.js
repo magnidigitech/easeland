@@ -62,28 +62,10 @@ export async function uploadConfidentialPropertyDocument({
       return { success: false, error: validation.error };
     }
 
-    // Disallow duplicate uploads with the exact same filename or title for the same property
+    // Automatically purge any previous/stale document record with the exact same filename or title to allow clean re-upload
     try {
-      const existingRes = await getPropertyDocuments(propertyId, ownerId);
-      if (existingRes.success && Array.isArray(existingRes.documents)) {
-        const targetFileName = (file.name || '').trim().toLowerCase();
-        const targetDocTitle = (documentName || file.name || '').trim().toLowerCase();
-
-        const isDuplicate = existingRes.documents.some(d => {
-          if (!d) return false;
-          const dFile = String(d.fileName || d.name || d.documentName || '').trim().toLowerCase();
-          const dTitle = String(d.documentName || d.name || d.title || '').trim().toLowerCase();
-          return (targetFileName && dFile === targetFileName) || (targetDocTitle && dTitle === targetDocTitle);
-        });
-
-        if (isDuplicate) {
-          return {
-            success: false,
-            error: `A document named "${file.name}" has already been uploaded for this property.`
-          };
-        }
-      }
-    } catch (dupErr) {}
+      await removeConfidentialPropertyDocument({ fileName: file.name, documentName: documentName || file.name }, propertyId, ownerId);
+    } catch (purgeErr) {}
 
     const docRef = doc(collection(db, 'propertyDocuments'));
     const docId = docRef.id;
