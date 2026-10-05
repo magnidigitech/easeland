@@ -106,7 +106,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       const map = L.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
         zoom: 17,
-        zoomControl: true
+        zoomControl: false
       });
 
       // Default Tile Layer: Google Satellite Hybrid
@@ -190,7 +190,12 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       });
     }
 
-    // Invalidate map size to render cleanly
+    // Invalidate map size to ensure tile rendering is 100% complete
+    requestAnimationFrame(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    });
     setTimeout(() => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
@@ -603,49 +608,62 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
           </div>
         </div>
 
-        {/* INTERACTIVE LEAFLET MAP CANVAS */}
-        <div className="relative rounded-2xl border-2 border-brand-charcoal/20 overflow-hidden shadow-lg">
-          <div
-            ref={mapContainerRef}
-            className={`h-96 w-full z-10 bg-slate-900 ${
-              drawMode === 'freehand' ? 'touch-none select-none' : 'touch-auto'
-            }`}
-          />
+        {/* INTERACTIVE LEAFLET MAP CANVAS CONTAINER */}
+        <div className="rounded-2xl border-2 border-brand-charcoal overflow-hidden shadow-lg bg-slate-900">
+          
+          {/* MAP TOP INSTRUCTION HEADER */}
+          <div className="bg-brand-charcoal text-white px-4 py-2.5 flex items-center justify-between gap-3 text-xs font-bold border-b border-brand-yellow/30">
+            <div className="flex items-center gap-2">
+              {drawMode === 'freehand' ? (
+                <>
+                  <Edit3 className="w-4 h-4 text-brand-yellow animate-pulse shrink-0" />
+                  <span className="text-brand-yellow font-extrabold uppercase tracking-wide">Amoeba Pencil Mode:</span>
+                  <span className="text-gray-200 font-medium">Trace parcel outline. Touch again to pick up where left off without losing points.</span>
+                </>
+              ) : (
+                <>
+                  <MapPin className="w-4 h-4 text-brand-yellow animate-bounce shrink-0" />
+                  <span className="text-brand-yellow font-extrabold uppercase tracking-wide">Points Mode:</span>
+                  <span className="text-gray-200 font-medium">Click map to drop pins, drag orange pins to reposition, or click '+' to split curves.</span>
+                </>
+              )}
+            </div>
 
-          {/* MAP FLOATING INSTRUCTION BADGE */}
-          <div className="absolute top-3 left-3 z-20 bg-black/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 border border-white/10 max-w-md">
-            {drawMode === 'freehand' ? (
-              <>
-                <Edit3 className="w-3.5 h-3.5 text-brand-yellow animate-pulse shrink-0" />
-                <span>Amoeba Pencil: Trace outline. Touch again to pick up where left off without losing points!</span>
-              </>
-            ) : (
-              <>
-                <MapPin className="w-3.5 h-3.5 text-brand-yellow animate-bounce shrink-0" />
-                <span>Click map to drop pins, drag orange pins to reposition, or click '+' handles to split curves.</span>
-              </>
+            {vertices.length > 0 && (
+              <span className="text-[11px] font-mono font-extrabold text-amber-300 bg-black/50 px-3 py-1 rounded-full shrink-0 border border-amber-400/30">
+                {vertices.length} {vertices.length === 1 ? 'Point' : 'Points'} Marked
+              </span>
             )}
           </div>
 
-          {/* FLOATING MAP ZOOM IN / ZOOM OUT CONTROLS */}
-          <div className="absolute top-14 left-3 z-20 flex flex-col bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => mapInstanceRef.current?.zoomIn()}
-              className="w-8 h-8 flex items-center justify-center font-black text-gray-800 hover:bg-amber-100 text-base transition-colors"
-              title="Zoom In Map"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              onClick={() => mapInstanceRef.current?.zoomOut()}
-              className="w-8 h-8 flex items-center justify-center font-black text-gray-800 hover:bg-amber-100 text-base border-t border-gray-200 transition-colors"
-              title="Zoom Out Map"
-            >
-              −
-            </button>
-          </div>
+          {/* MAP CANVAS */}
+          <div className="relative">
+            <div
+              ref={mapContainerRef}
+              className={`h-96 w-full z-10 bg-slate-900 ${
+                drawMode === 'freehand' ? 'touch-none select-none' : 'touch-auto'
+              }`}
+            />
+
+            {/* FLOATING MAP ZOOM IN / ZOOM OUT CONTROLS */}
+            <div className="absolute top-3 left-3 z-20 flex flex-col bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => mapInstanceRef.current?.zoomIn()}
+                className="w-8 h-8 flex items-center justify-center font-black text-gray-800 hover:bg-amber-100 text-base transition-colors"
+                title="Zoom In Map"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => mapInstanceRef.current?.zoomOut()}
+                className="w-8 h-8 flex items-center justify-center font-black text-gray-800 hover:bg-amber-100 text-base border-t border-gray-200 transition-colors"
+                title="Zoom Out Map"
+              >
+                −
+              </button>
+            </div>
 
           {/* MAP ACTION CONTROLS FLOATING BAR */}
           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-gray-200">
@@ -696,6 +714,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
             </button>
           </div>
         </div>
+      </div>
 
         {/* POLYGON SUMMARY BAR */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white border border-gray-200 rounded-xl">
