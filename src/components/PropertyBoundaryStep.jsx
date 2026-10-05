@@ -139,6 +139,14 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     map.off('mouseup');
 
     if (drawMode === 'freehand') {
+      if (pencilSubModeRef.current === 'pan') {
+        map.dragging.enable();
+        if (map.touchZoom) map.touchZoom.enable();
+      } else {
+        map.dragging.disable();
+        if (map.touchZoom) map.touchZoom.disable();
+      }
+
       const handleMouseDown = (e) => {
         // If in 'pan' mode, or multi-touch (2 fingers), or right click, DO NOT DRAW -> allow map pan!
         const isMultiTouch = e.originalEvent?.touches && e.originalEvent.touches.length > 1;
@@ -147,37 +155,29 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
         if (isMultiTouch || isRightClick || isPanMode) {
           isTracingRef.current = false;
+          map.dragging.enable();
+          if (map.touchZoom) map.touchZoom.enable();
           return;
         }
 
         if (e.originalEvent && e.originalEvent.button !== undefined && e.originalEvent.button !== 0) return;
+        if (e.originalEvent && e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
 
-        // Check double tap / double click timing (< 400ms)
-        const now = Date.now();
-        const timeDiff = now - lastTapTimeRef.current;
-        lastTapTimeRef.current = now;
+        isTracingRef.current = true;
+        map.dragging.disable();
 
-        // Double click/tap OR active trace -> Start drawing!
-        if (timeDiff < 400 || isTracingRef.current) {
-          if (e.originalEvent && e.originalEvent.stopPropagation) {
-            e.originalEvent.stopPropagation();
-          }
-          isTracingRef.current = true;
-          const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
-          // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
-          const initial = [...verticesRef.current, newPt];
-          tracePointsRef.current = initial;
-          setVertices(initial);
-        } else {
-          // Single click / single drag -> Allow map to pan naturally!
-          isTracingRef.current = false;
-        }
+        const newPt = { lat: e.latlng.lat, lng: e.latlng.lng };
+        // APPEND to existing vertices so zoom in/out or picking up finger NEVER clears previous points!
+        const initial = [...verticesRef.current, newPt];
+        tracePointsRef.current = initial;
+        setVertices(initial);
       };
 
       const handleMouseMove = (e) => {
         if (!isTracingRef.current) return;
         if (pencilSubModeRef.current === 'pan') {
           isTracingRef.current = false;
+          map.dragging.enable();
           return;
         }
         if (e.originalEvent && e.originalEvent.stopPropagation) {
@@ -212,6 +212,9 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       map.on('mousemove touchmove', handleMouseMove);
       map.on('mouseup touchend', handleMouseUp);
     } else {
+      map.dragging.enable();
+      if (map.touchZoom) map.touchZoom.enable();
+
       map.on('click', (e) => {
         const newPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
         setVertices(prev => [...prev, newPoint]);
@@ -236,7 +239,7 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
         mapInstanceRef.current = null;
       }
     };
-  }, [method, centerLat, centerLng, drawMode]);
+  }, [method, centerLat, centerLng, drawMode, pencilSubMode]);
 
   // Update Tile Layer when mapType changes (Satellite vs Street)
   useEffect(() => {
