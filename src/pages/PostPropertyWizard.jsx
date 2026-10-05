@@ -62,6 +62,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   const [successMsg, setSuccessMsg] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Clear step-specific validation errors when changing steps
+  useEffect(() => {
+    setErrorMsg(null);
+    setFieldErrors({});
+  }, [step]);
+
   // Close modal on Escape key press
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -420,6 +426,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   };
 
   const handlePrevStep = () => {
+    setErrorMsg(null);
+    setFieldErrors({});
     setStep(prev => Math.max(prev - 1, 1));
   };
 
