@@ -312,11 +312,13 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
     let docIdStr = '';
     let docUrlStr = '';
     let docNameStr = '';
+    let docStoragePath = '';
 
     if (typeof docTarget === 'object' && docTarget !== null) {
       docIdStr = String(docTarget.docId || docTarget.mediaId || docTarget.id || '').trim().toLowerCase();
       docUrlStr = String(docTarget.publicUrl || docTarget.url || docTarget.storagePath || '').trim().toLowerCase();
       docNameStr = String(docTarget.documentName || docTarget.name || docTarget.fileName || docTarget.title || '').trim().toLowerCase();
+      docStoragePath = String(docTarget.storagePath || '').trim();
     } else {
       docIdStr = String(docTarget).trim().toLowerCase();
     }
@@ -335,7 +337,17 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       return false;
     };
 
-    // 2. Remove from local storage keys
+    // 1. Delete actual file from Firebase Storage / Private Vault if storagePath is available
+    if (docStoragePath && !docStoragePath.startsWith('http')) {
+      try {
+        const fileRef = ref(storage, docStoragePath);
+        await deleteObject(fileRef);
+      } catch (sErr) {
+        console.warn('Storage file deletion note:', sErr.message);
+      }
+    }
+
+    // 2. Remove from Local Storage backups
     try {
       if (typeof window !== 'undefined') {
         const keysToClean = ['easeland_user_documents'];
@@ -354,7 +366,7 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       }
     } catch (e) {}
 
-    // 3. Remove from Firestore propertyDocuments collection (Delete by ID and query match)
+    // 3. Remove from Firestore propertyDocuments collection (Delete by ID and matching query)
     try {
       if (docIdStr) {
         try {
@@ -368,6 +380,11 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
           for (const dSnap of snap.docs) {
             const dData = dSnap.data();
             if (isDocMatch(dData) || dSnap.id === docIdStr) {
+              if (dData.storagePath) {
+                try {
+                  await deleteObject(ref(storage, dData.storagePath));
+                } catch (stErr) {}
+              }
               try {
                 await deleteDoc(dSnap.ref);
               } catch (e) {}
@@ -379,7 +396,7 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
       console.warn('Firestore document delete note:', fsErr.message);
     }
 
-    // 4. Remove from target property's documents array in memory, mockApi, PostgreSQL, and Firestore
+    // 4. Remove from property document array in Memory, Mock API, PostgreSQL, and Firestore
     if (propertyId) {
       let remainingDocs = [];
 
@@ -398,7 +415,7 @@ export async function removeConfidentialPropertyDocument(docTarget, propertyId, 
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj && Array.isArray(pObj.documents)) {
           pObj.documents = pObj.documents.filter(d => !isDocMatch(d));
-          if (remainingDocs.length === 0) remainingDocs = pObj.documents;
+          remainingDocs = pObj.documents;
         }
       } catch (mErr) {}
 
