@@ -343,29 +343,49 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
 
     let data = null;
 
-    // 1. Try Firestore
+    // 1. Try PostgreSQL API (/api/properties/:id) FIRST (Primary Database Source)
     try {
-      const propRef = doc(db, 'properties', propertyId);
-      const snap = await getDoc(propRef);
-      if (snap.exists()) {
-        data = snap.data();
+      const res = await fetch(`/api/properties/${encodeURIComponent(propertyId)}`);
+      if (res.ok) {
+        const pgRes = await res.json();
+        if (pgRes.success && pgRes.property) {
+          data = pgRes.property;
+        }
       }
     } catch (e) {}
 
-    // 2. Try PostgreSQL API (/api/properties/:id)
+    // 1b. Fallback: Search all properties in PostgreSQL API (/api/properties) by ID or title
     if (!data) {
       try {
-        const res = await fetch(`/api/properties/${propertyId}`);
+        const res = await fetch('/api/properties');
         if (res.ok) {
-          const pgRes = await res.json();
-          if (pgRes.success && pgRes.property) {
-            data = pgRes.property;
+          const allData = await res.json();
+          if (allData.success && Array.isArray(allData.properties)) {
+            const targetStr = String(propertyId).toLowerCase().trim();
+            data = allData.properties.find(p => {
+              if (!p) return false;
+              const pId = String(p.id || p.propertyId || '').toLowerCase().trim();
+              const refId = String(p.referenceId || '').toLowerCase().trim();
+              const pTitle = String(p.title || '').toLowerCase().trim();
+              return pId === targetStr || refId === targetStr || (pTitle && pTitle === targetStr);
+            });
           }
         }
       } catch (e) {}
     }
 
-    // 3. Try mockApi & Local Storage
+    // 2. Try Firestore
+    if (!data) {
+      try {
+        const propRef = doc(db, 'properties', propertyId);
+        const snap = await getDoc(propRef);
+        if (snap.exists()) {
+          data = snap.data();
+        }
+      } catch (e) {}
+    }
+
+    // 3. Try mockApi & Local Storage fallback
     if (!data) {
       try {
         const { mockApi } = await import('../services/mockApi.js');
@@ -378,10 +398,23 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
       return { success: false, error: 'Property not found.' };
     }
 
-    const isOwner = currentUserId && (data.ownerId === currentUserId || currentUserId === 'admin_uid_001');
+    const pOwnerId = String(data.ownerId || data.owner?.id || data.userId || data.uid || data.submittedBy || '').toLowerCase().trim();
+    const pOwnerEmail = (data.ownerPrivateEmail || data.ownerPublicEmail || data.owner?.email || data.email || '').toLowerCase().trim();
+
+    const isOwner = (currentUserId && pOwnerId === currentUserId) ||
+      (currentUserEmail && pOwnerEmail === currentUserEmail) ||
+      currentUserId === 'admin_uid_001';
+
+    const isLive = Boolean(
+      data.listingStatus === ListingStatus.LIVE || data.status === ListingStatus.LIVE ||
+      data.status === 'LIVE' || data.listingStatus === 'LIVE' ||
+      data.status === 'APPROVED' || data.listingStatus === 'APPROVED' || data.status === 'APPROVED_LIVE' ||
+      data.verificationStatus === 'Platform Verified' || data.verificationStatus === 'PLATFORM VERIFIED' ||
+      data.isPlatformVerified || data.isPublished
+    );
 
     // Security Check: Non-LIVE listings accessible ONLY by Owner or Admin
-    if (data.listingStatus !== ListingStatus.LIVE && data.status !== ListingStatus.LIVE && !isOwner && !isAdminUser) {
+    if (!isLive && !isOwner && !isAdminUser) {
       return { success: false, error: 'Property listing is not publicly accessible.' };
     }
 

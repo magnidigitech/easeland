@@ -621,15 +621,55 @@ app.get('/api/properties', async (req, res) => {
 // API Endpoint: Get single property by ID from Local Store / PostgreSQL
 app.get('/api/properties/:id', async (req, res) => {
   const targetId = req.params.id;
-  const localProp = localPropsMap.get(targetId);
+  if (!targetId) {
+    return res.status(400).json({ success: false, error: 'Property ID is required.' });
+  }
+
+  let localProp = localPropsMap.get(targetId);
+  if (!localProp) {
+    const tLower = targetId.toLowerCase().trim();
+    for (const v of localPropsMap.values()) {
+      if (v) {
+        const id1 = String(v.id || '').toLowerCase().trim();
+        const id2 = String(v.propertyId || '').toLowerCase().trim();
+        const id3 = String(v.referenceId || '').toLowerCase().trim();
+        const tTitle = String(v.title || '').toLowerCase().trim();
+        if (id1 === tLower || id2 === tLower || id3 === tLower || (tTitle && tTitle === tLower)) {
+          localProp = v;
+          break;
+        }
+      }
+    }
+  }
 
   let pgProp = null;
   try {
-    const result = await pgPool.query('SELECT raw_data FROM properties WHERE property_id = $1;', [targetId]);
+    const result = await pgPool.query(
+      "SELECT raw_data FROM properties WHERE property_id = $1 OR reference_id = $1 OR raw_data->>'id' = $1 OR raw_data->>'propertyId' = $1 OR raw_data->>'referenceId' = $1;",
+      [targetId]
+    );
     if (result.rows.length > 0) {
       pgProp = result.rows[0].raw_data;
     }
   } catch (err) {}
+
+  if (!pgProp) {
+    try {
+      const allRes = await pgPool.query('SELECT raw_data FROM properties;');
+      const tLower = targetId.toLowerCase().trim();
+      const found = allRes.rows.map(r => r.raw_data).find(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '').toLowerCase().trim();
+        const id2 = String(p.propertyId || '').toLowerCase().trim();
+        const id3 = String(p.referenceId || '').toLowerCase().trim();
+        const tTitle = String(p.title || '').toLowerCase().trim();
+        return id1 === tLower || id2 === tLower || id3 === tLower || (tTitle && tTitle === tLower);
+      });
+      if (found) {
+        pgProp = found;
+      }
+    } catch (e) {}
+  }
 
   if (localProp || pgProp) {
     const property = { ...(pgProp || {}), ...(localProp || {}) };
