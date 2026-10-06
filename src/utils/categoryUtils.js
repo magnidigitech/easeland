@@ -218,27 +218,29 @@ export function getFirstUploadedImage(property) {
  * Resolves a thumbnail image URL for video items (YouTube poster, video poster, or property photo).
  */
 export function getVideoThumbnailUrl(item, property) {
-  const fallback = getFirstUploadedImage(property);
+  const fallback = property ? getFirstUploadedImage(property) : null;
   if (!item) return fallback;
 
-  const url = typeof item === 'string' ? item : (item.url || item.publicUrl || item.embedUrl || item.src || '');
+  const url = typeof item === 'string' ? item : (item.thumbnailUrl || item.thumbnail || item.poster || item.url || item.publicUrl || item.embedUrl || item.mediaUrl || item.src || '');
   if (!url) return fallback;
 
-  if (url.includes('youtube.com/embed/')) {
-    const id = url.split('/embed/')[1]?.split('?')[0]?.split('&')[0];
-    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-  } else if (url.includes('youtu.be/')) {
-    const id = url.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
-    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-  } else if (url.includes('youtube.com/watch')) {
-    const match = url.match(/v=([^&]+)/);
-    if (match && match[1]) return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
+  // 1. YouTube thumbnail matching
+  const ytMatch = String(url).match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+  }
+
+  // 2. Google Drive thumbnail
+  const driveMatch = String(url).match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+  if (driveMatch && (driveMatch[1] || driveMatch[2])) {
+    return `https://lh3.googleusercontent.com/u/0/d/${driveMatch[1] || driveMatch[2]}`;
   }
 
   if (typeof item === 'object') {
+    if (item.thumbnailUrl) return item.thumbnailUrl;
     if (item.poster) return item.poster;
     if (item.thumbnail) return item.thumbnail;
   }
 
-  return fallback;
+  return url || fallback;
 }

@@ -14,7 +14,9 @@ import {
   Send,
   Sparkles,
   Info,
-  Clock
+  Clock,
+  Play,
+  Video
 } from 'lucide-react';
 import { getPropertyDocuments } from '../firebase/documentService.js';
 import { submitPropertyForVerification } from '../firebase/propertyService.js';
@@ -393,23 +395,74 @@ export default function PropertyReviewStep({
 
         {reviewMedia.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {reviewMedia.map((item, idx) => (
-              <div key={item.mediaId || idx} className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
-                {item.type === 'PHOTO' || (!item.type && item.publicUrl) ? (
-                  <img src={item.publicUrl || item.thumbnailUrl} alt={item.fileName || `Photo ${idx + 1}`} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white font-extrabold text-[10px] p-2 text-center">
-                    <span className="text-brand-yellow font-black text-xs">🎬 VIDEO</span>
-                    <span className="text-[9px] text-gray-300 font-semibold line-clamp-1 mt-1">{item.fileName || item.provider || 'Walkthrough Video'}</span>
-                  </div>
-                )}
-                {item.isPrimary && (
-                  <span className="absolute top-1 left-1 bg-brand-yellow text-brand-charcoal text-[9px] font-black px-2 py-0.5 rounded shadow">
-                    COVER
-                  </span>
-                )}
-              </div>
-            ))}
+            {reviewMedia.map((item, idx) => {
+              const rawUrl = typeof item === 'string' ? item : (item.publicUrl || item.url || item.embedUrl || item.mediaUrl || '');
+              const isVideoType = item.type === 'VIDEO' || item.type === 'WALKTHROUGH_VIDEO' || item.type === 'DRONE_VIDEO' || item.mediaType === 'WALKTHROUGH_VIDEO' || item.mediaType === 'DRONE_VIDEO' || item.provider === 'youtube' || item.provider === 'gdrive';
+              const isVideoUrl = Boolean(rawUrl && (rawUrl.includes('youtube.com') || rawUrl.includes('youtu.be') || rawUrl.includes('drive.google.com') || rawUrl.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i) || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:video/')));
+              const isVideo = isVideoType || isVideoUrl;
+
+              // Resolve thumbnail URL for YouTube / Google Drive / explicit thumbnail
+              const ytMatch = String(rawUrl).match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+              const ytThumb = ytMatch && ytMatch[1] ? `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg` : null;
+
+              const driveMatch = String(rawUrl).match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+              const driveThumb = driveMatch && (driveMatch[1] || driveMatch[2]) ? `https://lh3.googleusercontent.com/u/0/d/${driveMatch[1] || driveMatch[2]}` : null;
+
+              const thumbUrl = ytThumb || driveThumb || item.thumbnailUrl || item.thumbnail || (!isVideo ? (item.publicUrl || item.url || rawUrl) : null);
+
+              return (
+                <div key={item.mediaId || idx} className="relative aspect-video bg-slate-900 rounded-xl overflow-hidden border border-gray-200 shadow-sm group">
+                  {thumbUrl ? (
+                    <img
+                      src={thumbUrl}
+                      alt={item.fileName || `Media ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // If image fails, fallback to video element or hidden
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : isVideo && rawUrl ? (
+                    <video
+                      src={`${rawUrl}#t=0.1`}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-400 text-xs font-bold">
+                      <span>No Media Preview</span>
+                    </div>
+                  )}
+
+                  {/* VIDEO OVERLAY BADGE & PLAY ICON */}
+                  {isVideo && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-between p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow uppercase flex items-center gap-1">
+                          🎬 VIDEO
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/50 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-200 truncate drop-shadow">
+                        {item.fileName || (ytThumb ? 'YouTube Video' : driveThumb ? 'Google Drive Video' : 'Walkthrough Video')}
+                      </span>
+                    </div>
+                  )}
+
+                  {item.isPrimary && (
+                    <span className="absolute top-1 left-1 z-10 bg-brand-yellow text-brand-charcoal text-[9px] font-black px-2 py-0.5 rounded shadow">
+                      COVER
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-xs text-gray-500 font-medium">No media uploaded yet.</div>
