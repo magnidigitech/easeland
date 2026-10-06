@@ -339,21 +339,24 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   };
 
   // Auto-Save / Save Draft
-  const handleSaveDraft = async (targetStep = step) => {
+  const handleSaveDraft = async (targetStep = step, customUpdates = null) => {
     if (!user?.uid) return;
     setSavingDraft(true);
     setErrorMsg(null);
 
     try {
-      const priceNum = Number(formData.price) || 0;
-      const areaNum = Number(formData.area) || 0;
+      const priceNum = Number(customUpdates?.price !== undefined ? customUpdates.price : formData.price) || 0;
+      const areaNum = Number(customUpdates?.area !== undefined ? customUpdates.area : formData.area) || 0;
 
       const ownerName = profile?.displayName || profile?.name || user?.displayName || user?.name || user?.email || 'EaseLand User';
       const ownerPhone = profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phone || user?.phoneNumber || '';
       const ownerEmail = user?.email || profile?.email || '';
 
+      const effectiveBoundary = customUpdates?.boundary !== undefined ? customUpdates.boundary : (formData.boundary || formData.ownerSubmittedBoundary || null);
+
       const draftData = {
         ...formData,
+        ...(customUpdates || {}),
         ownerId: user?.uid || user?.id,
         ownerPublicName: ownerName,
         ownerPrivateEmail: ownerEmail,
@@ -364,28 +367,31 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           email: ownerEmail,
           phone: ownerPhone
         },
-        title: formData.title,
-        propertyType: formData.propertyType,
-        otherPropertyType: formData.otherPropertyType || '',
-        purpose: formData.purpose,
+        title: customUpdates?.title !== undefined ? customUpdates.title : formData.title,
+        propertyType: customUpdates?.propertyType !== undefined ? customUpdates.propertyType : formData.propertyType,
+        otherPropertyType: customUpdates?.otherPropertyType !== undefined ? customUpdates.otherPropertyType : (formData.otherPropertyType || ''),
+        purpose: customUpdates?.purpose !== undefined ? customUpdates.purpose : formData.purpose,
         price: priceNum,
         priceDisplay: getPriceDisplay(),
         area: areaNum,
         areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
         areaDisplay: getAreaDisplay(),
-        description: formData.description,
+        description: customUpdates?.description !== undefined ? customUpdates.description : formData.description,
         specs: {
           ...(formData.specs || {}),
+          ...(customUpdates?.specs || {}),
           areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT
         },
-        amenities: formData.amenities || [],
-        location: formData.location || null,
-        media: formData.media || [],
-        photos: formData.photos || [],
+        amenities: customUpdates?.amenities !== undefined ? customUpdates.amenities : (formData.amenities || []),
+        location: customUpdates?.location !== undefined ? customUpdates.location : (formData.location || null),
+        boundary: effectiveBoundary || null,
+        ownerSubmittedBoundary: effectiveBoundary || null,
+        media: customUpdates?.media !== undefined ? customUpdates.media : (formData.media || []),
+        photos: customUpdates?.photos !== undefined ? customUpdates.photos : (formData.photos || []),
         videoUrl: formData.videoUrl || formData.videoLink || null,
         videoLink: formData.videoLink || formData.videoUrl || null,
         embeddedVideoUrl: formData.embeddedVideoUrl || null,
-        documents: formData.documents || []
+        documents: customUpdates?.documents !== undefined ? customUpdates.documents : (formData.documents || [])
       };
 
       let pId = propertyId;
@@ -403,9 +409,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         await savePropertyDraftStep(pId, user.uid, draftData, targetStep);
       }
 
-      if (formData.boundary && pId) {
+      if (effectiveBoundary && pId) {
         try {
-          await saveOwnerBoundarySubmission(pId, user.uid, formData.boundary);
+          await saveOwnerBoundarySubmission(pId, user.uid, effectiveBoundary);
         } catch (e) {}
       }
 
@@ -914,15 +920,18 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         {step === 7 && (
           <PropertyBoundaryStep
             propertyLocation={formData.location}
-            boundaryData={formData.boundary}
+            boundaryData={formData.boundary || formData.ownerSubmittedBoundary}
             onSaveBoundary={async (boundaryPayload) => {
-              setFormData(prev => ({ ...prev, boundary: boundaryPayload }));
-              await handleSaveDraft(7);
+              setFormData(prev => ({ ...prev, boundary: boundaryPayload, ownerSubmittedBoundary: boundaryPayload }));
+              await handleSaveDraft(7, { boundary: boundaryPayload, ownerSubmittedBoundary: boundaryPayload });
               setStep(8);
             }}
             onSkipBoundary={async () => {
               await handleSaveDraft(7);
               setStep(8);
+            }}
+            onChangeBoundary={(boundaryPayload) => {
+              setFormData(prev => ({ ...prev, boundary: boundaryPayload, ownerSubmittedBoundary: boundaryPayload }));
             }}
           />
         )}

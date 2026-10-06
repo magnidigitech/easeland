@@ -57,13 +57,22 @@ function simplifyPoints(points, tolerance = 0.000015) {
   return simplifyRDP(points, sqTolerance);
 }
 
-export default function PropertyBoundaryStep({ propertyLocation, boundaryData, onSaveBoundary, onSkipBoundary }) {
+export default function PropertyBoundaryStep({ propertyLocation, boundaryData, onSaveBoundary, onSkipBoundary, onChangeBoundary }) {
   const [method, setMethod] = useState('DRAW'); // 'DRAW', 'GPS', 'MAP_DOC'
   const [drawMode, setDrawMode] = useState('click'); // 'click' (point-by-point) or 'freehand' (pencil trace for amoeba shapes)
   const [vertices, setVertices] = useState(boundaryData?.vertices || []);
   const [source, setSource] = useState(boundaryData?.source || BoundarySource.DRAWN_ON_MAP);
   const [docRefName, setDocRefName] = useState(boundaryData?.confidentialDocRef?.name || '');
   const [mapType, setMapType] = useState('satellite'); // 'satellite', 'street'
+
+  // Sync vertices if boundaryData prop updates dynamically
+  useEffect(() => {
+    if (boundaryData?.vertices && Array.isArray(boundaryData.vertices) && boundaryData.vertices.length > 0) {
+      if (vertices.length === 0) {
+        setVertices(boundaryData.vertices);
+      }
+    }
+  }, [boundaryData]);
 
   // Freehand Pencil Trace Refs
   const isTracingRef = useRef(false);
@@ -81,6 +90,21 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   useEffect(() => {
     pencilSubModeRef.current = pencilSubMode;
   }, [pencilSubMode]);
+
+  // Continuously notify parent component of boundary updates
+  useEffect(() => {
+    if (typeof onChangeBoundary === 'function' && Array.isArray(vertices) && vertices.length > 0) {
+      const estimatedArea = calculateApproximatePolygonAreaSqFt(vertices);
+      const payload = {
+        vertices,
+        source: method === 'GPS' ? BoundarySource.GPS_ASSISTED : method === 'MAP_DOC' ? BoundarySource.UPLOADED_PLOT_MAP : BoundarySource.DRAWN_ON_MAP,
+        confidentialDocRef: docRefName ? { name: docRefName, category: 'Plot Map' } : null,
+        status: BoundaryStatus.PENDING_REVIEW,
+        estimatedAreaSqFt: estimatedArea
+      };
+      onChangeBoundary(payload);
+    }
+  }, [vertices, method, docRefName]);
 
   // Map Leaflet Refs
   const mapContainerRef = useRef(null);
