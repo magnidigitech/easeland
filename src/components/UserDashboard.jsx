@@ -234,7 +234,10 @@ export default function UserDashboard({
     const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy || '').toLowerCase().trim();
     const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
 
-    const isOwned = (currentUserId && pOwnerId === currentUserId) || (currentUserEmail && pOwnerEmail === currentUserEmail);
+    const isOwned = (!pOwnerId && !pOwnerEmail) ||
+      (currentUserId && pOwnerId === currentUserId) ||
+      (currentUserEmail && pOwnerEmail === currentUserEmail) ||
+      !currentUserId;
     if (!isOwned) return;
 
     const pId = String(p.propertyId || p.id || p.referenceId || '');
@@ -867,13 +870,13 @@ export default function UserDashboard({
                         </div>
 
                         <div className="flex items-center gap-3">
-                          {(prop.status === 'APPROVED' || prop.status === 'LIVE') && (
+                          {(prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) && (
                             <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               Live & Verified
                             </span>
                           )}
-                          {(prop.status === 'PENDING' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
+                          {!(prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
                             <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                               <Clock className="w-3 h-3 text-blue-600" />
                               Under Review
@@ -946,8 +949,8 @@ export default function UserDashboard({
                 {/* PROPERTY LIST CARDS WITH CANONICAL OWNER ACTIONS & ADMIN FEEDBACK BANNERS */}
                 {userProperties.filter(p => {
                   if (propertyFilter === 'ALL') return true;
-                  if (propertyFilter === 'LIVE') return p.status === 'LIVE' || p.status === 'APPROVED';
-                  if (propertyFilter === 'PENDING_VERIFICATION') return p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING';
+                  if (propertyFilter === 'LIVE') return p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished;
+                  if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED';
                   if (propertyFilter === 'CHANGES_REQUIRED') return p.status === 'CHANGES_REQUIRED';
                   if (propertyFilter === 'UNAVAILABLE') return p.status === 'UNAVAILABLE';
                   if (propertyFilter === 'DRAFT') return p.status === 'DRAFT';
@@ -974,8 +977,8 @@ export default function UserDashboard({
                   <div className="space-y-4">
                     {userProperties.filter(p => {
                       if (propertyFilter === 'ALL') return true;
-                      if (propertyFilter === 'LIVE') return p.status === 'LIVE' || p.status === 'APPROVED';
-                      if (propertyFilter === 'PENDING_VERIFICATION') return p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING';
+                      if (propertyFilter === 'LIVE') return p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished;
+                      if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED';
                       if (propertyFilter === 'CHANGES_REQUIRED') return p.status === 'CHANGES_REQUIRED';
                       if (propertyFilter === 'UNAVAILABLE') return p.status === 'UNAVAILABLE';
                       if (propertyFilter === 'DRAFT') return p.status === 'DRAFT';
@@ -1021,13 +1024,13 @@ export default function UserDashboard({
 
                           {/* STATUS BADGE */}
                           <div>
-                            {(prop.status === 'LIVE' || prop.status === 'APPROVED') && (
+                            {(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (
                               <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                                 Live & Verified
                               </span>
                             )}
-                            {(prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING') && (
+                            {!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING') && (
                               <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-blue-200">
                                 <Clock className="w-4 h-4 text-blue-600" />
                                 Under Audit
@@ -1081,7 +1084,7 @@ export default function UserDashboard({
                         {/* ADMIN FEEDBACK BANNER */}
                         <div className={`p-4 rounded-xl border text-xs font-medium ${prop.status === 'CHANGES_REQUIRED'
                             ? 'bg-amber-50 text-amber-900 border-amber-200'
-                            : (prop.status === 'LIVE' || prop.status === 'APPROVED')
+                            : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
                               ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                               : 'bg-blue-50 text-blue-900 border-blue-200'
                           }`}>
@@ -1090,9 +1093,9 @@ export default function UserDashboard({
                           </span>
                           <span>
                             {prop.adminNote || (
-                              (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW')
+                              (!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW'))
                                 ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
-                                : ((prop.status === 'LIVE' || prop.status === 'APPROVED')
+                                : ((prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
                                     ? 'Property audited and verified live on marketplace. Click "Edit Listing" anytime to update details (new changes will submit for re-audit while old details remain live).'
                                     : 'Property draft created. Complete all steps to submit for verification.')
                             )}
@@ -1135,7 +1138,7 @@ export default function UserDashboard({
                             )}
 
                             {/* PENDING VERIFICATION & UNDER REVIEW */}
-                            {(prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
+                            {!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

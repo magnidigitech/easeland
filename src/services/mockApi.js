@@ -676,7 +676,26 @@ export const mockApi = {
       if (!p || isFakeProperty(p)) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
       if (pId) {
-        allPropsMap.set(pId, { ...(allPropsMap.get(pId) || {}), ...p });
+        const existing = allPropsMap.get(pId) || {};
+        const isLive = Boolean(
+          p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' || p.status === 'APPROVED_LIVE' ||
+          p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.isPlatformVerified || p.isPublished ||
+          existing.status === 'LIVE' || existing.listingStatus === 'LIVE' || existing.status === 'APPROVED' || existing.listingStatus === 'APPROVED' || existing.status === 'APPROVED_LIVE' ||
+          existing.verificationStatus === 'Platform Verified' || existing.verificationStatus === 'PLATFORM VERIFIED' || existing.isPlatformVerified || existing.isPublished
+        );
+        const resolvedStatus = isLive ? 'LIVE' : (p.status || existing.status || 'DRAFT');
+        const resolvedListingStatus = isLive ? 'LIVE' : (p.listingStatus || existing.listingStatus || 'DRAFT');
+        const resolvedVerStatus = isLive ? 'Platform Verified' : (p.verificationStatus || existing.verificationStatus || 'Pending Admin Verification');
+
+        allPropsMap.set(pId, {
+          ...existing,
+          ...p,
+          status: resolvedStatus,
+          listingStatus: resolvedListingStatus,
+          verificationStatus: resolvedVerStatus,
+          isPlatformVerified: isLive || Boolean(p.isPlatformVerified || existing.isPlatformVerified),
+          isPublished: isLive || Boolean(p.isPublished || existing.isPublished)
+        });
       }
     });
 
