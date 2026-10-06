@@ -224,7 +224,7 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
                 onClick={onClose}
                 className="w-1/2 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors cursor-pointer"
               >
-                Cancel
+                Skip 2FA & Sign In
               </button>
               <button
                 type="submit"

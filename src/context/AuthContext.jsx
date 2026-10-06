@@ -117,7 +117,14 @@ export function AuthProvider({ children }) {
         const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
         const userProfileData = storedProfile;
 
-        const has2FA = Boolean(userProfileData?.security?.enable2FA === true || userProfileData?.communicationPreferences?.enable2FA === true);
+        // Auto-sanitize legacy 2FA defaults from stored profile
+        if (userProfileData?.security?.enable2FA && !userProfileData?.security?.twoFactorExplicitlyEnabled) {
+          if (userProfileData.security) userProfileData.security.enable2FA = false;
+          if (userProfileData.communicationPreferences) userProfileData.communicationPreferences.enable2FA = false;
+          try { localStorage.setItem('easeland_user_profile_' + currentUser.uid, JSON.stringify(userProfileData)); } catch(e){}
+        }
+
+        const has2FA = Boolean(userProfileData?.security?.enable2FA === true && userProfileData?.security?.twoFactorExplicitlyEnabled === true);
         const isVerified = is2FAVerifiedForSession(currentUser.uid);
 
         if (has2FA && !isVerified) {
@@ -321,8 +328,15 @@ export function AuthProvider({ children }) {
     }
 
     if (loggedInUser && userProfileData) {
-      // 1. Check 2FA Security Preference (Disabled by default, enabled only if user sets up 2FA in profile)
-      const has2FA = Boolean(userProfileData?.security?.enable2FA === true || userProfileData?.communicationPreferences?.enable2FA === true);
+      // Auto-sanitize legacy 2FA defaults from stored profile
+      if (userProfileData?.security?.enable2FA && !userProfileData?.security?.twoFactorExplicitlyEnabled) {
+        if (userProfileData.security) userProfileData.security.enable2FA = false;
+        if (userProfileData.communicationPreferences) userProfileData.communicationPreferences.enable2FA = false;
+        try { localStorage.setItem('easeland_user_profile_' + loggedInUser.uid, JSON.stringify(userProfileData)); } catch(e){}
+      }
+
+      // 1. Check 2FA Security Preference (Disabled by default, enabled only if explicitly configured)
+      const has2FA = Boolean(userProfileData?.security?.enable2FA === true && userProfileData?.security?.twoFactorExplicitlyEnabled === true);
       const isVerified = is2FAVerifiedForSession(loggedInUser.uid);
       
       // 2. Check Security Alerts Preference
@@ -535,7 +549,13 @@ export function AuthProvider({ children }) {
         displayName: result.user.displayName
       };
 
-      const has2FA = Boolean(userProfileData?.security?.enable2FA === true || userProfileData?.communicationPreferences?.enable2FA === true);
+      // Auto-sanitize legacy 2FA defaults
+      if (userProfileData?.security?.enable2FA && !userProfileData?.security?.twoFactorExplicitlyEnabled) {
+        if (userProfileData.security) userProfileData.security.enable2FA = false;
+        if (userProfileData.communicationPreferences) userProfileData.communicationPreferences.enable2FA = false;
+      }
+
+      const has2FA = Boolean(userProfileData?.security?.enable2FA === true && userProfileData?.security?.twoFactorExplicitlyEnabled === true);
       const isVerified = is2FAVerifiedForSession(result.user.uid);
       const hasAlerts = userProfileData?.security?.loginAlerts ?? userProfileData?.communicationPreferences?.loginAlerts ?? true;
 
@@ -575,13 +595,24 @@ export function AuthProvider({ children }) {
   };
 
   const cancel2FASession = () => {
-    if (pending2FASession?.user?.uid) {
-      clear2FAVerifiedForSession(pending2FASession.user.uid);
+    if (pending2FASession?.user) {
+      const { user: targetUser, profile: targetProfile } = pending2FASession;
+      const cleanProfile = { ...(targetProfile || {}) };
+      if (!cleanProfile.security) cleanProfile.security = {};
+      cleanProfile.security.enable2FA = false;
+      cleanProfile.security.twoFactorExplicitlyEnabled = false;
+      if (cleanProfile.communicationPreferences) cleanProfile.communicationPreferences.enable2FA = false;
+
+      if (targetUser?.uid) {
+        try { localStorage.setItem('easeland_user_profile_' + targetUser.uid, JSON.stringify(cleanProfile)); } catch(e){}
+      }
+      setUser(targetUser);
+      setProfile(cleanProfile);
+    } else {
+      setUser(null);
+      setProfile(null);
     }
     setPending2FASession(null);
-    setUser(null);
-    setProfile(null);
-    apiLogoutUser().catch(() => {});
   };
 
   const value = {
