@@ -331,9 +331,9 @@ export default function AdminPortal({ onNavigate }) {
 
   // Dynamic Activity Logs & Audit Trail State
   const defaultInitialLogs = [
-    '[2026-09-02 12:45:00] Admin Scarlett published site configuration changes live.',
-    '[2026-09-02 12:42:00] Admin Scarlett suspended user Ramesh Varma for 7 days (Fraudulent Title Document Upload).',
-    '[2026-09-02 11:30:00] Admin Scarlett verified and published property prop-106 live.'
+    '[2026-09-02 12:45:00] EaseLand Admin published site configuration changes live.',
+    '[2026-09-02 12:42:00] EaseLand Admin suspended user Ramesh Varma for 7 days (Fraudulent Title Document Upload).',
+    '[2026-09-02 11:30:00] EaseLand Admin verified and published property prop-106 live.'
   ];
 
   const [activityLogs, setActivityLogs] = useState(() => {
@@ -354,7 +354,13 @@ export default function AdminPortal({ onNavigate }) {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    const currentAdminName = user?.displayName || user?.name || profile?.displayName || localStorage.getItem('easeland_admin_name') || 'Admin Scarlett';
+    
+    let rawAdminName = user?.displayName || user?.name || profile?.displayName || localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
+    if (rawAdminName.includes('Scarlett')) {
+      rawAdminName = 'EaseLand Admin';
+      try { localStorage.setItem('easeland_admin_name', 'EaseLand Admin'); } catch(e){}
+    }
+    const currentAdminName = rawAdminName;
     const logEntry = `[${timestamp}] Admin ${currentAdminName} ${actionMessage}`;
 
     setActivityLogs(prev => {
@@ -819,6 +825,7 @@ export default function AdminPortal({ onNavigate }) {
 
       return {
         ...u,
+        status: u.status || u.accountStatus || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
         role: derivedRole,
         postedListingsCount: userListings.length,
         authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
@@ -4945,7 +4952,7 @@ export default function AdminPortal({ onNavigate }) {
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Assigned Admin: <strong>{selectedDealForDossier.assignedAdmin || 'Scarlett'}</strong></span>
+                    <span>Assigned Admin: <strong>{selectedDealForDossier.assignedAdmin || 'EaseLand Admin'}</strong></span>
                   </div>
                 </div>
               </div>

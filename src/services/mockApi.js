@@ -341,7 +341,7 @@ export const DEFAULT_SITE_CONFIG = {
   publish: {
     autoPublish: false,
     version: '2.4.0',
-    lastPublishedBy: 'Scarlett (Admin)'
+    lastPublishedBy: 'EaseLand Admin'
   }
 };
 
@@ -1187,7 +1187,7 @@ export const mockApi = {
       customerPhone: enquiryPayload.customerPhone,
       ownerName: enquiryPayload.ownerName || 'Property Owner',
       stage: 'NEW',
-      assignedAdmin: 'Scarlett (Admin)',
+      assignedAdmin: 'EaseLand Admin',
       createdAt: new Date().toISOString().split('T')[0],
       lastUpdate: new Date().toISOString().split('T')[0],
       notes: `Enquiry received: "${enquiryPayload.message}"`
@@ -1335,7 +1335,7 @@ export const mockApi = {
       if (password === 'Admin@12345' || password === 'Admin@2026') {
         const adminAccount = {
           id: 'admin-101',
-          name: 'Scarlett (Admin)',
+          name: 'EaseLand Admin',
           email: 'admin@easeland.in',
           phone: '+91 98765 00000',
           role: 'ADMIN',
@@ -1400,7 +1400,7 @@ export const mockApi = {
         reason: reason || 'Violation of platform verification rules',
         suspendedAt: now.toISOString(),
         suspendedUntil: suspendedUntil,
-        suspendedBy: 'Scarlett (Admin)'
+        suspendedBy: 'EaseLand Admin'
       };
       setStoredData('easeland_registered_users', registeredUsers);
       if (typeof window !== 'undefined') {
@@ -1553,7 +1553,7 @@ export const mockApi = {
       publish: {
         ...(siteConfig.publish || {}),
         ...(newPartialConfig.publish || {}),
-        lastPublishedBy: 'Scarlett (Admin)',
+        lastPublishedBy: 'EaseLand Admin',
         lastPublishedTime: new Date().toISOString()
       }
     });

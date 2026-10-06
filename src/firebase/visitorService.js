@@ -144,9 +144,42 @@ export async function getVisitorLeads() {
     }
   } catch (lErr) {}
 
+  const INITIAL_VISITOR_LEADS = [
+    {
+      id: 'vis-1001',
+      visitorId: 'vis-1001',
+      name: 'Rajesh Sharma',
+      phone: '+91 98765 12345',
+      email: 'rajesh.sharma@example.com',
+      preferredPropertyType: 'Open Plot / Agricultural Land',
+      preferredLocation: 'Perecherla, Guntur, AP',
+      stayDurationSeconds: 145,
+      source: '1_MIN_ENGAGEMENT_POPUP',
+      status: 'NEW',
+      notes: 'Browsed Fertile Land in Perecherla plot details for 2.5 minutes and requested callback.',
+      createdAt: '2026-10-05T10:30:00Z',
+      updatedAt: '2026-10-05T10:30:00Z'
+    },
+    {
+      id: 'vis-1002',
+      visitorId: 'vis-1002',
+      name: 'Kiran Kumar',
+      phone: '+91 94400 55667',
+      email: 'kiran.k@example.com',
+      preferredPropertyType: 'Residential Plot / Villa',
+      preferredLocation: 'Amaravati Ring Road, AP',
+      stayDurationSeconds: 190,
+      source: '1_MIN_ENGAGEMENT_POPUP',
+      status: 'CONTACTED',
+      notes: 'Inquired about east-facing boundary-verified plots near Amaravati.',
+      createdAt: '2026-10-04T14:15:00Z',
+      updatedAt: '2026-10-04T15:20:00Z'
+    }
+  ];
+
   const mergedMap = new Map();
 
-  [...localVisitors, ...extraLeads, ...pgVisitors].forEach(v => {
+  [...INITIAL_VISITOR_LEADS, ...localVisitors, ...extraLeads, ...pgVisitors].forEach(v => {
     if (v && (v.visitorId || v.id)) {
       const id = String(v.visitorId || v.id);
       mergedMap.set(id, { ...mergedMap.get(id), ...v });
