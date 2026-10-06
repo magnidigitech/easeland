@@ -576,7 +576,20 @@ export default function AdminPortal({ onNavigate }) {
       console.warn('Error loading verification queue:', e1);
     }
 
-    // 2. Users (Combines Firestore + Local Storage + Registered Property Owners)
+    // 2. Users (Combines PostgreSQL /api/users + Firestore + Local Storage + Registered Property Owners)
+    let pgServerUsers = [];
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.users)) {
+          pgServerUsers = json.users;
+        }
+      }
+    } catch (ePg) {
+      console.warn('Error fetching users from PostgreSQL server:', ePg);
+    }
+
     let firestoreUsers = [];
     try {
       const usersRes = await getAllUsersAdmin();
@@ -633,12 +646,21 @@ export default function AdminPortal({ onNavigate }) {
     });
 
     const userMap = new Map();
-    [...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
+    [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
       if (!u) return;
       const key = String(u.uid || u.id || u.email || '').toLowerCase().trim();
       if (key) {
         const existing = userMap.get(key) || {};
-        userMap.set(key, { ...existing, ...u });
+        const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
+        const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
+        const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
+
+        userMap.set(key, {
+          ...existing,
+          ...u,
+          name: cleanName,
+          displayName: cleanName
+        });
       }
     });
 
@@ -817,16 +839,23 @@ export default function AdminPortal({ onNavigate }) {
         return (uUid && pOwnerId && uUid === pOwnerId) || (uEmail && pEmail && uEmail === pEmail);
       });
 
-      const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in';
+      const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in' || uUid === 'admin-101';
       let derivedRole = u.role;
       if (!isUserAdmin) {
         derivedRole = userListings.length > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : 'USER';
       }
 
+      let finalName = u.name || u.displayName || 'EaseLand User';
+      if (isUserAdmin || finalName.includes('Scarlett') || uEmail === 'admin@easeland.in') {
+        finalName = 'EaseLand Admin';
+      }
+
       return {
         ...u,
+        name: finalName,
+        displayName: finalName,
         status: u.status || u.accountStatus || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
-        role: derivedRole,
+        role: isUserAdmin ? 'ADMIN' : derivedRole,
         postedListingsCount: userListings.length,
         authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
         emailVerified: u.emailVerified ?? (u.email ? true : false)
