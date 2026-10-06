@@ -70,6 +70,33 @@ export default function PropertyReviewStep({
     }
   }, [propertyId, formData.media, formData.photos]);
 
+  const [reviewLocation, setReviewLocation] = useState(() => formData.location || null);
+
+  useEffect(() => {
+    if (formData.location && (formData.location.confirmed || formData.location.geoPoint || formData.location.city || formData.location.address || formData.location.locality || formData.location.lat)) {
+      setReviewLocation(formData.location);
+    } else if (propertyId) {
+      try {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem(`easeland_wizard_draft_${propertyId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.location) {
+              setReviewLocation(parsed.location);
+              return;
+            }
+          }
+        }
+        import('../services/mockApi.js').then(({ mockApi }) => {
+          const pObj = mockApi.getPropertyById(propertyId);
+          if (pObj && pObj.location) {
+            setReviewLocation(pObj.location);
+          }
+        });
+      } catch (e) {}
+    }
+  }, [propertyId, formData.location]);
+
   // Fetch confidential documents for this property
   useEffect(() => {
     if (propertyId && ownerId) {
@@ -85,12 +112,17 @@ export default function PropertyReviewStep({
     }
   }, [propertyId, ownerId]);
 
+  // Active Location Object
+  const activeLoc = reviewLocation || formData.location;
+
   // Validation checks for submission
   const isTitleValid = Boolean(formData.title && formData.title.trim().length >= 2);
   const isPriceValid = Boolean(Number(formData.price) > 0);
   const isAreaValid = Boolean(Number(formData.area) > 0);
   const isDescriptionValid = Boolean(formData.description && formData.description.trim().length >= 2);
-  const isLocationValid = Boolean(formData.location && (formData.location.confirmed || formData.location.geoPoint || formData.location.city || formData.location.address || formData.location.locality));
+  const isLocationValid = Boolean(
+    activeLoc && (activeLoc.confirmed || activeLoc.geoPoint || activeLoc.city || activeLoc.address || activeLoc.locality || activeLoc.lat)
+  );
 
   const isFormValid = isTitleValid && isPriceValid && isAreaValid && isDescriptionValid && isLocationValid;
 
@@ -301,22 +333,22 @@ export default function PropertyReviewStep({
           </button>
         </div>
 
-        {formData.location && formData.location.confirmed ? (
+        {activeLoc && (activeLoc.confirmed || activeLoc.geoPoint || activeLoc.address || activeLoc.city || activeLoc.locality || activeLoc.lat) ? (
           <div className="space-y-2 text-xs">
             <div className="flex items-start gap-2">
               <span className="p-1 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[10px] mt-0.5">
                 CONFIRMED
               </span>
               <span className="font-bold text-brand-charcoal leading-snug">
-                {formData.location.address || 'Location confirmed'}
+                {activeLoc.address || [activeLoc.locality, activeLoc.city, activeLoc.district, activeLoc.state].filter(Boolean).join(', ') || 'Location confirmed'}
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px]">
-              <div><span className="text-gray-500 font-bold">State:</span> <span className="font-extrabold">{formData.location.state || 'N/A'}</span></div>
-              <div><span className="text-gray-500 font-bold">District:</span> <span className="font-extrabold">{formData.location.district || 'N/A'}</span></div>
-              <div><span className="text-gray-500 font-bold">City/Town:</span> <span className="font-extrabold">{formData.location.city || 'N/A'}</span></div>
-              <div><span className="text-gray-500 font-bold">Locality:</span> <span className="font-extrabold">{formData.location.locality || 'N/A'}</span></div>
+              <div><span className="text-gray-500 font-bold">State:</span> <span className="font-extrabold">{activeLoc.state || 'N/A'}</span></div>
+              <div><span className="text-gray-500 font-bold">District:</span> <span className="font-extrabold">{activeLoc.district || 'N/A'}</span></div>
+              <div><span className="text-gray-500 font-bold">City/Town:</span> <span className="font-extrabold">{activeLoc.city || 'N/A'}</span></div>
+              <div><span className="text-gray-500 font-bold">Locality:</span> <span className="font-extrabold">{activeLoc.locality || 'N/A'}</span></div>
             </div>
           </div>
         ) : (

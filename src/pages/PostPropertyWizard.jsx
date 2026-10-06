@@ -106,6 +106,15 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             const pId = p.propertyId || p.id;
             setPropertyId(pId);
             setReferenceId(p.referenceId);
+
+            let cachedLoc = p.location || null;
+            if (typeof window !== 'undefined') {
+              try {
+                const storedLoc = localStorage.getItem(`easeland_wizard_location_${pId}`) || localStorage.getItem(`easeland_wizard_location_${user.uid}`);
+                if (storedLoc) cachedLoc = JSON.parse(storedLoc);
+              } catch (e) {}
+            }
+
             setFormData({
               title: p.title || '',
               propertyType: p.propertyType || PropertyType.OPEN_PLOT,
@@ -126,7 +135,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               videoUrl: p.videoUrl || p.videoLink || null,
               videoLink: p.videoLink || p.videoUrl || null,
               embeddedVideoUrl: p.embeddedVideoUrl || null,
-              location: p.location || null,
+              location: cachedLoc,
               boundary: p.boundary || null,
               ownerSubmittedBoundary: p.ownerSubmittedBoundary || null
             });
@@ -150,6 +159,15 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     const dId = draft.propertyId || draft.id;
     setPropertyId(dId);
     setReferenceId(draft.referenceId);
+
+    let cachedLoc = draft.location || null;
+    if (typeof window !== 'undefined') {
+      try {
+        const storedLoc = localStorage.getItem(`easeland_wizard_location_${dId}`) || localStorage.getItem(`easeland_wizard_location_${user?.uid}`);
+        if (storedLoc) cachedLoc = JSON.parse(storedLoc);
+      } catch (e) {}
+    }
+
     setFormData({
       title: draft.title || '',
       propertyType: draft.propertyType || PropertyType.OPEN_PLOT,
@@ -170,7 +188,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       videoUrl: draft.videoUrl || draft.videoLink || null,
       videoLink: draft.videoLink || draft.videoUrl || null,
       embeddedVideoUrl: draft.embeddedVideoUrl || null,
-      location: draft.location || null,
+      location: cachedLoc,
       boundary: draft.boundary || null
     });
     setStep(draft.lastStep || 1);
@@ -868,7 +886,19 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           <PropertyLocationStep
             locationData={formData.location}
             onLocationConfirmed={(confirmedLocation) => {
-              setFormData(prev => ({ ...prev, location: confirmedLocation }));
+              setFormData(prev => {
+                const next = { ...prev, location: confirmedLocation };
+                if (typeof window !== 'undefined') {
+                  try {
+                    localStorage.setItem(`easeland_wizard_location_${user?.uid || 'guest'}`, JSON.stringify(confirmedLocation));
+                    if (propertyId) {
+                      localStorage.setItem(`easeland_wizard_location_${propertyId}`, JSON.stringify(confirmedLocation));
+                    }
+                  } catch (e) {}
+                }
+                return next;
+              });
+              handleSaveDraft(3, { location: confirmedLocation });
             }}
           />
         )}
