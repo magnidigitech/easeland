@@ -265,6 +265,9 @@ async function initPgDb() {
         raw_data JSONB,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 6. Registered Users Table (PostgreSQL User Governance)
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -1277,6 +1280,11 @@ app.delete('/api/visitors/:id', async (req, res) => {
     }
 
     return res.json({ success: true, message: 'Visitor deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Registered Users API Endpoints (PostgreSQL User Governance)
 app.get('/api/users', async (req, res) => {
   try {
