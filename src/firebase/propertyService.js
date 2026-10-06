@@ -412,16 +412,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       }
     } catch (e) {}
 
-    // 1. Try local store & mockApi
-    try {
-      const { mockApi } = await import('../services/mockApi.js');
-      const myProps = mockApi.getMyProperties(ownerId, '');
-      if (Array.isArray(myProps)) {
-        propertiesList = [...myProps];
-      }
-    } catch (e) {}
-
-    // 2. Try PostgreSQL API (/api/properties)
+    // 1. Primary PostgreSQL database fetch (/api/properties)
     try {
       const res = await fetch('/api/properties');
       if (res.ok) {
@@ -429,12 +420,22 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
         if (data.success && Array.isArray(data.properties)) {
           const pgProps = data.properties.filter(p => {
             if (!p) return false;
-            const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || '').toLowerCase().trim();
+            const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || '').toLowerCase().trim();
             const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || '').toLowerCase().trim();
-            return pOwnerId === String(ownerId).toLowerCase().trim() || (userEmail && pOwnerEmail === userEmail.toLowerCase().trim());
+            const targetIdStr = String(ownerId || '').toLowerCase().trim();
+            return (targetIdStr && pOwnerId === targetIdStr) || (!pOwnerId && !pOwnerEmail);
           });
-          propertiesList = [...propertiesList, ...pgProps];
+          propertiesList = [...pgProps];
         }
+      }
+    } catch (e) {}
+
+    // 2. Try local store & mockApi fallback
+    try {
+      const { mockApi } = await import('../services/mockApi.js');
+      const myProps = mockApi.getMyProperties(ownerId, '');
+      if (Array.isArray(myProps)) {
+        propertiesList = [...propertiesList, ...myProps];
       }
     } catch (e) {}
 
@@ -451,14 +452,29 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       console.warn('Firestore getOwnerProperties note:', error);
     }
 
-    // Deduplicate and filter out deleted property IDs
+    // Deduplicate and filter out deleted property IDs (by ID & title)
     const propMap = new Map();
     propertiesList.forEach(p => {
       if (!p) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
+      const normTitle = (p.title || '').toLowerCase().trim();
       const pStatus = String(p.status || p.listingStatus || '').toUpperCase();
-      if (pId && !deletedIds.includes(pId) && pStatus !== 'DELETED') {
-        const existing = propMap.get(pId) || {};
+
+      if ((pId || normTitle) && !deletedIds.includes(pId) && pStatus !== 'DELETED') {
+        let existingKey = pId;
+        let existing = propMap.get(pId);
+
+        if (!existing && normTitle) {
+          for (const [k, v] of propMap.entries()) {
+            if (v && (v.title || '').toLowerCase().trim() === normTitle) {
+              existingKey = k;
+              existing = v;
+              break;
+            }
+          }
+        }
+        existing = existing || {};
+
         const isLive = Boolean(
           p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' || p.status === 'APPROVED_LIVE' ||
           p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.isPlatformVerified || p.isPublished ||
@@ -470,9 +486,11 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
         const resolvedListingStatus = isLive ? 'LIVE' : (p.listingStatus || existing.listingStatus || 'DRAFT');
         const resolvedVerStatus = isLive ? 'Platform Verified' : (p.verificationStatus || existing.verificationStatus || 'Pending Admin Verification');
 
-        propMap.set(pId, {
+        propMap.set(existingKey || pId, {
           ...existing,
           ...p,
+          id: existing.id || p.id || p.propertyId,
+          propertyId: existing.propertyId || p.propertyId || p.id,
           status: resolvedStatus,
           listingStatus: resolvedListingStatus,
           verificationStatus: resolvedVerStatus,

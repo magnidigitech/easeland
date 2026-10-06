@@ -185,11 +185,31 @@ export default function UserDashboard({
     });
   }, [user]);
 
-  // Load user properties from mockApi storage on mount and when events fire
-  const refreshUserProperties = () => {
+  // Load user properties directly from PostgreSQL API (/api/properties) on mount and when events fire
+  const refreshUserProperties = async () => {
     const userIdToPass = user?.uid || user?.id;
-    const rawList = mockApi.getMyProperties(userIdToPass, user?.email);
-    setMyPropertiesList(rawList);
+    const userEmailToPass = user?.email;
+
+    try {
+      const res = await fetch('/api/properties');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.properties)) {
+          const uId = String(userIdToPass || '').toLowerCase().trim();
+          const uEmail = (userEmailToPass || '').toLowerCase().trim();
+          const pgProps = data.properties.filter(p => {
+            if (!p) return false;
+            const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || '').toLowerCase().trim();
+            const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || '').toLowerCase().trim();
+            return (uId && pOwnerId === uId) || (uEmail && pOwnerEmail === uEmail) || (!pOwnerId && !pOwnerEmail);
+          });
+          setMyPropertiesList(pgProps);
+        }
+      }
+    } catch (err) {
+      console.warn('PostgreSQL fetch error in UserDashboard:', err);
+    }
+
     refreshOwnerProperties();
   };
 
@@ -216,7 +236,7 @@ export default function UserDashboard({
     };
   }, [user]);
 
-  // Combine Firestore and local/database properties cleanly so user always sees live status updates
+  // Combine Firestore and database properties cleanly so user always sees live status updates
   let deletedIdsSet = new Set();
   try {
     if (typeof window !== 'undefined') {
@@ -241,8 +261,23 @@ export default function UserDashboard({
     if (!isOwned) return;
 
     const pId = String(p.propertyId || p.id || p.referenceId || '');
-    if (pId && !deletedIdsSet.has(pId) && !p.isDeleted && p.listingStatus !== 'DELETED' && p.status !== 'DELETED') {
-      const existing = combinedPropsMap.get(pId) || {};
+    const normTitle = (p.title || '').toLowerCase().trim();
+
+    if ((pId || normTitle) && !deletedIdsSet.has(pId) && !p.isDeleted && p.listingStatus !== 'DELETED' && p.status !== 'DELETED') {
+      let existingKey = pId;
+      let existing = combinedPropsMap.get(pId);
+
+      if (!existing && normTitle) {
+        for (const [k, v] of combinedPropsMap.entries()) {
+          if (v && (v.title || '').toLowerCase().trim() === normTitle) {
+            existingKey = k;
+            existing = v;
+            break;
+          }
+        }
+      }
+      existing = existing || {};
+
       const isLive = Boolean(
         p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
         p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED' ||
@@ -259,9 +294,11 @@ export default function UserDashboard({
 
       const noteCandidate = p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || existing.verificationNotes || existing.ownerFacingNotes || existing.adminNotes || existing.adminFeedback;
 
-      combinedPropsMap.set(pId, {
+      combinedPropsMap.set(existingKey || pId, {
         ...existing,
         ...p,
+        id: existing.id || p.id || p.propertyId,
+        propertyId: existing.propertyId || p.propertyId || p.id,
         listingStatus: statusResolved,
         status: statusResolved,
         verificationStatus: isLive ? 'Platform Verified' : (p.verificationStatus || existing.verificationStatus || 'Pending Verification'),
