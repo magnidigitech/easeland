@@ -570,14 +570,73 @@ export default function AdminPortal({ onNavigate }) {
       console.warn('Error loading verification queue:', e1);
     }
 
-    // 2. Users (Strictly Cloud Firestore Data)
-    let users = [];
+    // 2. Users (Combines Firestore + Local Storage + Registered Property Owners)
+    let firestoreUsers = [];
     try {
       const usersRes = await getAllUsersAdmin();
-      users = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users : [];
+      firestoreUsers = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users : [];
     } catch (e2) {
       console.warn('Error loading users from Firestore:', e2);
     }
+
+    let localRegisteredUsers = [];
+    let localProfileUsers = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) localRegisteredUsers = parsed;
+        }
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('easeland_user_profile_')) {
+            const rawProf = localStorage.getItem(k);
+            if (rawProf) {
+              const profObj = JSON.parse(rawProf);
+              if (profObj && (profObj.uid || profObj.id || profObj.email)) {
+                localProfileUsers.push(profObj);
+              }
+            }
+          }
+        }
+      }
+    } catch (lErr) {}
+
+    let propertyOwnerUsers = [];
+    allMergedProps.forEach(p => {
+      if (!p) return;
+      const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').trim();
+      const oName = (p.ownerPublicName || p.owner?.name || 'Property Owner').trim();
+      const oPhone = (p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || p.phone || '').trim();
+      const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy;
+      if (oEmail || oPhone || oId) {
+        propertyOwnerUsers.push({
+          uid: oId || `owner-${oEmail || oPhone}`,
+          id: oId || `owner-${oEmail || oPhone}`,
+          displayName: oName,
+          name: oName,
+          email: oEmail,
+          phone: oPhone,
+          phoneNumber: oPhone,
+          role: 'VERIFIED PROPERTY OWNER & BUYER',
+          accountStatus: 'ACTIVE',
+          authProvider: oEmail.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'
+        });
+      }
+    });
+
+    const userMap = new Map();
+    [...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
+      if (!u) return;
+      const key = String(u.uid || u.id || u.email || '').toLowerCase().trim();
+      if (key) {
+        const existing = userMap.get(key) || {};
+        userMap.set(key, { ...existing, ...u });
+      }
+    });
+
+    let users = Array.from(userMap.values());
 
     // Enrich verification queue properties with matching registered user account details
     queue = queue.map(p => {

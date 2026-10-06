@@ -108,11 +108,47 @@ export async function getVisitorLeads() {
   }
 
   const localVisitors = getStoredVisitors();
+  let extraLeads = [];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const rawLeads = localStorage.getItem('easeland_visitor_leads');
+      if (rawLeads) {
+        const parsed = JSON.parse(rawLeads);
+        if (Array.isArray(parsed)) extraLeads.push(...parsed);
+      }
+      const rawEnqs = localStorage.getItem('easeland_enquiries');
+      if (rawEnqs) {
+        const parsedEnqs = JSON.parse(rawEnqs);
+        if (Array.isArray(parsedEnqs)) {
+          parsedEnqs.forEach(enq => {
+            if (enq && (enq.customerPhone || enq.phone || enq.email || enq.customerName)) {
+              extraLeads.push({
+                id: enq.id || `lead-enq-${Date.now()}`,
+                visitorId: enq.id || `lead-enq-${Date.now()}`,
+                name: enq.customerName || enq.name || 'Interested Buyer',
+                phone: enq.customerPhone || enq.phone || '+91 N/A',
+                email: enq.customerEmail || enq.email || '',
+                preferredPropertyType: enq.propertyTitle || 'Property Enquiry',
+                preferredLocation: enq.propertyLocation || 'Amaravati / Guntur',
+                stayDurationSeconds: 60,
+                source: 'PROPERTY_DETAIL_ENQUIRY',
+                status: enq.status || 'NEW',
+                notes: enq.message || `Customer submitted enquiry for property "${enq.propertyTitle || ''}"`,
+                createdAt: enq.createdAt || new Date().toISOString(),
+                updatedAt: enq.updatedAt || new Date().toISOString()
+              });
+            }
+          });
+        }
+      }
+    }
+  } catch (lErr) {}
+
   const mergedMap = new Map();
 
-  [...localVisitors, ...pgVisitors].forEach(v => {
+  [...localVisitors, ...extraLeads, ...pgVisitors].forEach(v => {
     if (v && (v.visitorId || v.id)) {
-      const id = v.visitorId || v.id;
+      const id = String(v.visitorId || v.id);
       mergedMap.set(id, { ...mergedMap.get(id), ...v });
     }
   });
