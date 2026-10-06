@@ -716,6 +716,122 @@ export const mockApi = {
     return prop;
   },
 
+  approvePropertyAdmin: (propertyId, notes = '') => {
+    if (!propertyId) return false;
+    const pIdStr = String(propertyId);
+    const noteText = notes || 'Verified & Approved by EaseLand Senior Admin Auditor.';
+
+    // 1. Update in-memory properties array
+    properties = properties.map(p => {
+      if (p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr)) {
+        return {
+          ...p,
+          status: 'LIVE',
+          listingStatus: 'LIVE',
+          verificationStatus: 'Platform Verified',
+          isPlatformVerified: true,
+          isPublished: true,
+          verifiedDate: new Date().toISOString(),
+          verificationNotes: noteText,
+          ownerFacingNotes: noteText,
+          adminNotes: noteText
+        };
+      }
+      return p;
+    });
+
+    // 2. Update ALL localStorage keys
+    if (typeof window !== 'undefined') {
+      const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+      keys.forEach(k => {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map(p => {
+                if (p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr)) {
+                  return {
+                    ...p,
+                    status: 'LIVE',
+                    listingStatus: 'LIVE',
+                    verificationStatus: 'Platform Verified',
+                    isPlatformVerified: true,
+                    isPublished: true,
+                    verifiedDate: new Date().toISOString(),
+                    verificationNotes: noteText,
+                    ownerFacingNotes: noteText,
+                    adminNotes: noteText
+                  };
+                }
+                return p;
+              });
+              localStorage.setItem(k, JSON.stringify(updated));
+            }
+          }
+        } catch (e) {}
+      });
+    }
+
+    setStoredData('easeland_properties', properties.filter(p => !isFakeProperty(p)));
+    return true;
+  },
+
+  rejectPropertyAdmin: (propertyId, notes = '') => {
+    if (!propertyId) return false;
+    const pIdStr = String(propertyId);
+    const noteText = notes || 'Listing rejected by platform admin auditor.';
+
+    properties = properties.map(p => {
+      if (p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr)) {
+        return {
+          ...p,
+          status: 'REJECTED',
+          listingStatus: 'REJECTED',
+          verificationStatus: 'Rejected',
+          isPlatformVerified: false,
+          isPublished: false,
+          verificationNotes: noteText,
+          rejectionReason: noteText
+        };
+      }
+      return p;
+    });
+
+    if (typeof window !== 'undefined') {
+      const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+      keys.forEach(k => {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map(p => {
+                if (p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr)) {
+                  return {
+                    ...p,
+                    status: 'REJECTED',
+                    listingStatus: 'REJECTED',
+                    verificationStatus: 'Rejected',
+                    isPlatformVerified: false,
+                    isPublished: false,
+                    verificationNotes: noteText,
+                    rejectionReason: noteText
+                  };
+                }
+                return p;
+              });
+              localStorage.setItem(k, JSON.stringify(updated));
+            }
+          }
+        } catch (e) {}
+      });
+    }
+
+    setStoredData('easeland_properties', properties.filter(p => !isFakeProperty(p)));
+    return true;
+  },
+
   deleteProperty: (propertyId) => {
     if (!propertyId) return false;
     const pIdStr = String(propertyId);

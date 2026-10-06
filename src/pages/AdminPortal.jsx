@@ -972,26 +972,33 @@ export default function AdminPortal({ onNavigate }) {
         });
       } catch (pgErr) { }
 
-      // 4. LocalStorage update
+      // 4. LocalStorage update across all storage arrays
       try {
-        const rawLocal = localStorage.getItem('easeland_user_properties');
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          const updated = parsed.map(p => {
-            if ((p.id || p.propertyId) === propId) {
-              return {
-                ...p,
-                listingStatus: 'LIVE',
-                status: 'LIVE',
-                isPlatformVerified: true,
-                isPublished: true,
-                verificationNotes: note,
-                verificationStatus: 'Platform Verified'
-              };
+        if (typeof window !== 'undefined') {
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+          keys.forEach(k => {
+            const rawLocal = localStorage.getItem(k);
+            if (rawLocal) {
+              const parsed = JSON.parse(rawLocal);
+              if (Array.isArray(parsed)) {
+                const updated = parsed.map(p => {
+                  if (p && (String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId))) {
+                    return {
+                      ...p,
+                      listingStatus: 'LIVE',
+                      status: 'LIVE',
+                      isPlatformVerified: true,
+                      isPublished: true,
+                      verificationNotes: note,
+                      verificationStatus: 'Platform Verified'
+                    };
+                  }
+                  return p;
+                });
+                localStorage.setItem(k, JSON.stringify(updated));
+              }
             }
-            return p;
           });
-          localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
         }
       } catch (lErr) { }
 

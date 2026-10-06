@@ -240,7 +240,13 @@ export default function UserDashboard({
     const pId = String(p.propertyId || p.id || p.referenceId || '');
     if (pId && !deletedIdsSet.has(pId) && !p.isDeleted && p.listingStatus !== 'DELETED' && p.status !== 'DELETED') {
       const existing = combinedPropsMap.get(pId) || {};
-      const statusResolved = (p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.isPublished || p.isPlatformVerified || existing.status === 'LIVE' || existing.listingStatus === 'LIVE')
+      const isLive = Boolean(
+        p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
+        p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED' ||
+        p.isPublished || p.isPlatformVerified ||
+        existing.status === 'LIVE' || existing.listingStatus === 'LIVE' || existing.status === 'APPROVED_LIVE' || existing.isPlatformVerified || existing.isPublished
+      );
+      const statusResolved = isLive
         ? 'LIVE'
         : (p.listingStatus === 'REJECTED' || p.status === 'REJECTED' || existing.status === 'REJECTED')
         ? 'REJECTED'
@@ -255,8 +261,9 @@ export default function UserDashboard({
         ...p,
         listingStatus: statusResolved,
         status: statusResolved,
-        isPlatformVerified: Boolean(p.isPlatformVerified || existing.isPlatformVerified || statusResolved === 'LIVE'),
-        isPublished: Boolean(p.isPublished || existing.isPublished || statusResolved === 'LIVE'),
+        verificationStatus: isLive ? 'Platform Verified' : (p.verificationStatus || existing.verificationStatus || 'Pending Verification'),
+        isPlatformVerified: Boolean(isLive || p.isPlatformVerified || existing.isPlatformVerified),
+        isPublished: Boolean(isLive || p.isPublished || existing.isPublished),
         verificationNotes: noteCandidate,
         ownerFacingNotes: noteCandidate,
         adminNotes: noteCandidate,
@@ -286,7 +293,13 @@ export default function UserDashboard({
 
     const thumbImage = getFirstUploadedImage(p);
 
-    const statusVal = (p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.isPublished || p.isPlatformVerified)
+    const isLiveProp = Boolean(
+      p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
+      p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED' ||
+      p.isPublished || p.isPlatformVerified
+    );
+
+    const statusVal = isLiveProp
       ? 'LIVE'
       : (p.status === 'REJECTED' || p.listingStatus === 'REJECTED')
       ? 'REJECTED'
