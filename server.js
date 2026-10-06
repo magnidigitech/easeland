@@ -672,7 +672,7 @@ app.get('/api/properties/:id', async (req, res) => {
   }
 
   if (localProp || pgProp) {
-    const property = { ...(pgProp || {}), ...(localProp || {}) };
+    const property = { ...(localProp || {}), ...(pgProp || {}) };
     return res.json({ success: true, property });
   }
 

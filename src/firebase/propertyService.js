@@ -1152,18 +1152,58 @@ export async function getPublicPropertyById(propertyId) {
 
     let data = null;
 
-    // 1. Try Direct Firestore Doc Lookup by Document ID
-    try {
-      const propRef = doc(db, 'properties', targetIdStr);
-      const snap = await getDoc(propRef);
-      if (snap.exists()) {
-        data = { ...snap.data(), propertyId: snap.id };
+    // 1. Try PostgreSQL API (/api/properties/:id) FIRST (Primary Database Source)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/properties/${encodeURIComponent(targetIdStr)}`);
+        if (res.ok) {
+          const pgRes = await res.json();
+          if (pgRes && (pgRes.property || pgRes.data)) {
+            data = pgRes.property || pgRes.data;
+          }
+        }
+      } catch (err) {
+        console.warn('PostgreSQL property lookup note:', err);
       }
-    } catch (err) {
-      console.warn('Firestore doc lookup note:', err);
     }
 
-    // 2. Query Firestore by referenceId or propertyId field
+    // 1b. Search PostgreSQL API (/api/properties) by ID, referenceId, or title match
+    if (!data && typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/properties');
+        if (res.ok) {
+          const pgRes = await res.json();
+          if (pgRes && Array.isArray(pgRes.properties)) {
+            const match = pgRes.properties.find(p => {
+              if (!p) return false;
+              const pid = String(p.propertyId || p.id || '');
+              const refid = String(p.referenceId || '');
+              const ptitle = String(p.title || '');
+              return pid === targetIdStr || refid === targetIdStr ||
+                     pid.toLowerCase() === targetIdStr.toLowerCase() ||
+                     refid.toLowerCase() === targetIdStr.toLowerCase() ||
+                     (ptitle && ptitle.toLowerCase() === targetIdStr.toLowerCase());
+            });
+            if (match) data = match;
+          }
+        }
+      } catch (err) {}
+    }
+
+    // 2. Direct Firestore Doc Lookup by Document ID
+    if (!data) {
+      try {
+        const propRef = doc(db, 'properties', targetIdStr);
+        const snap = await getDoc(propRef);
+        if (snap.exists()) {
+          data = { ...snap.data(), propertyId: snap.id };
+        }
+      } catch (err) {
+        console.warn('Firestore doc lookup note:', err);
+      }
+    }
+
+    // 3. Query Firestore by referenceId or propertyId field
     if (!data) {
       try {
         const qRef = query(collection(db, 'properties'), where('referenceId', '==', targetIdStr));
@@ -1184,7 +1224,7 @@ export async function getPublicPropertyById(propertyId) {
       }
     }
 
-    // 3. Fallback to mockApi & Local Storage stores
+    // 4. Fallback to mockApi & Local Storage stores
     if (!data && typeof window !== 'undefined' && typeof mockApi !== 'undefined') {
       try {
         const allLocal = mockApi.getPublicProperties({});
@@ -1192,30 +1232,17 @@ export async function getPublicPropertyById(propertyId) {
           if (!p) return false;
           const pid = String(p.propertyId || p.id || '');
           const refid = String(p.referenceId || '');
+          const ptitle = String(p.title || '');
           return pid === targetIdStr || refid === targetIdStr ||
                  pid.toLowerCase() === targetIdStr.toLowerCase() ||
-                 refid.toLowerCase() === targetIdStr.toLowerCase();
+                 refid.toLowerCase() === targetIdStr.toLowerCase() ||
+                 (ptitle && ptitle.toLowerCase() === targetIdStr.toLowerCase());
         });
         if (match) {
           data = { ...match };
         }
       } catch (err) {
         console.warn('Local store lookup note:', err);
-      }
-    }
-
-    // 4. Fallback to PostgreSQL server endpoint /api/properties/:id
-    if (!data && typeof window !== 'undefined') {
-      try {
-        const res = await fetch(`/api/properties/${encodeURIComponent(targetIdStr)}`);
-        if (res.ok) {
-          const pgRes = await res.json();
-          if (pgRes && (pgRes.property || pgRes.data)) {
-            data = pgRes.property || pgRes.data;
-          }
-        }
-      } catch (err) {
-        console.warn('PostgreSQL property lookup note:', err);
       }
     }
 
