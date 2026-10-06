@@ -173,34 +173,15 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     }
   }, [lat, lng]);
 
-  // Auto-center map on entered address changes
+  // Sync lat/lng if locationData prop updates externally
   useEffect(() => {
-    const parts = [
-      hierarchy.address,
-      hierarchy.locality,
-      hierarchy.mandal,
-      hierarchy.city,
-      hierarchy.district,
-      hierarchy.state,
-      'India'
-    ].filter(Boolean);
-
-    if (parts.length < 2) return;
-
-    const queryStr = parts.join(', ');
-    const timer = setTimeout(async () => {
-      try {
-        const results = await searchLocationQuery(queryStr);
-        if (results && results.length > 0) {
-          const top = results[0];
-          setLat(top.lat);
-          setLng(top.lng);
-        }
-      } catch (e) {}
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [hierarchy.state, hierarchy.district, hierarchy.city, hierarchy.mandal, hierarchy.locality, hierarchy.postalCode, hierarchy.address]);
+    const propLat = Number(locationData?.geoPoint?.latitude || locationData?.lat || locationData?.latitude);
+    const propLng = Number(locationData?.geoPoint?.longitude || locationData?.lng || locationData?.longitude);
+    if (propLat && propLng && !isNaN(propLat) && !isNaN(propLng)) {
+      setLat(propLat);
+      setLng(propLng);
+    }
+  }, [locationData]);
 
   // Dynamic Tile Layer style toggle
   const handleMapStyleToggle = () => {
