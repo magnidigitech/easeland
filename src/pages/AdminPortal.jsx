@@ -3669,26 +3669,23 @@ export default function AdminPortal({ onNavigate }) {
                                 ) : (
                                   <div className="space-y-4">
                                     {videos.map((vObj, vIdx) => {
-                                      const vItem = typeof vObj.url === 'string' ? vObj.url : (typeof vObj.embedUrl === 'string' ? vObj.embedUrl : String(vObj.url || vObj.embedUrl || ''));
-                                      if (!vItem) return null;
+                                      const rawUrl = typeof vObj === 'string' ? vObj : (vObj.embedUrl || vObj.publicUrl || vObj.url || vObj.mediaUrl || '');
+                                      if (!rawUrl) return null;
 
-                                      const isYoutube = vItem.includes('youtube.com') || vItem.includes('youtu.be');
-                                      const isDrive = vItem.includes('drive.google.com');
+                                      const isYoutube = rawUrl.includes('youtube.com') || rawUrl.includes('youtu.be') || (typeof vObj === 'object' && vObj.provider === 'youtube');
+                                      const isDrive = rawUrl.includes('drive.google.com') || (typeof vObj === 'object' && vObj.provider === 'gdrive');
 
-                                      let embedSrc = vItem;
+                                      let embedSrc = (typeof vObj === 'object' && vObj.embedUrl) ? vObj.embedUrl : rawUrl;
+
                                       if (isYoutube) {
-                                        if (vItem.includes('watch?v=')) {
-                                          embedSrc = vItem.replace('watch?v=', 'embed/').split('&')[0];
-                                        } else if (vItem.includes('youtu.be/')) {
-                                          const id = vItem.split('youtu.be/')[1]?.split('?')[0];
-                                          embedSrc = `https://www.youtube.com/embed/${id}`;
+                                        const ytMatch = String(vObj.embedUrl || vObj.publicUrl || vObj.url || rawUrl).match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+                                        if (ytMatch && ytMatch[1]) {
+                                          embedSrc = `https://www.youtube.com/embed/${ytMatch[1]}?rel=0`;
                                         }
                                       } else if (isDrive) {
-                                        if (vItem.includes('/view')) {
-                                          embedSrc = vItem.replace('/view', '/preview');
-                                        } else if (!vItem.includes('/preview')) {
-                                          const match = vItem.match(/d\/([a-zA-Z0-9_-]+)/);
-                                          if (match && match[1]) embedSrc = `https://drive.google.com/file/d/${match[1]}/preview`;
+                                        const driveMatch = String(vObj.embedUrl || vObj.publicUrl || vObj.url || rawUrl).match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+                                        if (driveMatch && (driveMatch[1] || driveMatch[2])) {
+                                          embedSrc = `https://drive.google.com/file/d/${driveMatch[1] || driveMatch[2]}/preview`;
                                         }
                                       }
 
@@ -3703,7 +3700,7 @@ export default function AdminPortal({ onNavigate }) {
                                             />
                                           ) : (
                                             <video
-                                              src={vItem}
+                                              src={rawUrl}
                                               controls
                                               className="w-full aspect-video rounded-xl max-h-96"
                                             />
@@ -3719,7 +3716,7 @@ export default function AdminPortal({ onNavigate }) {
                                             </div>
                                             <div className="flex items-center gap-3">
                                               <a
-                                                href={vItem}
+                                                href={rawUrl}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="text-amber-400 hover:text-amber-300 font-extrabold underline flex items-center gap-1"
@@ -3728,7 +3725,7 @@ export default function AdminPortal({ onNavigate }) {
                                               </a>
                                               <button
                                                 type="button"
-                                                onClick={() => handleAdminRemoveMediaItem('video', vItem, propId)}
+                                                onClick={() => handleAdminRemoveMediaItem('video', rawUrl, propId)}
                                                 className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg transition-all shadow-sm flex items-center gap-1"
                                                 title="Remove non-compliant video"
                                               >

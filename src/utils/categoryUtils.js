@@ -134,8 +134,18 @@ export function getPropertyMediaList(property) {
       lowerUrl.endsWith('.mov')
     ) {
       if (mediaType === 'PHOTO') mediaType = 'WALKTHROUGH_VIDEO';
-      if (!embedUrl && (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be'))) {
-        embedUrl = url;
+      if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+        const ytMatch = (embedUrl || url).match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+        if (ytMatch && ytMatch[1]) {
+          embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}?rel=0`;
+        } else if (!embedUrl) {
+          embedUrl = url;
+        }
+      } else if (lowerUrl.includes('drive.google.com')) {
+        const driveMatch = (embedUrl || url).match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+        if (driveMatch && (driveMatch[1] || driveMatch[2])) {
+          embedUrl = `https://drive.google.com/file/d/${driveMatch[1] || driveMatch[2]}/preview`;
+        }
       }
     }
 
