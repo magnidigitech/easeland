@@ -41,6 +41,19 @@ export function formatFirestoreError(error) {
   return error.message || 'A database service error occurred. Please try again.';
 }
 
+export async function syncUserToPostgres(userData) {
+  try {
+    if (!userData || (!userData.uid && !userData.id && !userData.email)) return;
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+  } catch (err) {
+    console.warn('PostgreSQL user sync note:', err);
+  }
+}
+
 /**
  * Create a new user profile document in users/{uid}.
  */
@@ -60,6 +73,7 @@ export async function createUserProfile(uid, data) {
       updatedAt: serverTimestamp()
     };
     await setDoc(userRef, profile, { merge: true });
+    syncUserToPostgres({ ...profile, id: uid, uid });
     return { success: true, user: profile };
   } catch (error) {
     console.error('Error creating user profile:', error);

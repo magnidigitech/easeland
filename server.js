@@ -265,14 +265,72 @@ async function initPgDb() {
         raw_data JSONB,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    // 6. Registered Users Table (PostgreSQL User Governance)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        uid VARCHAR(100) PRIMARY KEY,
+        email VARCHAR(255),
+        display_name TEXT,
+        phone VARCHAR(50),
+        role VARCHAR(50) DEFAULT 'USER',
+        account_status VARCHAR(50) DEFAULT 'ACTIVE',
+        email_verified BOOLEAN DEFAULT false,
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     client.release();
-    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors) initialized successfully.');
+    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors, users) initialized successfully.');
   } catch (err) {
     console.warn('PostgreSQL connection/init note (Local disk store active):', err.message);
   }
+}
+
+// Local Persistent Disk & Memory Store for Registered Users (100% Availability Fallback)
+const usersStoreFile = path.join(uploadsDir, 'users_store.json');
+const localUsersMap = new Map();
+
+try {
+  if (fs.existsSync(usersStoreFile)) {
+    const rawDisk = fs.readFileSync(usersStoreFile, 'utf8');
+    const parsedDisk = JSON.parse(rawDisk);
+    if (Array.isArray(parsedDisk)) {
+      parsedDisk.forEach(u => {
+        if (u && (u.uid || u.id || u.email)) {
+          const key = u.uid || u.id || u.email;
+          localUsersMap.set(key, u);
+        }
+      });
+    }
+  }
+} catch (e) {
+  console.warn('Local users store initialization note:', e.message);
+}
+
+function saveLocalUser(u) {
+  if (!u || (!u.uid && !u.id && !u.email)) return;
+  const key = u.uid || u.id || u.email;
+  const existing = localUsersMap.get(key) || {};
+  const updated = {
+    ...existing,
+    ...u,
+    uid: u.uid || u.id || existing.uid || existing.id,
+    updatedAt: new Date().toISOString()
+  };
+  localUsersMap.set(key, updated);
+  try {
+    const arrayToStore = Array.from(localUsersMap.values());
+    fs.writeFileSync(usersStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Local users disk write note:', err.message);
+  }
+  return updated;
+}
+
+function getLocalUsers() {
+  return Array.from(localUsersMap.values());
 }
 
 // Local Persistent Disk & Memory Store for Site Visitors (100% Availability Fallback)
@@ -1219,6 +1277,103 @@ app.delete('/api/visitors/:id', async (req, res) => {
     }
 
     return res.json({ success: true, message: 'Visitor deleted successfully.' });
+// Registered Users API Endpoints (PostgreSQL User Governance)
+app.get('/api/users', async (req, res) => {
+  try {
+    const localList = getLocalUsers();
+    let pgUsers = [];
+
+    try {
+      const result = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 500;');
+      pgUsers = result.rows.map(row => row.raw_data).filter(Boolean);
+    } catch (pgErr) {
+      console.warn('PostgreSQL fetch users note:', pgErr.message);
+    }
+
+    const mergedMap = new Map();
+    [...localList, ...pgUsers].forEach(u => {
+      if (u && (u.uid || u.id || u.email)) {
+        const key = String(u.uid || u.id || u.email).toLowerCase().trim();
+        mergedMap.set(key, { ...mergedMap.get(key), ...u });
+      }
+    });
+
+    const allUsers = Array.from(mergedMap.values());
+    return res.json({ success: true, count: allUsers.length, users: allUsers });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/users', async (req, res) => {
+  try {
+    const userData = req.body || {};
+    const uUid = userData.uid || userData.id || `user-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    const fullPayload = {
+      ...userData,
+      uid: uUid,
+      id: uUid,
+      displayName: (userData.displayName || userData.name || 'EaseLand User').trim(),
+      email: (userData.email || '').trim(),
+      phone: (userData.phone || userData.phoneNumber || '').trim(),
+      role: userData.role || 'USER',
+      accountStatus: userData.accountStatus || 'ACTIVE',
+      updatedAt: nowIso
+    };
+
+    saveLocalUser(fullPayload);
+
+    try {
+      const queryText = `
+        INSERT INTO users (
+          uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
+        ) ON CONFLICT (uid) DO UPDATE SET
+          email = EXCLUDED.email,
+          display_name = EXCLUDED.display_name,
+          phone = EXCLUDED.phone,
+          role = EXCLUDED.role,
+          account_status = EXCLUDED.account_status,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = NOW();
+      `;
+      await pgPool.query(queryText, [
+        uUid,
+        fullPayload.email,
+        fullPayload.displayName,
+        fullPayload.phone,
+        fullPayload.role,
+        fullPayload.accountStatus,
+        Boolean(fullPayload.emailVerified),
+        JSON.stringify(fullPayload)
+      ]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL save user note:', pgErr.message);
+    }
+
+    return res.json({ success: true, uid: uUid, user: fullPayload });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/users/:uid', async (req, res) => {
+  try {
+    const uUid = req.params.uid;
+    localUsersMap.delete(uUid);
+    try {
+      const arrayToStore = Array.from(localUsersMap.values());
+      fs.writeFileSync(usersStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+    } catch (e) {}
+
+    try {
+      await pgPool.query('DELETE FROM users WHERE uid = $1;', [uUid]);
+    } catch (pgErr) {}
+
+    return res.json({ success: true, message: 'User deleted successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
