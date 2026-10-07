@@ -639,10 +639,25 @@ export function AuthProvider({ children }) {
         return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
       }
 
-      setUser(result.user);
+      const activeUserObj = {
+        uid: result.user.uid,
+        id: result.user.uid,
+        displayName: result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+        name: result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+        email: result.user.email || '',
+        phone: result.user.phoneNumber || '',
+        emailVerified: result.user.emailVerified,
+        role: userProfileData?.role || 'USER'
+      };
+
+      setUser(activeUserObj);
+      try {
+        localStorage.setItem('easeland_session_user', JSON.stringify(activeUserObj));
+        localStorage.setItem('easeland_user_profile_' + result.user.uid, JSON.stringify(userProfileData));
+      } catch(e) {}
       setProfile(userProfileData);
 
-      return { success: true, user: result.user };
+      return { success: true, user: activeUserObj };
     }
     return result;
   };
