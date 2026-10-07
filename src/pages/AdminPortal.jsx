@@ -822,7 +822,7 @@ export default function AdminPortal({ onNavigate }) {
       const uUid = String(u.uid || u.id || '').toLowerCase().trim();
       const uEmail = (u.email || '').toLowerCase().trim();
 
-      const userListings = finalAllProperties.filter(p => {
+      const userListings = allMergedProps.filter(p => {
         if (!p) return false;
         const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
         const pEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
