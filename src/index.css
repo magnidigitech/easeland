@@ -334,3 +334,21 @@ select.bg-gray-50 option {
   background-color: #ffffff;
   color: #0f172a;
 }
+
+/* CONTINUOUS 3D PULSING GLOW ANIMATION */
+@keyframes pulseGlow3D {
+  0%, 100% {
+    opacity: 0.95;
+    transform: scale(1.03);
+    filter: blur(8px) brightness(1.3);
+  }
+  50% {
+    opacity: 0.40;
+    transform: scale(0.96);
+    filter: blur(5px) brightness(0.95);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow3D 2s ease-in-out infinite;
+}

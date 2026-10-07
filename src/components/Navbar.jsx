@@ -38,17 +38,17 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             </div>
           </div>
 
-          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH CONTINUOUS 3D GLOWS & POPUP CARDS) */}
+          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH CONTINUOUS 3D PULSING GLOWS & POPUP CARDS) */}
           <nav className="hidden md:flex items-center gap-4 relative">
             
-            {/* BUY BUTTON (PERMANENT 3D EMERALD GLOW) */}
+            {/* BUY BUTTON (PERMANENT CONTINUOUS 3D PULSING EMERALD GLOW) */}
             <div 
               className="relative group"
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Permanent Ambient 3D Backdrop Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 opacity-60 blur-md group-hover:opacity-100 transition duration-300" />
+              {/* Permanent Ambient 3D Pulsing Backdrop Glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 blur-md animate-pulse-glow group-hover:opacity-100 transition duration-300" />
               
               <button
                 onClick={() => setActivePage('buy')}
@@ -89,14 +89,14 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* RENT BUTTON (PERMANENT 3D ROYAL PURPLE GLOW) */}
+            {/* RENT BUTTON (PERMANENT CONTINUOUS 3D PULSING ROYAL PURPLE GLOW) */}
             <div 
               className="relative group"
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Permanent Ambient 3D Backdrop Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 opacity-60 blur-md group-hover:opacity-100 transition duration-300" />
+              {/* Permanent Ambient 3D Pulsing Backdrop Glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 blur-md animate-pulse-glow group-hover:opacity-100 transition duration-300" />
 
               <button
                 onClick={() => setActivePage('rent')}
@@ -137,14 +137,14 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* SELL BUTTON (PERMANENT 3D AMBER GOLD GLOW) */}
+            {/* SELL BUTTON (PERMANENT CONTINUOUS 3D PULSING AMBER GOLD GLOW) */}
             <div 
               className="relative group"
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Permanent Ambient 3D Backdrop Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 opacity-70 blur-md group-hover:opacity-100 transition duration-300" />
+              {/* Permanent Ambient 3D Pulsing Backdrop Glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 blur-md animate-pulse-glow group-hover:opacity-100 transition duration-300" />
 
               <button
                 onClick={() => setActivePage('sell')}
