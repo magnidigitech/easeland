@@ -168,121 +168,6 @@ import { ensureAuthSession } from './authService.js';
 /**
  * Fetch all registered users for Admin Governance Directory directly from Cloud Firestore.
  */
-const KNOWN_FIREBASE_AUTH_ACCOUNTS = [
-  {
-    uid: '8kNnNTIBcDQxu8XCO9D5910',
-    id: '8kNnNTIBcDQxu8XCO9D5910',
-    name: 'EaseLand Admin',
-    displayName: 'EaseLand Admin',
-    email: 'admin@easeland.in',
-    role: 'ADMIN',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Email/Password',
-    emailVerified: true
-  },
-  {
-    uid: 'HE7L7WiQ7wUKFexfebWIlP5uA183',
-    id: 'HE7L7WiQ7wUKFexfebWIlP5uA183',
-    name: 'Clinformatiq Admin',
-    displayName: 'Clinformatiq Admin',
-    email: 'clinformatiq@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'FbalzqaSkqbR6X1EGIBffVWC2s12',
-    id: 'FbalzqaSkqbR6X1EGIBffVWC2s12',
-    name: 'Peddi S',
-    displayName: 'Peddi S',
-    email: 'peddissrgnt@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'ahKgRgxVVHWCEO5lY14moE82',
-    id: 'ahKgRgxVVHWCEO5lY14moE82',
-    name: 'Praveen Kannasani',
-    displayName: 'Praveen Kannasani',
-    email: 'praveenkannasani04@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'gOzEAFM3KJT5iezGuOLsou61',
-    id: 'gOzEAFM3KJT5iezGuOLsou61',
-    name: 'Krishna Sai Kannasani',
-    displayName: 'Krishna Sai Kannasani',
-    email: 'krishnasaikannasani28@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'wVshoAL69fdhFFbXRbPdr356',
-    id: 'wVshoAL69fdhFFbXRbPdr356',
-    name: 'Clinformatiq Sessions',
-    displayName: 'Clinformatiq Sessions',
-    email: 'clinformatiqsessions@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'jnu9kaxd3KThAo5Qzeo3pO2L',
-    id: 'jnu9kaxd3KThAo5Qzeo3pO2L',
-    name: 'Magni Digitech',
-    displayName: 'Magni Digitech',
-    email: 'magnidigitech@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'dOKfndgSbIXeeWAwhQt8m2',
-    id: 'dOKfndgSbIXeeWAwhQt8m2',
-    name: 'KrishnaSai Kannasani',
-    displayName: 'KrishnaSai Kannasani',
-    email: 'krishnasai8999@gmail.com',
-    phone: '9502264269',
-    role: 'VERIFIED PROPERTY OWNER & BUYER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'xU60aL70KLPisNKb9PH5jZ2G',
-    id: 'xU60aL70KLPisNKb9PH5jZ2G',
-    name: 'Krishna Sai (5466)',
-    displayName: 'Krishna Sai (5466)',
-    email: 'krishnasai5466@gmail.com',
-    role: 'USER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  },
-  {
-    uid: 'bxcuGY2a0iV4n2HowF9CE5Zi',
-    id: 'bxcuGY2a0iV4n2HowF9CE5Zi',
-    name: 'Krishna Sai (4222)',
-    displayName: 'Krishna Sai (4222)',
-    email: 'krishnasai4222@gmail.com',
-    phone: '6300691560',
-    role: 'VERIFIED PROPERTY OWNER & BUYER',
-    accountStatus: 'ACTIVE',
-    authProvider: 'Google OAuth',
-    emailVerified: true
-  }
-];
-
 export async function getAllUsersAdmin() {
   try {
     await ensureAuthSession();
@@ -298,11 +183,6 @@ export async function getAllUsersAdmin() {
     } catch (e) { }
 
     const fetchedMap = new Map();
-
-    // 1. Seed with known Firebase Auth users
-    KNOWN_FIREBASE_AUTH_ACCOUNTS.forEach(u => {
-      fetchedMap.set(u.email.toLowerCase(), u);
-    });
 
     snapshot.forEach((docSnap) => {
       try {
@@ -349,8 +229,7 @@ export async function getAllUsersAdmin() {
         };
 
         const key = (userObj.email || userObj.uid).toLowerCase();
-        const existing = fetchedMap.get(key) || {};
-        fetchedMap.set(key, { ...existing, ...userObj });
+        fetchedMap.set(key, userObj);
       } catch (errDoc) {
         console.error(`Error processing user document ${docSnap.id}:`, errDoc);
       }
@@ -360,7 +239,7 @@ export async function getAllUsersAdmin() {
     return { success: true, users };
   } catch (error) {
     console.error('Error fetching all users for admin:', error);
-    return { success: false, error: error.message, users: KNOWN_FIREBASE_AUTH_ACCOUNTS };
+    return { success: false, error: error.message, users: [] };
   }
 }
 
