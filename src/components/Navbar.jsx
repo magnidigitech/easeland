@@ -38,24 +38,24 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             </div>
           </div>
 
-          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH SCOPED CONTINUOUS 3D PULSING GLOWS & POPUP CARDS) */}
+          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH 360° ROTATING GLOW BEAM BORDERS & POPUP CARDS) */}
           <nav className="hidden md:flex items-center gap-3 sm:gap-4 relative shrink-0">
             
-            {/* BUY BUTTON (EMERALD 3D GLOW) */}
+            {/* BUY BUTTON (ROTATING EMERALD GLOW BEAM) */}
             <div 
-              className="relative group p-0.5"
+              className="relative p-[2px] rounded-xl overflow-hidden group shrink-0"
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Scoped Ambient 3D Pulsing Backdrop Glow */}
-              <div className="absolute inset-0.5 rounded-xl bg-emerald-500/80 blur-sm animate-pulse-glow pointer-events-none" />
+              {/* Continuous 360-degree Rotating Conic Glow Beam */}
+              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_220deg,#10b981_290deg,#6ee7b7_360deg)] opacity-95 blur-[1px]" />
               
               <button
                 onClick={() => setActivePage('buy')}
-                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
                   activePage === 'buy'
-                    ? 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-t-emerald-300 border-x-emerald-500 border-b-2 border-b-emerald-800 shadow-lg shadow-emerald-500/40 scale-105 ring-2 ring-emerald-400/50'
-                    : 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white border-t-emerald-400/80 border-x-emerald-600 border-b-2 border-b-emerald-800 shadow-md shadow-emerald-600/30 hover:shadow-emerald-500/50 hover:scale-105 active:scale-95'
+                    ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/50 scale-105'
+                    : 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
                 }`}
               >
                 <Search className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -89,21 +89,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* RENT BUTTON (ROYAL PURPLE 3D GLOW) */}
+            {/* RENT BUTTON (ROTATING ROYAL PURPLE GLOW BEAM) */}
             <div 
-              className="relative group p-0.5"
+              className="relative p-[2px] rounded-xl overflow-hidden group shrink-0"
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Scoped Ambient 3D Pulsing Backdrop Glow */}
-              <div className="absolute inset-0.5 rounded-xl bg-purple-500/80 blur-sm animate-pulse-glow pointer-events-none" />
+              {/* Continuous 360-degree Rotating Conic Glow Beam */}
+              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_220deg,#a855f7_290deg,#e9d5ff_360deg)] opacity-95 blur-[1px]" />
 
               <button
                 onClick={() => setActivePage('rent')}
-                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
                   activePage === 'rent'
-                    ? 'bg-gradient-to-b from-purple-500 to-purple-600 text-white border-t-purple-300 border-x-purple-500 border-b-2 border-b-purple-800 shadow-lg shadow-purple-500/40 scale-105 ring-2 ring-purple-400/50'
-                    : 'bg-gradient-to-b from-purple-600 to-purple-700 text-white border-t-purple-400/80 border-x-purple-600 border-b-2 border-b-purple-800 shadow-md shadow-purple-600/30 hover:shadow-purple-500/50 hover:scale-105 active:scale-95'
+                    ? 'bg-gradient-to-b from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/50 scale-105'
+                    : 'bg-gradient-to-b from-purple-600 to-purple-800 text-white shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
                 }`}
               >
                 <Key className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -137,21 +137,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* SELL BUTTON (AMBER GOLD 3D GLOW) */}
+            {/* SELL BUTTON (ROTATING AMBER GOLD GLOW BEAM) */}
             <div 
-              className="relative group p-0.5"
+              className="relative p-[2px] rounded-xl overflow-hidden group shrink-0"
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Scoped Ambient 3D Pulsing Backdrop Glow */}
-              <div className="absolute inset-0.5 rounded-xl bg-amber-400/90 blur-sm animate-pulse-glow pointer-events-none" />
+              {/* Continuous 360-degree Rotating Conic Glow Beam */}
+              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_220deg,#f59e0b_290deg,#fef08a_360deg)] opacity-95 blur-[1px]" />
 
               <button
                 onClick={() => setActivePage('sell')}
-                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
                   activePage === 'sell'
-                    ? 'bg-gradient-to-b from-amber-300 to-amber-500 text-slate-950 border-t-amber-100 border-x-amber-300 border-b-2 border-b-amber-700 shadow-lg shadow-amber-500/50 scale-105 ring-2 ring-amber-400/50'
-                    : 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 border-t-amber-200 border-x-amber-400 border-b-2 border-b-amber-700 shadow-md shadow-amber-500/30 hover:shadow-amber-500/60 hover:scale-105 active:scale-95'
+                    ? 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/50 scale-105'
+                    : 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
                 }`}
               >
                 <Tag className="w-3.5 h-3.5 stroke-[2.5]" />

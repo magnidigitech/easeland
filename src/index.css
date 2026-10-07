@@ -352,3 +352,17 @@ select.bg-gray-50 option {
 .animate-pulse-glow {
   animation: pulseGlow3D 2s ease-in-out infinite;
 }
+
+/* ROTATING GLOW BORDER LINE ANIMATION */
+@keyframes rotateGlowLine {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-rotate-glow {
+  animation: rotateGlowLine 3s linear infinite;
+}
