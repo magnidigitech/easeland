@@ -220,8 +220,23 @@ export default function AdminPortal({ onNavigate }) {
 
   const isAdminAuthenticated = profile?.role === 'ADMIN' || profile?.adminRole === true || localStorage.getItem('easeland_admin_authenticated') === 'true';
 
-  const [activeTab, setActiveTab] = useState('cms');
-  // 'cms', 'verification', 'workspace', 'users', 'enquiries', 'crm', 'followups', 'reports', 'archive', 'security'
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('easeland_admin_active_tab');
+        if (stored) return stored;
+      }
+    } catch (e) {}
+    return 'cms';
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && activeTab) {
+        localStorage.setItem('easeland_admin_active_tab', activeTab);
+      }
+    } catch (e) {}
+  }, [activeTab]);
 
   // Admin Profile & Dedicated Security Credentials State
   const [adminName, setAdminName] = useState(() => localStorage.getItem('easeland_admin_name') || 'EaseLand Admin');
@@ -243,7 +258,23 @@ export default function AdminPortal({ onNavigate }) {
   // Master Site Management CMS State (All 16 Modules)
 
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
-  const [cmsTab, setCmsTab] = useState('overview'); // 1-16 modules
+  const [cmsTab, setCmsTab] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('easeland_admin_cms_tab');
+        if (stored) return stored;
+      }
+    } catch (e) {}
+    return 'overview';
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && cmsTab) {
+        localStorage.setItem('easeland_admin_cms_tab', cmsTab);
+      }
+    } catch (e) {}
+  }, [cmsTab]);
   const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
 
   const [globalSearch, setGlobalSearch] = useState('');
