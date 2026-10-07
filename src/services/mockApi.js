@@ -359,28 +359,7 @@ export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
 };
 
 let rawUsers = getStoredData('easeland_registered_users', INITIAL_USERS);
-// Clean stale dummy users & guarantee core admin account exists
-let registeredUsers = rawUsers.filter(u =>
-  u && u.status !== 'DELETED' &&
-  (u.email === 'admin@easeland.in' || u.isCustomRegistered)
-);
-
-// Guarantee admin@easeland.in exists
-if (!registeredUsers.some(u => u.email === 'admin@easeland.in')) {
-  registeredUsers.push({
-    id: 'admin-101',
-    name: 'EaseLand Admin',
-    email: 'admin@easeland.in',
-    phone: '9876500000',
-    password: 'Admin@12345',
-    role: 'ADMIN',
-    status: 'ADMIN',
-    joinedDate: '2026-01-01',
-    postedListingsCount: 0,
-    enquiriesCount: 0,
-    suspension: null
-  });
-}
+let registeredUsers = rawUsers.filter(u => u && u.status !== 'DELETED' && u.isCustomRegistered);
 
 setStoredData('easeland_registered_users', registeredUsers);
 let siteConfig = mergeSiteConfigWithDefaults(getStoredData('easeland_site_config', DEFAULT_SITE_CONFIG));

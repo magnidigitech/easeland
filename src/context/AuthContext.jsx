@@ -12,7 +12,8 @@ import {
   createUserProfile,
   getCurrentUserProfile,
   updateOwnProfile,
-  updateCommunicationPreferences
+  updateCommunicationPreferences,
+  syncUserToPostgres
 } from '../firebase/userService.js';
 import {
   checkAndTriggerSecurityAlert,
@@ -109,9 +110,20 @@ export function AuthProvider({ children }) {
     // Listen for Firebase Auth state changes and restore session
     const unsubscribe = subscribeToAuthState((currentUser) => {
       if (currentUser) {
-        const isAdmin = currentUser.email === 'admin@easeland.in' ||
-                        currentUser.email?.includes('admin') ||
-                        localStorage.getItem('easeland_admin_authenticated') === 'true';
+        if (currentUser && currentUser.uid) {
+          syncUserToPostgres({
+            uid: currentUser.uid,
+            id: currentUser.uid,
+            displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+            name: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+            email: currentUser.email || '',
+            phone: currentUser.phoneNumber || '',
+            role: currentUser.email === 'admin@easeland.in' ? 'ADMIN' : 'USER',
+            accountStatus: 'ACTIVE',
+            emailVerified: currentUser.emailVerified,
+            authProvider: currentUser.providerData?.[0]?.providerId === 'google.com' ? 'Google OAuth' : 'Email/Password'
+          });
+        }
 
         // Synchronous profile hydration from local storage for 0ms instant UI response
         const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
