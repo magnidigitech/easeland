@@ -646,23 +646,32 @@ export default function AdminPortal({ onNavigate }) {
     const userMap = new Map();
     [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
       if (!u) return;
-      const key = String(u.uid || u.id || u.email || '').toLowerCase().trim();
-      if (key) {
-        const existing = userMap.get(key) || {};
-        const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
-        const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
-        const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
+      const emailKey = (u.email || '').toLowerCase().trim();
+      const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
+      if (!emailKey && !uidKey) return;
 
-        userMap.set(key, {
-          ...existing,
-          ...u,
-          name: cleanName,
-          displayName: cleanName
-        });
-      }
+      const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
+      const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
+      const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
+      const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
+
+      const mergedUser = {
+        ...existing,
+        ...u,
+        uid: u.uid || u.id || existing.uid || existing.id,
+        id: u.id || u.uid || existing.id || existing.uid,
+        email: u.email || existing.email || '',
+        name: cleanName,
+        displayName: cleanName,
+        status: u.status || u.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
+        role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER')
+      };
+
+      if (emailKey) userMap.set(emailKey, mergedUser);
+      if (uidKey) userMap.set(uidKey, mergedUser);
     });
 
-    let users = Array.from(userMap.values());
+    let users = Array.from(new Set(userMap.values()));
 
     // Enrich verification queue properties with matching registered user account details
     queue = queue.map(p => {
