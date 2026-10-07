@@ -366,3 +366,35 @@ select.bg-gray-50 option {
 .animate-rotate-glow {
   animation: rotateGlowLine 3s linear infinite;
 }
+
+/* SMOOTH GENTLE BOUNCE ANIMATION FOR NAV BUTTONS */
+@keyframes gentleBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-gentle-bounce {
+  animation: gentleBounce 2.2s ease-in-out infinite;
+}
+
+.animate-gentle-bounce-delay-1 {
+  animation: gentleBounce 2.2s ease-in-out 0.25s infinite;
+}
+
+.animate-gentle-bounce-delay-2 {
+  animation: gentleBounce 2.2s ease-in-out 0.5s infinite;
+}
+
+/* Pause animation on hover or active press */
+.group:hover.animate-gentle-bounce,
+.group:hover.animate-gentle-bounce-delay-1,
+.group:hover.animate-gentle-bounce-delay-2,
+.group:hover .animate-gentle-bounce,
+.group:hover .animate-gentle-bounce-delay-1,
+.group:hover .animate-gentle-bounce-delay-2 {
+  animation-play-state: paused !important;
+}

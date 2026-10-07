@@ -38,12 +38,14 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             </div>
           </div>
 
-          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH CONTRASTING 360° ROTATING GLOW BEAM BORDERS & POPUP CARDS) */}
+          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH BOUNCING ANIMATION & 360° ROTATING GLOW BEAM BORDERS) */}
           <nav className="hidden md:flex items-center gap-3 sm:gap-4 relative shrink-0">
             
-            {/* BUY BUTTON (TEAL BODY WITH ROTATING NEON GOLD/AMBER GLOW BEAM) */}
+            {/* BUY BUTTON (TEAL BODY WITH ROTATING NEON GOLD/AMBER GLOW BEAM & GENTLE BOUNCE) */}
             <div 
-              className="relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md"
+              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${
+                hoveredNav === 'buy' || activePage === 'buy' ? '' : 'animate-gentle-bounce'
+              }`}
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
@@ -89,9 +91,11 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* RENT BUTTON (ROYAL PURPLE BODY WITH ROTATING NEON CYAN GLOW BEAM) */}
+            {/* RENT BUTTON (ROYAL PURPLE BODY WITH ROTATING NEON CYAN GLOW BEAM & STAGGERED GENTLE BOUNCE) */}
             <div 
-              className="relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md"
+              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${
+                hoveredNav === 'rent' || activePage === 'rent' ? '' : 'animate-gentle-bounce-delay-1'
+              }`}
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
@@ -137,9 +141,11 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* SELL BUTTON (AMBER GOLD BODY WITH ROTATING NEON MAGENTA/ROSE GLOW BEAM) */}
+            {/* SELL BUTTON (AMBER GOLD BODY WITH ROTATING NEON MAGENTA/ROSE GLOW BEAM & STAGGERED GENTLE BOUNCE) */}
             <div 
-              className="relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md"
+              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${
+                hoveredNav === 'sell' || activePage === 'sell' ? '' : 'animate-gentle-bounce-delay-2'
+              }`}
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
