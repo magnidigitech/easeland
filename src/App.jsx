@@ -35,7 +35,22 @@ const getInitialPageState = () => {
   const urlParams = new URLSearchParams(search);
   const modeParam = urlParams.get('mode');
 
+  if (cleanPath === '/admin' || modeParam === 'admin') return { page: 'admin', propId: null };
+
+  const storedActivePage = localStorage.getItem('easeland_active_page');
+  const storedAdminAuth = localStorage.getItem('easeland_admin_authenticated') === 'true';
+
+  if (storedAdminAuth && (storedActivePage === 'admin' || cleanPath === '/admin')) {
+    return { page: 'admin', propId: null };
+  }
+
   if (cleanPath === '/' || cleanPath === '') {
+    if (storedActivePage && storedActivePage !== 'home') {
+      if (storedActivePage === 'admin' && storedAdminAuth) {
+        return { page: 'admin', propId: null };
+      }
+      return { page: storedActivePage, propId: null };
+    }
     return { page: 'home', propId: null };
   }
 
@@ -45,7 +60,6 @@ const getInitialPageState = () => {
   }
 
   if (cleanPath.startsWith('/properties')) return { page: 'map', propId: null };
-  if (cleanPath === '/admin' || modeParam === 'admin') return { page: 'admin', propId: null };
   if (cleanPath === '/crm' || modeParam === 'crm' || urlParams.get('view') === 'crm') return { page: 'crm', propId: null };
   if (cleanPath === '/buy') return { page: 'buy', propId: null };
   if (cleanPath === '/rent') return { page: 'rent', propId: null };
@@ -265,7 +279,27 @@ export default function App() {
     const urlParams = new URLSearchParams(search);
     const modeParam = urlParams.get('mode');
 
+    const storedActivePage = localStorage.getItem('easeland_active_page');
+    const storedAdminAuth = localStorage.getItem('easeland_admin_authenticated') === 'true';
+
+    if (cleanPath === '/admin' || modeParam === 'admin') {
+      setActivePage('admin');
+      try { localStorage.setItem('easeland_active_page', 'admin'); } catch(e){}
+      return;
+    }
+
     if (cleanPath === '/' || cleanPath === '') {
+      if (storedActivePage && storedActivePage !== 'home') {
+        if (storedActivePage === 'admin') {
+          if (storedAdminAuth) {
+            setActivePage('admin');
+            return;
+          }
+        } else {
+          setActivePage(storedActivePage);
+          return;
+        }
+      }
       setActivePage('home');
       try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
       return;
@@ -284,12 +318,6 @@ export default function App() {
       setFilters(prev => ({ ...prev, ...parsedFilters }));
       setActivePage('map');
       try { localStorage.setItem('easeland_active_page', 'map'); } catch(e){}
-      return;
-    }
-
-    if (cleanPath === '/admin' || modeParam === 'admin') {
-      setActivePage('admin');
-      try { localStorage.setItem('easeland_active_page', 'admin'); } catch(e){}
       return;
     }
 

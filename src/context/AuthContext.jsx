@@ -167,6 +167,11 @@ export function AuthProvider({ children }) {
         const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
         const userProfileData = storedProfile;
 
+        const isAdmin = currentUser.email === 'admin@easeland.in' ||
+          (typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true') ||
+          userProfileData?.role === 'ADMIN' ||
+          userProfileData?.adminRole === true;
+
         // Auto-sanitize legacy 2FA defaults from stored profile
         if (userProfileData?.security?.enable2FA && !userProfileData?.security?.twoFactorExplicitlyEnabled) {
           if (userProfileData.security) userProfileData.security.enable2FA = false;
