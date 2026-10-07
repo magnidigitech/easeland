@@ -201,7 +201,7 @@ export default function UserDashboard({
             if (!p) return false;
             const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || '').toLowerCase().trim();
             const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || '').toLowerCase().trim();
-            return (uId && pOwnerId === uId) || (uEmail && pOwnerEmail === uEmail) || (!pOwnerId && !pOwnerEmail);
+            return Boolean((uId && pOwnerId && pOwnerId === uId) || (uEmail && pOwnerEmail && pOwnerEmail === uEmail));
           });
           setMyPropertiesList(pgProps);
         }
@@ -254,10 +254,10 @@ export default function UserDashboard({
     const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy || '').toLowerCase().trim();
     const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
 
-    const isOwned = (!pOwnerId && !pOwnerEmail) ||
-      (currentUserId && pOwnerId === currentUserId) ||
-      (currentUserEmail && pOwnerEmail === currentUserEmail) ||
-      !currentUserId;
+    const isOwned = Boolean(
+      (currentUserId && pOwnerId && pOwnerId === currentUserId) ||
+      (currentUserEmail && pOwnerEmail && pOwnerEmail === currentUserEmail)
+    );
     if (!isOwned) return;
 
     const pId = String(p.propertyId || p.id || p.referenceId || '');

@@ -456,7 +456,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
             const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || '').toLowerCase().trim();
             const pOwnerEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || '').toLowerCase().trim();
             const targetIdStr = String(ownerId || '').toLowerCase().trim();
-            return (targetIdStr && pOwnerId === targetIdStr) || (!pOwnerId && !pOwnerEmail);
+            return Boolean(targetIdStr && pOwnerId && pOwnerId === targetIdStr);
           });
           propertiesList = [...pgProps];
         }
