@@ -38,21 +38,24 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             </div>
           </div>
 
-          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH 3 DISTINCT GLOWS & POPUP CARDS) */}
+          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH CONTINUOUS 3D GLOWS & POPUP CARDS) */}
           <nav className="hidden md:flex items-center gap-4 relative">
             
-            {/* BUY BUTTON (EMERALD GLOW) */}
+            {/* BUY BUTTON (PERMANENT 3D EMERALD GLOW) */}
             <div 
               className="relative group"
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
+              {/* Permanent Ambient 3D Backdrop Glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 opacity-60 blur-md group-hover:opacity-100 transition duration-300" />
+              
               <button
                 onClick={() => setActivePage('buy')}
-                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-300 transform border select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border-t border-x select-none flex items-center gap-1.5 ${
                   activePage === 'buy'
-                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.75)] scale-105'
-                    : 'bg-emerald-50/60 text-emerald-800 border-emerald-300/60 hover:border-emerald-500 hover:text-emerald-900 hover:bg-emerald-100/80 hover:shadow-[0_0_22px_rgba(16,185,129,0.6)] hover:-translate-y-0.5'
+                    ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white border-t-emerald-300 border-x-emerald-500 border-b-4 border-b-emerald-950 shadow-[0_6px_20px_rgba(16,185,129,0.85),inset_0_1px_1px_rgba(255,255,255,0.4)] scale-105 -translate-y-0.5'
+                    : 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white border-t-emerald-300/80 border-x-emerald-600 border-b-4 border-b-emerald-950 shadow-[0_4px_16px_rgba(16,185,129,0.55),0_0_14px_rgba(16,185,129,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:shadow-[0_8px_25px_rgba(16,185,129,0.9),0_0_22px_rgba(16,185,129,0.75)] hover:-translate-y-1 active:translate-y-0.5 active:border-b-2'
                 }`}
               >
                 <Search className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -86,18 +89,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* RENT BUTTON (ROYAL PURPLE GLOW) */}
+            {/* RENT BUTTON (PERMANENT 3D ROYAL PURPLE GLOW) */}
             <div 
               className="relative group"
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
+              {/* Permanent Ambient 3D Backdrop Glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 opacity-60 blur-md group-hover:opacity-100 transition duration-300" />
+
               <button
                 onClick={() => setActivePage('rent')}
-                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-300 transform border select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border-t border-x select-none flex items-center gap-1.5 ${
                   activePage === 'rent'
-                    ? 'bg-purple-600 text-white border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.75)] scale-105'
-                    : 'bg-purple-50/60 text-purple-800 border-purple-300/60 hover:border-purple-500 hover:text-purple-900 hover:bg-purple-100/80 hover:shadow-[0_0_22px_rgba(168,85,247,0.6)] hover:-translate-y-0.5'
+                    ? 'bg-gradient-to-b from-purple-500 to-purple-700 text-white border-t-purple-300 border-x-purple-500 border-b-4 border-b-purple-950 shadow-[0_6px_20px_rgba(168,85,247,0.85),inset_0_1px_1px_rgba(255,255,255,0.4)] scale-105 -translate-y-0.5'
+                    : 'bg-gradient-to-b from-purple-600 to-purple-800 text-white border-t-purple-300/80 border-x-purple-600 border-b-4 border-b-purple-950 shadow-[0_4px_16px_rgba(168,85,247,0.55),0_0_14px_rgba(168,85,247,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:shadow-[0_8px_25px_rgba(168,85,247,0.9),0_0_22px_rgba(168,85,247,0.75)] hover:-translate-y-1 active:translate-y-0.5 active:border-b-2'
                 }`}
               >
                 <Key className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -131,18 +137,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* SELL BUTTON (AMBER GOLD GLOW) */}
+            {/* SELL BUTTON (PERMANENT 3D AMBER GOLD GLOW) */}
             <div 
               className="relative group"
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
+              {/* Permanent Ambient 3D Backdrop Glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 opacity-70 blur-md group-hover:opacity-100 transition duration-300" />
+
               <button
                 onClick={() => setActivePage('sell')}
-                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-300 transform border select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border-t border-x select-none flex items-center gap-1.5 ${
                   activePage === 'sell'
-                    ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.85)] scale-105'
-                    : 'bg-amber-50/60 text-amber-900 border-amber-300/60 hover:border-amber-500 hover:text-amber-950 hover:bg-amber-100/80 hover:shadow-[0_0_22px_rgba(245,158,11,0.65)] hover:-translate-y-0.5'
+                    ? 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 border-t-amber-200 border-x-amber-400 border-b-4 border-b-amber-900 shadow-[0_6px_20px_rgba(245,158,11,0.9),inset_0_1px_1px_rgba(255,255,255,0.6)] scale-105 -translate-y-0.5'
+                    : 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 border-t-amber-200/90 border-x-amber-400 border-b-4 border-b-amber-900 shadow-[0_4px_16px_rgba(245,158,11,0.65),0_0_16px_rgba(245,158,11,0.5),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:shadow-[0_8px_25px_rgba(245,158,11,0.95),0_0_24px_rgba(245,158,11,0.8)] hover:-translate-y-1 active:translate-y-0.5 active:border-b-2'
                 }`}
               >
                 <Tag className="w-3.5 h-3.5 stroke-[2.5]" />
