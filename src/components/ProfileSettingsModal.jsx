@@ -27,7 +27,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
 
   // Profile Form State
   const [profileData, setProfileData] = useState({
-    name: profile?.displayName || user?.displayName || '',
+    name: profile?.displayName || profile?.name || user?.displayName || user?.name || '',
     email: profile?.email || user?.email || '',
     phone: sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || ''),
   });
@@ -46,7 +46,32 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
   const [successMsg, setSuccessMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      const activeName = profile?.displayName || profile?.name || user?.displayName || user?.name || '';
+      const activeEmail = profile?.email || user?.email || '';
+      const activePhone = sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || '');
+      setProfileData({
+        name: activeName,
+        email: activeEmail,
+        phone: activePhone
+      });
+      setSecurityData({
+        newPassword: '',
+        confirmPassword: '',
+        enable2FA: profile?.security?.enable2FA ?? profile?.communicationPreferences?.enable2FA ?? false,
+        loginAlerts: profile?.security?.loginAlerts ?? profile?.communicationPreferences?.loginAlerts ?? true
+      });
+      setError(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen, user, profile]);
+
   if (!isOpen) return null;
+
+  const displayName = profile?.displayName || profile?.name || user?.displayName || user?.name || 'EaseLand User';
+  const displayEmail = profile?.email || user?.email || '';
+  const displayRole = (profile?.role === 'ADMIN' || user?.role === 'ADMIN' || profile?.adminRole) ? 'ADMIN' : 'USER';
 
   const passLengthValid = securityData.newPassword.length >= 8;
   const passUpperValid = /[A-Z]/.test(securityData.newPassword);
@@ -75,7 +100,10 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     setLoading(true);
     const result = await updateProfileData({
       displayName: profileData.name.trim(),
-      phone: cleanPhone
+      name: profileData.name.trim(),
+      email: profileData.email.trim(),
+      phone: cleanPhone,
+      phoneNumber: cleanPhone
     });
 
     setLoading(false);
@@ -145,18 +173,18 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
 
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-brand-yellow text-brand-charcoal font-black text-xl flex items-center justify-center shadow-md">
-              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              {displayName ? displayName.charAt(0).toUpperCase() : 'U'}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-extrabold text-white">{user.name}</h3>
+                <h3 className="text-lg font-extrabold text-white">{displayName}</h3>
                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                  user.role === 'ADMIN' ? 'bg-purple-500 text-white' : 'bg-brand-yellow text-brand-charcoal'
+                  displayRole === 'ADMIN' ? 'bg-purple-500 text-white' : 'bg-brand-yellow text-brand-charcoal'
                 }`}>
-                  {user.role === 'ADMIN' ? 'Administrator' : 'User'}
+                  {displayRole === 'ADMIN' ? 'Administrator' : 'User'}
                 </span>
               </div>
-              <span className="text-xs text-gray-300 font-medium block mt-0.5">{user.email}</span>
+              <span className="text-xs text-gray-300 font-medium block mt-0.5">{displayEmail}</span>
             </div>
           </div>
         </div>
