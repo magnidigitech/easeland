@@ -40,10 +40,48 @@ const AuthContext = createContext({
 });
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const storedAdmin = localStorage.getItem('easeland_admin_authenticated') === 'true';
+      if (storedAdmin) {
+        const email = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
+        const name = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
+        const phone = localStorage.getItem('easeland_admin_phone') || '';
+        return { uid: 'admin_uid_001', email, displayName: name, name, phone, phoneNumber: phone, emailVerified: true };
+      }
+      const storedUser = localStorage.getItem('easeland_session_user');
+      if (storedUser) return JSON.parse(storedUser);
+    } catch (e) {}
+    return null;
+  });
+
+  const [profile, setProfile] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const storedAdmin = localStorage.getItem('easeland_admin_authenticated') === 'true';
+      if (storedAdmin) {
+        const email = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
+        const name = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
+        const phone = localStorage.getItem('easeland_admin_phone') || '';
+        return { uid: 'admin_uid_001', displayName: name, name, email, phone, phoneNumber: phone, role: 'ADMIN', adminRole: true, capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'], ownerVerificationState: 'VERIFIED', accountStatus: 'ACTIVE' };
+      }
+      const storedUser = localStorage.getItem('easeland_session_user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        const uid = parsedUser.uid || parsedUser.id;
+        if (uid) {
+          const storedProf = localStorage.getItem('easeland_user_profile_' + uid);
+          if (storedProf) return JSON.parse(storedProf);
+          return { uid, displayName: parsedUser.displayName || parsedUser.name, name: parsedUser.displayName || parsedUser.name, email: parsedUser.email, role: 'USER', accountStatus: 'ACTIVE', capabilities: ['CUSTOMER', 'OWNER'] };
+        }
+      }
+    } catch (e) {}
+    return null;
+  });
+
   const [pending2FASession, setPending2FASession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Helper to load user's Firestore profile
   const reloadProfile = async (uid) => {
@@ -157,10 +195,20 @@ export function AuthProvider({ children }) {
           });
         } else {
           setPending2FASession(null);
-          setUser({
-            ...currentUser,
+          const activeUserObj = {
+            uid: currentUser.uid,
+            id: currentUser.uid,
+            displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+            name: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+            email: currentUser.email || '',
+            phone: currentUser.phoneNumber || '',
+            emailVerified: currentUser.emailVerified,
             role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
-          });
+          };
+          setUser(activeUserObj);
+          try {
+            localStorage.setItem('easeland_session_user', JSON.stringify(activeUserObj));
+          } catch(e) {}
           setProfile({
             ...userProfileData,
             role: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? 'ADMIN' : (userProfileData?.role || 'USER'),
@@ -450,7 +498,11 @@ export function AuthProvider({ children }) {
     setUser(null);
     setProfile(null);
     setPending2FASession(null);
-    try { localStorage.removeItem('easeland_admin_authenticated'); } catch(e){}
+    try {
+      localStorage.removeItem('easeland_admin_authenticated');
+      localStorage.removeItem('easeland_session_user');
+      localStorage.removeItem('easeland_active_page');
+    } catch(e){}
     return result;
   };
 
