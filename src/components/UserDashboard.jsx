@@ -147,12 +147,7 @@ export default function UserDashboard({
 
   // Use real Firebase derived notifications & wishlist items
   const notifications = fbNotifications;
-  const mockWishlistProps = typeof mockApi.getWishlist === 'function' ? mockApi.getWishlist() : [];
-  const wishlistProperties = (fbWishlistProps && fbWishlistProps.length > 0)
-    ? fbWishlistProps
-    : (Array.isArray(wishlist) && wishlist.length > 0)
-      ? wishlist
-      : mockWishlistProps;
+  const wishlistProperties = fbWishlistProps || [];
   const unreadNotificationsCount = (notifications || []).filter(n => !n.read).length;
 
 

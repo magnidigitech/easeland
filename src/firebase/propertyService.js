@@ -385,14 +385,6 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
       } catch (e) {}
     }
 
-    // 3. Try mockApi & Local Storage fallback
-    if (!data) {
-      try {
-        const { mockApi } = await import('../services/mockApi.js');
-        const mProp = mockApi.getPropertyById(propertyId);
-        if (mProp) data = mProp;
-      } catch (e) {}
-    }
 
     if (!data || data.status === 'DELETED' || data.listingStatus === 'DELETED') {
       return { success: false, error: 'Property not found.' };
@@ -463,14 +455,6 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       }
     } catch (e) {}
 
-    // 2. Try local store & mockApi fallback
-    try {
-      const { mockApi } = await import('../services/mockApi.js');
-      const myProps = mockApi.getMyProperties(ownerId, '');
-      if (Array.isArray(myProps)) {
-        propertiesList = [...propertiesList, ...myProps];
-      }
-    } catch (e) {}
 
     // 3. Try Firestore non-blockingly
     try {
@@ -1080,14 +1064,6 @@ export async function getOwnerDrafts(ownerId) {
       return sVal === 'DRAFT' || p.isDraft === true || !sVal;
     };
 
-    // 1. Try local store & mockApi
-    try {
-      const { mockApi } = await import('../services/mockApi.js');
-      const myProps = mockApi.getMyProperties(ownerId, '');
-      if (Array.isArray(myProps)) {
-        drafts = myProps.filter(isTrueDraft);
-      }
-    } catch (e) {}
 
     // 2. Try PostgreSQL API (/api/properties)
     try {
@@ -1224,27 +1200,7 @@ export async function getPublicPropertyById(propertyId) {
       }
     }
 
-    // 4. Fallback to mockApi & Local Storage stores
-    if (!data && typeof window !== 'undefined' && typeof mockApi !== 'undefined') {
-      try {
-        const allLocal = mockApi.getPublicProperties({});
-        const match = allLocal.find(p => {
-          if (!p) return false;
-          const pid = String(p.propertyId || p.id || '');
-          const refid = String(p.referenceId || '');
-          const ptitle = String(p.title || '');
-          return pid === targetIdStr || refid === targetIdStr ||
-                 pid.toLowerCase() === targetIdStr.toLowerCase() ||
-                 refid.toLowerCase() === targetIdStr.toLowerCase() ||
-                 (ptitle && ptitle.toLowerCase() === targetIdStr.toLowerCase());
-        });
-        if (match) {
-          data = { ...match };
-        }
-      } catch (err) {
-        console.warn('Local store lookup note:', err);
-      }
-    }
+
 
     if (!data) {
       return { success: false, error: 'The requested property reference does not exist on our direct marketplace.' };

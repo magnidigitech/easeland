@@ -488,10 +488,8 @@ export default function AdminPortal({ onNavigate }) {
       } catch (lErr) { }
 
       const queueMap = new Map();
-      let mockQueueProps = typeof mockApi.getVerificationQueue === 'function' ? mockApi.getVerificationQueue() : [];
-      let mockAllProps = typeof mockApi.getAllPropertiesAdmin === 'function' ? mockApi.getAllPropertiesAdmin() : [];
 
-      [...mockQueueProps, ...mockAllProps, ...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
+      [...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
         if (!p) return;
         const pId = String(p.id || p.propertyId || p.referenceId || '');
         if (pId) {
@@ -772,7 +770,7 @@ export default function AdminPortal({ onNavigate }) {
     let enqs = [];
     try {
       const enqsRes = await getAllEnquiriesAdmin();
-      enqs = (enqsRes.success && Array.isArray(enqsRes.enquiries)) ? enqsRes.enquiries : (typeof mockApi.getEnquiriesAdmin === 'function' ? mockApi.getEnquiriesAdmin() : []);
+      enqs = (enqsRes.success && Array.isArray(enqsRes.enquiries)) ? enqsRes.enquiries : [];
     } catch (e3) {
       console.warn('Error loading enquiries:', e3);
     }
@@ -786,7 +784,7 @@ export default function AdminPortal({ onNavigate }) {
       console.warn('Error loading reports:', e4);
     }
 
-    // 5. Site Config (Populated with defaults across all 16 modules)
+    // 5. Site Config
     let cfg = mockApi.getSiteConfig();
     try {
       const cfgRes = await getSiteConfigAdmin();
@@ -799,17 +797,9 @@ export default function AdminPortal({ onNavigate }) {
 
     setSiteConfig(cfg);
 
-    const dls = typeof mockApi.getDealsAdmin === 'function' ? mockApi.getDealsAdmin() : [];
-    const fups = typeof mockApi.getFollowUpsAdmin === 'function' ? mockApi.getFollowUpsAdmin() : [];
-    const props = typeof mockApi.getAllPropertiesAdmin === 'function' ? mockApi.getAllPropertiesAdmin() : [];
-
-    const finalAllProperties = allMergedProps.length > 0 ? allMergedProps : props;
-
     setVerificationQueue(queue);
-    setDeals(dls);
-    setFollowUps(fups);
     setEnquiries(enqs);
-    setAllProperties(finalAllProperties);
+    setAllProperties(allMergedProps);
     let deletedUsers = [];
     try {
       if (typeof window !== 'undefined') {
