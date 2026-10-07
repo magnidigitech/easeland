@@ -183,7 +183,13 @@ export default function PropertiesSearchPage({
   // 1. Initialize search state from URL query parameters or initialFilters
   const [searchState, setSearchState] = useState(() => {
     const fromUrl = urlParamsToSearchState(window.location.search);
-    if (initialFilters && (initialFilters.propertyType !== 'ALL' || initialFilters.category || initialFilters.query)) {
+    if (initialFilters && (
+      (initialFilters.purpose && initialFilters.purpose !== 'ALL' && initialFilters.purpose !== 'ANY') ||
+      (initialFilters.propertyType && initialFilters.propertyType !== 'ALL' && initialFilters.propertyType !== 'ANY') ||
+      initialFilters.category ||
+      initialFilters.query ||
+      initialFilters.cleared === false
+    )) {
       return { ...fromUrl, ...initialFilters };
     }
     return fromUrl;
