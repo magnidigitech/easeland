@@ -12,6 +12,7 @@ import {
   signInAnonymously
 } from 'firebase/auth';
 import { auth } from './config.js';
+import { createUserProfile, syncUserToPostgres } from './userService.js';
 
 /**
  * Format Firebase Auth error code into user-friendly error message
@@ -60,6 +61,15 @@ export async function registerUser(email, password, displayName = '') {
     if (displayName && userCredential.user) {
       await updateProfile(userCredential.user, { displayName });
     }
+    if (userCredential?.user) {
+      const u = userCredential.user;
+      await createUserProfile(u.uid, {
+        displayName: displayName || u.displayName || 'EaseLand User',
+        email: u.email || email,
+        phone: u.phoneNumber || '',
+        authProvider: 'Email/Password'
+      });
+    }
     return { success: true, user: userCredential.user };
   } catch (error) {
     return { success: false, error: formatAuthError(error) };
@@ -72,6 +82,15 @@ export async function registerUser(email, password, displayName = '') {
 export async function loginUser(email, password) {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    if (userCredential?.user) {
+      const u = userCredential.user;
+      await createUserProfile(u.uid, {
+        displayName: u.displayName || 'EaseLand User',
+        email: u.email || email,
+        phone: u.phoneNumber || '',
+        authProvider: 'Email/Password'
+      });
+    }
     return { success: true, user: userCredential.user };
   } catch (error) {
     return { success: false, error: formatAuthError(error) };
@@ -122,6 +141,14 @@ export async function sendEmailVerificationUser() {
  */
 export function subscribeToAuthState(callback) {
   return onAuthStateChanged(auth, (user) => {
+    if (user && user.uid) {
+      createUserProfile(user.uid, {
+        displayName: user.displayName || (user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+        email: user.email || '',
+        phone: user.phoneNumber || '',
+        authProvider: user.providerData?.[0]?.providerId === 'google.com' ? 'Google OAuth' : 'Email/Password'
+      });
+    }
     callback(user);
   });
 }
@@ -148,6 +175,15 @@ export async function loginWithGoogle() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
+      if (result?.user) {
+        const u = result.user;
+        await createUserProfile(u.uid, {
+          displayName: u.displayName || 'EaseLand User',
+          email: u.email || '',
+          phone: u.phoneNumber || '',
+          authProvider: 'Google OAuth'
+        });
+      }
       return { success: true, user: result.user };
     } catch (popupErr) {
       if (popupErr?.code === 'auth/popup-blocked' || popupErr?.code === 'auth/cancelled-popup-request') {
