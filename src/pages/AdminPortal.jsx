@@ -576,10 +576,10 @@ export default function AdminPortal({ onNavigate }) {
       console.warn('Error loading verification queue:', e1);
     }
 
-    // 2. Users (Combines PostgreSQL /api/users + Firestore + Local Storage + Registered Property Owners)
+    // 2. Users (Combines Firebase Auth + PostgreSQL /api/admin/firebase-users + Firestore + Local Storage)
     let pgServerUsers = [];
     try {
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/admin/firebase-users');
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.users)) {
@@ -4105,7 +4105,6 @@ export default function AdminPortal({ onNavigate }) {
                           <th className="py-3 px-3">Auth Method</th>
                           <th className="py-3 px-3">Platform Role</th>
                           <th className="py-3 px-3">Contact Phone</th>
-                          <th className="py-3 px-3 text-center">Listings</th>
                           <th className="py-3 px-3 text-center">Account Status</th>
                           <th className="py-3 px-3 text-right">Governance Actions</th>
                         </tr>
@@ -4183,10 +4182,6 @@ export default function AdminPortal({ onNavigate }) {
                                 ) : (
                                   <span className="text-gray-400 italic text-[10px]">Not Provided</span>
                                 )}
-                              </td>
-
-                              <td className="py-3 px-3 text-center font-extrabold text-brand-charcoal text-xs">
-                                {u.postedListingsCount || 0} Posted
                               </td>
 
                               <td className="py-3 px-3 text-center">

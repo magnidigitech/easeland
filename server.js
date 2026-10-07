@@ -4,7 +4,19 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import pg from 'pg';
+import admin from 'firebase-admin';
 import { fileURLToPath } from 'url';
+
+// Initialize Firebase Admin SDK
+try {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04'
+    });
+  }
+} catch (eAdminInit) {
+  console.warn('Firebase Admin SDK initialization note:', eAdminInit.message);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1286,7 +1298,62 @@ app.delete('/api/visitors/:id', async (req, res) => {
   }
 });
 
-// Registered Users API Endpoints (PostgreSQL User Governance)
+// Registered Users API Endpoints (Firebase Auth + PostgreSQL User Governance)
+app.get('/api/admin/firebase-users', async (req, res) => {
+  try {
+    let authUsers = [];
+    try {
+      if (admin.apps.length) {
+        const listResult = await admin.auth().listUsers(1000);
+        authUsers = listResult.users.map(u => ({
+          uid: u.uid,
+          id: u.uid,
+          email: u.email || '',
+          displayName: (u.displayName || (u.email === 'admin@easeland.in' ? 'EaseLand Admin' : (u.email ? u.email.split('@')[0] : 'Registered User'))).trim(),
+          name: (u.displayName || (u.email === 'admin@easeland.in' ? 'EaseLand Admin' : (u.email ? u.email.split('@')[0] : 'Registered User'))).trim(),
+          phone: u.phoneNumber || '',
+          emailVerified: u.emailVerified ?? true,
+          authProvider: u.providerData?.[0]?.providerId === 'google.com' || u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password',
+          role: u.email === 'admin@easeland.in' ? 'ADMIN' : 'USER',
+          accountStatus: u.disabled ? 'SUSPENDED' : 'ACTIVE',
+          createdAt: u.metadata?.creationTime || new Date().toISOString()
+        }));
+      }
+    } catch (authErr) {
+      console.warn('Firebase Admin listUsers note:', authErr.message);
+    }
+
+    const localList = getLocalUsers();
+    let pgUsers = [];
+    try {
+      const result = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 1000;');
+      pgUsers = result.rows.map(row => row.raw_data).filter(Boolean);
+    } catch (pgErr) {}
+
+    const userMap = new Map();
+    [...authUsers, ...localList, ...pgUsers].forEach(u => {
+      if (u && (u.uid || u.id || u.email)) {
+        const key = String(u.uid || u.id || u.email).toLowerCase().trim();
+        const existing = userMap.get(key) || {};
+        const isAdmin = u.email === 'admin@easeland.in' || u.role === 'ADMIN';
+        const cleanName = isAdmin ? 'EaseLand Admin' : (u.displayName || u.name || existing.displayName || existing.name || 'Registered User');
+        userMap.set(key, {
+          ...existing,
+          ...u,
+          displayName: cleanName,
+          name: cleanName,
+          role: isAdmin ? 'ADMIN' : (existing.role || u.role || 'USER')
+        });
+      }
+    });
+
+    const allUsers = Array.from(userMap.values());
+    return res.json({ success: true, count: allUsers.length, users: allUsers });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/users', async (req, res) => {
   try {
     const localList = getLocalUsers();
