@@ -38,37 +38,37 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             </div>
           </div>
 
-          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH 360° ROTATING GLOW BEAM BORDERS & POPUP CARDS) */}
+          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH CONTRASTING 360° ROTATING GLOW BEAM BORDERS & POPUP CARDS) */}
           <nav className="hidden md:flex items-center gap-3 sm:gap-4 relative shrink-0">
             
-            {/* BUY BUTTON (ROTATING EMERALD GLOW BEAM) */}
+            {/* BUY BUTTON (TEAL BODY WITH ROTATING NEON GOLD/AMBER GLOW BEAM) */}
             <div 
-              className="relative p-[2px] rounded-xl overflow-hidden group shrink-0"
+              className="relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md"
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Continuous 360-degree Rotating Conic Glow Beam */}
-              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_220deg,#10b981_290deg,#6ee7b7_360deg)] opacity-95 blur-[1px]" />
+              {/* Continuous 360-degree Rotating Neon Amber Conic Glow Beam */}
+              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_200deg,#f59e0b_280deg,#fef08a_360deg)] opacity-100 blur-[1px]" />
               
               <button
                 onClick={() => setActivePage('buy')}
                 className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
                   activePage === 'buy'
-                    ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-lg shadow-emerald-500/50 scale-105'
-                    : 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
+                    ? 'bg-gradient-to-b from-teal-800 to-slate-950 text-amber-300 shadow-lg shadow-amber-500/40 scale-105 ring-1 ring-amber-400/60'
+                    : 'bg-gradient-to-b from-teal-900 to-slate-950 text-white shadow-md hover:brightness-125 hover:scale-105 active:scale-95'
                 }`}
               >
-                <Search className="w-3.5 h-3.5 stroke-[2.5]" />
+                <Search className="w-3.5 h-3.5 stroke-[2.5] text-amber-400" />
                 <span>{siteConfig?.navbar?.buyLabel || 'BUY'}</span>
               </button>
 
               {/* POP-UP CARD FOR BUY */}
               {hoveredNav === 'buy' && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(16,185,129,0.25)] border border-emerald-200 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-emerald-200 rotate-45" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(245,158,11,0.25)] border border-amber-200 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-amber-200 rotate-45" />
                   <div className="relative z-10 space-y-2">
-                    <div className="flex items-center gap-2 text-emerald-700 font-extrabold text-xs">
-                      <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
+                    <div className="flex items-center gap-2 text-amber-700 font-extrabold text-xs">
+                      <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
                         <Search className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <span>Buy Verified Properties</span>
@@ -76,12 +76,12 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                     <p className="text-[11px] text-slate-600 leading-snug">
                       Explore 100% owner-verified plots, residential homes, and commercial lands.
                     </p>
-                    <div className="pt-2 border-t border-emerald-100 flex flex-wrap gap-1.5">
-                      <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> 0% Brokerage
+                    <div className="pt-2 border-t border-amber-100 flex flex-wrap gap-1.5">
+                      <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-amber-500" /> 0% Brokerage
                       </span>
-                      <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-emerald-500" /> Land Verified
+                      <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-500" /> Land Verified
                       </span>
                     </div>
                   </div>
@@ -89,34 +89,34 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* RENT BUTTON (ROTATING ROYAL PURPLE GLOW BEAM) */}
+            {/* RENT BUTTON (ROYAL PURPLE BODY WITH ROTATING NEON CYAN GLOW BEAM) */}
             <div 
-              className="relative p-[2px] rounded-xl overflow-hidden group shrink-0"
+              className="relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md"
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Continuous 360-degree Rotating Conic Glow Beam */}
-              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_220deg,#a855f7_290deg,#e9d5ff_360deg)] opacity-95 blur-[1px]" />
+              {/* Continuous 360-degree Rotating Neon Cyan Conic Glow Beam */}
+              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_200deg,#06b6d4_280deg,#67e8f9_360deg)] opacity-100 blur-[1px]" />
 
               <button
                 onClick={() => setActivePage('rent')}
                 className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
                   activePage === 'rent'
-                    ? 'bg-gradient-to-b from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/50 scale-105'
-                    : 'bg-gradient-to-b from-purple-600 to-purple-800 text-white shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
+                    ? 'bg-gradient-to-b from-indigo-900 to-purple-950 text-cyan-300 shadow-lg shadow-cyan-500/40 scale-105 ring-1 ring-cyan-400/60'
+                    : 'bg-gradient-to-b from-indigo-950 to-purple-950 text-white shadow-md hover:brightness-125 hover:scale-105 active:scale-95'
                 }`}
               >
-                <Key className="w-3.5 h-3.5 stroke-[2.5]" />
+                <Key className="w-3.5 h-3.5 stroke-[2.5] text-cyan-400" />
                 <span>{siteConfig?.navbar?.rentLabel || 'RENT'}</span>
               </button>
 
               {/* POP-UP CARD FOR RENT */}
               {hoveredNav === 'rent' && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(168,85,247,0.25)] border border-purple-200 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-purple-200 rotate-45" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(6,182,212,0.25)] border border-cyan-200 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-cyan-200 rotate-45" />
                   <div className="relative z-10 space-y-2">
-                    <div className="flex items-center gap-2 text-purple-700 font-extrabold text-xs">
-                      <div className="p-1.5 rounded-lg bg-purple-100 text-purple-700">
+                    <div className="flex items-center gap-2 text-cyan-700 font-extrabold text-xs">
+                      <div className="p-1.5 rounded-lg bg-cyan-100 text-cyan-700">
                         <Key className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <span>Direct Tenant Rental Connect</span>
@@ -124,12 +124,12 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                     <p className="text-[11px] text-slate-600 leading-snug">
                       Find rental homes, villas, and farmland leases directly from property owners.
                     </p>
-                    <div className="pt-2 border-t border-purple-100 flex flex-wrap gap-1.5">
-                      <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-purple-500" /> Direct Agreement
+                    <div className="pt-2 border-t border-cyan-100 flex flex-wrap gap-1.5">
+                      <span className="text-[10px] font-bold bg-cyan-50 text-cyan-800 px-2 py-0.5 rounded-md border border-cyan-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-cyan-500" /> Direct Agreement
                       </span>
-                      <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-purple-500" /> Deposit Safe
+                      <span className="text-[10px] font-bold bg-cyan-50 text-cyan-800 px-2 py-0.5 rounded-md border border-cyan-200 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-cyan-500" /> Deposit Safe
                       </span>
                     </div>
                   </div>
@@ -137,34 +137,34 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* SELL BUTTON (ROTATING AMBER GOLD GLOW BEAM) */}
+            {/* SELL BUTTON (AMBER GOLD BODY WITH ROTATING NEON MAGENTA/ROSE GLOW BEAM) */}
             <div 
-              className="relative p-[2px] rounded-xl overflow-hidden group shrink-0"
+              className="relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md"
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Continuous 360-degree Rotating Conic Glow Beam */}
-              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_220deg,#f59e0b_290deg,#fef08a_360deg)] opacity-95 blur-[1px]" />
+              {/* Continuous 360-degree Rotating Neon Rose/Magenta Conic Glow Beam */}
+              <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_200deg,#e11d48_280deg,#f472b6_360deg)] opacity-100 blur-[1px]" />
 
               <button
                 onClick={() => setActivePage('sell')}
                 className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
                   activePage === 'sell'
-                    ? 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/50 scale-105'
+                    ? 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-lg shadow-rose-500/40 scale-105 ring-1 ring-rose-400/60'
                     : 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
                 }`}
               >
-                <Tag className="w-3.5 h-3.5 stroke-[2.5]" />
+                <Tag className="w-3.5 h-3.5 stroke-[2.5] text-rose-950" />
                 <span>{siteConfig?.navbar?.sellLabel || 'SELL'}</span>
               </button>
 
               {/* POP-UP CARD FOR SELL */}
               {hoveredNav === 'sell' && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(245,158,11,0.3)] border border-amber-200 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-amber-200 rotate-45" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(225,29,72,0.25)] border border-rose-200 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-rose-200 rotate-45" />
                   <div className="relative z-10 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-700 font-extrabold text-xs">
-                      <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
+                    <div className="flex items-center gap-2 text-rose-700 font-extrabold text-xs">
+                      <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700">
                         <Tag className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <span>List Property Free</span>
@@ -172,12 +172,12 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                     <p className="text-[11px] text-slate-600 leading-snug">
                       Reach 50,000+ verified buyers across South India with zero commission fees.
                     </p>
-                    <div className="pt-2 border-t border-amber-100 flex flex-wrap gap-1.5">
-                      <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-amber-500" /> Free Posting
+                    <div className="pt-2 border-t border-rose-100 flex flex-wrap gap-1.5">
+                      <span className="text-[10px] font-bold bg-rose-50 text-rose-800 px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-rose-500" /> Free Posting
                       </span>
-                      <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-500" /> Instant Buyer Leads
+                      <span className="text-[10px] font-bold bg-rose-50 text-rose-800 px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-rose-500" /> Instant Buyer Leads
                       </span>
                     </div>
                   </div>
