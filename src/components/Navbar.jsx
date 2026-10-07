@@ -15,47 +15,47 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl text-slate-900 border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20 gap-4">
           
           {/* LOGO - Returns Admin to Admin Studio or Users to Homepage */}
           <div 
             onClick={() => setActivePage(user?.role === 'ADMIN' ? 'admin' : 'home')}
-            className="flex items-center gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-3 cursor-pointer group select-none shrink-0"
           >
             <img
               src={siteConfig?.navbar?.logoEmblemUrl || "/easeland_emblem_transparent.png"}
               alt="EaseLand Logo"
-              className="h-11 w-auto object-contain group-hover:scale-105 transition-transform"
+              className="h-10 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform"
             />
             <div>
-              <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-sans">
+              <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 font-sans">
                 {siteConfig?.navbar?.logoTextPrefix || 'Ease'}<span className="text-amber-500">{siteConfig?.navbar?.logoTextSuffix || 'Land'}</span>
               </span>
-              <span className="hidden sm:block text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+              <span className="hidden sm:block text-[10px] uppercase tracking-widest text-slate-500 font-semibold whitespace-nowrap">
                 {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig?.navbar?.logoSubtext || 'Direct Property Platform')}
               </span>
             </div>
           </div>
 
-          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH CONTINUOUS 3D PULSING GLOWS & POPUP CARDS) */}
-          <nav className="hidden md:flex items-center gap-4 relative">
+          {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH SCOPED CONTINUOUS 3D PULSING GLOWS & POPUP CARDS) */}
+          <nav className="hidden md:flex items-center gap-3 sm:gap-4 relative shrink-0">
             
-            {/* BUY BUTTON (PERMANENT CONTINUOUS 3D PULSING EMERALD GLOW) */}
+            {/* BUY BUTTON (EMERALD 3D GLOW) */}
             <div 
-              className="relative group"
+              className="relative group p-0.5"
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Permanent Ambient 3D Pulsing Backdrop Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 blur-md animate-pulse-glow group-hover:opacity-100 transition duration-300" />
+              {/* Scoped Ambient 3D Pulsing Backdrop Glow */}
+              <div className="absolute inset-0.5 rounded-xl bg-emerald-500/80 blur-sm animate-pulse-glow pointer-events-none" />
               
               <button
                 onClick={() => setActivePage('buy')}
-                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border-t border-x select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border select-none flex items-center gap-1.5 ${
                   activePage === 'buy'
-                    ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white border-t-emerald-300 border-x-emerald-500 border-b-4 border-b-emerald-950 shadow-[0_6px_20px_rgba(16,185,129,0.85),inset_0_1px_1px_rgba(255,255,255,0.4)] scale-105 -translate-y-0.5'
-                    : 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white border-t-emerald-300/80 border-x-emerald-600 border-b-4 border-b-emerald-950 shadow-[0_4px_16px_rgba(16,185,129,0.55),0_0_14px_rgba(16,185,129,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:shadow-[0_8px_25px_rgba(16,185,129,0.9),0_0_22px_rgba(16,185,129,0.75)] hover:-translate-y-1 active:translate-y-0.5 active:border-b-2'
+                    ? 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-t-emerald-300 border-x-emerald-500 border-b-2 border-b-emerald-800 shadow-lg shadow-emerald-500/40 scale-105 ring-2 ring-emerald-400/50'
+                    : 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white border-t-emerald-400/80 border-x-emerald-600 border-b-2 border-b-emerald-800 shadow-md shadow-emerald-600/30 hover:shadow-emerald-500/50 hover:scale-105 active:scale-95'
                 }`}
               >
                 <Search className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -89,21 +89,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* RENT BUTTON (PERMANENT CONTINUOUS 3D PULSING ROYAL PURPLE GLOW) */}
+            {/* RENT BUTTON (ROYAL PURPLE 3D GLOW) */}
             <div 
-              className="relative group"
+              className="relative group p-0.5"
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Permanent Ambient 3D Pulsing Backdrop Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 blur-md animate-pulse-glow group-hover:opacity-100 transition duration-300" />
+              {/* Scoped Ambient 3D Pulsing Backdrop Glow */}
+              <div className="absolute inset-0.5 rounded-xl bg-purple-500/80 blur-sm animate-pulse-glow pointer-events-none" />
 
               <button
                 onClick={() => setActivePage('rent')}
-                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border-t border-x select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border select-none flex items-center gap-1.5 ${
                   activePage === 'rent'
-                    ? 'bg-gradient-to-b from-purple-500 to-purple-700 text-white border-t-purple-300 border-x-purple-500 border-b-4 border-b-purple-950 shadow-[0_6px_20px_rgba(168,85,247,0.85),inset_0_1px_1px_rgba(255,255,255,0.4)] scale-105 -translate-y-0.5'
-                    : 'bg-gradient-to-b from-purple-600 to-purple-800 text-white border-t-purple-300/80 border-x-purple-600 border-b-4 border-b-purple-950 shadow-[0_4px_16px_rgba(168,85,247,0.55),0_0_14px_rgba(168,85,247,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:shadow-[0_8px_25px_rgba(168,85,247,0.9),0_0_22px_rgba(168,85,247,0.75)] hover:-translate-y-1 active:translate-y-0.5 active:border-b-2'
+                    ? 'bg-gradient-to-b from-purple-500 to-purple-600 text-white border-t-purple-300 border-x-purple-500 border-b-2 border-b-purple-800 shadow-lg shadow-purple-500/40 scale-105 ring-2 ring-purple-400/50'
+                    : 'bg-gradient-to-b from-purple-600 to-purple-700 text-white border-t-purple-400/80 border-x-purple-600 border-b-2 border-b-purple-800 shadow-md shadow-purple-600/30 hover:shadow-purple-500/50 hover:scale-105 active:scale-95'
                 }`}
               >
                 <Key className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -137,21 +137,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               )}
             </div>
             
-            {/* SELL BUTTON (PERMANENT CONTINUOUS 3D PULSING AMBER GOLD GLOW) */}
+            {/* SELL BUTTON (AMBER GOLD 3D GLOW) */}
             <div 
-              className="relative group"
+              className="relative group p-0.5"
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
-              {/* Permanent Ambient 3D Pulsing Backdrop Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 blur-md animate-pulse-glow group-hover:opacity-100 transition duration-300" />
+              {/* Scoped Ambient 3D Pulsing Backdrop Glow */}
+              <div className="absolute inset-0.5 rounded-xl bg-amber-400/90 blur-sm animate-pulse-glow pointer-events-none" />
 
               <button
                 onClick={() => setActivePage('sell')}
-                className={`relative z-10 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border-t border-x select-none flex items-center gap-1.5 ${
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black tracking-widest transition-all duration-200 transform border select-none flex items-center gap-1.5 ${
                   activePage === 'sell'
-                    ? 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 border-t-amber-200 border-x-amber-400 border-b-4 border-b-amber-900 shadow-[0_6px_20px_rgba(245,158,11,0.9),inset_0_1px_1px_rgba(255,255,255,0.6)] scale-105 -translate-y-0.5'
-                    : 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 border-t-amber-200/90 border-x-amber-400 border-b-4 border-b-amber-900 shadow-[0_4px_16px_rgba(245,158,11,0.65),0_0_16px_rgba(245,158,11,0.5),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:shadow-[0_8px_25px_rgba(245,158,11,0.95),0_0_24px_rgba(245,158,11,0.8)] hover:-translate-y-1 active:translate-y-0.5 active:border-b-2'
+                    ? 'bg-gradient-to-b from-amber-300 to-amber-500 text-slate-950 border-t-amber-100 border-x-amber-300 border-b-2 border-b-amber-700 shadow-lg shadow-amber-500/50 scale-105 ring-2 ring-amber-400/50'
+                    : 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 border-t-amber-200 border-x-amber-400 border-b-2 border-b-amber-700 shadow-md shadow-amber-500/30 hover:shadow-amber-500/60 hover:scale-105 active:scale-95'
                 }`}
               >
                 <Tag className="w-3.5 h-3.5 stroke-[2.5]" />
