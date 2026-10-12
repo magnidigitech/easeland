@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Mail, Phone, Lock, ShieldCheck, Check, AlertCircle, Eye, EyeOff, Key, Bell, Save } from 'lucide-react';
+import { X, User, Mail, Phone, MapPin, Lock, ShieldCheck, Check, AlertCircle, Eye, EyeOff, Key, Bell, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated }) {
@@ -11,17 +11,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     if (!ph) return '';
     const str = String(ph).trim();
     const lower = str.toLowerCase();
-    if (
-      str === '+91 98765 43210' ||
-      str === '9876543210' ||
-      str === '+91 98765 00000' ||
-      str === '9876500000' ||
-      str === '+91 N/A' ||
-      str === 'N/A' ||
-      lower === 'n/a' ||
-      lower === 'null' ||
-      lower === 'undefined'
-    ) return '';
+    if (lower === 'n/a' || lower === 'null' || lower === 'undefined' || str === '+91 N/A') return '';
     return str;
   };
 
@@ -30,6 +20,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     name: profile?.displayName || profile?.name || user?.displayName || user?.name || '',
     email: profile?.email || user?.email || '',
     phone: sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || ''),
+    city: profile?.city || profile?.location || user?.city || user?.location || ''
   });
 
   // Security Form State
@@ -51,10 +42,12 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       const activeName = profile?.displayName || profile?.name || user?.displayName || user?.name || '';
       const activeEmail = profile?.email || user?.email || '';
       const activePhone = sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || '');
+      const activeCity = profile?.city || profile?.location || user?.city || user?.location || '';
       setProfileData({
         name: activeName,
         email: activeEmail,
-        phone: activePhone
+        phone: activePhone,
+        city: activeCity
       });
       setSecurityData({
         newPassword: '',
@@ -65,7 +58,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       setError(null);
       setSuccessMsg(null);
     }
-  }, [isOpen, user, profile]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -91,9 +84,12 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       return;
     }
 
-    const cleanPhone = profileData.phone.replace(/\D/g, '');
+    let cleanPhone = (profileData.phone || '').trim().replace(/\D/g, '');
+    if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) {
+      cleanPhone = cleanPhone.slice(2);
+    }
     if (cleanPhone && cleanPhone.length !== 10) {
-      setError('Mobile number must be exactly 10 digits (e.g. 9876543210)');
+      setError('Mobile number must be 10 digits (e.g. 9876543210)');
       return;
     }
 
@@ -102,8 +98,10 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       displayName: profileData.name.trim(),
       name: profileData.name.trim(),
       email: profileData.email.trim(),
-      phone: cleanPhone,
-      phoneNumber: cleanPhone
+      phone: cleanPhone || profileData.phone.trim(),
+      phoneNumber: cleanPhone || profileData.phone.trim(),
+      city: (profileData.city || '').trim(),
+      location: (profileData.city || '').trim()
     });
 
     setLoading(false);
@@ -279,13 +277,17 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Account Role Description</label>
-                <input
-                  type="text"
-                  value={profileData.role}
-                  onChange={(e) => setProfileData({ ...profileData, role: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-                />
+                <label className="block text-xs font-bold text-gray-700 mb-1">City / Location</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Guntur, Andhra Pradesh"
+                    value={profileData.city || ''}
+                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-3">

@@ -19,17 +19,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     if (!ph) return '';
     const str = String(ph).trim();
     const lower = str.toLowerCase();
-    if (
-      str === '+91 98765 43210' ||
-      str === '9876543210' ||
-      str === '+91 98765 00000' ||
-      str === '9876500000' ||
-      str === '+91 N/A' ||
-      str === 'N/A' ||
-      lower === 'n/a' ||
-      lower === 'null' ||
-      lower === 'undefined'
-    ) return '';
+    if (lower === 'n/a' || lower === 'null' || lower === 'undefined' || str === '+91 N/A') return '';
     return str;
   };
 
@@ -40,7 +30,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     const phone = sanitizePhone(user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || '');
     const city = (user?.city || user?.location || profile?.city || profile?.location || '').trim();
 
-    if (!name || name === 'EaseLand User') missing.push('Full Name');
+    if (!name) missing.push('Full Name');
     if (!email) missing.push('Email Address');
     if (!phone) missing.push('Phone Number');
     if (!city) missing.push('City / Location');

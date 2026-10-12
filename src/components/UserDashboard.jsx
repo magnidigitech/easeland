@@ -52,10 +52,18 @@ export default function UserDashboard({
   wishlist = [],
   onWishlistToggle,
   onNavigate,
-  onPostProperty
+  onPostProperty,
+  initialTab = 'overview'
 }) {
   const { updateProfileData } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'properties', 'verification', 'enquiries', 'wishlist', 'notifications', 'account'
+  const [activeTab, setActiveTab] = useState(initialTab || 'overview'); // 'overview', 'properties', 'verification', 'enquiries', 'wishlist', 'notifications', 'account'
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [propertyFilter, setPropertyFilter] = useState('ALL'); // 'ALL', 'LIVE', 'PENDING_VERIFICATION', 'CHANGES_REQUIRED', 'REJECTED', 'DRAFT', 'UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'
   const [enquiryType, setEnquiryType] = useState('RECEIVED'); // 'RECEIVED', 'SENT'
 
@@ -154,15 +162,16 @@ export default function UserDashboard({
   const sanitizePhone = (ph) => {
     if (!ph) return '';
     const str = String(ph).trim();
-    if (str === '+91 98765 43210' || str === '9876543210' || str === '+91 98765 00000' || str === '9876500000' || str === '+91 N/A' || str === 'N/A') return '';
+    const lower = str.toLowerCase();
+    if (lower === 'n/a' || lower === 'null' || lower === 'undefined' || str === '+91 N/A') return '';
     return str;
   };
 
   // Account settings form state
   const [profileForm, setProfileForm] = useState({
-    name: user?.name || user?.displayName || 'EaseLand User',
+    name: user?.name || user?.displayName || '',
     email: user?.email || '',
-    phone: sanitizePhone(user?.phone || user?.phoneNumber),
+    phone: sanitizePhone(user?.phone || user?.phoneNumber) || '',
     city: user?.city || user?.location || '',
     accountType: 'Verified Property Owner & Buyer'
   });
@@ -171,14 +180,15 @@ export default function UserDashboard({
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
-    setProfileForm({
-      name: user?.name || user?.displayName || 'EaseLand User',
-      email: user?.email || '',
-      phone: sanitizePhone(user?.phone || user?.phoneNumber),
-      city: user?.city || user?.location || '',
+    if (!user) return;
+    setProfileForm(prev => ({
+      name: user?.name || user?.displayName || prev.name || '',
+      email: user?.email || prev.email || '',
+      phone: sanitizePhone(user?.phone || user?.phoneNumber) || prev.phone || '',
+      city: user?.city || user?.location || prev.city || '',
       accountType: 'Verified Property Owner & Buyer'
-    });
-  }, [user]);
+    }));
+  }, [user?.uid, user?.id, user?.email, user?.name, user?.displayName, user?.phone, user?.city]);
 
   // Load user properties directly from PostgreSQL API (/api/properties) on mount and when events fire
   const refreshUserProperties = async () => {
@@ -515,12 +525,12 @@ export default function UserDashboard({
 
     const nameVal = (profileForm.name || '').trim();
     const emailVal = (profileForm.email || '').trim();
-    const phoneVal = sanitizePhone(profileForm.phone);
+    const phoneVal = (profileForm.phone || '').trim();
     const cityVal = (profileForm.city || '').trim();
 
-    if (!nameVal || nameVal === 'EaseLand User' || !emailVal || !phoneVal || !cityVal) {
+    if (!nameVal || !emailVal || !phoneVal || !cityVal) {
       const missing = [];
-      if (!nameVal || nameVal === 'EaseLand User') missing.push('Full Name');
+      if (!nameVal) missing.push('Full Name');
       if (!emailVal) missing.push('Email Address');
       if (!phoneVal) missing.push('Phone Number');
       if (!cityVal) missing.push('City / Location');

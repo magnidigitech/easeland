@@ -48,7 +48,8 @@ export function AuthProvider({ children }) {
         const email = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
         const name = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
         const phone = localStorage.getItem('easeland_admin_phone') || '';
-        return { uid: 'admin_uid_001', email, displayName: name, name, phone, phoneNumber: phone, emailVerified: true };
+        const city = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
+        return { uid: 'admin_uid_001', email, displayName: name, name, phone, phoneNumber: phone, city, location: city, emailVerified: true };
       }
       const storedUser = localStorage.getItem('easeland_session_user');
       if (storedUser) return JSON.parse(storedUser);
@@ -64,7 +65,8 @@ export function AuthProvider({ children }) {
         const email = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
         const name = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
         const phone = localStorage.getItem('easeland_admin_phone') || '';
-        return { uid: 'admin_uid_001', displayName: name, name, email, phone, phoneNumber: phone, role: 'ADMIN', adminRole: true, capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'], ownerVerificationState: 'VERIFIED', accountStatus: 'ACTIVE' };
+        const city = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
+        return { uid: 'admin_uid_001', displayName: name, name, email, phone, phoneNumber: phone, city, location: city, role: 'ADMIN', adminRole: true, capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'], ownerVerificationState: 'VERIFIED', accountStatus: 'ACTIVE' };
       }
       const storedUser = localStorage.getItem('easeland_session_user');
       if (storedUser) {
@@ -116,6 +118,7 @@ export function AuthProvider({ children }) {
         const dedicatedAdminEmail = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
         const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
         const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
+        const dedicatedAdminCity = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
         const adminUser = {
           uid: 'admin_uid_001',
           email: dedicatedAdminEmail,
@@ -123,6 +126,8 @@ export function AuthProvider({ children }) {
           name: dedicatedAdminName,
           phone: dedicatedAdminPhone,
           phoneNumber: dedicatedAdminPhone,
+          city: dedicatedAdminCity,
+          location: dedicatedAdminCity,
           emailVerified: true
         };
         const adminProfile = {
@@ -132,6 +137,8 @@ export function AuthProvider({ children }) {
           email: dedicatedAdminEmail,
           phone: dedicatedAdminPhone,
           phoneNumber: dedicatedAdminPhone,
+          city: dedicatedAdminCity,
+          location: dedicatedAdminCity,
           role: 'ADMIN',
           adminRole: true,
           capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'],
@@ -534,20 +541,27 @@ export function AuthProvider({ children }) {
       if (updates.email) {
         localStorage.setItem('easeland_admin_email', updates.email);
       }
+      if (updates.city || updates.location) {
+        localStorage.setItem('easeland_admin_city', updates.city || updates.location);
+      }
       const dedicatedAdminEmail = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
       const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
       const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
+      const dedicatedAdminCity = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
       const adminObj = {
         displayName: dedicatedAdminName,
         name: dedicatedAdminName,
         email: dedicatedAdminEmail,
         phone: dedicatedAdminPhone,
-        phoneNumber: dedicatedAdminPhone
+        phoneNumber: dedicatedAdminPhone,
+        city: dedicatedAdminCity,
+        location: dedicatedAdminCity
       };
       setUser(prev => ({ ...prev, ...adminObj }));
       setProfile(prev => ({ ...prev, ...adminObj }));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-admin-updated', { detail: adminObj }));
+        window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', { detail: adminObj }));
       }
       return { success: true };
     }
@@ -555,8 +569,13 @@ export function AuthProvider({ children }) {
     // Standard User Profile Local & Cloud Sync
     const updatesToSave = {
       ...updates,
-      displayName: updates.displayName || updates.name || user.displayName || '',
-      phone: updates.phone !== undefined ? updates.phone : (updates.phoneNumber !== undefined ? updates.phoneNumber : (user.phone || ''))
+      displayName: updates.displayName || updates.name || user.displayName || user.name || '',
+      name: updates.displayName || updates.name || user.displayName || user.name || '',
+      email: updates.email || user.email || '',
+      phone: updates.phone !== undefined ? updates.phone : (updates.phoneNumber !== undefined ? updates.phoneNumber : (user.phone || '')),
+      phoneNumber: updates.phone !== undefined ? updates.phone : (updates.phoneNumber !== undefined ? updates.phoneNumber : (user.phone || '')),
+      city: updates.city !== undefined ? updates.city : (updates.location !== undefined ? updates.location : (user.city || user.location || '')),
+      location: updates.city !== undefined ? updates.city : (updates.location !== undefined ? updates.location : (user.city || user.location || ''))
     };
 
     const userKey = 'easeland_user_profile_' + user.uid;
@@ -573,8 +592,26 @@ export function AuthProvider({ children }) {
       ...updatesToSave
     };
 
+    try {
+      localStorage.setItem('easeland_session_user', JSON.stringify(updatedUser));
+    } catch (e) {}
+
     setUser(updatedUser);
     setProfile(updatedProfile);
+
+    try {
+      syncUserToPostgres({
+        uid: user.uid,
+        id: user.uid,
+        displayName: updatesToSave.displayName,
+        name: updatesToSave.name,
+        email: updatesToSave.email,
+        phone: updatesToSave.phone,
+        city: updatesToSave.city,
+        role: updatedProfile.role || 'USER',
+        accountStatus: 'ACTIVE'
+      });
+    } catch (e) {}
 
     try {
       const dbResult = await updateOwnProfile(user.uid, updatesToSave);
@@ -583,6 +620,10 @@ export function AuthProvider({ children }) {
       }
     } catch (e) {
       console.error('Error updating Firestore profile:', e);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', { detail: updatedUser }));
     }
 
     return { success: true };

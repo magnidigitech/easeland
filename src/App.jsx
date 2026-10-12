@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import HeroSearch from './components/HeroSearch';
 import PropertyCategoryCards from './components/PropertyCategoryCards';
@@ -90,35 +90,58 @@ export default function App() {
     const str = String(ph).trim();
     const lower = str.toLowerCase();
     if (
-      str === '+91 98765 43210' ||
-      str === '9876543210' ||
-      str === '+91 98765 00000' ||
-      str === '9876500000' ||
-      str === '+91 N/A' ||
-      str === 'N/A' ||
       lower === 'n/a' ||
       lower === 'null' ||
-      lower === 'undefined'
+      lower === 'undefined' ||
+      str === '+91 N/A'
     ) return '';
     return str;
   };
 
-  const currentUser = authUser ? {
-    uid: authUser.uid,
-    id: authUser.uid,
-    name: authProfile?.displayName || authUser.displayName || (isAdminSession ? 'EaseLand Admin' : 'EaseLand User'),
-    email: authUser.email,
-    phone: sanitizePhone(authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || authUser?.phone || ''),
-    role: isAdminSession ? 'ADMIN' : (authProfile?.role || 'USER'),
-    adminRole: isAdminSession,
-    capabilities: isAdminSession ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (authProfile?.capabilities || ['CUSTOMER', 'OWNER']),
-    ownerVerificationState: isAdminSession ? 'VERIFIED' : (authProfile?.ownerVerificationState || 'NOT_VERIFIED')
-  } : null;
+  const currentUser = useMemo(() => {
+    if (!authUser) return null;
+    const activeName = authProfile?.displayName || authProfile?.name || authUser.displayName || authUser.name || (isAdminSession ? 'EaseLand Admin' : 'EaseLand User');
+    const activeEmail = authProfile?.email || authUser.email || '';
+    const activePhone = sanitizePhone(authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || authUser?.phone || '');
+    const activeCity = (authProfile?.city || authProfile?.location || authUser?.city || authUser?.location || (isAdminSession ? (localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh') : '')).trim();
+
+    return {
+      uid: authUser.uid,
+      id: authUser.uid,
+      name: activeName,
+      displayName: activeName,
+      email: activeEmail,
+      phone: activePhone,
+      phoneNumber: activePhone,
+      city: activeCity,
+      location: activeCity,
+      role: isAdminSession ? 'ADMIN' : (authProfile?.role || 'USER'),
+      adminRole: isAdminSession,
+      capabilities: isAdminSession ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (authProfile?.capabilities || ['CUSTOMER', 'OWNER']),
+      ownerVerificationState: isAdminSession ? 'VERIFIED' : (authProfile?.ownerVerificationState || 'NOT_VERIFIED')
+    };
+  }, [
+    authUser?.uid,
+    authUser?.email,
+    authUser?.displayName,
+    authUser?.phoneNumber,
+    authProfile?.displayName,
+    authProfile?.name,
+    authProfile?.email,
+    authProfile?.phone,
+    authProfile?.phoneNumber,
+    authProfile?.city,
+    authProfile?.location,
+    authProfile?.role,
+    authProfile?.ownerVerificationState,
+    isAdminSession
+  ]);
 
   // Auth & Profile Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [authIntent, setAuthIntent] = useState(null);
+  const [dashboardTab, setDashboardTab] = useState('overview');
 
   // Search & Filter State
   const [filters, setFilters] = useState({
@@ -540,7 +563,7 @@ export default function App() {
     const phone = sanitizePhone(u?.phone || u?.phoneNumber || p?.phone || p?.phoneNumber || '');
     const city = (u?.city || u?.location || p?.city || p?.location || '').trim();
 
-    if (!name || name === 'EaseLand User') missing.push('Full Name');
+    if (!name) missing.push('Full Name');
     if (!email) missing.push('Email Address');
     if (!phone) missing.push('Phone Number');
     if (!city) missing.push('City / Location');
@@ -945,6 +968,7 @@ export default function App() {
             }}
             onCancel={() => {
               setEditingPropertyId(null);
+              setDashboardTab('account');
               changeActivePage('dashboard');
             }}
           />
@@ -964,6 +988,7 @@ export default function App() {
         {activePage === 'dashboard' && (
           <UserDashboard
             user={currentUser}
+            initialTab={dashboardTab}
             properties={properties}
             wishlist={wishlistProperties}
             onWishlistToggle={handleWishlistToggle}
@@ -1175,6 +1200,7 @@ export default function App() {
               <button
                 onClick={() => {
                   setIsProfileWarningOpen(false);
+                  setDashboardTab('account');
                   changeActivePage('dashboard');
                 }}
                 className="flex-1 bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
