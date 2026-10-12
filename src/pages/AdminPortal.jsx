@@ -32,6 +32,7 @@ import {
   Flag,
   History,
   Key,
+  ChevronLeft,
   ChevronRight,
   PlusCircle,
   X,
@@ -346,6 +347,8 @@ export default function AdminPortal({ onNavigate }) {
   const [registeredUsersList, setRegisteredUsersList] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState('ALL');
+  const [userCurrentPage, setUserCurrentPage] = useState(1);
+  const [usersPerPage, setUsersPerPage] = useState(10);
 
   // Suspension Modal State
   const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
@@ -4089,13 +4092,16 @@ export default function AdminPortal({ onNavigate }) {
                       type="text"
                       placeholder="Search users by name, email, phone, or UID..."
                       value={userSearchQuery}
-                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setUserSearchQuery(e.target.value);
+                        setUserCurrentPage(1);
+                      }}
                       className="w-full bg-gray-50 border border-gray-200 text-xs font-semibold px-3.5 py-2.5 pl-9 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                     />
                     <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+                  <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto flex-wrap sm:flex-nowrap">
                     <button
                       type="button"
                       onClick={async () => {
@@ -4113,7 +4119,10 @@ export default function AdminPortal({ onNavigate }) {
                     {['ALL', 'ACTIVE', 'SUSPENDED', 'REMOVED'].map((st) => (
                       <button
                         key={st}
-                        onClick={() => setUserStatusFilter(st)}
+                        onClick={() => {
+                          setUserStatusFilter(st);
+                          setUserCurrentPage(1);
+                        }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${userStatusFilter === st
                             ? 'bg-brand-charcoal text-white shadow'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -4122,162 +4131,284 @@ export default function AdminPortal({ onNavigate }) {
                         {st}
                       </button>
                     ))}
+
+                    {/* Per Page Quick Selector in Toolbar */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1 rounded-xl text-xs shrink-0">
+                      <span className="text-gray-500 font-bold text-[11px] whitespace-nowrap">Show:</span>
+                      <select
+                        value={usersPerPage}
+                        onChange={(e) => {
+                          setUsersPerPage(Number(e.target.value));
+                          setUserCurrentPage(1);
+                        }}
+                        className="bg-white border border-gray-200 text-gray-800 rounded-lg text-xs font-black py-0.5 px-2 focus:outline-none focus:ring-1 focus:ring-brand-yellow cursor-pointer"
+                        title="Set limit per page"
+                      >
+                        <option value={5}>5 / page</option>
+                        <option value={10}>10 / page</option>
+                        <option value={20}>20 / page</option>
+                        <option value={50}>50 / page</option>
+                        <option value={100}>100 / page</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
-                {/* REGISTERED USERS DIRECTORY TABLE (Clean Responsive Layout with Zero Side-Scrolling) */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="w-full">
-                    <table className="w-full text-left border-collapse table-auto">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                          <th className="py-3 px-3">User & Auth Details</th>
-                          <th className="py-3 px-3">Auth Method</th>
-                          <th className="py-3 px-3">Platform Role</th>
-                          <th className="py-3 px-3">Contact Phone</th>
-                          <th className="py-3 px-3 text-center">Account Status</th>
-                          <th className="py-3 px-3 text-right">Governance Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 text-xs">
-                        {registeredUsersList
-                          .filter(u => {
-                            if (!u || u.status === 'DELETED' || u.status === 'REMOVED') return false;
-                            if (userStatusFilter !== 'ALL' && u.status !== userStatusFilter) return false;
-                            if (userSearchQuery) {
-                              const q = userSearchQuery.toLowerCase();
-                              return (u.name || '').toLowerCase().includes(q) ||
-                                (u.email || '').toLowerCase().includes(q) ||
-                                (u.phone || '').includes(q) ||
-                                (u.uid || '').toLowerCase().includes(q);
-                            }
-                            return true;
-                          })
-                          .sort((a, b) => {
-                            const aIsAdmin = a.role === 'ADMIN' || a.email === 'admin@easeland.in';
-                            const bIsAdmin = b.role === 'ADMIN' || b.email === 'admin@easeland.in';
-                            if (aIsAdmin && !bIsAdmin) return -1;
-                            if (!aIsAdmin && bIsAdmin) return 1;
-                            return 0;
-                          })
-                          .map((u) => (
-                            <tr key={u.id || u.email || u.uid} className="hover:bg-gray-50/80 transition-colors">
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-xl bg-brand-charcoal text-brand-yellow font-black text-xs flex items-center justify-center shadow-sm shrink-0">
-                                    {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="font-extrabold text-brand-charcoal block truncate text-xs">{u.name}</span>
-                                      {u.emailVerified && (
-                                        <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center gap-0.5" title="Firebase Email Verified">
-                                          ✓ Verified
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span className="text-[10px] text-gray-500 font-medium block truncate">{u.email}</span>
-                                    {(u.uid || u.id) && (
-                                      <span className="text-[9px] text-slate-400 font-mono block truncate" title={`Firebase Auth UID: ${u.uid || u.id}`}>
-                                        UID: {String(u.uid || u.id).length > 18 ? `${String(u.uid || u.id).substring(0, 16)}...` : String(u.uid || u.id)}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
+                {/* REGISTERED USERS DIRECTORY TABLE WITH PAGINATION */}
+                {(() => {
+                  const filteredUsers = registeredUsersList
+                    .filter(u => {
+                      if (!u || u.status === 'DELETED' || u.status === 'REMOVED') return false;
+                      if (userStatusFilter !== 'ALL' && u.status !== userStatusFilter) return false;
+                      if (userSearchQuery) {
+                        const q = userSearchQuery.toLowerCase();
+                        return (u.name || '').toLowerCase().includes(q) ||
+                          (u.email || '').toLowerCase().includes(q) ||
+                          (u.phone || '').includes(q) ||
+                          (u.uid || '').toLowerCase().includes(q);
+                      }
+                      return true;
+                    })
+                    .sort((a, b) => {
+                      const aIsAdmin = a.role === 'ADMIN' || a.email === 'admin@easeland.in';
+                      const bIsAdmin = b.role === 'ADMIN' || b.email === 'admin@easeland.in';
+                      if (aIsAdmin && !bIsAdmin) return -1;
+                      if (!aIsAdmin && bIsAdmin) return 1;
+                      return 0;
+                    });
 
-                              <td className="py-3 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
-                                  }`}>
-                                  {u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password')}
-                                </span>
-                              </td>
+                  const totalUsers = filteredUsers.length;
+                  const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage));
+                  const currentPageClamped = Math.min(Math.max(1, userCurrentPage), totalPages);
+                  const startIndex = (currentPageClamped - 1) * usersPerPage;
+                  const endIndex = Math.min(startIndex + usersPerPage, totalUsers);
+                  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
-                              <td className="py-3 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${u.role === 'ADMIN' || u.email === 'admin@easeland.in'
-                                    ? 'bg-purple-100 text-purple-900 border border-purple-200'
-                                    : u.role?.includes('VERIFIED') || u.postedListingsCount > 0
-                                      ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                                      : 'bg-gray-100 text-gray-700'
-                                  }`}>
-                                  {u.role === 'ADMIN' || u.email === 'admin@easeland.in' ? 'ADMINISTRATOR' : (u.postedListingsCount > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : u.role)}
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-3 font-semibold text-gray-700 text-xs">
-                                {u.phone ? (
-                                  <span>{u.phone}</span>
-                                ) : (
-                                  <span className="text-gray-400 italic text-[10px]">Not Provided</span>
-                                )}
-                              </td>
-
-                              <td className="py-3 px-3 text-center">
-                                {u.status === 'ACTIVE' && (
-                                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    ACTIVE
-                                  </span>
-                                )}
-
-                                {u.status === 'SUSPENDED' && (
-                                  <div>
-                                    <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                                      <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                      SUSPENDED
-                                    </span>
-                                    {u.suspension && (
-                                      <span className="block text-[9px] text-amber-700 font-semibold mt-0.5">
-                                        Until: {new Date(u.suspension.suspendedUntil).toLocaleDateString('en-IN')}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-
-                                {u.status === 'ADMIN' && (
-                                  <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                                    <ShieldCheck className="w-3 h-3 text-purple-600" />
-                                    ADMIN
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="py-3 px-3 text-right">
-                                {u.status !== 'ADMIN' && u.role !== 'ADMIN' && u.email !== 'admin@easeland.in' && (
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    {u.status === 'SUSPENDED' ? (
-                                      <button
-                                        onClick={() => handleUnsuspendUser(u.id)}
-                                        className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
-                                      >
-                                        Lift Suspension
-                                      </button>
-                                    ) : u.status === 'ACTIVE' ? (
-                                      <button
-                                        onClick={() => handleOpenSuspendModal(u)}
-                                        className="bg-amber-100 text-amber-900 hover:bg-amber-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
-                                      >
-                                        Suspend Account
-                                      </button>
-                                    ) : null}
-
-                                    <button
-                                      onClick={() => handleOpenRemoveModal(u)}
-                                      className="bg-red-100 text-red-800 hover:bg-red-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
-                                    >
-                                      Remove Account
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
+                  return (
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="w-full">
+                        <table className="w-full text-left border-collapse table-auto">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                              <th className="py-3 px-3">User & Auth Details</th>
+                              <th className="py-3 px-3">Auth Method</th>
+                              <th className="py-3 px-3">Platform Role</th>
+                              <th className="py-3 px-3">Contact Phone</th>
+                              <th className="py-3 px-3 text-center">Account Status</th>
+                              <th className="py-3 px-3 text-right">Governance Actions</th>
                             </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-xs">
+                            {paginatedUsers.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} className="py-10 text-center text-gray-400 font-semibold text-xs">
+                                  No registered users found matching your filters.
+                                </td>
+                              </tr>
+                            ) : (
+                              paginatedUsers.map((u) => (
+                                <tr key={u.id || u.email || u.uid} className="hover:bg-gray-50/80 transition-colors">
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-xl bg-brand-charcoal text-brand-yellow font-black text-xs flex items-center justify-center shadow-sm shrink-0">
+                                        {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-extrabold text-brand-charcoal block truncate text-xs">{u.name}</span>
+                                          {u.emailVerified && (
+                                            <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center gap-0.5" title="Firebase Email Verified">
+                                              ✓ Verified
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[10px] text-gray-500 font-medium block truncate">{u.email}</span>
+                                        {(u.uid || u.id) && (
+                                          <span className="text-[9px] text-slate-400 font-mono block truncate" title={`Firebase Auth UID: ${u.uid || u.id}`}>
+                                            UID: {String(u.uid || u.id).length > 18 ? `${String(u.uid || u.id).substring(0, 16)}...` : String(u.uid || u.id)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-3">
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
+                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                      }`}>
+                                      {u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password')}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3 px-3">
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${u.role === 'ADMIN' || u.email === 'admin@easeland.in'
+                                        ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                                        : u.role?.includes('VERIFIED') || u.postedListingsCount > 0
+                                          ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                          : 'bg-gray-100 text-gray-700'
+                                      }`}>
+                                      {u.role === 'ADMIN' || u.email === 'admin@easeland.in' ? 'ADMINISTRATOR' : (u.postedListingsCount > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : u.role)}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3 px-3 font-semibold text-gray-700 text-xs">
+                                    {u.phone ? (
+                                      <span>{u.phone}</span>
+                                    ) : (
+                                      <span className="text-gray-400 italic text-[10px]">Not Provided</span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3 px-3 text-center">
+                                    {u.status === 'ACTIVE' && (
+                                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        ACTIVE
+                                      </span>
+                                    )}
+
+                                    {u.status === 'SUSPENDED' && (
+                                      <div>
+                                        <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                          SUSPENDED
+                                        </span>
+                                        {u.suspension && (
+                                          <span className="block text-[9px] text-amber-700 font-semibold mt-0.5">
+                                            Until: {new Date(u.suspension.suspendedUntil).toLocaleDateString('en-IN')}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {u.status === 'ADMIN' && (
+                                      <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                        <ShieldCheck className="w-3 h-3 text-purple-600" />
+                                        ADMIN
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3 px-3 text-right">
+                                    {u.status !== 'ADMIN' && u.role !== 'ADMIN' && u.email !== 'admin@easeland.in' && (
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        {u.status === 'SUSPENDED' ? (
+                                          <button
+                                            onClick={() => handleUnsuspendUser(u.id)}
+                                            className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
+                                          >
+                                            Lift Suspension
+                                          </button>
+                                        ) : u.status === 'ACTIVE' ? (
+                                          <button
+                                            onClick={() => handleOpenSuspendModal(u)}
+                                            className="bg-amber-100 text-amber-900 hover:bg-amber-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
+                                          >
+                                            Suspend Account
+                                          </button>
+                                        ) : null}
+
+                                        <button
+                                          onClick={() => handleOpenRemoveModal(u)}
+                                          className="bg-red-100 text-red-800 hover:bg-red-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
+                                        >
+                                          Remove Account
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* PAGINATION CONTROLS & PER PAGE SELECTOR */}
+                      <div className="p-4 bg-gray-50/80 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-semibold text-gray-600">
+                            Showing <span className="font-black text-brand-charcoal">{totalUsers === 0 ? 0 : startIndex + 1}</span> to{' '}
+                            <span className="font-black text-brand-charcoal">{endIndex}</span> of{' '}
+                            <span className="font-black text-brand-charcoal">{totalUsers}</span> users
+                          </span>
+
+                          <div className="flex items-center gap-2 pl-3 border-l border-gray-300">
+                            <span className="text-[11px] font-bold text-gray-500">Show per page:</span>
+                            <select
+                              value={usersPerPage}
+                              onChange={(e) => {
+                                setUsersPerPage(Number(e.target.value));
+                                setUserCurrentPage(1);
+                              }}
+                              className="bg-white border border-gray-200 text-gray-800 rounded-lg text-xs font-black py-1 px-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-yellow cursor-pointer"
+                            >
+                              <option value={5}>5 per page</option>
+                              <option value={10}>10 per page</option>
+                              <option value={20}>20 per page</option>
+                              <option value={50}>50 per page</option>
+                              <option value={100}>100 per page</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={currentPageClamped <= 1}
+                            onClick={() => setUserCurrentPage(prev => Math.max(1, prev - 1))}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none text-xs font-extrabold text-gray-700 flex items-center gap-1 shadow-sm transition-all"
+                            title="Previous Page"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span>Previous</span>
+                          </button>
+
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                              .filter(page => {
+                                if (totalPages <= 7) return true;
+                                if (page === 1 || page === totalPages) return true;
+                                return Math.abs(page - currentPageClamped) <= 1;
+                              })
+                              .map((page, idx, arr) => {
+                                const prev = arr[idx - 1];
+                                const showEllipsis = prev && page - prev > 1;
+                                return (
+                                  <React.Fragment key={page}>
+                                    {showEllipsis && <span className="px-1 text-gray-400 font-bold">...</span>}
+                                    <button
+                                      type="button"
+                                      onClick={() => setUserCurrentPage(page)}
+                                      className={`w-7 h-7 rounded-lg text-xs font-black transition-all ${
+                                        currentPageClamped === page
+                                          ? 'bg-brand-charcoal text-brand-yellow shadow'
+                                          : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  </React.Fragment>
+                                );
+                              })}
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={currentPageClamped >= totalPages}
+                            onClick={() => setUserCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none text-xs font-extrabold text-gray-700 flex items-center gap-1 shadow-sm transition-all"
+                            title="Next Page"
+                          >
+                            <span>Next</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
               </div>
             )}
