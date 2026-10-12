@@ -17,9 +17,9 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl text-slate-900 border-b border-slate-200 shadow-sm">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 gap-4">
-          
+
           {/* LOGO - Returns Admin to Admin Studio or Users to Homepage */}
-          <div 
+          <div
             onClick={() => setActivePage(user?.role === 'ADMIN' ? 'admin' : 'home')}
             className="flex items-center gap-3 cursor-pointer group select-none shrink-0"
           >
@@ -40,25 +40,23 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
           {/* DESKTOP NAVIGATION (BUY, RENT, SELL WITH BOUNCING ANIMATION & 360° ROTATING GLOW BEAM BORDERS) */}
           <nav className="hidden md:flex items-center gap-3 sm:gap-4 relative shrink-0">
-            
+
             {/* BUY BUTTON (TEAL BODY WITH ROTATING NEON GOLD/AMBER GLOW BEAM & GENTLE BOUNCE) */}
-            <div 
-              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${
-                hoveredNav === 'buy' || activePage === 'buy' ? '' : 'animate-gentle-bounce'
-              }`}
+            <div
+              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${hoveredNav === 'buy' || activePage === 'buy' ? '' : 'animate-gentle-bounce'
+                }`}
               onMouseEnter={() => setHoveredNav('buy')}
               onMouseLeave={() => setHoveredNav(null)}
             >
               {/* Continuous 360-degree Rotating Neon Amber Conic Glow Beam */}
               <div className="absolute -inset-[150%] animate-rotate-glow bg-[conic-gradient(from_0deg,transparent_0_200deg,#f59e0b_280deg,#fef08a_360deg)] opacity-100 blur-[1px]" />
-              
+
               <button
                 onClick={() => setActivePage('buy')}
-                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
-                  activePage === 'buy'
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${activePage === 'buy'
                     ? 'bg-gradient-to-b from-teal-800 to-slate-950 text-amber-300 shadow-lg shadow-amber-500/40 scale-105 ring-1 ring-amber-400/60'
                     : 'bg-gradient-to-b from-teal-900 to-slate-950 text-white shadow-md hover:brightness-125 hover:scale-105 active:scale-95'
-                }`}
+                  }`}
               >
                 <Search className="w-3.5 h-3.5 stroke-[2.5] text-amber-400" />
                 <span>{siteConfig?.navbar?.buyLabel || 'BUY'}</span>
@@ -90,12 +88,11 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 </div>
               )}
             </div>
-            
+
             {/* RENT BUTTON (ROYAL PURPLE BODY WITH ROTATING NEON CYAN GLOW BEAM & STAGGERED GENTLE BOUNCE) */}
-            <div 
-              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${
-                hoveredNav === 'rent' || activePage === 'rent' ? '' : 'animate-gentle-bounce-delay-1'
-              }`}
+            <div
+              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${hoveredNav === 'rent' || activePage === 'rent' ? '' : 'animate-gentle-bounce-delay-1'
+                }`}
               onMouseEnter={() => setHoveredNav('rent')}
               onMouseLeave={() => setHoveredNav(null)}
             >
@@ -104,11 +101,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
               <button
                 onClick={() => setActivePage('rent')}
-                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
-                  activePage === 'rent'
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${activePage === 'rent'
                     ? 'bg-gradient-to-b from-indigo-900 to-purple-950 text-cyan-300 shadow-lg shadow-cyan-500/40 scale-105 ring-1 ring-cyan-400/60'
                     : 'bg-gradient-to-b from-indigo-950 to-purple-950 text-white shadow-md hover:brightness-125 hover:scale-105 active:scale-95'
-                }`}
+                  }`}
               >
                 <Key className="w-3.5 h-3.5 stroke-[2.5] text-cyan-400" />
                 <span>{siteConfig?.navbar?.rentLabel || 'RENT'}</span>
@@ -140,12 +136,11 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 </div>
               )}
             </div>
-            
+
             {/* SELL BUTTON (AMBER GOLD BODY WITH ROTATING NEON MAGENTA/ROSE GLOW BEAM & STAGGERED GENTLE BOUNCE) */}
-            <div 
-              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${
-                hoveredNav === 'sell' || activePage === 'sell' ? '' : 'animate-gentle-bounce-delay-2'
-              }`}
+            <div
+              className={`relative p-[2.5px] rounded-xl overflow-hidden group shrink-0 shadow-md transition-transform duration-200 ${hoveredNav === 'sell' || activePage === 'sell' ? '' : 'animate-gentle-bounce-delay-2'
+                }`}
               onMouseEnter={() => setHoveredNav('sell')}
               onMouseLeave={() => setHoveredNav(null)}
             >
@@ -154,11 +149,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
               <button
                 onClick={() => setActivePage('sell')}
-                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${
-                  activePage === 'sell'
+                className={`relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 rounded-[10px] text-xs font-black tracking-widest transition-all duration-200 transform select-none flex items-center gap-1.5 ${activePage === 'sell'
                     ? 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-lg shadow-rose-500/40 scale-105 ring-1 ring-rose-400/60'
                     : 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-md hover:brightness-110 hover:scale-105 active:scale-95'
-                }`}
+                  }`}
               >
                 <Tag className="w-3.5 h-3.5 stroke-[2.5] text-rose-950" />
                 <span>{siteConfig?.navbar?.sellLabel || 'SELL'}</span>
@@ -228,11 +222,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
                 <button
                   onClick={() => setActivePage('crm')}
-                  className={`font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border flex items-center gap-1.5 transition-all select-none whitespace-nowrap ${
-                    activePage === 'crm'
+                  className={`font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md border flex items-center gap-1.5 transition-all select-none whitespace-nowrap ${activePage === 'crm'
                       ? 'bg-amber-400 text-slate-950 border-amber-300 ring-2 ring-amber-400/50'
                       : 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
-                  }`}
+                    }`}
                   title="Open EaseLand CRM Studio"
                 >
                   <Briefcase className={`w-3.5 h-3.5 ${activePage === 'crm' ? 'text-slate-950' : 'text-amber-400'}`} />
@@ -246,11 +239,10 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActivePage('dashboard')}
-                  className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all ${
-                    activePage === 'dashboard'
+                  className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all ${activePage === 'dashboard'
                       ? 'bg-slate-100 text-slate-900 border-2 border-amber-500 font-extrabold shadow-sm'
                       : 'bg-slate-50 text-slate-800 border border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                   title="Open User Dashboard"
                 >
                   <div className="w-7 h-7 rounded-lg bg-metallic-gold text-slate-950 font-black text-xs flex items-center justify-center shadow-md border border-amber-300 shrink-0">
@@ -260,9 +252,8 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                     <span className="block text-xs font-bold line-clamp-1 max-w-[110px] text-slate-900">
                       {user.name || user.displayName || 'EaseLand User'}
                     </span>
-                    <span className={`block text-[9px] uppercase font-black tracking-wider ${
-                      activePage === 'dashboard' ? 'text-amber-600' : 'text-slate-500'
-                    }`}>
+                    <span className={`block text-[9px] uppercase font-black tracking-wider ${activePage === 'dashboard' ? 'text-amber-600' : 'text-slate-500'
+                      }`}>
                       {user.role === 'ADMIN' ? 'DASHBOARD' : 'Dashboard'}
                     </span>
                   </div>

@@ -846,7 +846,7 @@ export default function App() {
                         <input
                           type="text"
                           required
-                          placeholder="Ryuu"
+                          placeholder="Enter Your Name"
                           value={generalContact.name}
                           onChange={(e) => setGeneralContact({ ...generalContact, name: e.target.value })}
                           className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -857,7 +857,7 @@ export default function App() {
                         <input
                           type="email"
                           required
-                          placeholder="ryuu@example.com"
+                          placeholder="Enter Your Email Address"
                           value={generalContact.email}
                           onChange={(e) => setGeneralContact({ ...generalContact, email: e.target.value })}
                           className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
