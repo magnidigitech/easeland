@@ -642,7 +642,7 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
             <input
               type="text"
               maxLength={6}
-              placeholder="e.g. 500081"
+              placeholder="Enter 6-digit PIN code"
               value={hierarchy.postalCode}
               onChange={(e) => { setHierarchy({ ...hierarchy, postalCode: e.target.value.replace(/\D/g, '') }); setIsConfirmed(false); }}
               className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold"

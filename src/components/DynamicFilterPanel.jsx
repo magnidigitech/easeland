@@ -238,7 +238,7 @@ export default function DynamicFilterPanel({
           <div className="grid grid-cols-2 gap-2">
             <input
               type="text"
-              placeholder="Near place e.g. Guntur"
+              placeholder="Enter Nearby Place"
               value={filters.referencePlace || filters.city || ''}
               onChange={(e) => handleChange('referencePlace', e.target.value)}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
@@ -266,14 +266,14 @@ export default function DynamicFilterPanel({
           <div className="grid grid-cols-2 gap-2">
             <input
               type="text"
-              placeholder="City (e.g. Hyderabad)"
+              placeholder="Enter City"
               value={filters.city || ''}
               onChange={(e) => handleChange('city', e.target.value)}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
             />
             <input
               type="text"
-              placeholder="Locality (e.g. Gachibowli)"
+              placeholder="Enter Locality"
               value={filters.locality || ''}
               onChange={(e) => handleChange('locality', e.target.value)}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
@@ -291,7 +291,7 @@ export default function DynamicFilterPanel({
               <span className="text-[10px] text-gray-400 font-medium">Min Price (Rs.)</span>
               <input
                 type="number"
-                placeholder="e.g. 1000000"
+                placeholder="Enter Min Price"
                 value={filters.minPrice || ''}
                 onChange={(e) => handleChange('minPrice', e.target.value)}
                 className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
@@ -301,7 +301,7 @@ export default function DynamicFilterPanel({
               <span className="text-[10px] text-gray-400 font-medium">Max Price (Rs.)</span>
               <input
                 type="number"
-                placeholder="e.g. 15000000"
+                placeholder="Enter Max Price"
                 value={filters.maxPrice || ''}
                 onChange={(e) => handleChange('maxPrice', e.target.value)}
                 className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
@@ -318,14 +318,14 @@ export default function DynamicFilterPanel({
           <div className="grid grid-cols-2 gap-2">
             <input
               type="number"
-              placeholder="Min Area sq ft"
+              placeholder="Enter Min Area"
               value={filters.minArea || filters.minAreaSqFt || ''}
               onChange={(e) => handleChange('minArea', e.target.value)}
               className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
             />
             <input
               type="number"
-              placeholder="Max Area sq ft"
+              placeholder="Enter Max Area"
               value={filters.maxArea || filters.maxAreaSqFt || ''}
               onChange={(e) => handleChange('maxArea', e.target.value)}
               className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"

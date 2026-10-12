@@ -1428,7 +1428,7 @@ export default function UserDashboard({
                       <input
                         type="text"
                         required
-                        placeholder="e.g. KrishnaSai Kannasani"
+                        placeholder="Enter Your Name"
                         value={profileForm.name}
                         onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1442,7 +1442,7 @@ export default function UserDashboard({
                       <input
                         type="email"
                         required
-                        placeholder="clinformatiqsessions@gmail.com"
+                        placeholder="Enter Your Email Address"
                         value={profileForm.email}
                         onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1456,7 +1456,7 @@ export default function UserDashboard({
                       <input
                         type="text"
                         required
-                        placeholder="+91 98765 43210"
+                        placeholder="Enter Your Phone Number"
                         value={profileForm.phone}
                         onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1470,7 +1470,7 @@ export default function UserDashboard({
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Guntur, Andhra Pradesh"
+                        placeholder="Enter Your City / Location"
                         value={profileForm.city}
                         onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"

@@ -1646,7 +1646,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="text"
                     required
-                    placeholder="e.g. S. Ramakrishna"
+                    placeholder="Enter Full Name"
                     value={newLeadForm.name}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1657,7 +1657,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="text"
                     required
-                    placeholder="+91 98765 43210"
+                    placeholder="Enter 10-digit Phone Number"
                     value={newLeadForm.phone}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1670,7 +1670,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
                   <input
                     type="email"
-                    placeholder="buyer@example.com"
+                    placeholder="Enter Email Address"
                     value={newLeadForm.email}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1695,7 +1695,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <label className="block text-xs font-bold text-slate-700 mb-1">Target Location</label>
                   <input
                     type="text"
-                    placeholder="e.g. Amaravati Core Sector"
+                    placeholder="Enter Target Location"
                     value={newLeadForm.preferredLocation}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, preferredLocation: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1802,7 +1802,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Dr. K. Rao"
+                    placeholder="Enter Buyer Name"
                     value={newDealForm.customerName}
                     onChange={(e) => setNewDealForm({ ...newDealForm, customerName: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1812,7 +1812,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <label className="block text-xs font-bold text-slate-700 mb-1">Buyer Phone</label>
                   <input
                     type="text"
-                    placeholder="+91 98480 12345"
+                    placeholder="Enter Buyer Phone Number"
                     value={newDealForm.customerPhone}
                     onChange={(e) => setNewDealForm({ ...newDealForm, customerPhone: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1825,7 +1825,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Amaravati Highway Commercial Plot"
+                  placeholder="Enter Property Listing Title"
                   value={newDealForm.propertyTitle}
                   onChange={(e) => setNewDealForm({ ...newDealForm, propertyTitle: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1838,7 +1838,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="number"
                     required
-                    placeholder="e.g. 4500000"
+                    placeholder="Enter Deal Value"
                     value={newDealForm.dealValue}
                     onChange={(e) => setNewDealForm({ ...newDealForm, dealValue: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"

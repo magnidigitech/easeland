@@ -240,6 +240,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <input
                     type="text"
                     required
+                    placeholder="Enter Your Name"
                     value={profileData.name}
                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -254,6 +255,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <input
                     type="email"
                     required
+                    placeholder="Enter Your Email Address"
                     value={profileData.email}
                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -269,6 +271,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                     type="tel"
                     required
                     maxLength={10}
+                    placeholder="Enter 10-digit mobile number"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value.replace(/\D/g, '') })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -282,7 +285,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="e.g. Guntur, Andhra Pradesh"
+                    placeholder="Enter City / Location"
                     value={profileData.city || ''}
                     onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"

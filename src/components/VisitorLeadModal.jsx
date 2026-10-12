@@ -200,7 +200,7 @@ export default function VisitorLeadModal({ currentUser }) {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Ramesh Varma"
+                      placeholder="Enter Your Name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
@@ -218,7 +218,7 @@ export default function VisitorLeadModal({ currentUser }) {
                     <input
                       type="tel"
                       required
-                      placeholder="+91 98765 43210"
+                      placeholder="Enter 10-digit mobile number"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
@@ -236,7 +236,7 @@ export default function VisitorLeadModal({ currentUser }) {
                   <MapPin className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   <input
                     type="text"
-                    placeholder="e.g. Guntur, Vijayawada, Amaravati, Mangalagiri..."
+                    placeholder="Enter preferred location / address"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"

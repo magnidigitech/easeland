@@ -5124,7 +5124,7 @@ export default function AdminPortal({ onNavigate }) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 11:30 AM"
+                    placeholder="Enter Scheduled Time (11:30 AM)"
                     value={scheduleForm.followUpTime}
                     onChange={(e) => setScheduleForm(prev => ({ ...prev, followUpTime: e.target.value }))}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
@@ -5137,7 +5137,7 @@ export default function AdminPortal({ onNavigate }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Call customer to confirm loan eligibility and close final offer"
+                  placeholder="Enter Action Agenda / Next Step"
                   value={scheduleForm.nextAction}
                   onChange={(e) => setScheduleForm(prev => ({ ...prev, nextAction: e.target.value }))}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"

@@ -831,14 +831,14 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
               type="number"
               step="any"
               id="vLatInput"
-              placeholder="Latitude (e.g. 17.3850)"
+              placeholder="Enter Latitude"
               className="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
             />
             <input
               type="number"
               step="any"
               id="vLngInput"
-              placeholder="Longitude (e.g. 78.4867)"
+              placeholder="Enter Longitude"
               className="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
             />
             <button

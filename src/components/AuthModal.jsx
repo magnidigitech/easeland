@@ -233,7 +233,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Suresh Kumar"
+                    placeholder="Enter Your Name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -250,7 +250,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     type="tel"
                     required
                     maxLength={10}
-                    placeholder="e.g. 9876543210"
+                    placeholder="Enter 10-digit mobile number"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -266,7 +266,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                   <input
                     type="email"
                     required
-                    placeholder="name@domain.com"
+                    placeholder="Enter Your Email Address"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -340,7 +340,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                   <input
                     type="email"
                     required
-                    placeholder="name@domain.com"
+                    placeholder="Enter Your Email Address"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
