@@ -25,7 +25,7 @@ import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
-import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings, User } from 'lucide-react';
+import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User } from 'lucide-react';
 
 const getInitialPageState = () => {
   if (typeof window === 'undefined') return { page: 'home', propId: null };
@@ -472,6 +472,41 @@ export default function App() {
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
     }
+  }, [activePage, activePropertyId]);
+
+  // Scroll To Top (Arrow Head Button) state & listeners
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const scrollToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      document.body.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === 'undefined') return;
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const documentHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+        document.documentElement.offsetHeight,
+        document.body.offsetHeight
+      );
+
+      // Trigger button when user scrolls down (> 300px) or reaches near the end of the page (within 800px of bottom)
+      const isScrolledDown = scrollTop > 300;
+      const isNearEnd = (scrollTop + windowHeight >= documentHeight - 800);
+
+      setShowScrollTop(isScrolledDown || isNearEnd);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [activePage, activePropertyId]);
 
   useEffect(() => {
@@ -1270,8 +1305,19 @@ export default function App() {
             </div>
           </div>
 
-          <div className="text-center text-[11px] text-gray-500 font-semibold">
-            {siteConfig?.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5 text-[11px] text-gray-400 font-semibold">
+            <div>
+              {siteConfig?.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}
+            </div>
+            <button
+              onClick={scrollToTop}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-amber-400 hover:text-slate-950 text-gray-300 font-extrabold text-xs transition-all border border-white/10 hover:border-amber-400 shadow-sm group cursor-pointer"
+              title="Scroll to top of current page"
+              aria-label="Scroll to top of current page"
+            >
+              <span>Back to Top</span>
+              <ChevronUp className="w-4 h-4 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform" />
+            </button>
           </div>
         </div>
       </footer>
@@ -1373,6 +1419,21 @@ export default function App() {
 
       {/* ENGAGEMENT VISITOR LEAD POPUP MODAL (1-MIN ENGAGEMENT FOR UNAUTHENTICATED VISITORS) */}
       <VisitorLeadModal currentUser={currentUser} />
+
+      {/* SCROLL TO TOP ARROW HEAD BUTTON */}
+      <button
+        id="scroll-to-top-btn"
+        onClick={scrollToTop}
+        aria-label="Scroll to top of current page"
+        title="Scroll to top of page"
+        className={`fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-[0_10px_30px_rgba(217,119,6,0.4)] hover:shadow-[0_15px_40px_rgba(217,119,6,0.6)] border-2 border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
+          showScrollTop
+            ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+            : 'opacity-0 translate-y-8 scale-75 pointer-events-none'
+        }`}
+      >
+        <ChevronUp className="w-6 h-6 sm:w-7 sm:h-7 stroke-[3] group-hover:-translate-y-1 transition-transform duration-200" />
+      </button>
 
     </div>
   );
