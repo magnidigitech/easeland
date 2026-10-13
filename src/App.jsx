@@ -1415,13 +1415,13 @@ export default function App() {
         onClick={scrollToTop}
         aria-label="Scroll to top of current page"
         title="Scroll to top of page"
-        className={`fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-[0_10px_30px_rgba(217,119,6,0.4)] hover:shadow-[0_15px_40px_rgba(217,119,6,0.6)] border-2 border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
+        className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
           showScrollTop
             ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
             : 'opacity-0 translate-y-8 scale-75 pointer-events-none'
         }`}
       >
-        <ChevronUp className="w-6 h-6 sm:w-7 sm:h-7 stroke-[3] group-hover:-translate-y-1 transition-transform duration-200" />
+        <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform duration-200" />
       </button>
 
     </div>
