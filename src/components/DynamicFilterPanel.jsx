@@ -82,10 +82,18 @@ export default function DynamicFilterPanel({
   const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType);
 
   const handleChange = (key, value) => {
+    let cleanVal = value;
+    if (['minPrice', 'maxPrice', 'minArea', 'maxArea', 'minAreaSqFt', 'maxAreaSqFt'].includes(key)) {
+      if (typeof cleanVal === 'string') {
+        cleanVal = cleanVal.replace(/[^0-9.]/g, '');
+      } else if (typeof cleanVal === 'number') {
+        cleanVal = Math.max(0, cleanVal);
+      }
+    }
     setFilters(prev => ({
       ...prev,
       cleared: false,
-      [key]: value
+      [key]: cleanVal
     }));
   };
 
@@ -148,8 +156,12 @@ export default function DynamicFilterPanel({
   if (filters.district) activeChips.push({ label: `District: ${filters.district}`, key: 'district', val: '' });
   if (filters.city) activeChips.push({ label: `City: ${filters.city}`, key: 'city', val: '' });
   if (filters.locality) activeChips.push({ label: `Locality: ${filters.locality}`, key: 'locality', val: '' });
-  if (filters.minPrice) activeChips.push({ label: `Min Price: Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`, key: 'minPrice', val: '' });
-  if (filters.maxPrice) activeChips.push({ label: `Max Price: Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`, key: 'maxPrice', val: '' });
+  if (filters.minPrice !== null && filters.minPrice !== undefined && filters.minPrice !== '' && Number(filters.minPrice) >= 0) {
+    activeChips.push({ label: `Min Price: Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`, key: 'minPrice', val: '' });
+  }
+  if (filters.maxPrice !== null && filters.maxPrice !== undefined && filters.maxPrice !== '' && Number(filters.maxPrice) >= 0) {
+    activeChips.push({ label: `Max Price: Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`, key: 'maxPrice', val: '' });
+  }
   
   const currentAreaUnit = filters.areaUnit || 'sq ft';
   if (filters.minArea || filters.minAreaSqFt) activeChips.push({ label: `Min Area: ${filters.minArea || filters.minAreaSqFt} ${currentAreaUnit}`, key: 'minArea', val: '' });
@@ -356,20 +368,163 @@ export default function DynamicFilterPanel({
           </div>
         </div>
 
-        {/* Price Range */}
+        {/* Price Range with Interactive Price Dragger */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
-            Price Range (Rupees)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+              Price Range (Rupees)
+            </label>
+            {(filters.minPrice || filters.maxPrice) && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleChange('minPrice', '');
+                  handleChange('maxPrice', '');
+                }}
+                className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline"
+              >
+                Reset Price
+              </button>
+            )}
+          </div>
+
+          {/* Interactive Dual Price Dragger Bar */}
+          {(() => {
+            const isRent = filters.purpose === Purpose.RENT;
+            const priceSliderMax = isRent ? 200000 : 100000000;
+            const priceSliderStep = isRent ? 5000 : 500000;
+            const sliderMinVal = Math.max(0, Math.min(Number(filters.minPrice) || 0, priceSliderMax));
+            const sliderMaxVal = filters.maxPrice ? Math.max(0, Math.min(Number(filters.maxPrice), priceSliderMax)) : priceSliderMax;
+            const minPercent = Math.min(100, Math.max(0, (sliderMinVal / priceSliderMax) * 100));
+            const maxPercent = Math.min(100, Math.max(0, (sliderMaxVal / priceSliderMax) * 100));
+
+            return (
+              <div className="bg-gray-50/90 p-3.5 rounded-xl border border-gray-200 mb-3 space-y-3">
+                <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-800">
+                  <span className="truncate max-w-[45%]">
+                    {filters.minPrice ? (formatPriceInWords(filters.minPrice) || `Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`) : 'Rs. 0'}
+                  </span>
+                  <span className="text-gray-400 font-bold shrink-0">to</span>
+                  <span className="truncate max-w-[45%] text-right">
+                    {filters.maxPrice ? (formatPriceInWords(filters.maxPrice) || `Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`) : (isRent ? 'Rs. 2L+' : 'Rs. 10 Cr+')}
+                  </span>
+                </div>
+
+                {/* Dragger Bar Track */}
+                <div className="relative h-6 flex items-center select-none">
+                  {/* Background Track */}
+                  <div className="absolute inset-x-0 h-2 bg-gray-200 rounded-full"></div>
+                  {/* Highlight Active Range Fill */}
+                  <div
+                    className="absolute h-2 bg-gradient-to-r from-brand-navy via-amber-400 to-brand-yellow rounded-full shadow-xs"
+                    style={{
+                      left: `${minPercent}%`,
+                      width: `${Math.max(0, maxPercent - minPercent)}%`
+                    }}
+                  ></div>
+
+                  {/* Min Price Dragger Thumb */}
+                  <input
+                    type="range"
+                    min={0}
+                    max={priceSliderMax}
+                    step={priceSliderStep}
+                    value={sliderMinVal}
+                    onChange={(e) => {
+                      const val = Math.max(0, Math.min(Number(e.target.value), sliderMaxVal));
+                      handleChange('minPrice', val > 0 ? String(val) : '');
+                    }}
+                    className={`price-slider-input absolute inset-x-0 w-full h-2 cursor-pointer ${sliderMinVal > priceSliderMax * 0.7 ? 'z-20' : 'z-10'}`}
+                    aria-label="Minimum Price Dragger"
+                  />
+
+                  {/* Max Price Dragger Thumb */}
+                  <input
+                    type="range"
+                    min={0}
+                    max={priceSliderMax}
+                    step={priceSliderStep}
+                    value={sliderMaxVal}
+                    onChange={(e) => {
+                      const val = Math.max(sliderMinVal, Number(e.target.value));
+                      handleChange('maxPrice', val < priceSliderMax ? String(val) : '');
+                    }}
+                    className="price-slider-input absolute inset-x-0 w-full h-2 cursor-pointer z-15"
+                    aria-label="Maximum Price Dragger"
+                  />
+                </div>
+
+                {/* Slider Scale End Labels */}
+                <div className="flex items-center justify-between text-[10px] text-gray-500 font-bold px-0.5">
+                  <span>Rs. 0</span>
+                  <span>{isRent ? 'Rs. 50k' : 'Rs. 50 Lakhs'}</span>
+                  <span>{isRent ? 'Rs. 1 Lakh' : 'Rs. 1 Crore'}</span>
+                  <span>{isRent ? 'Rs. 2L+' : 'Rs. 10 Cr+'}</span>
+                </div>
+
+                {/* Quick Budget Preset Chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-200/60">
+                  {(isRent
+                    ? [
+                        { label: 'Under 15k', min: '', max: '15000' },
+                        { label: '15k - 30k', min: '15000', max: '30000' },
+                        { label: '30k - 50k', min: '30000', max: '50000' },
+                        { label: '50k - 1L', min: '50000', max: '100000' },
+                        { label: '1L+', min: '100000', max: '' }
+                      ]
+                    : [
+                        { label: '< 25L', min: '', max: '2500000' },
+                        { label: '25L - 50L', min: '2500000', max: '5000000' },
+                        { label: '50L - 1 Cr', min: '5000000', max: '10000000' },
+                        { label: '1 - 2 Cr', min: '10000000', max: '20000000' },
+                        { label: '2 - 5 Cr', min: '20000000', max: '50000000' },
+                        { label: '5 Cr+', min: '50000000', max: '' }
+                      ]
+                  ).map((preset) => {
+                    const isSelected = String(filters.minPrice || '') === String(preset.min) && String(filters.maxPrice || '') === String(preset.max);
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          handleChange('minPrice', preset.min);
+                          handleChange('maxPrice', preset.max);
+                        }}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all border ${
+                          isSelected
+                            ? 'bg-brand-navy text-brand-yellow border-brand-navy shadow-xs'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Precision Numeric Inputs (No up/down stepper arrows, zero negative values) */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <span className="text-[10px] text-gray-400 font-medium">Min Price (Rs.)</span>
+              <span className="text-[10px] text-gray-500 font-bold block mb-1">Min Price (Rs.)</span>
               <input
-                type="number"
-                placeholder="Enter Min Price"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="0"
                 value={filters.minPrice || ''}
-                onChange={(e) => handleChange('minPrice', e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(/[^0-9]/g, '');
+                  handleChange('minPrice', clean);
+                }}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
               {filters.minPrice && formatPriceInWords(filters.minPrice) && (
                 <div className="mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 leading-tight">
@@ -378,13 +533,23 @@ export default function DynamicFilterPanel({
               )}
             </div>
             <div>
-              <span className="text-[10px] text-gray-400 font-medium">Max Price (Rs.)</span>
+              <span className="text-[10px] text-gray-500 font-bold block mb-1">Max Price (Rs.)</span>
               <input
-                type="number"
-                placeholder="Enter Max Price"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Any"
                 value={filters.maxPrice || ''}
-                onChange={(e) => handleChange('maxPrice', e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(/[^0-9]/g, '');
+                  handleChange('maxPrice', clean);
+                }}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
               {filters.maxPrice && formatPriceInWords(filters.maxPrice) && (
                 <div className="mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 leading-tight">
@@ -418,21 +583,35 @@ export default function DynamicFilterPanel({
             <div>
               <span className="text-[10px] text-gray-400 font-medium">Min Area ({filters.areaUnit || 'sq ft'})</span>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder={'Enter Min (' + (filters.areaUnit || 'sq ft') + ')'}
                 value={filters.minArea || filters.minAreaSqFt || ''}
-                onChange={(e) => handleChange('minArea', e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => handleChange('minArea', e.target.value.replace(/[^0-9.]/g, ''))}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
             </div>
             <div>
               <span className="text-[10px] text-gray-400 font-medium">Max Area ({filters.areaUnit || 'sq ft'})</span>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder={'Enter Max (' + (filters.areaUnit || 'sq ft') + ')'}
                 value={filters.maxArea || filters.maxAreaSqFt || ''}
-                onChange={(e) => handleChange('maxArea', e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => handleChange('maxArea', e.target.value.replace(/[^0-9.]/g, ''))}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
               />
             </div>
           </div>

@@ -43,22 +43,22 @@ export function searchStateToUrlParams(searchState = {}) {
     params.set('locality', searchState.locality.trim());
   }
 
-  if (searchState.minPrice !== null && searchState.minPrice !== undefined && searchState.minPrice !== '') {
-    params.set('minPrice', String(searchState.minPrice));
+  if (searchState.minPrice !== null && searchState.minPrice !== undefined && searchState.minPrice !== '' && Number(searchState.minPrice) >= 0) {
+    params.set('minPrice', String(Math.max(0, Number(searchState.minPrice))));
   }
 
-  if (searchState.maxPrice !== null && searchState.maxPrice !== undefined && searchState.maxPrice !== '') {
-    params.set('maxPrice', String(searchState.maxPrice));
+  if (searchState.maxPrice !== null && searchState.maxPrice !== undefined && searchState.maxPrice !== '' && Number(searchState.maxPrice) >= 0) {
+    params.set('maxPrice', String(Math.max(0, Number(searchState.maxPrice))));
   }
 
   const minAreaToSave = searchState.minArea ?? searchState.minAreaSqFt;
-  if (minAreaToSave !== null && minAreaToSave !== undefined && minAreaToSave !== '') {
-    params.set('minArea', String(minAreaToSave));
+  if (minAreaToSave !== null && minAreaToSave !== undefined && minAreaToSave !== '' && Number(minAreaToSave) >= 0) {
+    params.set('minArea', String(Math.max(0, Number(minAreaToSave))));
   }
 
   const maxAreaToSave = searchState.maxArea ?? searchState.maxAreaSqFt;
-  if (maxAreaToSave !== null && maxAreaToSave !== undefined && maxAreaToSave !== '') {
-    params.set('maxArea', String(maxAreaToSave));
+  if (maxAreaToSave !== null && maxAreaToSave !== undefined && maxAreaToSave !== '' && Number(maxAreaToSave) >= 0) {
+    params.set('maxArea', String(Math.max(0, Number(maxAreaToSave))));
   }
 
   if (searchState.areaUnit && searchState.areaUnit !== 'sq ft') {
@@ -154,12 +154,12 @@ export function urlParamsToSearchState(searchString = '') {
     district: districtParam,
     city: cityParam,
     locality: localityParam,
-    minPrice: (minPriceParam && !isNaN(Number(minPriceParam))) ? Number(minPriceParam) : '',
-    maxPrice: (maxPriceParam && !isNaN(Number(maxPriceParam))) ? Number(maxPriceParam) : '',
-    minArea: (minAreaParam && !isNaN(Number(minAreaParam))) ? Number(minAreaParam) : '',
-    maxArea: (maxAreaParam && !isNaN(Number(maxAreaParam))) ? Number(maxAreaParam) : '',
-    minAreaSqFt: (minAreaParam && !isNaN(Number(minAreaParam))) ? Number(minAreaParam) : '',
-    maxAreaSqFt: (maxAreaParam && !isNaN(Number(maxAreaParam))) ? Number(maxAreaParam) : '',
+    minPrice: (minPriceParam && !isNaN(Number(minPriceParam)) && Number(minPriceParam) >= 0) ? Math.max(0, Number(minPriceParam)) : '',
+    maxPrice: (maxPriceParam && !isNaN(Number(maxPriceParam)) && Number(maxPriceParam) >= 0) ? Math.max(0, Number(maxPriceParam)) : '',
+    minArea: (minAreaParam && !isNaN(Number(minAreaParam)) && Number(minAreaParam) >= 0) ? Math.max(0, Number(minAreaParam)) : '',
+    maxArea: (maxAreaParam && !isNaN(Number(maxAreaParam)) && Number(maxAreaParam) >= 0) ? Math.max(0, Number(maxAreaParam)) : '',
+    minAreaSqFt: (minAreaParam && !isNaN(Number(minAreaParam)) && Number(minAreaParam) >= 0) ? Math.max(0, Number(minAreaParam)) : '',
+    maxAreaSqFt: (maxAreaParam && !isNaN(Number(maxAreaParam)) && Number(maxAreaParam) >= 0) ? Math.max(0, Number(maxAreaParam)) : '',
     areaUnit: areaUnitParam,
     bedrooms: bhkParam || 'ANY',
     bathrooms: bathsParam || 'ANY',

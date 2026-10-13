@@ -190,11 +190,11 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 6. Price range
-  if (searchState.minPrice != null && searchState.minPrice !== '') {
+  if (searchState.minPrice != null && searchState.minPrice !== '' && Number(searchState.minPrice) >= 0) {
     const price = Number(p.price) || 0;
     if (price > 0 && price < Number(searchState.minPrice)) return false;
   }
-  if (searchState.maxPrice != null && searchState.maxPrice !== '') {
+  if (searchState.maxPrice != null && searchState.maxPrice !== '' && Number(searchState.maxPrice) >= 0) {
     const price = Number(p.price) || 0;
     if (price > 0 && price > Number(searchState.maxPrice)) return false;
   }

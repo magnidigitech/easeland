@@ -925,11 +925,18 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 </label>
                 <input
                   type="number"
+                  min="0"
                   required
                   placeholder="Enter your price"
                   value={formData.price}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
                   onChange={(e) => {
-                    setFormData({ ...formData, price: e.target.value });
+                    const clean = e.target.value.replace(/[^0-9]/g, '');
+                    setFormData({ ...formData, price: clean });
                     if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
                     if (errorMsg) setErrorMsg(null);
                   }}
@@ -955,11 +962,18 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 </label>
                 <input
                   type="number"
+                  min="0"
                   required
                   placeholder="Enter Total Area"
                   value={formData.area}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
                   onChange={(e) => {
-                    setFormData({ ...formData, area: e.target.value });
+                    const clean = e.target.value.replace(/[^0-9.]/g, '');
+                    setFormData({ ...formData, area: clean });
                     if (fieldErrors.area) setFieldErrors(prev => ({ ...prev, area: null }));
                     if (errorMsg) setErrorMsg(null);
                   }}
