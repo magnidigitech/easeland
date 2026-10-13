@@ -723,7 +723,7 @@ export default function App() {
         changeActivePage('post-property');
       }
     } else {
-      changeActivePage('dashboard');
+      changeActivePage('home');
     }
   };
 
@@ -1364,7 +1364,10 @@ export default function App() {
       <TwoFactorModal
         isOpen={!!pending2FASession}
         userEmail={pending2FASession?.email || ''}
-        onVerifySuccess={complete2FASession}
+        onVerifySuccess={() => {
+          complete2FASession();
+          changeActivePage('home');
+        }}
         onClose={cancel2FASession}
       />
 
