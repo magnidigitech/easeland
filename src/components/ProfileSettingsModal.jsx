@@ -115,7 +115,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       cleanPhone = cleanPhone.slice(2);
     }
     if (cleanPhone && cleanPhone.length !== 10) {
-      setError('Mobile number must be 10 digits (e.g. 9876543210)');
+      setError('Mobile number must be exactly 10 digits.');
       return;
     }
 
@@ -311,7 +311,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <input
                     type="text"
                     required
-                    placeholder="Enter Your Name"
+                    placeholder="Enter your full name"
                     value={profileData.name}
                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -326,7 +326,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <input
                     type="email"
                     required
-                    placeholder="Enter Your Email Address"
+                    placeholder="Enter your email address"
                     value={profileData.email}
                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -356,7 +356,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Enter City / Location"
+                    placeholder="Enter your city and state"
                     value={profileData.city || ''}
                     onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"

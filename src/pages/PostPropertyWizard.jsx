@@ -348,10 +348,10 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
     if (step === 1) {
       if (!formData.purpose) {
-        errors.purpose = 'Please select a transaction purpose (Sale, Rent, or Lease).';
+        errors.purpose = 'Please select a transaction purpose.';
       }
       if (!formData.propertyType) {
-        errors.propertyType = 'Please select a property type (e.g. Open Plot, House, Villa).';
+        errors.propertyType = 'Please select a property type.';
       }
       if (formData.propertyType === PropertyType.OTHER && (!formData.otherPropertyType || !formData.otherPropertyType.trim())) {
         errors.otherPropertyType = 'Please mention what property type you are listing.';

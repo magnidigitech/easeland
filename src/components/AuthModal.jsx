@@ -175,7 +175,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const trimmedEmail = formData.email.trim();
     if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
-      setError('Please enter a valid email address (e.g. name@domain.com)');
+      setError('Please enter a valid email address.');
       return false;
     }
 
@@ -571,7 +571,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     <input
                       type="text"
                       required
-                      placeholder="Enter Your Name"
+                      placeholder="Enter your full name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -608,7 +608,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     <input
                       type="email"
                       required
-                      placeholder="Enter Your Email Address"
+                      placeholder="Enter your email address"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -686,7 +686,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     <input
                       type="email"
                       required
-                      placeholder="Enter Your Email Address"
+                      placeholder="Enter your email address"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"

@@ -175,7 +175,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder='Try "3 BHK villa in Gachibowli"...'
+            placeholder="Search property type, locality, or landmark..."
             className="w-full pl-10 pr-9 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow"
           />
           <button
@@ -293,7 +293,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder='Try "3 BHK villa in Gachibowli under 1.5 Cr"...'
+                placeholder="Search by locality, city, project name, or property type..."
                 className="w-full pl-12 pr-12 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
               />
 

@@ -567,7 +567,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
           <div className="flex flex-col sm:flex-row items-center gap-2">
             <input
               type="url"
-              placeholder="Paste YouTube link (e.g. https://youtu.be/...) or Google Drive preview link..."
+              placeholder="Paste YouTube or Google Drive video preview link..."
               value={videoLinkInput}
               onChange={(e) => setVideoLinkInput(e.target.value)}
               className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-brand-yellow focus:outline-none"

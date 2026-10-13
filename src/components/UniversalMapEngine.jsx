@@ -619,7 +619,7 @@ export default function UniversalMapEngine({
               <MapPin className="w-4 h-4 text-brand-yellow absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder='Search locality or city (e.g. "Perecherla") & press Enter...'
+                placeholder="Search locality, city, or landmark..."
                 value={filters?.query || filters?.address || ''}
                 onChange={(e) => {
                   const val = e.target.value;

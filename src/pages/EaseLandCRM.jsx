@@ -1725,7 +1725,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <label className="block text-xs font-bold text-slate-700 mb-1">Max Budget (Rs)</label>
                   <input
                     type="number"
-                    placeholder="5000000"
+                    placeholder="Enter maximum budget in INR"
                     value={newLeadForm.budgetMax}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, budgetMax: Number(e.target.value) })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1921,7 +1921,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="text"
                     required
-                    placeholder="Customer Name"
+                    placeholder="Enter customer name"
                     value={newVisitForm.customerName}
                     onChange={(e) => setNewVisitForm({ ...newVisitForm, customerName: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1932,7 +1932,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="text"
                     required
-                    placeholder="+91 98480 00000"
+                    placeholder="Enter 10-digit mobile number"
                     value={newVisitForm.customerPhone}
                     onChange={(e) => setNewVisitForm({ ...newVisitForm, customerPhone: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1945,7 +1945,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                 <input
                   type="text"
                   required
-                  placeholder="Plot Name or Location"
+                  placeholder="Enter property title or location"
                   value={newVisitForm.propertyTitle}
                   onChange={(e) => setNewVisitForm({ ...newVisitForm, propertyTitle: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
@@ -1968,7 +1968,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                   <input
                     type="text"
                     required
-                    placeholder="10:30 AM"
+                    placeholder="Enter scheduled time"
                     value={newVisitForm.visitTime}
                     onChange={(e) => setNewVisitForm({ ...newVisitForm, visitTime: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"

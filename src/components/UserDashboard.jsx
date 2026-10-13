@@ -1599,7 +1599,7 @@ export default function UserDashboard({
                         id="account-profile-name"
                         type="text"
                         required
-                        placeholder="Enter Your Name"
+                        placeholder="Enter your full name"
                         value={profileForm.name}
                         onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1614,7 +1614,7 @@ export default function UserDashboard({
                         id="account-profile-email"
                         type="email"
                         required
-                        placeholder="Enter Your Email Address"
+                        placeholder="Enter your email address"
                         value={profileForm.email}
                         onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1629,7 +1629,7 @@ export default function UserDashboard({
                         id="account-profile-phone"
                         type="text"
                         required
-                        placeholder="Enter Your 10-digit Phone Number"
+                        placeholder="Enter 10-digit mobile number"
                         value={profileForm.phone}
                         onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1644,7 +1644,7 @@ export default function UserDashboard({
                         id="account-profile-city"
                         type="text"
                         required
-                        placeholder="Enter Your City / Location"
+                        placeholder="Enter your city and state"
                         value={profileForm.city}
                         onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"

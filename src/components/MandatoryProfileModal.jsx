@@ -38,12 +38,12 @@ export default function MandatoryProfileModal({ isOpen, onComplete }) {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-      setError('Please enter a valid email address (e.g. name@domain.com).');
+      setError('Please enter a valid email address.');
       return;
     }
 
     if (!cleanCity || cleanCity.length < 2) {
-      setError('Please enter your city and state (e.g. Guntur, Andhra Pradesh).');
+      setError('Please enter your city and state.');
       return;
     }
 
@@ -131,7 +131,7 @@ export default function MandatoryProfileModal({ isOpen, onComplete }) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Ryuu Krishna"
+                placeholder="Enter your full legal name"
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
               />
             </div>
@@ -149,7 +149,7 @@ export default function MandatoryProfileModal({ isOpen, onComplete }) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
+                placeholder="Enter your email address"
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
               />
             </div>
@@ -167,7 +167,7 @@ export default function MandatoryProfileModal({ isOpen, onComplete }) {
                 required
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="e.g. Guntur, Andhra Pradesh"
+                placeholder="Enter your city and state"
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
               />
             </div>

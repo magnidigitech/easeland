@@ -200,7 +200,7 @@ export default function VisitorLeadModal({ currentUser }) {
                     <input
                       type="text"
                       required
-                      placeholder="Enter Your Name"
+                      placeholder="Enter your full name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
@@ -278,7 +278,7 @@ export default function VisitorLeadModal({ currentUser }) {
                     <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                     <input
                       type="email"
-                      placeholder="name@example.com"
+                      placeholder="Enter your email address"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white transition-all"
