@@ -235,6 +235,15 @@ export async function approvePropertyVerification(propertyId, adminUid, adminNam
     } catch (e) {}
 
     if (typeof window !== 'undefined') {
+      try {
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) {
+          const parsedSub = JSON.parse(rawSub);
+          if (Array.isArray(parsedSub)) {
+            localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== String(propertyId))));
+          }
+        }
+      } catch (e) {}
       window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
     }
 
@@ -369,6 +378,15 @@ export async function requestVerificationChanges(propertyId, adminUid, adminName
     } catch (e) {}
 
     if (typeof window !== 'undefined') {
+      try {
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) {
+          const parsedSub = JSON.parse(rawSub);
+          if (Array.isArray(parsedSub)) {
+            localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== String(propertyId))));
+          }
+        }
+      } catch (e) {}
       window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
     }
 
@@ -456,6 +474,15 @@ export async function rejectPropertyVerification(propertyId, adminUid, adminName
     } catch (e) {}
 
     if (typeof window !== 'undefined') {
+      try {
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) {
+          const parsedSub = JSON.parse(rawSub);
+          if (Array.isArray(parsedSub)) {
+            localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== String(propertyId))));
+          }
+        }
+      } catch (e) {}
       window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
     }
 

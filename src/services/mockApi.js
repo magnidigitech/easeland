@@ -873,14 +873,23 @@ export const mockApi = {
     const currentProps = getStoredData('easeland_properties', properties);
     return currentProps.filter(p => {
       if (!p || isFakeProperty(p)) return false;
-      const pId = String(p.id || p.propertyId || '');
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
       if (deletedIds.includes(pId)) return false;
 
-      const st = (p.status || p.listingStatus || '').toUpperCase();
-      const isDraft = st === 'DRAFT' || p.isDraft === true;
-      const isExplicitlySubmitted = submittedIds.includes(pId) || Boolean(p.submittedAt) || ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING', 'SUBMITTED', 'CHANGES_REQUIRED'].includes(st);
+      const st = String(p.status || p.listingStatus || '').toUpperCase();
+      const lst = String(p.listingStatus || '').toUpperCase();
 
-      return isExplicitlySubmitted && !isDraft;
+      const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
+      const isClosed = st === 'REJECTED' || st === 'DELETED' || st === 'REJECTED_CLOSED' || st === 'CLOSED' || st === 'ARCHIVED' || lst === 'REJECTED' || lst === 'DELETED';
+      const isChangesRequired = st === 'CHANGES_REQUIRED' || st === 'CHANGES_REQUESTED' || st === 'REVISION_REQUESTED' || lst === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUESTED' || lst === 'REVISION_REQUESTED';
+      const isDraft = st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true;
+
+      // Never show in verification queue if approved, rejected, changes requested, or draft
+      if (isLive || isClosed || isChangesRequired || isDraft) return false;
+
+      const isPending = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED' || (p.hasPendingEdits && (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW'));
+
+      return isPending || (submittedIds.includes(pId) && !isDraft && !isChangesRequired && !isClosed && !isLive);
     });
   },
 
@@ -889,12 +898,12 @@ export const mockApi = {
     let deletedIds = [];
     try {
       if (typeof window !== 'undefined') {
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
         keys.forEach(k => {
           const raw = localStorage.getItem(k);
           if (raw) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) localProps.push(...parsed);
+            if (Array.isArray(parsed)) localProps.push(...parsed.filter(item => item && typeof item === 'object' && !Array.isArray(item) && (item.id || item.propertyId || item.title)));
             else if (parsed && typeof parsed === 'object') localProps.push(parsed);
           }
         });
@@ -921,12 +930,12 @@ export const mockApi = {
     let localProps = [];
     try {
       if (typeof window !== 'undefined') {
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
         keys.forEach(k => {
           const raw = localStorage.getItem(k);
           if (raw) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) localProps.push(...parsed);
+            if (Array.isArray(parsed)) localProps.push(...parsed.filter(item => item && typeof item === 'object' && !Array.isArray(item)));
             else if (parsed && typeof parsed === 'object') localProps.push(parsed);
           }
         });
@@ -955,7 +964,15 @@ export const mockApi = {
 
       if (typeof window !== 'undefined') {
         try {
-          const keys = ['easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+          const rawSub = localStorage.getItem('easeland_submitted_properties');
+          if (rawSub) {
+            const parsedSub = JSON.parse(rawSub);
+            if (Array.isArray(parsedSub)) {
+              localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== targetIdStr && String(id) !== String(prop.id) && String(id) !== String(prop.propertyId) && String(id) !== String(prop.referenceId))));
+            }
+          }
+
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
           keys.forEach(k => {
             const raw = localStorage.getItem(k);
             if (raw) {
@@ -1012,7 +1029,15 @@ export const mockApi = {
 
     if (typeof window !== 'undefined') {
       try {
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) {
+          const parsedSub = JSON.parse(rawSub);
+          if (Array.isArray(parsedSub)) {
+            localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== targetIdStr && String(id) !== String(prop.id) && String(id) !== String(prop.propertyId) && String(id) !== String(prop.referenceId))));
+          }
+        }
+
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
         keys.forEach(k => {
           const raw = localStorage.getItem(k);
           if (raw) {
@@ -1060,6 +1085,7 @@ export const mockApi = {
     prop.status = 'CHANGES_REQUIRED';
     prop.listingStatus = 'CHANGES_REQUIRED';
     prop.isPublished = false;
+    prop.isPlatformVerified = false;
     prop.verificationStatus = 'Changes Requested by Admin';
     prop.adminFeedback = feedback;
     prop.ownerFacingNotes = feedback;
@@ -1070,7 +1096,15 @@ export const mockApi = {
 
     if (typeof window !== 'undefined') {
       try {
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) {
+          const parsedSub = JSON.parse(rawSub);
+          if (Array.isArray(parsedSub)) {
+            localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== targetIdStr && String(id) !== String(prop.id) && String(id) !== String(prop.propertyId) && String(id) !== String(prop.referenceId))));
+          }
+        }
+
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
         keys.forEach(k => {
           const raw = localStorage.getItem(k);
           if (raw) {
@@ -1083,6 +1117,7 @@ export const mockApi = {
                     status: 'CHANGES_REQUIRED',
                     listingStatus: 'CHANGES_REQUIRED',
                     isPublished: false,
+                    isPlatformVerified: false,
                     verificationStatus: 'Changes Requested by Admin',
                     adminFeedback: feedback,
                     ownerFacingNotes: feedback,

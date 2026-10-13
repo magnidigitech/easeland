@@ -509,13 +509,16 @@ export default function AdminPortal({ onNavigate }) {
       let localProps = [];
       try {
         if (typeof window !== 'undefined') {
-          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
           keys.forEach(k => {
             const raw = localStorage.getItem(k);
             if (raw) {
               const parsed = JSON.parse(raw);
-              if (Array.isArray(parsed)) localProps.push(...parsed);
-              else if (parsed && typeof parsed === 'object') localProps.push(parsed);
+              if (Array.isArray(parsed)) {
+                localProps.push(...parsed.filter(item => item && typeof item === 'object' && !Array.isArray(item) && (item.id || item.propertyId || item.title)));
+              } else if (parsed && typeof parsed === 'object') {
+                localProps.push(parsed);
+              }
             }
           });
         }
@@ -523,8 +526,8 @@ export default function AdminPortal({ onNavigate }) {
 
       const queueMap = new Map();
 
-      [...localProps, ...postgresProps, ...firebaseProps].forEach(p => {
-        if (!p) return;
+      [...firebaseProps, ...postgresProps, ...localProps].forEach(p => {
+        if (!p || typeof p !== 'object') return;
         const pId = String(p.id || p.propertyId || p.referenceId || '');
         if (pId) {
           const prev = queueMap.get(pId) || {};
@@ -541,11 +544,26 @@ export default function AdminPortal({ onNavigate }) {
             ...(Array.isArray(p.confidentialDocuments) ? p.confidentialDocuments : [])
           ];
 
+          let finalStatus = p.status || prev.status;
+          let finalListingStatus = p.listingStatus || prev.listingStatus;
+
+          const prevSt = String(prev.status || prev.listingStatus || '').toUpperCase();
+          const pSt = String(p.status || p.listingStatus || '').toUpperCase();
+          const prevTime = new Date(prev.updatedAt || 0).getTime();
+          const pTime = new Date(p.updatedAt || 0).getTime();
+
+          if (prevTime > pTime && (prevSt === 'CHANGES_REQUIRED' || prevSt === 'CHANGES_REQUESTED' || prevSt === 'REJECTED' || prevSt === 'LIVE')) {
+            finalStatus = prev.status || prevSt;
+            finalListingStatus = prev.listingStatus || prevSt;
+          }
+
           queueMap.set(pId, {
             ...prev,
             ...p,
             id: pId,
             propertyId: pId,
+            status: finalStatus,
+            listingStatus: finalListingStatus,
             media: mergedMedia.length > 0 ? mergedMedia : (p.media || prev.media || []),
             photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (prev.photos || []),
             documents: mergedDocs.length > 0 ? mergedDocs : (p.documents || prev.documents || []),
@@ -588,6 +606,22 @@ export default function AdminPortal({ onNavigate }) {
         return title.length > 0 && title !== '.' && title !== ',';
       });
 
+      // Synchronize submittedIds: remove properties that have been verified, rejected, or changes requested
+      if (typeof window !== 'undefined' && submittedIds.length > 0) {
+        const activeSubmittedIds = submittedIds.filter(sId => {
+          const matched = allMergedProps.find(mp => String(mp.id || mp.propertyId || mp.referenceId || '') === String(sId));
+          if (!matched) return true;
+          const mst = String(matched.status || matched.listingStatus || '').toUpperCase();
+          const mlst = String(matched.listingStatus || '').toUpperCase();
+          const isNotPending = mst === 'CHANGES_REQUIRED' || mst === 'CHANGES_REQUESTED' || mlst === 'CHANGES_REQUIRED' || mlst === 'CHANGES_REQUESTED' || mst === 'REJECTED' || mlst === 'REJECTED' || mst === 'LIVE' || mlst === 'LIVE' || mst === 'DRAFT' || mlst === 'DRAFT';
+          return !isNotPending;
+        });
+        if (activeSubmittedIds.length !== submittedIds.length) {
+          localStorage.setItem('easeland_submitted_properties', JSON.stringify(activeSubmittedIds));
+          submittedIds = activeSubmittedIds;
+        }
+      }
+
       queue = allMergedProps.filter(p => {
         if (!p) return false;
         const pId = String(p.id || p.propertyId || p.referenceId || '');
@@ -596,13 +630,16 @@ export default function AdminPortal({ onNavigate }) {
 
         const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
         const isClosed = st === 'REJECTED' || st === 'DELETED' || st === 'REJECTED_CLOSED' || st === 'CLOSED' || st === 'ARCHIVED' || lst === 'REJECTED' || lst === 'DELETED' || lst === 'REJECTED_CLOSED' || lst === 'CLOSED' || lst === 'ARCHIVED';
-
-        if (isLive || isClosed) return false;
-
+        const isChangesRequired = st === 'CHANGES_REQUIRED' || st === 'CHANGES_REQUESTED' || st === 'REVISION_REQUESTED' || lst === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUESTED' || lst === 'REVISION_REQUESTED';
         const isDraft = st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true;
-        const isExplicitlySubmitted = submittedIds.includes(pId) || Boolean(p.submittedAt) || st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED';
 
-        return isExplicitlySubmitted && !isDraft;
+        // CRITICAL RULE: If ANY of the 3 actions took place (Live/Approved, Rejected, or Changes Requested), or if it's draft, NEVER show in Verification Queue!
+        if (isLive || isClosed || isChangesRequired || isDraft) return false;
+
+        // ONLY visible if actively in pending verification audit state (first submission or resubmission after changes)
+        const isPendingAudit = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED' || (p.hasPendingEdits === true && (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW'));
+
+        return isPendingAudit || (submittedIds.includes(pId) && !isDraft && !isChangesRequired && !isClosed && !isLive);
       });
     } catch (e1) {
       console.warn('Error loading verification queue:', e1);
@@ -1103,14 +1140,28 @@ export default function AdminPortal({ onNavigate }) {
       // 4. LocalStorage update across all storage arrays
       try {
         if (typeof window !== 'undefined') {
-          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+          const targetIdStr = String(propId);
+          const rawSub = localStorage.getItem('easeland_submitted_properties');
+          if (rawSub) {
+            const parsedSub = JSON.parse(rawSub);
+            if (Array.isArray(parsedSub)) {
+              localStorage.setItem('easeland_submitted_properties', JSON.stringify(
+                parsedSub.filter(id => {
+                  const s = String(id || '');
+                  return s !== targetIdStr && s !== String(selectedProperty?.id) && s !== String(selectedProperty?.propertyId) && s !== String(selectedProperty?.referenceId);
+                })
+              ));
+            }
+          }
+
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
           keys.forEach(k => {
             const rawLocal = localStorage.getItem(k);
             if (rawLocal) {
               const parsed = JSON.parse(rawLocal);
               if (Array.isArray(parsed)) {
                 const updated = parsed.map(p => {
-                  if (p && (String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId))) {
+                  if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
                     return {
                       ...p,
                       listingStatus: 'LIVE',
@@ -1129,6 +1180,37 @@ export default function AdminPortal({ onNavigate }) {
           });
         }
       } catch (lErr) { }
+
+      // Evict immediately from Verification Queue UI state
+      setVerificationQueue(prev => prev.filter(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        return id1 !== targetId && id2 !== targetId && id3 !== targetId;
+      }));
+
+      // Update in All Properties state
+      setAllProperties(prev => prev.map(p => {
+        if (!p) return p;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        if (id1 === targetId || id2 === targetId || id3 === targetId) {
+          return {
+            ...p,
+            listingStatus: 'LIVE',
+            status: 'LIVE',
+            isPlatformVerified: true,
+            isPublished: true,
+            verificationNotes: note,
+            verificationStatus: 'Platform Verified'
+          };
+        }
+        return p;
+      }));
 
       // 5. Notify window to refresh all user dashboards immediately
       if (typeof window !== 'undefined') {
@@ -1193,35 +1275,84 @@ export default function AdminPortal({ onNavigate }) {
       } catch (pgErr) { }
 
       try {
-        const targetIdStr = String(propId);
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
-        keys.forEach(k => {
-          const rawLocal = localStorage.getItem(k);
-          if (rawLocal) {
-            const parsed = JSON.parse(rawLocal);
-            if (Array.isArray(parsed)) {
-              const updated = parsed.map(p => {
-                if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
-                  return {
-                    ...p,
-                    listingStatus: 'REJECTED',
-                    status: 'REJECTED',
-                    isPlatformVerified: false,
-                    isPublished: false,
-                    verificationNotes: note,
-                    ownerFacingNotes: note,
-                    adminNotes: note,
-                    adminFeedback: note,
-                    rejectionReason: note
-                  };
-                }
-                return p;
-              });
-              localStorage.setItem(k, JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          const targetIdStr = String(propId);
+          const rawSub = localStorage.getItem('easeland_submitted_properties');
+          if (rawSub) {
+            const parsedSub = JSON.parse(rawSub);
+            if (Array.isArray(parsedSub)) {
+              localStorage.setItem('easeland_submitted_properties', JSON.stringify(
+                parsedSub.filter(id => {
+                  const s = String(id || '');
+                  return s !== targetIdStr && s !== String(selectedProperty?.id) && s !== String(selectedProperty?.propertyId) && s !== String(selectedProperty?.referenceId);
+                })
+              ));
             }
           }
-        });
+
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
+          keys.forEach(k => {
+            const rawLocal = localStorage.getItem(k);
+            if (rawLocal) {
+              const parsed = JSON.parse(rawLocal);
+              if (Array.isArray(parsed)) {
+                const updated = parsed.map(p => {
+                  if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
+                    return {
+                      ...p,
+                      listingStatus: 'REJECTED',
+                      status: 'REJECTED',
+                      isPlatformVerified: false,
+                      isPublished: false,
+                      verificationNotes: note,
+                      ownerFacingNotes: note,
+                      adminNotes: note,
+                      adminFeedback: note,
+                      rejectionReason: note
+                    };
+                  }
+                  return p;
+                });
+                localStorage.setItem(k, JSON.stringify(updated));
+              }
+            }
+          });
+        }
       } catch (lErr) { }
+
+      // Evict immediately from Verification Queue UI state
+      setVerificationQueue(prev => prev.filter(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        return id1 !== targetId && id2 !== targetId && id3 !== targetId;
+      }));
+
+      // Update in All Properties state
+      setAllProperties(prev => prev.map(p => {
+        if (!p) return p;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        if (id1 === targetId || id2 === targetId || id3 === targetId) {
+          return {
+            ...p,
+            listingStatus: 'REJECTED',
+            status: 'REJECTED',
+            isPlatformVerified: false,
+            isPublished: false,
+            verificationNotes: note,
+            ownerFacingNotes: note,
+            adminNotes: note,
+            adminFeedback: note,
+            rejectionReason: note
+          };
+        }
+        return p;
+      }));
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
@@ -1283,33 +1414,80 @@ export default function AdminPortal({ onNavigate }) {
       } catch (pgErr) { }
 
       try {
-        const targetIdStr = String(propId);
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
-        keys.forEach(k => {
-          const rawLocal = localStorage.getItem(k);
-          if (rawLocal) {
-            const parsed = JSON.parse(rawLocal);
-            if (Array.isArray(parsed)) {
-              const updated = parsed.map(p => {
-                if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
-                  return {
-                    ...p,
-                    listingStatus: 'CHANGES_REQUIRED',
-                    status: 'CHANGES_REQUIRED',
-                    isPublished: false,
-                    verificationNotes: note,
-                    ownerFacingNotes: note,
-                    adminNotes: note,
-                    adminFeedback: note
-                  };
-                }
-                return p;
-              });
-              localStorage.setItem(k, JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          const targetIdStr = String(propId);
+          const rawSub = localStorage.getItem('easeland_submitted_properties');
+          if (rawSub) {
+            const parsedSub = JSON.parse(rawSub);
+            if (Array.isArray(parsedSub)) {
+              localStorage.setItem('easeland_submitted_properties', JSON.stringify(
+                parsedSub.filter(id => {
+                  const s = String(id || '');
+                  return s !== targetIdStr && s !== String(selectedProperty?.id) && s !== String(selectedProperty?.propertyId) && s !== String(selectedProperty?.referenceId);
+                })
+              ));
             }
           }
-        });
+
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
+          keys.forEach(k => {
+            const rawLocal = localStorage.getItem(k);
+            if (rawLocal) {
+              const parsed = JSON.parse(rawLocal);
+              if (Array.isArray(parsed)) {
+                const updated = parsed.map(p => {
+                  if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
+                    return {
+                      ...p,
+                      listingStatus: 'CHANGES_REQUIRED',
+                      status: 'CHANGES_REQUIRED',
+                      isPublished: false,
+                      verificationNotes: note,
+                      ownerFacingNotes: note,
+                      adminNotes: note,
+                      adminFeedback: note
+                    };
+                  }
+                  return p;
+                });
+                localStorage.setItem(k, JSON.stringify(updated));
+              }
+            }
+          });
+        }
       } catch (lErr) { }
+
+      // Evict immediately from Verification Queue UI state
+      setVerificationQueue(prev => prev.filter(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        return id1 !== targetId && id2 !== targetId && id3 !== targetId;
+      }));
+
+      // Update in All Properties state
+      setAllProperties(prev => prev.map(p => {
+        if (!p) return p;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        if (id1 === targetId || id2 === targetId || id3 === targetId) {
+          return {
+            ...p,
+            listingStatus: 'CHANGES_REQUIRED',
+            status: 'CHANGES_REQUIRED',
+            isPublished: false,
+            verificationNotes: note,
+            ownerFacingNotes: note,
+            adminNotes: note,
+            adminFeedback: note
+          };
+        }
+        return p;
+      }));
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));

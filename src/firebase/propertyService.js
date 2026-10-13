@@ -710,6 +710,7 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         ...derived,
         listingStatus: ListingStatus.PENDING_VERIFICATION,
         status: ListingStatus.PENDING_VERIFICATION,
+        verificationStatus: 'Pending Verification',
         isPublished: false,
         submittedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -730,7 +731,7 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         ownerId,
         ownerPrivateEmail: publicPayload.ownerPrivateEmail || '',
         createdAt: publicPayload.createdAt || new Date().toISOString()
-      }, true);
+      }, false);
     } catch (e) {}
 
     if (typeof window !== 'undefined') {
@@ -752,6 +753,7 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
                 ...p,
                 listingStatus: ListingStatus.PENDING_VERIFICATION,
                 status: ListingStatus.PENDING_VERIFICATION,
+                verificationStatus: 'Pending Verification',
                 isPublished: false
               };
             }
@@ -759,10 +761,30 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           });
           localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
         }
+
+        const rawAllProps = localStorage.getItem('easeland_properties');
+        if (rawAllProps) {
+          const parsedAll = JSON.parse(rawAllProps);
+          const updatedAll = parsedAll.map(p => {
+            if (p && String(p.id || p.propertyId) === pIdStr) {
+              return {
+                ...p,
+                listingStatus: ListingStatus.PENDING_VERIFICATION,
+                status: ListingStatus.PENDING_VERIFICATION,
+                verificationStatus: 'Pending Verification',
+                isPublished: false
+              };
+            }
+            return p;
+          });
+          localStorage.setItem('easeland_properties', JSON.stringify(updatedAll));
+        }
       } catch (lErr) {}
 
       window.dispatchEvent(new CustomEvent('easeland-property-submitted', { detail: publicPayload }));
+      window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: publicPayload }));
       window.dispatchEvent(new CustomEvent('easeland-property-created', { detail: publicPayload }));
+      window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: publicPayload }));
     }
 
     // 3. Attempt Firestore write (non-blocking fallback for unauthenticated/dummy admin sessions)
