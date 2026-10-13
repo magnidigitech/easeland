@@ -16,7 +16,7 @@ export class ErrorBoundary extends React.Component {
 
   handleReset = () => {
     try {
-      localStorage.setItem('easeland_active_page', 'home');
+      localStorage.removeItem('easeland_active_page');
       // If site config was corrupted, remove cached version to force default re-hydration
       localStorage.removeItem('easeland_site_config');
     } catch (e) {}

@@ -29,6 +29,30 @@ import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, Chec
 
 const getInitialPageState = () => {
   if (typeof window === 'undefined') return { page: 'home', propId: null };
+
+  // Detect whether this is an existing active tab session or a reopened tab/window
+  let isExistingTabSession = false;
+  try {
+    isExistingTabSession = sessionStorage.getItem('easeland_tab_session') === 'active';
+  } catch (e) {}
+
+  // Clean up any legacy localStorage page persistence so stale pages never linger across closes
+  try {
+    localStorage.removeItem('easeland_active_page');
+  } catch (e) {}
+
+  // When tab/site was closed and reopened: ALWAYS open the Home Page!
+  if (!isExistingTabSession) {
+    try {
+      sessionStorage.setItem('easeland_tab_session', 'active');
+      if (window.location.pathname !== '/' || window.location.search !== '') {
+        window.history.replaceState(null, '', '/');
+      }
+    } catch (e) {}
+    return { page: 'home', propId: null };
+  }
+
+  // Active tab session (e.g. user refreshed the current open tab):
   const rawPath = window.location.pathname || '/';
   const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
   const search = window.location.search || '';
@@ -36,23 +60,6 @@ const getInitialPageState = () => {
   const modeParam = urlParams.get('mode');
 
   if (cleanPath === '/admin' || modeParam === 'admin') return { page: 'admin', propId: null };
-
-  const storedActivePage = localStorage.getItem('easeland_active_page');
-  const storedAdminAuth = localStorage.getItem('easeland_admin_authenticated') === 'true';
-
-  if (storedAdminAuth && (storedActivePage === 'admin' || cleanPath === '/admin')) {
-    return { page: 'admin', propId: null };
-  }
-
-  if (cleanPath === '/' || cleanPath === '') {
-    if (storedActivePage && storedActivePage !== 'home') {
-      if (storedActivePage === 'admin' && storedAdminAuth) {
-        return { page: 'admin', propId: null };
-      }
-      return { page: storedActivePage, propId: null };
-    }
-    return { page: 'home', propId: null };
-  }
 
   const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
   if (propertyMatch && propertyMatch[1]) {
@@ -300,8 +307,6 @@ export default function App() {
     }
 
     try {
-      localStorage.setItem('easeland_active_page', resolvedPage);
-
       let targetPath = '/';
       if (resolvedPage === 'property-detail' && resolvedPropId) {
         targetPath = `/property/${resolvedPropId}`;
@@ -336,35 +341,36 @@ export default function App() {
   };
 
   const syncStateFromUrl = () => {
+    // If this is a newly reopened tab/window, enforce Home Page
+    let isExistingTabSession = false;
+    try {
+      isExistingTabSession = sessionStorage.getItem('easeland_tab_session') === 'active';
+    } catch (e) {}
+
+    if (!isExistingTabSession) {
+      try {
+        sessionStorage.setItem('easeland_tab_session', 'active');
+        if (window.location.pathname !== '/' || window.location.search !== '') {
+          window.history.replaceState(null, '', '/');
+        }
+      } catch (e) {}
+      setActivePage('home');
+      return;
+    }
+
     const rawPath = window.location.pathname || '/';
     const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
     const search = window.location.search || '';
     const urlParams = new URLSearchParams(search);
     const modeParam = urlParams.get('mode');
 
-    const storedActivePage = localStorage.getItem('easeland_active_page');
-    const storedAdminAuth = localStorage.getItem('easeland_admin_authenticated') === 'true';
-
     if (cleanPath === '/admin' || modeParam === 'admin') {
       setActivePage('admin');
-      try { localStorage.setItem('easeland_active_page', 'admin'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/' || cleanPath === '') {
-      if (storedActivePage && storedActivePage !== 'home') {
-        if (storedActivePage === 'admin') {
-          if (storedAdminAuth) {
-            setActivePage('admin');
-            return;
-          }
-        } else {
-          setActivePage(storedActivePage);
-          return;
-        }
-      }
       setActivePage('home');
-      try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
       return;
     }
 
@@ -372,7 +378,6 @@ export default function App() {
     if (propertyMatch && propertyMatch[1]) {
       setActivePropertyId(propertyMatch[1]);
       setActivePage('property-detail');
-      try { localStorage.setItem('easeland_active_page', 'property-detail'); } catch(e){}
       return;
     }
 
@@ -380,31 +385,26 @@ export default function App() {
       const parsedFilters = urlParamsToSearchState(search);
       setFilters(prev => ({ ...prev, ...parsedFilters }));
       setActivePage('map');
-      try { localStorage.setItem('easeland_active_page', 'map'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/buy') {
       setActivePage('buy');
-      try { localStorage.setItem('easeland_active_page', 'buy'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/rent') {
       setActivePage('rent');
-      try { localStorage.setItem('easeland_active_page', 'rent'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/sell') {
       setActivePage('sell');
-      try { localStorage.setItem('easeland_active_page', 'sell'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/post-property') {
       setActivePage('post-property');
-      try { localStorage.setItem('easeland_active_page', 'post-property'); } catch(e){}
       return;
     }
 
@@ -415,24 +415,20 @@ export default function App() {
         setDashboardTabKey(Date.now());
       }
       setActivePage('dashboard');
-      try { localStorage.setItem('easeland_active_page', 'dashboard'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/wishlist') {
       setActivePage('wishlist');
-      try { localStorage.setItem('easeland_active_page', 'wishlist'); } catch(e){}
       return;
     }
 
     if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') {
       setActivePage('privacy-policy');
-      try { localStorage.setItem('easeland_active_page', 'privacy-policy'); } catch(e){}
       return;
     }
 
     setActivePage('home');
-    try { localStorage.setItem('easeland_active_page', 'home'); } catch(e){}
   };
 
   useEffect(() => {
