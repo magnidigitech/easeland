@@ -136,13 +136,18 @@ export function urlParamsToSearchState(searchString = '') {
   const validPropertyType = Object.values(PropertyType).includes(typeParam) ? typeParam : 'ALL';
 
   const catParam = params.get('category');
-  let resolvedCategory = catParam || 'All';
-  if (!catParam || catParam === 'All') {
-    if (validPropertyType === 'OPEN_PLOT') resolvedCategory = 'Open Plot Ventures';
-    else if (validPropertyType === 'HOUSE' || validPropertyType === 'VILLA') resolvedCategory = 'Independent House/Villa';
-    else if (validPropertyType === 'APARTMENT') resolvedCategory = 'Apartments/Flat';
-    else if (validPropertyType === 'COMMERCIAL') resolvedCategory = 'Commerical Property';
-    else if (validPropertyType === 'LAND') resolvedCategory = 'Agricultural Lands';
+  let resolvedCategory = 'All';
+  if (catParam && catParam !== 'All') {
+    const cleanCat = catParam.trim().toLowerCase();
+    if (cleanCat.includes('amaravathi') || cleanCat.includes('lps')) resolvedCategory = 'Amaravathi LPS layout plots';
+    else if (cleanCat.includes('agricultural') || cleanCat.includes('farm')) resolvedCategory = 'Agricultural Lands';
+    else if (cleanCat.includes('commercial') || cleanCat.includes('commeric')) resolvedCategory = 'Commerical Property';
+    else if (cleanCat.includes('apartment') || cleanCat.includes('flat')) resolvedCategory = 'Apartments/Flat';
+    else if (cleanCat.includes('house') || cleanCat.includes('villa') || cleanCat.includes('independent')) resolvedCategory = 'Independent House/Villa';
+    else if (cleanCat.includes('city') && cleanCat.includes('plot')) resolvedCategory = 'Open Plot (City)';
+    else if (cleanCat.includes('venture') || cleanCat.includes('plot')) resolvedCategory = 'Open Plot Ventures';
+    else if (cleanCat.includes('other')) resolvedCategory = 'Others';
+    else resolvedCategory = catParam.trim();
   }
 
   return {
@@ -169,5 +174,49 @@ export function urlParamsToSearchState(searchString = '') {
     radiusKm: (radiusParam && !isNaN(Number(radiusParam))) ? Number(radiusParam) : null,
     referencePlace: nearParam || '',
     sortBy: sortParam || 'newest'
+  };
+}
+
+/**
+ * Returns a clean, initialized search filter state object with default values
+ * and optional overrides, guaranteeing no stale or cross-pollinated filters.
+ */
+export function createDefaultFilterState(overrides = {}) {
+  const defaults = {
+    query: '',
+    purpose: 'ALL',
+    propertyType: 'ALL',
+    category: 'All',
+    state: '',
+    district: '',
+    city: '',
+    locality: '',
+    minPrice: '',
+    maxPrice: '',
+    minArea: '',
+    maxArea: '',
+    minAreaSqFt: '',
+    maxAreaSqFt: '',
+    areaUnit: 'sq ft',
+    bedrooms: 'ANY',
+    bathrooms: 'ANY',
+    facing: 'ALL',
+    furnishing: 'ALL',
+    amenities: [],
+    radiusKm: null,
+    referencePlace: '',
+    referenceLat: null,
+    referenceLng: null,
+    sortBy: 'newest',
+    cleared: false
+  };
+
+  if (!overrides || typeof overrides !== 'object') {
+    return defaults;
+  }
+
+  return {
+    ...defaults,
+    ...overrides
   };
 }

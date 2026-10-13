@@ -7,7 +7,7 @@ import HeroSearch from '../components/HeroSearch';
 import { mockApi, deduplicateProperties } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext';
 import { searchPublicProperties, validateSortCompatibility } from '../firebase/searchService.js';
-import { searchStateToUrlParams, urlParamsToSearchState } from '../firebase/searchUrl.js';
+import { searchStateToUrlParams, urlParamsToSearchState, createDefaultFilterState } from '../firebase/searchUrl.js';
 import { getUserWishlist, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { searchLocationQuery, extractCoordinates, resolvePlaceCoordinates, calculateDistanceKm } from '../services/locationProvider.js';
 import { convertAreaToSqFt } from '../firebase/propertyService.js';
@@ -41,12 +41,13 @@ export function matchesSearchFilters(p, searchState = {}) {
     const pType = String(p.propertyType || p.type || '').toUpperCase();
     const pCat = String(p.category || p.title || '').toUpperCase();
     const targetType = String(searchState.propertyType).toUpperCase();
-    const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
+    const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('COMMERIC') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
     if (targetType === 'OPEN_PLOT' || targetType === 'PLOT') {
       if (isCommercialProp) return false;
-      const isPlot = pType.includes('PLOT') || pType.includes('LAND') || pCat.includes('PLOT') || pCat.includes('LAND');
-      if (!isPlot) return false;
+      const isPlot = pType.includes('PLOT') || (pCat.includes('PLOT') && !pCat.includes('COMMERCIAL'));
+      const isAgri = pType.includes('LAND') && (pCat.includes('AGRI') || pCat.includes('FARM'));
+      if (!isPlot || isAgri) return false;
     } else if (targetType === 'HOUSE' || targetType === 'VILLA') {
       if (isCommercialProp) return false;
       const isHouse = pType.includes('HOUSE') || pType.includes('VILLA') || pCat.includes('HOUSE') || pCat.includes('VILLA') || pCat.includes('HOME');
@@ -58,8 +59,10 @@ export function matchesSearchFilters(p, searchState = {}) {
     } else if (targetType === 'COMMERCIAL') {
       if (!isCommercialProp) return false;
     } else if (targetType === 'LAND' || targetType === 'AGRICULTURAL_LAND') {
-      const isLand = pType.includes('LAND') || pCat.includes('LAND') || pType.includes('AGRICULTURAL');
+      const isLand = pType.includes('LAND') || pCat.includes('LAND') || pType.includes('AGRICULTURAL') || pCat.includes('AGRI') || pCat.includes('FARM');
       if (!isLand) return false;
+    } else if (targetType === 'OTHER') {
+      if (!pType.includes('OTHER') && !pCat.includes('OTHER') && !pCat.includes('WAREHOUSE')) return false;
     }
   }
 
@@ -67,34 +70,44 @@ export function matchesSearchFilters(p, searchState = {}) {
   if (searchState.category && searchState.category !== 'All' && searchState.category !== 'ALL') {
     const targetCat = String(searchState.category).toLowerCase().trim();
     const pBadge = String(getCategoryBadgeLabel(p)).toLowerCase();
-    if (pBadge !== targetCat) {
+
+    let isCategoryMatch = false;
+
+    if (pBadge === targetCat) {
+      isCategoryMatch = true;
+    } else {
       const pType = String(p.propertyType || p.type || '').toUpperCase();
-      const pCat = String(p.category || p.title || '').toUpperCase();
+      const pCat = String(p.category || '').toUpperCase();
       const pTitle = String(p.title || '').toUpperCase();
-      const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
+      const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('COMMERIC') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
       if (targetCat.includes('amaravathi') || targetCat.includes('lps')) {
-        if (!pCat.includes('AMARAVATHI') && !pTitle.includes('AMARAVATHI') && !pCat.includes('LPS') && !pTitle.includes('LPS')) return false;
+        isCategoryMatch = (pCat.includes('AMARAVATHI') || pTitle.includes('AMARAVATHI') || pCat.includes('LPS') || pTitle.includes('LPS'));
       } else if (targetCat.includes('agricultural') || targetCat.includes('farm')) {
-        if (!pType.includes('LAND') && !pCat.includes('AGRI') && !pCat.includes('FARM') && !pTitle.includes('AGRI') && !pTitle.includes('FARM')) return false;
-      } else if (targetCat.includes('commercial')) {
-        if (!isCommercialProp) return false;
+        isCategoryMatch = (pType.includes('LAND') || pCat.includes('AGRI') || pCat.includes('FARM') || pTitle.includes('AGRI') || pTitle.includes('FARM'));
+      } else if (targetCat.includes('commercial') || targetCat.includes('commeric')) {
+        isCategoryMatch = isCommercialProp;
       } else if (targetCat.includes('apartment') || targetCat.includes('flat')) {
-        if (isCommercialProp) return false;
-        if (!pType.includes('APARTMENT') && !pType.includes('FLAT') && !pCat.includes('APARTMENT') && !pCat.includes('FLAT')) return false;
+        isCategoryMatch = !isCommercialProp && (pType.includes('APARTMENT') || pType.includes('FLAT') || pCat.includes('APARTMENT') || pCat.includes('FLAT') || pTitle.includes('APARTMENT') || pTitle.includes('FLAT'));
       } else if (targetCat.includes('house') || targetCat.includes('villa') || targetCat.includes('independent')) {
-        if (isCommercialProp) return false;
-        if (!pType.includes('HOUSE') && !pType.includes('VILLA') && !pCat.includes('HOUSE') && !pCat.includes('VILLA')) return false;
+        isCategoryMatch = !isCommercialProp && (pType.includes('HOUSE') || pType.includes('VILLA') || pCat.includes('HOUSE') || pCat.includes('VILLA') || pTitle.includes('HOUSE') || pTitle.includes('VILLA'));
       } else if (targetCat.includes('city') && targetCat.includes('plot')) {
-        if (isCommercialProp) return false;
-        if (!pType.includes('PLOT') && !pCat.includes('PLOT')) return false;
-        if (!pCat.includes('CITY') && !pTitle.includes('CITY') && !pCat.includes('COLONY')) return false;
-      } else if (targetCat.includes('venture') || targetCat.includes('plot')) {
-        if (isCommercialProp) return false;
-        if (!pType.includes('PLOT') && !pCat.includes('PLOT') && !pCat.includes('VENTURE')) return false;
+        const isPlot = (pType.includes('PLOT') || pCat.includes('PLOT'));
+        const isCityOrColony = (pCat.includes('CITY') || pTitle.includes('CITY') || pCat.includes('COLONY') || pTitle.includes('COLONY') || pCat.includes('MUNICIPAL'));
+        const isAmaravathi = (pCat.includes('AMARAVATHI') || pTitle.includes('AMARAVATHI') || pCat.includes('LPS') || pTitle.includes('LPS'));
+        isCategoryMatch = !isCommercialProp && isPlot && isCityOrColony && !isAmaravathi;
+      } else if (targetCat.includes('venture')) {
+        const isPlot = (pType.includes('PLOT') || pCat.includes('PLOT') || pCat.includes('VENTURE') || pTitle.includes('VENTURE') || pCat.includes('LAYOUT'));
+        const isAmaravathi = (pCat.includes('AMARAVATHI') || pTitle.includes('AMARAVATHI') || pCat.includes('LPS') || pTitle.includes('LPS'));
+        const isCityPlot = (pBadge === 'open plot (city)' || (pCat.includes('CITY') && !pCat.includes('VENTURE')));
+        isCategoryMatch = !isCommercialProp && isPlot && !isAmaravathi && !isCityPlot;
       } else if (targetCat.includes('other')) {
-        if (!pType.includes('OTHER') && !pCat.includes('OTHER')) return false;
+        isCategoryMatch = (pType.includes('OTHER') || pCat.includes('OTHER') || pTitle.includes('OTHER') || pCat.includes('WAREHOUSE'));
       }
+    }
+
+    if (!isCategoryMatch) {
+      return false;
     }
   }
 
@@ -269,22 +282,19 @@ export default function PropertiesSearchPage({
     if (initialFilters && (
       (initialFilters.purpose && initialFilters.purpose !== 'ALL' && initialFilters.purpose !== 'ANY') ||
       (initialFilters.propertyType && initialFilters.propertyType !== 'ALL' && initialFilters.propertyType !== 'ANY') ||
-      initialFilters.category ||
+      (initialFilters.category && initialFilters.category !== 'All') ||
       initialFilters.query ||
       initialFilters.cleared === false
     )) {
-      return { ...fromUrl, ...initialFilters };
+      return createDefaultFilterState({ ...fromUrl, ...initialFilters });
     }
-    return fromUrl;
+    return createDefaultFilterState(fromUrl);
   });
 
   // Keep searchState synchronized whenever initialFilters updates
   useEffect(() => {
     if (initialFilters) {
-      setSearchState(prev => ({
-        ...prev,
-        ...initialFilters
-      }));
+      setSearchState(createDefaultFilterState(initialFilters));
     }
   }, [initialFilters]);
 

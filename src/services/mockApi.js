@@ -463,23 +463,29 @@ export const mockApi = {
         if (targetCat.includes('agricultural') || targetCat.includes('farm')) {
           return pCat.includes('agri') || pType.includes('land') || pTitle.includes('agri') || pTitle.includes('farm');
         }
-        if (targetCat.includes('commercial')) {
-          return pCat.includes('commercial') || pType.includes('commercial') || pCat.includes('shop') || pCat.includes('office');
+        if (targetCat.includes('commercial') || targetCat.includes('commeric')) {
+          return pCat.includes('commercial') || pCat.includes('commeric') || pType.includes('commercial') || pCat.includes('shop') || pCat.includes('office') || pTitle.includes('shop') || pTitle.includes('office');
         }
         if (targetCat.includes('apartment') || targetCat.includes('flat')) {
-          return pCat.includes('apartment') || pCat.includes('flat') || pType === 'apartment';
+          return pCat.includes('apartment') || pCat.includes('flat') || pType === 'apartment' || pTitle.includes('apartment') || pTitle.includes('flat');
         }
         if (targetCat.includes('house') || targetCat.includes('villa') || targetCat.includes('independent')) {
-          return pCat.includes('house') || pCat.includes('villa') || pType === 'house' || pType === 'villa';
+          return pCat.includes('house') || pCat.includes('villa') || pType === 'house' || pType === 'villa' || pTitle.includes('house') || pTitle.includes('villa');
         }
         if (targetCat.includes('city') && targetCat.includes('plot')) {
-          return (pCat.includes('city') || pTitle.includes('city')) && (pType.includes('plot') || pCat.includes('plot'));
+          const isPlot = pType.includes('plot') || pCat.includes('plot');
+          const isCity = pCat.includes('city') || pTitle.includes('city') || pCat.includes('colony') || pTitle.includes('colony');
+          const isAmaravathi = pCat.includes('amaravathi') || pTitle.includes('amaravathi') || pCat.includes('lps') || pTitle.includes('lps');
+          return isPlot && isCity && !isAmaravathi;
         }
-        if (targetCat.includes('venture') || targetCat.includes('plot')) {
-          return pType.includes('plot') || pCat.includes('plot') || pCat.includes('venture');
+        if (targetCat.includes('venture')) {
+          const isPlot = pType.includes('plot') || pCat.includes('plot') || pCat.includes('venture') || pTitle.includes('venture');
+          const isAmaravathi = pCat.includes('amaravathi') || pTitle.includes('amaravathi') || pCat.includes('lps') || pTitle.includes('lps');
+          const isCity = pBadge === 'open plot (city)' || (pCat.includes('city') && !pCat.includes('venture'));
+          return isPlot && !isAmaravathi && !isCity;
         }
         if (targetCat.includes('other')) {
-          return pType === 'other' || pCat.includes('other');
+          return pType.includes('other') || pCat.includes('other') || pCat.includes('warehouse') || pTitle.includes('warehouse');
         }
         return false;
       });

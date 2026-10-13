@@ -20,7 +20,7 @@ import PropertiesSearchPage from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import { mockApi, applySiteTheme, safeArray, deduplicateProperties } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
-import { urlParamsToSearchState, searchStateToUrlParams } from './firebase/searchUrl.js';
+import { urlParamsToSearchState, searchStateToUrlParams, createDefaultFilterState } from './firebase/searchUrl.js';
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
@@ -297,7 +297,7 @@ export default function App() {
 
     let activeFilterState = { ...filters };
     if ((resolvedPage === 'map' || resolvedPage === 'properties') && propIdOrFilters && typeof propIdOrFilters === 'object') {
-      activeFilterState = { ...filters, ...propIdOrFilters, cleared: false };
+      activeFilterState = createDefaultFilterState(propIdOrFilters);
       setFilters(activeFilterState);
     }
 
@@ -383,7 +383,7 @@ export default function App() {
 
     if (cleanPath.startsWith('/properties')) {
       const parsedFilters = urlParamsToSearchState(search);
-      setFilters(prev => ({ ...prev, ...parsedFilters }));
+      setFilters(createDefaultFilterState(parsedFilters));
       setActivePage('map');
       return;
     }
@@ -547,7 +547,7 @@ export default function App() {
     const catStr = String(searchPayload?.category || '').toLowerCase();
     if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
     else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
-    else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('commercial') || catStr.includes('commeric')) propType = 'COMMERCIAL';
     else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
     else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
     else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';
@@ -555,13 +555,11 @@ export default function App() {
     else if (catStr.includes('other')) propType = 'OTHER';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
-    const newFilters = {
-      ...filters,
-      cleared: false,
+    const newFilters = createDefaultFilterState({
       ...searchPayload,
       propertyType: propType !== 'ALL' ? propType : (searchPayload?.propertyType || 'ALL'),
       purpose: purp !== 'ALL' ? purp : (searchPayload?.purpose || 'ALL')
-    };
+    });
 
     setFilters(newFilters);
 
@@ -582,7 +580,7 @@ export default function App() {
     const catStr = String(catTitle || '').toLowerCase();
     if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
     else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
-    else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('commercial') || catStr.includes('commeric')) propType = 'COMMERCIAL';
     else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
     else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
     else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';
@@ -590,26 +588,11 @@ export default function App() {
     else if (catStr.includes('other')) propType = 'OTHER';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
-    const updatedFilters = {
-      query: '',
+    const updatedFilters = createDefaultFilterState({
       purpose: purp,
       propertyType: propType,
-      category: catTitle,
-      cleared: false,
-      state: '',
-      district: '',
-      city: '',
-      locality: '',
-      minPrice: '',
-      maxPrice: '',
-      minArea: '',
-      maxArea: '',
-      bedrooms: 'ANY',
-      facing: 'ALL',
-      furnishing: 'ALL',
-      amenities: [],
-      sortBy: 'newest'
-    };
+      category: catTitle
+    });
 
     setFilters(updatedFilters);
 
@@ -877,7 +860,7 @@ export default function App() {
                       </h2>
                     </div>
                     <button
-                      onClick={() => changeActivePage('map')}
+                      onClick={() => changeActivePage('map', { clean: true })}
                       className="mt-3 md:mt-0 text-sm font-bold text-brand-charcoal hover:text-brand-yellowHover flex items-center gap-1 cursor-pointer"
                     >
                       <span>Explore All Properties on Map</span>
@@ -1282,7 +1265,7 @@ export default function App() {
                 <li><button onClick={() => changeActivePage('buy')} className="hover:text-white">Buy Property Info</button></li>
                 <li><button onClick={() => changeActivePage('rent')} className="hover:text-white">Rent Property Info</button></li>
                 <li><button onClick={() => changeActivePage('sell')} className="hover:text-white">Sell Property Info</button></li>
-                <li><button onClick={() => changeActivePage('map')} className="hover:text-white">Explore Universal Map</button></li>
+                <li><button onClick={() => changeActivePage('map', { clean: true })} className="hover:text-white">Explore Universal Map</button></li>
               </ul>
             </div>
 

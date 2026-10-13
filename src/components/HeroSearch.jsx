@@ -89,7 +89,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     const catStr = String(currentCategory || '').toLowerCase();
     if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
     else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
-    else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('commercial') || catStr.includes('commeric')) propType = 'COMMERCIAL';
     else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
     else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
     else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';

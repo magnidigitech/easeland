@@ -33,7 +33,7 @@ export function getCategoryBadgeLabel(property) {
   if (exactMatch) return exactMatch;
 
   // Handle common spelling / formatting variations
-  if (str === 'COMMERCIAL PROPERTY' || str === 'COMMERCIAL') {
+  if (str === 'COMMERCIAL PROPERTY' || str === 'COMMERCIAL' || str === 'COMMERICAL PROPERTY' || str === 'COMMERICAL') {
     return 'Commerical Property';
   }
   if (str === 'APARTMENT' || str === 'APARTMENTS' || str === 'FLAT' || str === 'FLATS') {
@@ -45,18 +45,19 @@ export function getCategoryBadgeLabel(property) {
   if (str === 'AGRICULTURAL LAND' || str === 'FARMLAND' || str === 'FARM LAND' || str === 'AGRI LAND') {
     return 'Agricultural Lands';
   }
-  if (str === 'AMARAVATHI LPS' || str === 'AMARAVATI LPS' || str.includes('AMARAVATHI LPS') || str.includes('AMARAVATI LPS')) {
+  if (str === 'AMARAVATHI LPS' || str === 'AMARAVATI LPS' || str.includes('AMARAVATHI LPS') || str.includes('AMARAVATI LPS') || str.includes('CRDA LPS')) {
     return 'Amaravathi LPS layout plots';
   }
-  if (str === 'OPEN PLOT' || str === 'OPEN PLOTS' || str === 'OPEN_PLOT' || str === 'OPEN_PLOTS') {
-    return 'Open Plot Ventures';
+  if (str === 'OPEN PLOT (CITY)' || str === 'CITY PLOT' || str === 'CITY PLOTS') {
+    return 'Open Plot (City)';
   }
 
   // 2. Keyword matching in category, title, or property type
   const titleStr = String(property.title || '').toUpperCase();
-  const combined = `${str} ${titleStr}`;
+  const descStr = String(property.description || '').toUpperCase();
+  const combined = `${str} ${titleStr} ${descStr}`;
 
-  if (combined.includes('AMARAVATHI') || combined.includes('AMARAVATI') || combined.includes('LPS')) {
+  if (combined.includes('AMARAVATHI') || combined.includes('AMARAVATI') || combined.includes('LPS') || combined.includes('CRDA')) {
     return 'Amaravathi LPS layout plots';
   }
 
@@ -66,9 +67,9 @@ export function getCategoryBadgeLabel(property) {
 
   if (
     combined.includes('COMMERCIAL') ||
+    combined.includes('COMMERIC') ||
     combined.includes('OFFICE') ||
     combined.includes('RETAIL') ||
-    combined.includes('WAREHOUSE') ||
     combined.includes('SHOP')
   ) {
     return 'Commerical Property';
@@ -93,7 +94,8 @@ export function getCategoryBadgeLabel(property) {
 
   if (
     (combined.includes('PLOT') || str === 'OPEN_PLOT') &&
-    (combined.includes('CITY') || combined.includes('MUNICIPAL') || combined.includes('COLONY') || combined.includes('TOWN'))
+    (combined.includes('CITY') || combined.includes('MUNICIPAL') || combined.includes('COLONY') || combined.includes('TOWN')) &&
+    !combined.includes('VENTURE')
   ) {
     return 'Open Plot (City)';
   }
@@ -105,12 +107,15 @@ export function getCategoryBadgeLabel(property) {
     combined.includes('HMDA') ||
     combined.includes('RERA') ||
     combined.includes('PLOT') ||
-    str === 'OPEN_PLOT'
+    str === 'OPEN_PLOT' ||
+    str === 'OPEN PLOT' ||
+    str === 'OPEN_PLOTS' ||
+    str === 'OPEN PLOTS'
   ) {
     return 'Open Plot Ventures';
   }
 
-  if (combined.includes('OTHER') || combined.includes('OTHERS')) {
+  if (combined.includes('OTHER') || combined.includes('OTHERS') || combined.includes('WAREHOUSE')) {
     return 'Others';
   }
 
