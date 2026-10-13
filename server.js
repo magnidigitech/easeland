@@ -554,6 +554,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             existingProp.videoLink = publicUrl;
             existingProp.embeddedVideoUrl = publicUrl;
           }
+        }
         saveLocalProperty(existingProp);
 
         // Sync directly to PostgreSQL properties table raw_data so getPropertyById has it immediately
