@@ -53,16 +53,20 @@ export default function UserDashboard({
   onWishlistToggle,
   onNavigate,
   onPostProperty,
-  initialTab = 'overview'
+  initialTab = 'overview',
+  tabKey = 0
 }) {
   const { updateProfileData } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab || 'overview'); // 'overview', 'properties', 'verification', 'enquiries', 'wishlist', 'notifications', 'account'
 
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const tabFromUrl = urlParams ? urlParams.get('tab') : null;
+    const targetTab = tabFromUrl || initialTab;
+    if (targetTab) {
+      setActiveTab(targetTab);
     }
-  }, [initialTab]);
+  }, [initialTab, tabKey]);
 
   const [propertyFilter, setPropertyFilter] = useState('ALL'); // 'ALL', 'LIVE', 'PENDING_VERIFICATION', 'CHANGES_REQUIRED', 'REJECTED', 'DRAFT', 'UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'
   const [enquiryType, setEnquiryType] = useState('RECEIVED'); // 'RECEIVED', 'SENT'
@@ -189,6 +193,29 @@ export default function UserDashboard({
       accountType: 'Verified Property Owner & Buyer'
     }));
   }, [user?.uid, user?.id, user?.email, user?.name, user?.displayName, user?.phone, user?.city]);
+
+  useEffect(() => {
+    if (activeTab === 'account') {
+      const timer = setTimeout(() => {
+        const ph = sanitizePhone(user?.phone || user?.phoneNumber) || profileForm?.phone;
+        const nm = user?.name || user?.displayName || profileForm?.name;
+        const em = user?.email || profileForm?.email;
+        const ct = user?.city || user?.location || profileForm?.city;
+
+        let targetId = 'account-profile-phone';
+        if (!nm) targetId = 'account-profile-name';
+        else if (!em) targetId = 'account-profile-email';
+        else if (!ph) targetId = 'account-profile-phone';
+        else if (!ct) targetId = 'account-profile-city';
+
+        const elem = document.getElementById(targetId);
+        if (elem) {
+          elem.focus();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, tabKey]);
 
   // Load user properties directly from PostgreSQL API (/api/properties) on mount and when events fire
   const refreshUserProperties = async () => {
@@ -1397,8 +1424,31 @@ export default function UserDashboard({
 
             {/* TAB 7: ACCOUNT SETTINGS */}
             {activeTab === 'account' && (
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                <h2 className="font-extrabold text-lg text-brand-charcoal">Account & Profile Settings</h2>
+              <div id="account-profile-settings-section" className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-gray-100">
+                  <div>
+                    <h2 className="font-extrabold text-lg text-brand-charcoal">Account & Profile Settings</h2>
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                      Ensure all required profile details are completed to post properties smoothly on EaseLand.
+                    </p>
+                  </div>
+                  {/* Status Badge */}
+                  {(() => {
+                    const isNameFilled = Boolean((profileForm.name || '').trim());
+                    const isEmailFilled = Boolean((profileForm.email || '').trim());
+                    const isPhoneFilled = Boolean((profileForm.phone || '').trim());
+                    const isCityFilled = Boolean((profileForm.city || '').trim());
+                    const allFilled = isNameFilled && isEmailFilled && isPhoneFilled && isCityFilled;
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black self-start sm:self-auto ${
+                        allFilled ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}>
+                        {allFilled ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
+                        {allFilled ? 'All Criteria Met' : 'Incomplete Profile'}
+                      </span>
+                    );
+                  })()}
+                </div>
 
                 {profileSaveError && (
                   <div className="bg-red-50 text-red-800 text-xs font-extrabold p-3 rounded-xl border border-red-200 flex items-center gap-2">
@@ -1408,24 +1458,64 @@ export default function UserDashboard({
                 )}
 
                 {savedSuccess && (
-                  <div className="bg-emerald-50 text-emerald-800 text-xs font-extrabold p-3 rounded-xl border border-emerald-200 flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Profile settings updated successfully! All posting criteria met.</span>
+                  <div className="bg-emerald-50 text-emerald-800 text-xs font-extrabold p-4 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Profile settings updated successfully! All posting criteria met.</span>
+                    </div>
+                    {onPostProperty && (
+                      <button
+                        type="button"
+                        onClick={onPostProperty}
+                        className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-lg shadow-sm border border-amber-300 flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Continue to Post Property</span>
+                      </button>
+                    )}
                   </div>
                 )}
 
-                <form onSubmit={handleProfileSave} className="space-y-4">
-                  <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-[11px] font-bold text-amber-900 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Note: All 4 profile fields below are required criteria before you can post property listings.</span>
-                  </div>
+                {/* Missing required criteria warning banner if any field is empty */}
+                {(() => {
+                  const missing = [];
+                  if (!(profileForm.name || '').trim()) missing.push('Full Name');
+                  if (!(profileForm.email || '').trim()) missing.push('Email Address');
+                  if (!(profileForm.phone || '').trim()) missing.push('Phone Number');
+                  if (!(profileForm.city || '').trim()) missing.push('City / Location');
 
+                  if (missing.length > 0) {
+                    return (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs font-bold text-amber-900 space-y-2">
+                        <div className="flex items-center gap-2 text-amber-800 font-extrabold">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>Profile Criteria Required Before Listing Properties</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 font-medium">
+                          Before posting a property listing on EaseLand, all 4 Account & Profile fields must be completed. Please fill out the missing required fields below:
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {missing.map((f) => (
+                            <span key={f} className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-2.5 py-1 rounded-md text-[11px] font-black border border-amber-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <form onSubmit={handleProfileSave} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      <label htmlFor="account-profile-name" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                         Full Name <span className="text-red-500">*</span>
                       </label>
                       <input
+                        id="account-profile-name"
                         type="text"
                         required
                         placeholder="Enter Your Name"
@@ -1436,10 +1526,11 @@ export default function UserDashboard({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      <label htmlFor="account-profile-email" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                         Email Address <span className="text-red-500">*</span>
                       </label>
                       <input
+                        id="account-profile-email"
                         type="email"
                         required
                         placeholder="Enter Your Email Address"
@@ -1450,13 +1541,14 @@ export default function UserDashboard({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      <label htmlFor="account-profile-phone" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                         Phone Number <span className="text-red-500">*</span>
                       </label>
                       <input
+                        id="account-profile-phone"
                         type="text"
                         required
-                        placeholder="Enter Your Phone Number"
+                        placeholder="Enter Your 10-digit Phone Number"
                         value={profileForm.phone}
                         onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                         className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-bold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
@@ -1464,10 +1556,11 @@ export default function UserDashboard({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      <label htmlFor="account-profile-city" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                         City / Location <span className="text-red-500">*</span>
                       </label>
                       <input
+                        id="account-profile-city"
                         type="text"
                         required
                         placeholder="Enter Your City / Location"
@@ -1478,11 +1571,21 @@ export default function UserDashboard({
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-100 flex items-center justify-end">
+                  <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                    {onPostProperty && (
+                      <button
+                        type="button"
+                        onClick={onPostProperty}
+                        className="text-xs font-extrabold text-gray-600 hover:text-brand-charcoal hover:underline flex items-center gap-1.5"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Go to Post Property</span>
+                      </button>
+                    )}
                     <button
                       type="submit"
                       disabled={savingProfile}
-                      className="bg-brand-charcoal hover:bg-brand-charcoalLight disabled:opacity-50 text-white font-extrabold text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-2"
+                      className="ml-auto bg-brand-charcoal hover:bg-brand-charcoalLight disabled:opacity-50 text-white font-extrabold text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all"
                     >
                       <Save className="w-4 h-4 text-brand-yellow" />
                       <span>{savingProfile ? 'Saving...' : 'Save Changes'}</span>

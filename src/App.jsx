@@ -142,6 +142,7 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [authIntent, setAuthIntent] = useState(null);
   const [dashboardTab, setDashboardTab] = useState('overview');
+  const [dashboardTabKey, setDashboardTabKey] = useState(Date.now());
 
   // Search & Filter State
   const [filters, setFilters] = useState({
@@ -280,7 +281,8 @@ export default function App() {
       } else if (resolvedPage === 'post-property') {
         targetPath = '/post-property';
       } else if (resolvedPage === 'dashboard') {
-        targetPath = '/dashboard';
+        const targetTab = (propIdOrFilters && typeof propIdOrFilters === 'object' && propIdOrFilters.tab) ? propIdOrFilters.tab : dashboardTab;
+        targetPath = targetTab && targetTab !== 'overview' ? `/dashboard?tab=${targetTab}` : '/dashboard';
       } else if (resolvedPage === 'wishlist') {
         targetPath = '/wishlist';
       } else if (resolvedPage === 'privacy-policy' || resolvedPage === 'privacy') {
@@ -369,6 +371,11 @@ export default function App() {
     }
 
     if (cleanPath === '/dashboard') {
+      const tabParam = urlParams.get('tab');
+      if (tabParam) {
+        setDashboardTab(tabParam);
+        setDashboardTabKey(Date.now());
+      }
       setActivePage('dashboard');
       try { localStorage.setItem('easeland_active_page', 'dashboard'); } catch(e){}
       return;
@@ -586,6 +593,40 @@ export default function App() {
         changeActivePage('post-property');
       }
     }
+  };
+
+  const navigateToAccountSettings = (mode = 'dashboard') => {
+    setIsProfileWarningOpen(false);
+
+    if (mode === 'popup') {
+      setIsProfileModalOpen(true);
+      return;
+    }
+
+    setDashboardTab('account');
+    setDashboardTabKey(Date.now());
+    changeActivePage('dashboard', { tab: 'account' });
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    setTimeout(() => {
+      const section = document.getElementById('account-profile-settings-section');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const missingName = document.getElementById('account-profile-name');
+      const missingEmail = document.getElementById('account-profile-email');
+      const missingPhone = document.getElementById('account-profile-phone');
+      const missingCity = document.getElementById('account-profile-city');
+
+      if (missingName && !missingName.value) missingName.focus();
+      else if (missingEmail && !missingEmail.value) missingEmail.focus();
+      else if (missingPhone && !missingPhone.value) missingPhone.focus();
+      else if (missingCity && !missingCity.value) missingCity.focus();
+      else if (missingPhone) missingPhone.focus();
+    }, 300);
   };
 
   const handleAuthSuccess = (authenticatedUser, intent) => {
@@ -968,8 +1009,7 @@ export default function App() {
             }}
             onCancel={() => {
               setEditingPropertyId(null);
-              setDashboardTab('account');
-              changeActivePage('dashboard');
+              navigateToAccountSettings('dashboard');
             }}
           />
         )}
@@ -989,6 +1029,7 @@ export default function App() {
           <UserDashboard
             user={currentUser}
             initialTab={dashboardTab}
+            tabKey={dashboardTabKey}
             properties={properties}
             wishlist={wishlistProperties}
             onWishlistToggle={handleWishlistToggle}
@@ -1196,24 +1237,37 @@ export default function App() {
               </ul>
             </div>
 
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setIsProfileWarningOpen(false);
-                  setDashboardTab('account');
-                  changeActivePage('dashboard');
-                }}
-                className="flex-1 bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
-              >
-                <Settings className="w-4 h-4 text-brand-yellow" />
-                <span>Fill Account Settings</span>
-              </button>
-              <button
-                onClick={() => setIsProfileWarningOpen(false)}
-                className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-xl transition-all"
-              >
-                Cancel
-              </button>
+            <div className="space-y-3 pt-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigateToAccountSettings('dashboard')}
+                  className="flex-1 bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  title="Redirect to Account & Profile Settings in Dashboard"
+                >
+                  <Settings className="w-4 h-4 text-brand-yellow" />
+                  <span>Fill Account Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsProfileWarningOpen(false)}
+                  className="px-5 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-xl transition-all text-center cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <div className="text-center pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => navigateToAccountSettings('popup')}
+                  className="text-[11px] font-bold text-amber-800 hover:text-amber-950 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                  title="Quick Fill Required Details via Profile Popup Modal"
+                >
+                  <User className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Prefer a quick popup instead? Click here</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
