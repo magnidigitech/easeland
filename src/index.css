@@ -489,7 +489,7 @@ input[type="number"] {
     pointer;
 }
 
-/* Universal application cursor: every element inherits the custom marker */
+/* Base application cursor: custom compact Map Marker on all general surfaces */
 html,
 body,
 #root,
@@ -499,7 +499,7 @@ body,
   cursor: var(--cursor-marker-default);
 }
 
-/* All interactive, clickable elements AND their child tags (icons, spans, svgs) */
+/* All interactive, clickable buttons and links change into hand like usual */
 a,
 a *,
 button,
@@ -511,27 +511,26 @@ select *,
 summary,
 summary *,
 label,
+label *,
 input[type="button"],
 input[type="submit"],
 input[type="reset"],
 input[type="checkbox"],
 input[type="radio"],
 .cursor-pointer,
-.cursor-pointer * {
-  cursor: var(--cursor-marker-pointer) !important;
-}
-
-/* Leaflet maps, markers, and overlay interactive panes */
-.leaflet-container,
-.leaflet-container *,
-.leaflet-grab,
-.leaflet-grab *,
+.cursor-pointer *,
 .leaflet-interactive,
 .leaflet-marker-icon,
 .custom-map-marker-container,
 .custom-map-marker-container *,
 .custom-map-marker {
-  cursor: var(--cursor-marker-pointer) !important;
+  cursor: pointer !important;
+}
+
+/* Leaflet maps panning */
+.leaflet-container,
+.leaflet-grab {
+  cursor: var(--cursor-marker-default) !important;
 }
 
 .leaflet-dragging,
