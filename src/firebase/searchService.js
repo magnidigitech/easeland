@@ -228,7 +228,10 @@ export async function searchPublicProperties({
     const {
       purpose,
       propertyType,
+      state,
+      district,
       city,
+      locality,
       minPrice,
       maxPrice,
       minAreaSqFt,
@@ -317,6 +320,14 @@ export async function searchPublicProperties({
       }
       if (city && city.trim()) {
         filteredCandidates = filteredCandidates.filter(c => String(c.data.location?.city || '').toLowerCase() === city.trim().toLowerCase());
+      }
+      if (locality && locality.trim()) {
+        const locClean = locality.trim().toLowerCase();
+        filteredCandidates = filteredCandidates.filter(c => {
+          const loc = c.data.location || {};
+          const locBlob = [loc.locality, loc.subLocality, loc.colony, loc.mandal, loc.address, c.data.title].filter(Boolean).join(' ').toLowerCase();
+          return locBlob.includes(locClean);
+        });
       }
       if (hasPriceRange) {
         filteredCandidates = filteredCandidates.filter(c => {
@@ -509,9 +520,19 @@ export async function searchPublicProperties({
       };
     });
 
+    let filteredProperties = properties;
+    if (locality && locality.trim()) {
+      const locClean = locality.trim().toLowerCase();
+      filteredProperties = filteredProperties.filter(p => {
+        const loc = p.location || {};
+        const locBlob = [loc.locality, loc.subLocality, loc.colony, loc.mandal, loc.address, p.title].filter(Boolean).join(' ').toLowerCase();
+        return locBlob.includes(locClean);
+      });
+    }
+
     return {
       success: true,
-      properties,
+      properties: filteredProperties,
       lastDoc: newLastDoc,
       hasMore: snap.docs.length === pageSize,
       candidateLimitReached: false,

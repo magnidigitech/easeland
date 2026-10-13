@@ -1,7 +1,12 @@
-import React from 'react';
-import { X, Filter, RotateCcw, Check, Navigation, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, Filter, RotateCcw, Check, Navigation, AlertCircle, MapPin } from 'lucide-react';
 import { PropertyType, Purpose } from '../firebase/schema.js';
 import { resolvePlaceCoordinates } from '../services/locationProvider.js';
+import {
+  resolveLocalityHierarchy,
+  searchLocalities,
+  searchCities
+} from '../utils/locationHierarchyUtils.js';
 
 export const AREA_UNIT_OPTIONS = [
   { label: 'Sq Ft', value: 'sq ft' },
@@ -81,6 +86,143 @@ export default function DynamicFilterPanel({
 
   const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType);
 
+  const cityContainerRef = useRef(null);
+  const localityContainerRef = useRef(null);
+  const [cityQuery, setCityQuery] = useState(filters?.city || '');
+  const [localityQuery, setLocalityQuery] = useState(filters?.locality || '');
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showLocalityDropdown, setShowLocalityDropdown] = useState(false);
+
+  useEffect(() => {
+    setCityQuery(filters?.city || '');
+  }, [filters?.city]);
+
+  useEffect(() => {
+    setLocalityQuery(filters?.locality || '');
+  }, [filters?.locality]);
+
+  // Click outside listener for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (cityContainerRef.current && !cityContainerRef.current.contains(e.target)) {
+        setShowCityDropdown(false);
+      }
+      if (localityContainerRef.current && !localityContainerRef.current.contains(e.target)) {
+        setShowLocalityDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const citySuggestions = useMemo(() => {
+    if (!cityQuery.trim()) {
+      return searchCities('', 8);
+    }
+    return searchCities(cityQuery, 8);
+  }, [cityQuery]);
+
+  const localitySuggestions = useMemo(() => {
+    return searchLocalities(localityQuery, filters?.city || '', 8);
+  }, [localityQuery, filters?.city]);
+
+  const resolvedHierarchy = useMemo(() => {
+    if (!filters?.locality) return null;
+    return resolveLocalityHierarchy(filters.locality);
+  }, [filters?.locality]);
+
+  const handleSelectCity = (cityItem) => {
+    setFilters(prev => {
+      const currentLocality = prev.locality;
+      let keepLocality = false;
+      if (currentLocality) {
+        const resolved = resolveLocalityHierarchy(currentLocality);
+        if (resolved && (resolved.city.toLowerCase() === cityItem.city.toLowerCase() || cityItem.city.toLowerCase().includes(resolved.city.toLowerCase()))) {
+          keepLocality = true;
+        }
+      }
+
+      return {
+        ...prev,
+        cleared: false,
+        city: cityItem.city,
+        state: cityItem.state,
+        district: cityItem.district,
+        locality: keepLocality ? currentLocality : ''
+      };
+    });
+    setCityQuery(cityItem.city);
+    setShowCityDropdown(false);
+  };
+
+  const handleSelectLocality = (locItem) => {
+    setFilters(prev => ({
+      ...prev,
+      cleared: false,
+      locality: locItem.locality,
+      city: locItem.city,
+      district: locItem.district,
+      state: locItem.state
+    }));
+    setLocalityQuery(locItem.locality);
+    setCityQuery(locItem.city);
+    setShowLocalityDropdown(false);
+  };
+
+  const handleCityInputChange = (val) => {
+    setCityQuery(val);
+    setShowCityDropdown(true);
+    setFilters(prev => ({
+      ...prev,
+      cleared: false,
+      city: val
+    }));
+  };
+
+  const handleLocalityInputChange = (val) => {
+    setLocalityQuery(val);
+    setShowLocalityDropdown(true);
+
+    const resolved = resolveLocalityHierarchy(val);
+    if (resolved) {
+      setFilters(prev => ({
+        ...prev,
+        cleared: false,
+        locality: val,
+        city: resolved.city,
+        district: resolved.district,
+        state: resolved.state
+      }));
+      setCityQuery(resolved.city);
+    } else {
+      setFilters(prev => ({
+        ...prev,
+        cleared: false,
+        locality: val
+      }));
+    }
+  };
+
+  const handleClearCity = () => {
+    setCityQuery('');
+    setFilters(prev => ({
+      ...prev,
+      city: '',
+      district: '',
+      state: ''
+    }));
+    setShowCityDropdown(false);
+  };
+
+  const handleClearLocality = () => {
+    setLocalityQuery('');
+    setFilters(prev => ({
+      ...prev,
+      locality: ''
+    }));
+    setShowLocalityDropdown(false);
+  };
+
   const handleChange = (key, value) => {
     let cleanVal = value;
     if (['minPrice', 'maxPrice', 'minArea', 'maxArea', 'minAreaSqFt', 'maxAreaSqFt'].includes(key)) {
@@ -112,6 +254,10 @@ export default function DynamicFilterPanel({
   };
 
   const handleReset = () => {
+    setShowCityDropdown(false);
+    setShowLocalityDropdown(false);
+    setCityQuery('');
+    setLocalityQuery('');
     setFilters({
       cleared: false,
       query: '',
@@ -392,25 +538,142 @@ export default function DynamicFilterPanel({
 
         {/* Location Filters */}
         <div className="space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
-            Location Search
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Enter City"
-              value={filters.city || ''}
-              onChange={(e) => handleChange('city', e.target.value)}
-              className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
-            />
-            <input
-              type="text"
-              placeholder="Enter Locality"
-              value={filters.locality || ''}
-              onChange={(e) => handleChange('locality', e.target.value)}
-              className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
-            />
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
+              Location Search
+            </label>
+            {(filters.city || filters.locality) && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearCity();
+                  handleClearLocality();
+                }}
+                className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline"
+              >
+                Reset Location
+              </button>
+            )}
           </div>
+
+          <div className="grid grid-cols-2 gap-2 relative">
+            {/* CITY INPUT WITH AUTOCOMPLETE */}
+            <div ref={cityContainerRef} className="relative">
+              <input
+                type="text"
+                placeholder="Enter City"
+                value={cityQuery}
+                onFocus={() => setShowCityDropdown(true)}
+                onChange={(e) => handleCityInputChange(e.target.value)}
+                className="w-full p-2.5 pr-7 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
+              />
+              {cityQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearCity}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                  title="Clear City"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* City Suggestions Dropdown */}
+              {showCityDropdown && citySuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto divide-y divide-gray-100">
+                  {citySuggestions.map((item, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectCity(item);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-amber-50 flex flex-col transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-gray-900">{item.city}</span>
+                      <span className="text-[10px] text-gray-500">{item.district ? `${item.district} Dist, ` : ''}{item.state}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* LOCALITY INPUT WITH AUTOCOMPLETE & HIERARCHY SATISFACTION */}
+            <div ref={localityContainerRef} className="relative">
+              <input
+                type="text"
+                placeholder="Enter Locality"
+                value={localityQuery}
+                onFocus={() => setShowLocalityDropdown(true)}
+                onChange={(e) => handleLocalityInputChange(e.target.value)}
+                className="w-full p-2.5 pr-7 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
+              />
+              {localityQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearLocality}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                  title="Clear Locality"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Locality Suggestions Dropdown */}
+              {showLocalityDropdown && localitySuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto divide-y divide-gray-100">
+                  {localitySuggestions.map((item, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectLocality(item);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-amber-50 flex flex-col transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-gray-900">{item.locality}</span>
+                      <span className="text-[10px] text-gray-500">
+                        {item.city}{item.state ? `, ${item.state}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Visual Confirmation of Satisfied Hierarchy */}
+          {filters.locality && (
+            <div className="flex items-center justify-between p-2 bg-amber-50/80 border border-amber-200 rounded-lg text-xs text-amber-950">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="truncate">
+                  <strong className="font-extrabold text-amber-900">{filters.locality}</strong>
+                  {resolvedHierarchy ? (
+                    <span className="text-[11px] text-amber-800 ml-1">
+                      satisfies <strong>{resolvedHierarchy.city}</strong> ({resolvedHierarchy.state})
+                    </span>
+                  ) : filters.city ? (
+                    <span className="text-[11px] text-amber-800 ml-1">
+                      in <strong>{filters.city}</strong>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-800 ml-1">(Locality Filter Active)</span>
+                  )}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearLocality}
+                className="text-amber-700 hover:text-amber-900 ml-1 p-0.5 rounded hover:bg-amber-100"
+                title="Clear Locality Filter"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Price Range with Interactive Price Dragger */}

@@ -16,7 +16,7 @@ import PostPropertyWizard from './pages/PostPropertyWizard';
 import AdminPortal from './pages/AdminPortal';
 import EaseLandCRM from './pages/EaseLandCRM';
 import UserDashboard from './components/UserDashboard';
-import PropertiesSearchPage from './pages/PropertiesSearchPage';
+import PropertiesSearchPage, { matchesSearchFilters } from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import { mockApi, applySiteTheme, safeArray, deduplicateProperties } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
@@ -276,7 +276,11 @@ export default function App() {
 
     const localData = mockApi.getPublicProperties(filters) || [];
 
-    const merged = deduplicateProperties([...pgProperties, ...fsProperties, ...localData]);
+    const candidateProps = [...pgProperties, ...fsProperties, ...localData];
+    const hasActiveFilters = filters && Object.values(filters).some(v => v !== '' && v !== null && v !== undefined && v !== 'All' && v !== 'ALL');
+    const filteredCandidates = hasActiveFilters ? candidateProps.filter(p => matchesSearchFilters(p, filters)) : candidateProps;
+
+    const merged = deduplicateProperties(filteredCandidates);
     setProperties(merged);
     refreshWishlist();
   };

@@ -576,6 +576,56 @@ export const mockApi = {
     if (filters.cornerPlot) result = result.filter(p => p.cornerPlot === true);
     if (filters.gatedCommunity) result = result.filter(p => p.gatedCommunity === true);
 
+    // Location Filters (State, District, City, Locality)
+    if (filters.state && filters.state.trim()) {
+      const stateVal = filters.state.toLowerCase().trim();
+      result = result.filter(p => {
+        const loc = p.location || {};
+        const stateBlob = [loc.state, p.state].filter(Boolean).join(' ').toLowerCase();
+        return stateBlob.includes(stateVal);
+      });
+    }
+
+    if (filters.district && filters.district.trim()) {
+      const distVal = filters.district.toLowerCase().trim();
+      result = result.filter(p => {
+        const loc = p.location || {};
+        const distBlob = [loc.district, p.district].filter(Boolean).join(' ').toLowerCase();
+        return distBlob.includes(distVal);
+      });
+    }
+
+    if (filters.city && filters.city.trim()) {
+      const cityVal = filters.city.toLowerCase().trim();
+      result = result.filter(p => {
+        const loc = p.location || {};
+        const cityBlob = [
+          loc.city, loc.mandal, loc.address, loc.locality,
+          p.city, p.title, p.address
+        ].filter(Boolean).join(' ').toLowerCase();
+        return cityBlob.includes(cityVal);
+      });
+    }
+
+    if (filters.locality && filters.locality.trim()) {
+      const locClean = filters.locality.toLowerCase().trim();
+      const locTokens = locClean.split(/[\s,]+/).filter(tok => tok.length > 1);
+      result = result.filter(p => {
+        const loc = p.location || {};
+        const locBlob = [
+          loc.locality, loc.subLocality, loc.colony, loc.mandal, loc.village,
+          loc.road, loc.street, loc.layout, loc.landmark, loc.address, loc.formattedAddress,
+          p.locality, p.address, p.title, p.description
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (locBlob.includes(locClean)) return true;
+        if (locTokens.length > 0) {
+          return locTokens.every(tok => locBlob.includes(tok));
+        }
+        return false;
+      });
+    }
+
     return result;
   },
 

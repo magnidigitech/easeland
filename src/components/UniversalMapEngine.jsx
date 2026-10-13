@@ -6,6 +6,7 @@ import DynamicFilterPanel from './DynamicFilterPanel';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
 import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
+import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -23,7 +24,8 @@ export default function UniversalMapEngine({
   onWishlistToggle,
   isWishlisted,
   focusedProperty = null,
-  hideSidePanel = false
+  hideSidePanel = false,
+  onApplyFilters = null
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -33,8 +35,11 @@ export default function UniversalMapEngine({
   const polygonLayerRef = useRef(null);
   const userLocationMarkerRef = useRef(null);
 
-  // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas
-  const displayProperties = useMemo(() => deduplicateProperties(properties), [properties]);
+  // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas, filtered by active search filters
+  const displayProperties = useMemo(() => {
+    const raw = deduplicateProperties(properties);
+    return raw.filter(p => matchesSearchFilters(p, filters));
+  }, [properties, filters]);
 
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(!hideSidePanel);
@@ -1197,7 +1202,11 @@ export default function UniversalMapEngine({
         onClose={() => setFilterPanelOpen(false)}
         filters={filters}
         setFilters={setFilters}
-        onApplyFilters={() => {}}
+        onApplyFilters={() => {
+          if (typeof onApplyFilters === 'function') {
+            onApplyFilters();
+          }
+        }}
         totalCount={displayProperties.length}
       />
 
