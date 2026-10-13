@@ -86,53 +86,127 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     boundary: null
   });
 
+  // Helper: Apply loaded property data into wizard state
+  const applyPropertyToForm = (p) => {
+    if (!p) return;
+    const pId = p.propertyId || p.id;
+    if (pId) setPropertyId(pId);
+    if (p.referenceId) setReferenceId(p.referenceId);
+
+    let cachedLoc = p.location || null;
+    if (typeof window !== 'undefined') {
+      try {
+        const storedLoc = localStorage.getItem(`easeland_wizard_location_${pId}`) || localStorage.getItem(`easeland_wizard_location_${user?.uid}`);
+        if (storedLoc) cachedLoc = JSON.parse(storedLoc);
+      } catch (e) {}
+    }
+
+    setFormData({
+      title: p.title || '',
+      propertyType: p.propertyType || PropertyType.OPEN_PLOT,
+      otherPropertyType: p.otherPropertyType || '',
+      purpose: p.purpose || Purpose.SALE,
+      price: p.price !== undefined && p.price !== null ? String(p.price) : '',
+      area: p.area !== undefined && p.area !== null ? String(p.area) : '',
+      areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT,
+      description: p.description || '',
+      specs: {
+        ...(p.specs || {}),
+        areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT
+      },
+      amenities: Array.isArray(p.amenities) ? p.amenities : [],
+      media: Array.isArray(p.media) ? p.media : (Array.isArray(p.photos) ? p.photos : []),
+      photos: Array.isArray(p.photos) ? p.photos : (Array.isArray(p.media) ? p.media.filter(m => m.type === 'PHOTO') : []),
+      documents: Array.isArray(p.documents) ? p.documents : [],
+      videoUrl: p.videoUrl || p.videoLink || null,
+      videoLink: p.videoLink || p.videoUrl || null,
+      embeddedVideoUrl: p.embeddedVideoUrl || null,
+      location: cachedLoc,
+      boundary: p.boundary || p.ownerSubmittedBoundary || null,
+      ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || null
+    });
+    setStep(1);
+    setShowResumeModal(false);
+  };
+
   // Load existing owner drafts or target resume property on mount
   useEffect(() => {
     if (user?.uid) {
       if (resumePropertyId) {
-        getPropertyById(resumePropertyId, user.uid).then(res => {
-          if (res.success && res.property) {
-            const p = res.property;
-            const pId = p.propertyId || p.id;
-            setPropertyId(pId);
-            setReferenceId(p.referenceId);
+        const loadTargetProperty = async () => {
+          let foundProp = null;
 
-            let cachedLoc = p.location || null;
-            if (typeof window !== 'undefined') {
-              try {
-                const storedLoc = localStorage.getItem(`easeland_wizard_location_${pId}`) || localStorage.getItem(`easeland_wizard_location_${user.uid}`);
-                if (storedLoc) cachedLoc = JSON.parse(storedLoc);
-              } catch (e) {}
-            }
-
-            setFormData({
-              title: p.title || '',
-              propertyType: p.propertyType || PropertyType.OPEN_PLOT,
-              otherPropertyType: p.otherPropertyType || '',
-              purpose: p.purpose || Purpose.SALE,
-              price: p.price ? String(p.price) : '',
-              area: p.area ? String(p.area) : '',
-              areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT,
-              description: p.description || '',
-              specs: {
-                ...(p.specs || {}),
-                areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT
-              },
-              amenities: Array.isArray(p.amenities) ? p.amenities : [],
-              media: Array.isArray(p.media) ? p.media : (Array.isArray(p.photos) ? p.photos : []),
-              photos: Array.isArray(p.photos) ? p.photos : [],
-              documents: Array.isArray(p.documents) ? p.documents : [],
-              videoUrl: p.videoUrl || p.videoLink || null,
-              videoLink: p.videoLink || p.videoUrl || null,
-              embeddedVideoUrl: p.embeddedVideoUrl || null,
-              location: cachedLoc,
-              boundary: p.boundary || null,
-              ownerSubmittedBoundary: p.ownerSubmittedBoundary || null
-            });
-            setStep(p.lastStep || 1);
-            setShowResumeModal(false);
+          // 1. Instant cache check from sessionStorage
+          if (typeof window !== 'undefined') {
+            try {
+              const rawCached = sessionStorage.getItem('easeland_editing_property');
+              if (rawCached) {
+                const parsed = JSON.parse(rawCached);
+                const cId = String(parsed.propertyId || parsed.id || parsed.referenceId || '').toLowerCase().trim();
+                const rId = String(resumePropertyId || '').toLowerCase().trim();
+                if (cId && (cId === rId || !resumePropertyId)) {
+                  foundProp = parsed;
+                  applyPropertyToForm(parsed);
+                }
+              }
+            } catch (e) {}
           }
-        });
+
+          // 2. Fetch latest from getPropertyById
+          try {
+            const res = await getPropertyById(resumePropertyId, user.uid, false, user.email);
+            if (res.success && res.property) {
+              foundProp = res.property;
+              applyPropertyToForm(res.property);
+              return;
+            }
+          } catch (e) {}
+
+          // 3. Fallback: Search in owner drafts (the same method used by the modal)
+          if (!foundProp) {
+            try {
+              const dRes = await getOwnerDrafts(user.uid);
+              if (dRes.success && Array.isArray(dRes.drafts)) {
+                const targetStr = String(resumePropertyId).toLowerCase().trim();
+                const match = dRes.drafts.find(d => {
+                  if (!d) return false;
+                  const dId = String(d.id || '').toLowerCase().trim();
+                  const dPropId = String(d.propertyId || '').toLowerCase().trim();
+                  const dRefId = String(d.referenceId || '').toLowerCase().trim();
+                  const dTitle = String(d.title || '').toLowerCase().trim();
+                  return dId === targetStr || dPropId === targetStr || dRefId === targetStr || (dTitle && dTitle === targetStr);
+                });
+                if (match) {
+                  foundProp = match;
+                  applyPropertyToForm(match);
+                  return;
+                }
+              }
+            } catch (e) {}
+          }
+
+          // 4. Fallback: Search in mockApi
+          if (!foundProp) {
+            try {
+              const { mockApi } = await import('../services/mockApi.js');
+              const targetStr = String(resumePropertyId).toLowerCase().trim();
+              const allProps = mockApi.getProperties();
+              const match = allProps.find(p => {
+                if (!p) return false;
+                const pId = String(p.id || '').toLowerCase().trim();
+                const pPropId = String(p.propertyId || '').toLowerCase().trim();
+                const pRefId = String(p.referenceId || '').toLowerCase().trim();
+                return pId === targetStr || pPropId === targetStr || pRefId === targetStr;
+              });
+              if (match) {
+                applyPropertyToForm(match);
+                return;
+              }
+            } catch (e) {}
+          }
+        };
+
+        loadTargetProperty();
       } else {
         getOwnerDrafts(user.uid).then(res => {
           if (res.success && res.drafts.length > 0) {
@@ -146,43 +220,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
   // Resume selected draft
   const handleResumeDraft = (draft) => {
-    const dId = draft.propertyId || draft.id;
-    setPropertyId(dId);
-    setReferenceId(draft.referenceId);
-
-    let cachedLoc = draft.location || null;
-    if (typeof window !== 'undefined') {
-      try {
-        const storedLoc = localStorage.getItem(`easeland_wizard_location_${dId}`) || localStorage.getItem(`easeland_wizard_location_${user?.uid}`);
-        if (storedLoc) cachedLoc = JSON.parse(storedLoc);
-      } catch (e) {}
-    }
-
-    setFormData({
-      title: draft.title || '',
-      propertyType: draft.propertyType || PropertyType.OPEN_PLOT,
-      otherPropertyType: draft.otherPropertyType || '',
-      purpose: draft.purpose || Purpose.SALE,
-      price: draft.price ? String(draft.price) : '',
-      area: draft.area ? String(draft.area) : '',
-      areaUnit: draft.areaUnit || draft.specs?.areaUnit || AreaUnit.SQ_FT,
-      description: draft.description || '',
-      specs: {
-        ...(draft.specs || {}),
-        areaUnit: draft.areaUnit || draft.specs?.areaUnit || AreaUnit.SQ_FT
-      },
-      amenities: Array.isArray(draft.amenities) ? draft.amenities : [],
-      media: Array.isArray(draft.media) ? draft.media : (Array.isArray(draft.photos) ? draft.photos : []),
-      photos: Array.isArray(draft.photos) ? draft.photos : [],
-      documents: Array.isArray(draft.documents) ? draft.documents : [],
-      videoUrl: draft.videoUrl || draft.videoLink || null,
-      videoLink: draft.videoLink || draft.videoUrl || null,
-      embeddedVideoUrl: draft.embeddedVideoUrl || null,
-      location: cachedLoc,
-      boundary: draft.boundary || null
-    });
-    setStep(draft.lastStep || 1);
-    setShowResumeModal(false);
+    applyPropertyToForm(draft);
   };
 
   // Delete single draft

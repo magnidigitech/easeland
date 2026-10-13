@@ -1192,29 +1192,18 @@ export default function UserDashboard({
                               <span>View Listing</span>
                             </button>
 
-                            {/* DRAFT */}
-                            {prop.status === 'DRAFT' && (
+                            {/* DRAFT / PENDING VERIFICATION / UNDER REVIEW - UNIFIED EDIT LISTING */}
+                            {!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'DRAFT' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onPostProperty(prop.id || prop.propertyId);
-                                }}
-                                className="px-3 py-1.5 bg-brand-yellow hover:bg-brand-yellowHover text-brand-navy rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer"
-                              >
-                                <Edit className="w-3.5 h-3.5 text-brand-navy" />
-                                <span>Resume Draft</span>
-                              </button>
-                            )}
-
-                            {/* PENDING VERIFICATION & UNDER REVIEW */}
-                            {!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onPostProperty(prop.id || prop.propertyId);
+                                  try {
+                                    sessionStorage.setItem('easeland_editing_property', JSON.stringify(prop));
+                                  } catch (err) {}
+                                  onPostProperty(prop.propertyId || prop.id || prop.referenceId || prop);
                                 }}
                                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
-                                title="Update property details, files, or media before admin audit completes"
+                                title="Edit property details, files, or media"
                               >
                                 <Edit className="w-3.5 h-3.5 text-white" />
                                 <span>Edit Listing</span>
@@ -1226,12 +1215,15 @@ export default function UserDashboard({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onPostProperty(prop.id || prop.propertyId);
+                                  try {
+                                    sessionStorage.setItem('easeland_editing_property', JSON.stringify(prop));
+                                  } catch (err) {}
+                                  onPostProperty(prop.propertyId || prop.id || prop.referenceId || prop);
                                 }}
                                 className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>Fix & Resubmit</span>
+                                <span>Edit & Resubmit</span>
                               </button>
                             )}
 
@@ -1241,7 +1233,10 @@ export default function UserDashboard({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onPostProperty(prop.id || prop.propertyId);
+                                    try {
+                                      sessionStorage.setItem('easeland_editing_property', JSON.stringify(prop));
+                                    } catch (err) {}
+                                    onPostProperty(prop.propertyId || prop.id || prop.referenceId || prop);
                                   }}
                                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
                                   title="Edit property details. New changes will be submitted for Admin re-audit while existing live details remain published."

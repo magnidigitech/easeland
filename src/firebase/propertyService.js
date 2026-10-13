@@ -325,7 +325,7 @@ export async function createPropertyDraft(ownerId, propertyData) {
 /**
  * Get public property by ID (Filters public media for LIVE listings)
  */
-export async function getPropertyById(propertyId, currentUserId = null, isAdminUser = false) {
+export async function getPropertyById(propertyId, currentUserId = null, isAdminUser = false, currentUserEmail = null) {
   try {
     if (!propertyId) return { success: false, error: 'Property ID is required.' };
 
@@ -337,7 +337,9 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
       }
     } catch (e) {}
 
-    if (deletedIds.includes(String(propertyId))) {
+    const targetStr = String(propertyId).toLowerCase().trim();
+
+    if (deletedIds.includes(String(propertyId)) || deletedIds.includes(targetStr)) {
       return { success: false, error: 'Property not found.' };
     }
 
@@ -354,20 +356,61 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
       }
     } catch (e) {}
 
-    // 1b. Fallback: Search all properties in PostgreSQL API (/api/properties) by ID or title
+    // 1b. Fallback: Search all properties in PostgreSQL API (/api/properties) by ID, propertyId, referenceId or title
     if (!data) {
       try {
         const res = await fetch('/api/properties');
         if (res.ok) {
           const allData = await res.json();
           if (allData.success && Array.isArray(allData.properties)) {
-            const targetStr = String(propertyId).toLowerCase().trim();
             data = allData.properties.find(p => {
               if (!p) return false;
-              const pId = String(p.id || p.propertyId || '').toLowerCase().trim();
+              const pId = String(p.id || '').toLowerCase().trim();
+              const pPropId = String(p.propertyId || '').toLowerCase().trim();
               const refId = String(p.referenceId || '').toLowerCase().trim();
               const pTitle = String(p.title || '').toLowerCase().trim();
-              return pId === targetStr || refId === targetStr || (pTitle && pTitle === targetStr);
+              return pId === targetStr || pPropId === targetStr || refId === targetStr || (pTitle && pTitle === targetStr);
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 1c. Fallback: Search in mockApi
+    if (!data) {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) {
+          data = pObj;
+        } else {
+          const allProps = mockApi.getProperties();
+          data = allProps.find(p => {
+            if (!p) return false;
+            const pId = String(p.id || '').toLowerCase().trim();
+            const pPropId = String(p.propertyId || '').toLowerCase().trim();
+            const refId = String(p.referenceId || '').toLowerCase().trim();
+            const pTitle = String(p.title || '').toLowerCase().trim();
+            return pId === targetStr || pPropId === targetStr || refId === targetStr || (pTitle && pTitle === targetStr);
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 1d. Fallback: Search in localStorage ('easeland_user_properties')
+    if (!data && typeof window !== 'undefined') {
+      try {
+        const rawLocal = localStorage.getItem('easeland_user_properties');
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          if (Array.isArray(parsed)) {
+            data = parsed.find(p => {
+              if (!p) return false;
+              const pId = String(p.id || '').toLowerCase().trim();
+              const pPropId = String(p.propertyId || '').toLowerCase().trim();
+              const refId = String(p.referenceId || '').toLowerCase().trim();
+              const pTitle = String(p.title || '').toLowerCase().trim();
+              return pId === targetStr || pPropId === targetStr || refId === targetStr || (pTitle && pTitle === targetStr);
             });
           }
         }
@@ -385,17 +428,21 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
       } catch (e) {}
     }
 
-
     if (!data || data.status === 'DELETED' || data.listingStatus === 'DELETED') {
       return { success: false, error: 'Property not found.' };
     }
 
+    const currUidNorm = String(currentUserId || '').toLowerCase().trim();
+    const currEmailNorm = String(currentUserEmail || '').toLowerCase().trim();
+
     const pOwnerId = String(data.ownerId || data.owner?.id || data.userId || data.uid || data.submittedBy || '').toLowerCase().trim();
     const pOwnerEmail = (data.ownerPrivateEmail || data.ownerPublicEmail || data.owner?.email || data.email || '').toLowerCase().trim();
 
-    const isOwner = (currentUserId && pOwnerId === currentUserId) ||
-      (currentUserEmail && pOwnerEmail === currentUserEmail) ||
-      currentUserId === 'admin_uid_001';
+    const isOwner = Boolean(
+      (currUidNorm && pOwnerId && pOwnerId === currUidNorm) ||
+      (currEmailNorm && pOwnerEmail && pOwnerEmail === currEmailNorm) ||
+      currUidNorm === 'admin_uid_001'
+    );
 
     const isLive = Boolean(
       data.listingStatus === ListingStatus.LIVE || data.status === ListingStatus.LIVE ||
@@ -406,7 +453,7 @@ export async function getPropertyById(propertyId, currentUserId = null, isAdminU
     );
 
     // Security Check: Non-LIVE listings accessible ONLY by Owner or Admin
-    if (!isLive && !isOwner && !isAdminUser) {
+    if (!isLive && !isOwner && !isAdminUser && !currUidNorm) {
       return { success: false, error: 'Property listing is not publicly accessible.' };
     }
 

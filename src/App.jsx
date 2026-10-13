@@ -578,9 +578,16 @@ export default function App() {
     return missing;
   };
 
-  const handlePostPropertyClick = (propId = null) => {
-    const targetPropId = typeof propId === 'string' ? propId : null;
-    setEditingPropertyId(targetPropId);
+  const handlePostPropertyClick = (propParam = null) => {
+    let targetPropId = null;
+    if (propParam !== null && propParam !== undefined) {
+      if (typeof propParam === 'string' || typeof propParam === 'number') {
+        targetPropId = String(propParam).trim();
+      } else if (typeof propParam === 'object') {
+        targetPropId = String(propParam.propertyId || propParam.id || propParam.referenceId || '').trim();
+      }
+    }
+    setEditingPropertyId(targetPropId || null);
     if (!currentUser) {
       setAuthIntent('post-property');
       setIsAuthModalOpen(true);
@@ -1005,11 +1012,13 @@ export default function App() {
             resumePropertyId={editingPropertyId}
             onComplete={() => {
               setEditingPropertyId(null);
+              try { sessionStorage.removeItem('easeland_editing_property'); } catch (e) {}
               changeActivePage('dashboard');
             }}
             onCancel={() => {
               setEditingPropertyId(null);
-              navigateToAccountSettings('dashboard');
+              try { sessionStorage.removeItem('easeland_editing_property'); } catch (e) {}
+              changeActivePage('dashboard');
             }}
           />
         )}
