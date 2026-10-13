@@ -1,18 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 256 320" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="28" viewBox="0 0 256 320" fill="none">
   <defs>
     <linearGradient id="pinYellow" x1="48" y1="28" x2="204" y2="268" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#FFE66D"/>
       <stop offset="0.52" stop-color="#FFC928"/>
       <stop offset="1" stop-color="#F2A900"/>
     </linearGradient>
-    <filter id="shadow" x="8" y="4" width="240" height="308" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#9B6B00" flood-opacity="0.18"/>
-    </filter>
   </defs>
-  <g filter="url(#shadow)">
-    <path d="M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z" fill="url(#pinYellow)"/>
-    <path d="M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z" stroke="#E9A900" stroke-width="2"/>
-    <circle cx="128" cy="125" r="54" fill="#FFFFFF"/>
-    <circle cx="128" cy="125" r="54" stroke="#FFF8DF" stroke-width="3"/>
-  </g>
+  <!-- Vector drop shadow without raster filters for 100% hardware cursor compatibility -->
+  <path d="M128 18C65.4 18 15 68.4 15 131c0 24.7 7.9 47.6 21.3 66.2L119.8 308a10 10 0 0 0 16.4 0l83.5-110.8C233.1 178.6 241 155.7 241 131 241 68.4 190.6 18 128 18Z" fill="rgba(155, 107, 0, 0.28)"/>
+  
+  <!-- Main Pin Body -->
+  <path d="M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z" fill="url(#pinYellow)"/>
+  <path d="M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z" stroke="#E9A900" stroke-width="2"/>
+  
+  <!-- Inner White Circle -->
+  <circle cx="128" cy="125" r="54" fill="#FFFFFF"/>
+  <circle cx="128" cy="125" r="54" stroke="#FFF8DF" stroke-width="3"/>
 </svg>

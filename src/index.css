@@ -470,57 +470,81 @@ input[type="number"] {
 
 /* =========================================================================
    EASELAND MAP MARKER MOUSE CURSOR & POINTER SUITE
-   Transforms OS/browser cursor into brand-tailored Map Markers.
-   Hotspot is set to (16, 31) - the exact bottom tip of the map pin!
+   Transforms OS/browser cursor into compact brand Map Marker (22x28).
+   Hotspot is set to (11, 27) - the exact bottom tip of the map pin!
+   Comprehensive child selector coverage prevents fallback to normal cursor/hand.
    ========================================================================= */
 
 :root {
-  --cursor-marker-default: url('/yellow_white_map_marker.svg') 16 38, url('/yellow_white_map_marker.png') 16 38, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='40' viewBox='0 0 256 320' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='pinYellow' x1='48' y1='28' x2='204' y2='268' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23FFE66D'/%3E%3Cstop offset='0.52' stop-color='%23FFC928'/%3E%3Cstop offset='1' stop-color='%23F2A900'/%3E%3C/linearGradient%3E%3Cfilter id='shadow' x='8' y='4' width='240' height='308' filterUnits='userSpaceOnUse'%3E%3CfeDropShadow dx='0' dy='5' stdDeviation='5' flood-color='%239B6B00' flood-opacity='0.18'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url(%23shadow)'%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' fill='url(%23pinYellow)'/%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' stroke='%23E9A900' stroke-width='2'/%3E%3Ccircle cx='128' cy='125' r='54' fill='%23FFFFFF'/%3E%3Ccircle cx='128' cy='125' r='54' stroke='%23FFF8DF' stroke-width='3'/%3E%3C/g%3E%3C/svg%3E") 16 38, auto;
-  --cursor-marker-pointer: url('/yellow_white_map_marker.svg') 16 38, url('/yellow_white_map_marker.png') 16 38, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='40' viewBox='0 0 256 320' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='pinYellow' x1='48' y1='28' x2='204' y2='268' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23FFE66D'/%3E%3Cstop offset='0.52' stop-color='%23FFC928'/%3E%3Cstop offset='1' stop-color='%23F2A900'/%3E%3C/linearGradient%3E%3Cfilter id='shadow' x='8' y='4' width='240' height='308' filterUnits='userSpaceOnUse'%3E%3CfeDropShadow dx='0' dy='5' stdDeviation='5' flood-color='%239B6B00' flood-opacity='0.18'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url(%23shadow)'%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' fill='url(%23pinYellow)'/%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' stroke='%23E9A900' stroke-width='2'/%3E%3Ccircle cx='128' cy='125' r='54' fill='%23FFFFFF'/%3E%3Ccircle cx='128' cy='125' r='54' stroke='%23FFF8DF' stroke-width='3'/%3E%3C/g%3E%3C/svg%3E") 16 38, pointer;
+  --cursor-marker-default: 
+    url('/yellow_white_map_marker.png') 11 27,
+    url('/yellow_white_map_marker.svg') 11 27,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='28' viewBox='0 0 256 320' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='pinYellow' x1='48' y1='28' x2='204' y2='268' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23FFE66D'/%3E%3Cstop offset='0.52' stop-color='%23FFC928'/%3E%3Cstop offset='1' stop-color='%23F2A900'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M128 18C65.4 18 15 68.4 15 131c0 24.7 7.9 47.6 21.3 66.2L119.8 308a10 10 0 0 0 16.4 0l83.5-110.8C233.1 178.6 241 155.7 241 131 241 68.4 190.6 18 128 18Z' fill='rgba(155, 107, 0, 0.28)'/%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' fill='url(%23pinYellow)'/%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' stroke='%23E9A900' stroke-width='2'/%3E%3Ccircle cx='128' cy='125' r='54' fill='%23FFFFFF'/%3E%3Ccircle cx='128' cy='125' r='54' stroke='%23FFF8DF' stroke-width='3'/%3E%3C/svg%3E") 11 27,
+    default;
+
+  --cursor-marker-pointer: 
+    url('/yellow_white_map_marker.png') 11 27,
+    url('/yellow_white_map_marker.svg') 11 27,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='28' viewBox='0 0 256 320' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='pinYellow' x1='48' y1='28' x2='204' y2='268' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23FFE66D'/%3E%3Cstop offset='0.52' stop-color='%23FFC928'/%3E%3Cstop offset='1' stop-color='%23F2A900'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M128 18C65.4 18 15 68.4 15 131c0 24.7 7.9 47.6 21.3 66.2L119.8 308a10 10 0 0 0 16.4 0l83.5-110.8C233.1 178.6 241 155.7 241 131 241 68.4 190.6 18 128 18Z' fill='rgba(155, 107, 0, 0.28)'/%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' fill='url(%23pinYellow)'/%3E%3Cpath d='M128 12C65.4 12 15 62.4 15 125c0 24.7 7.9 47.6 21.3 66.2L119.8 302a10 10 0 0 0 16.4 0l83.5-110.8C233.1 172.6 241 149.7 241 125 241 62.4 190.6 12 128 12Z' stroke='%23E9A900' stroke-width='2'/%3E%3Ccircle cx='128' cy='125' r='54' fill='%23FFFFFF'/%3E%3Ccircle cx='128' cy='125' r='54' stroke='%23FFF8DF' stroke-width='3'/%3E%3C/svg%3E") 11 27,
+    pointer;
 }
 
-/* Base application cursor */
+/* Universal application cursor: every element inherits the custom marker */
 html,
 body,
-#root {
-  cursor: var(--cursor-marker-default) !important;
+#root,
+*,
+*::before,
+*::after {
+  cursor: var(--cursor-marker-default);
 }
 
-/* All interactive, clickable & action elements */
+/* All interactive, clickable elements AND their child tags (icons, spans, svgs) */
 a,
+a *,
 button,
+button *,
 [role="button"],
+[role="button"] *,
 select,
+select *,
 summary,
+summary *,
+label,
 input[type="button"],
 input[type="submit"],
 input[type="reset"],
 input[type="checkbox"],
 input[type="radio"],
-.cursor-pointer {
+.cursor-pointer,
+.cursor-pointer * {
   cursor: var(--cursor-marker-pointer) !important;
 }
 
-/* Leaflet maps and interactive map layers */
+/* Leaflet maps, markers, and overlay interactive panes */
 .leaflet-container,
+.leaflet-container *,
 .leaflet-grab,
+.leaflet-grab *,
 .leaflet-interactive,
+.leaflet-marker-icon,
 .custom-map-marker-container,
+.custom-map-marker-container *,
 .custom-map-marker {
   cursor: var(--cursor-marker-pointer) !important;
 }
 
 .leaflet-dragging,
-.leaflet-dragging .leaflet-grab,
-.leaflet-dragging .leaflet-interactive {
+.leaflet-dragging * {
   cursor: grabbing !important;
 }
 
-.cursor-default {
+.cursor-default,
+.cursor-default * {
   cursor: var(--cursor-marker-default) !important;
 }
 
-/* Preserve standard text selection I-beam */
+/* Form input fields maintain readable text selection I-beam */
 input[type="text"],
 input[type="password"],
 input[type="email"],
@@ -535,7 +559,10 @@ textarea,
 
 /* Preserve disabled state */
 :disabled,
+:disabled *,
 [disabled],
-.cursor-not-allowed {
+[disabled] *,
+.cursor-not-allowed,
+.cursor-not-allowed * {
   cursor: not-allowed !important;
 }
