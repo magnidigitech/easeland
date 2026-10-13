@@ -93,4 +93,37 @@ describe('Locality Filter & Administrative Hierarchy Satisfaction Suite', () => 
       expect(noRes.some(p => p.id === dummy.id)).toBe(false);
     }
   });
+
+  it('verifies Perecherla never resolves to Chennai and fetches accurately via Google Maps', async () => {
+    // 1. Ensure hardcoded lookup doesn't falsely greedily match "per" to Chennai
+    const resolved = resolveLocalityHierarchy('perecherla');
+    if (resolved) {
+      expect(resolved.city).not.toBe('Chennai');
+    }
+
+    // 2. Test Google Maps Platform Geocoding for Perecherla
+    const { geocodePlaceWithHierarchy } = await import('../services/locationProvider.js');
+    const geoPerecherla = await geocodePlaceWithHierarchy('Perecherla');
+    expect(geoPerecherla).not.toBeNull();
+    expect(geoPerecherla.city).toBe('Guntur');
+    expect(geoPerecherla.state).toBe('Andhra Pradesh');
+    expect(geoPerecherla.city).not.toBe('Chennai');
+    expect(geoPerecherla.lat).toBeGreaterThan(16);
+    expect(geoPerecherla.lng).toBeGreaterThan(80);
+
+    // 3. Test filter matching for Perecherla listing
+    const perecherlaProperty = {
+      id: 'prop-perecherla-1',
+      title: 'Agricultural Land near Perecherla Junction',
+      location: {
+        city: 'Guntur',
+        locality: 'Perecherla',
+        district: 'Guntur',
+        state: 'Andhra Pradesh'
+      }
+    };
+    expect(matchesSearchFilters(perecherlaProperty, { locality: 'perecherla' })).toBe(true);
+    expect(matchesSearchFilters(perecherlaProperty, { locality: 'perecherla', city: 'Guntur' })).toBe(true);
+    expect(matchesSearchFilters(perecherlaProperty, { locality: 'perecherla', city: 'Chennai' })).toBe(false);
+  });
 });

@@ -80,9 +80,11 @@ export function resolveLocalityHierarchy(localityName) {
   const exact = localities.find(l => l.locality.toLowerCase() === clean);
   if (exact) return exact;
 
-  // 2. Starts-with or includes match
-  const partial = localities.find(l => l.locality.toLowerCase().includes(clean) || clean.includes(l.locality.toLowerCase()));
-  if (partial) return partial;
+  // 2. Prefix match only if user typed at least 4 chars and starts with clean string
+  if (clean.length >= 4) {
+    const starts = localities.find(l => l.locality.toLowerCase().startsWith(clean));
+    if (starts) return starts;
+  }
 
   return null;
 }

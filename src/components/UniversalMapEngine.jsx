@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Navigation, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
 import DynamicFilterPanel from './DynamicFilterPanel';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
-import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
+import { extractCoordinates, extractBoundaryPolygon, geocodePlaceWithHierarchy } from '../services/locationProvider';
 import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
 import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
 
@@ -619,7 +619,7 @@ export default function UniversalMapEngine({
               <MapPin className="w-4 h-4 text-brand-yellow absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder='Try searching "Hyderabad" or click detect location...'
+                placeholder='Search locality or city (e.g. "Perecherla") & press Enter...'
                 value={filters?.query || filters?.address || ''}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -629,6 +629,30 @@ export default function UniversalMapEngine({
                     query: val,
                     address: val
                   }));
+                }}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const q = (filters?.query || filters?.address || '').trim();
+                    if (q) {
+                      const geo = await geocodePlaceWithHierarchy(q);
+                      if (geo) {
+                        setFilters(prev => ({
+                          ...prev,
+                          cleared: false,
+                          referenceLat: geo.lat,
+                          referenceLng: geo.lng,
+                          referencePlace: geo.displayName || q,
+                          city: geo.city || prev.city,
+                          locality: geo.locality || prev.locality,
+                          state: geo.state || prev.state,
+                          district: geo.district || prev.district
+                        }));
+                        if (mapInstanceRef.current) {
+                          mapInstanceRef.current.setView([geo.lat, geo.lng], 14, { animate: true });
+                        }
+                      }
+                    }
+                  }
                 }}
                 className="w-full pl-9 pr-10 py-2 bg-white/10 border border-white/20 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-yellow"
               />

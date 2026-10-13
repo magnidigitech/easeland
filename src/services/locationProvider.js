@@ -4,13 +4,16 @@
  * Nominatim / OpenStreetMap fallbacks have been completely removed.
  */
 
-const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const GOOGLE_MAPS_KEY = (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY)
+  || (typeof process !== 'undefined' && process.env?.VITE_GOOGLE_MAPS_API_KEY)
+  || 'AIzaSyB5PrlDfnJ2jLEOTaEMENd34e_u-sQSDfA';
 
 /**
  * Helper to dynamically load Google Maps JS SDK script if not already present
  */
 export function loadGoogleMapsScript() {
   return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') return resolve(null);
     if (window.google && window.google.maps) {
       return resolve(window.google.maps);
     }
@@ -62,6 +65,9 @@ export function buildEmptyLocationHierarchy(lat = 0, lng = 0) {
 
 /**
  * Extract canonical location hierarchy from Google Maps Geocoding API address_components
+ * Intelligently supports Indian administrative hierarchy:
+ * - Sublocality (Brodipet, MVP Colony) -> City (Guntur, Visakhapatnam)
+ * - Town / Village (Perecherla) -> Taluk / Mandal (Guntur) -> District (Guntur) -> State (AP)
  */
 export function extractGoogleLocationHierarchy(geocodedResult) {
   if (!geocodedResult || !Array.isArray(geocodedResult.address_components)) {
@@ -74,14 +80,30 @@ export function extractGoogleLocationHierarchy(geocodedResult) {
     return item ? item.long_name : '';
   };
 
+  const rawSubLocality = getComp('sublocality_level_1') || getComp('sublocality') || getComp('neighborhood');
+  const rawLocality = getComp('locality');
+  const admin3 = getComp('administrative_area_level_3');
+  const admin2 = getComp('administrative_area_level_2');
+  const admin1 = getComp('administrative_area_level_1');
+
+  // Hierarchy resolution:
+  // Case A: Neighborhood in a City (e.g. Brodipet in Guntur)
+  // Case B: Village or Town in a Taluk/District (e.g. Perecherla in Guntur)
+  const locality = rawSubLocality || rawLocality || '';
+  const city = rawSubLocality
+    ? (rawLocality || admin3 || admin2)
+    : (admin3 || admin2 || rawLocality);
+  const district = admin2 || admin3 || (rawSubLocality ? rawLocality : '');
+  const state = admin1;
+
   return {
     country: getComp('country') || 'India',
-    state: getComp('administrative_area_level_1'),
-    district: getComp('administrative_area_level_2'),
-    city: getComp('locality') || getComp('administrative_area_level_3') || getComp('sublocality_level_1'),
-    mandal: getComp('administrative_area_level_3') || getComp('sublocality_level_1'),
-    locality: getComp('sublocality_level_1') || getComp('sublocality') || getComp('neighborhood'),
-    subLocality: getComp('sublocality_level_2') || getComp('neighborhood'),
+    state: state,
+    district: district,
+    city: city,
+    mandal: admin3 || admin2 || city,
+    locality: locality,
+    subLocality: getComp('sublocality_level_2') || rawSubLocality,
     village: getComp('administrative_area_level_4') || getComp('village'),
     road: getComp('route'),
     colony: getComp('premise') || getComp('subpremise'),
@@ -133,7 +155,7 @@ export async function getCurrentDeviceLocation() {
  */
 export async function reverseGeocodeLocation(lat, lng) {
   // 1. Try Google Maps JS SDK Geocoder instance if window.google is loaded
-  if (window.google && window.google.maps && window.google.maps.Geocoder) {
+  if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.Geocoder) {
     return new Promise((resolve) => {
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ location: { lat, lng } }, (results, status) => {
@@ -173,7 +195,7 @@ export async function searchLocationQuery(queryStr) {
   if (!queryStr || queryStr.trim().length < 3) return [];
 
   // 1. Try Google Maps JS SDK Geocoder instance if window.google is loaded
-  if (window.google && window.google.maps && window.google.maps.Geocoder) {
+  if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.Geocoder) {
     return new Promise((resolve) => {
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: queryStr.trim(), componentRestrictions: { country: 'IN' } }, (results, status) => {
@@ -224,6 +246,18 @@ export async function searchLocationQuery(queryStr) {
   }
 
   return [];
+}
+
+/**
+ * Geocode a place/locality string with full administrative hierarchy and coordinates
+ */
+export async function geocodePlaceWithHierarchy(queryStr) {
+  if (!queryStr || typeof queryStr !== 'string' || !queryStr.trim()) return null;
+  const results = await searchLocationQuery(queryStr.trim());
+  if (Array.isArray(results) && results.length > 0) {
+    return results[0];
+  }
+  return null;
 }
 
 /**
