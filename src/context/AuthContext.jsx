@@ -6,7 +6,9 @@ import {
   logoutUser as apiLogoutUser,
   sendPasswordReset as apiSendPasswordReset,
   sendEmailVerificationUser as apiSendEmailVerification,
-  subscribeToAuthState
+  subscribeToAuthState,
+  sendMobileOtp as apiSendMobileOtp,
+  verifyMobileOtp as apiVerifyMobileOtp
 } from '../firebase/authService.js';
 import {
   createUserProfile,
@@ -28,8 +30,12 @@ const AuthContext = createContext({
   pending2FASession: null,
   loading: true,
   isAuthenticated: false,
+  isProfileIncomplete: false,
   registerUser: async () => {},
   loginUser: async () => {},
+  loginWithMobile: async () => {},
+  sendMobileOtp: async () => {},
+  completeUserProfile: async () => {},
   logoutUser: async () => {},
   sendPasswordReset: async () => {},
   sendEmailVerification: async () => {},
@@ -751,16 +757,109 @@ export function AuthProvider({ children }) {
     setPending2FASession(null);
   };
 
+  const sendMobileOtp = async (phone) => {
+    return await apiSendMobileOtp(phone);
+  };
+
+  const loginWithMobile = async (phone, otp) => {
+    const res = await apiVerifyMobileOtp(phone, otp);
+    if (res.success && res.user) {
+      setUser(res.user);
+      setProfile(res.profile);
+      return res;
+    }
+    return res;
+  };
+
+  const completeUserProfile = async (details) => {
+    if (!user) return { success: false, error: 'User is not authenticated.' };
+
+    const cleanName = String(details.name || '').trim();
+    const cleanEmail = String(details.email || '').trim().toLowerCase();
+    const cleanCity = String(details.city || '').trim();
+    const cleanUserType = details.userType || details.role || 'BUYER';
+
+    if (!cleanName || cleanName.length < 2) {
+      return { success: false, error: 'Please enter your full name (minimum 2 characters).' };
+    }
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    if (!cleanCity) {
+      return { success: false, error: 'Please enter your city and state.' };
+    }
+
+    const updatedUserObj = {
+      ...user,
+      displayName: cleanName,
+      name: cleanName,
+      email: cleanEmail,
+      city: cleanCity,
+      location: cleanCity,
+      userType: cleanUserType,
+      profileCompleted: true
+    };
+
+    const updatedProfileObj = {
+      ...(profile || {}),
+      ...updatedUserObj,
+      profileCompleted: true,
+      profileCompletedAt: new Date().toISOString()
+    };
+
+    try {
+      await updateOwnProfile(user.uid, updatedProfileObj);
+    } catch (e) {
+      try {
+        await createUserProfile(user.uid, updatedProfileObj);
+      } catch (err) {}
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('easeland_session_user', JSON.stringify(updatedUserObj));
+        localStorage.setItem('easeland_user_profile_' + user.uid, JSON.stringify(updatedProfileObj));
+
+        const reg = JSON.parse(localStorage.getItem('easeland_registered_users') || '[]');
+        const idx = reg.findIndex(u => u.uid === user.uid || (u.phone && u.phone === user.phone));
+        if (idx !== -1) {
+          reg[idx] = { ...reg[idx], ...updatedProfileObj };
+        } else {
+          reg.push(updatedProfileObj);
+        }
+        localStorage.setItem('easeland_registered_users', JSON.stringify(reg));
+      } catch (e) {}
+    }
+
+    setUser(updatedUserObj);
+    setProfile(updatedProfileObj);
+
+    return { success: true, user: updatedUserObj, profile: updatedProfileObj };
+  };
+
+  const isProfileIncomplete = Boolean(
+    user && (
+      profile?.profileCompleted === false ||
+      !profile?.name ||
+      profile?.name.trim().length < 2 ||
+      !profile?.email
+    )
+  );
+
   const value = {
     user,
     profile,
     pending2FASession,
     loading,
     isAuthenticated: !!user,
+    isProfileIncomplete,
     registerUser,
     loginUser,
     loginAdmin,
     loginWithGoogle,
+    loginWithMobile,
+    sendMobileOtp,
+    completeUserProfile,
     logoutUser,
     sendPasswordReset,
     sendEmailVerification,

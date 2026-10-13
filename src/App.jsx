@@ -6,6 +6,7 @@ import UniversalMapEngine from './components/UniversalMapEngine';
 import PropertyDetailsView from './components/PropertyDetailsView';
 import PropertyDetailPage from './pages/PropertyDetailPage';
 import AuthModal from './components/AuthModal';
+import MandatoryProfileModal from './components/MandatoryProfileModal';
 import ProfileSettingsModal from './components/ProfileSettingsModal';
 import TwoFactorModal from './components/TwoFactorModal';
 import VisitorLeadModal from './components/VisitorLeadModal';
@@ -80,7 +81,7 @@ const getInitialPageState = () => {
 };
 
 export default function App() {
-  const { user: authUser, profile: authProfile, loading: authLoading, logoutUser, pending2FASession, complete2FASession, cancel2FASession } = useAuth();
+  const { user: authUser, profile: authProfile, loading: authLoading, logoutUser, pending2FASession, complete2FASession, cancel2FASession, isProfileIncomplete } = useAuth();
   const [initialPageState] = useState(getInitialPageState);
   const [activePage, setActivePage] = useState(initialPageState.page);
 
@@ -288,6 +289,10 @@ export default function App() {
   const changeActivePage = (pageName, propIdOrFilters = null) => {
     let resolvedPage = pageName;
     let resolvedPropId = typeof propIdOrFilters === 'string' ? propIdOrFilters : null;
+
+    if (authUser && isProfileIncomplete && (resolvedPage === 'dashboard' || resolvedPage === 'crm' || resolvedPage === 'post-property')) {
+      return;
+    }
 
     if (typeof pageName === 'string') {
       if (pageName.startsWith('property/')) {
@@ -685,6 +690,10 @@ export default function App() {
       return;
     }
 
+    if (authUser && isProfileIncomplete) {
+      return;
+    }
+
     // Editing existing property: NEVER block with profile criteria warning modal!
     if (targetPropId || targetPropObj) {
       setIsProfileWarningOpen(false);
@@ -736,6 +745,9 @@ export default function App() {
   };
 
   const handleAuthSuccess = (authenticatedUser, intent) => {
+    if (isProfileIncomplete) {
+      return;
+    }
     if (intent === 'post-property') {
       const missingFields = checkProfileComplete(authenticatedUser, authProfile);
       if (missingFields.length > 0) {
@@ -1298,6 +1310,14 @@ export default function App() {
         </div>
       </footer>
       )}
+
+      {/* MANDATORY PROFILE COMPLETION MODAL FOR MOBILE NUMBER SIGNUP */}
+      <MandatoryProfileModal
+        isOpen={Boolean(authUser && isProfileIncomplete)}
+        onComplete={() => {
+          setProfileRefreshTick((prev) => prev + 1);
+        }}
+      />
 
       {/* PROFILE & SECURITY SETTINGS MODAL */}
       <ProfileSettingsModal
