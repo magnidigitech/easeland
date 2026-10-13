@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Soft drop shadow offset down -->
+  <path d="M 16,31.5 C 15.5,30 7.5,19 7.5,12 C 7.5,7.3 11.3,3.5 16,3.5 C 20.7,3.5 24.5,7.3 24.5,12 C 24.5,19 16.5,30 16,31.5 Z" fill="rgba(0,0,0,0.32)"/>
+  
+  <!-- Outer crisp white boundary for universal contrast -->
+  <path d="M 16,30.5 C 15.5,29 7.5,18 7.5,11 C 7.5,6.3 11.3,2.5 16,2.5 C 20.7,2.5 24.5,6.3 24.5,11 C 24.5,18 16.5,29 16,30.5 Z" fill="#ffffff"/>
+  
+  <!-- Main Navy Blue marker body -->
+  <path d="M 16,28.5 C 15.6,27.2 9,17.2 9,11 C 9,7.1 12.1,4 16,4 C 19.9,4 23,7.1 23,11 C 23,17.2 16.4,27.2 16,28.5 Z" fill="#000080"/>
+  
+  <!-- EaseLand Yellow center core dot -->
+  <circle cx="16" cy="11" r="3.2" fill="#FFE135"/>
+</svg>
