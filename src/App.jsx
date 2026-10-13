@@ -25,7 +25,7 @@ import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
-import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings } from 'lucide-react';
+import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, AlertTriangle, X, Settings, User } from 'lucide-react';
 
 const getInitialPageState = () => {
   if (typeof window === 'undefined') return { page: 'home', propId: null };
