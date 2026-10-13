@@ -1137,6 +1137,81 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
   }
 });
 
+
+// API Endpoint: Upsert user to PostgreSQL DB & Local Disk
+app.post('/api/users', async (req, res) => {
+  try {
+    const u = req.body;
+    if (!u || (!u.uid && !u.id && !u.email)) {
+      return res.status(400).json({ success: false, error: 'User payload required.' });
+    }
+    const saved = saveLocalUser(u);
+    const uId = String(u.uid || u.id || u.email);
+    const uEmail = String(u.email || '').toLowerCase().trim();
+    const uName = u.displayName || u.name || '';
+    const uPhone = u.phone || u.phoneNumber || '';
+    const uRole = u.role || 'USER';
+
+    try {
+      const queryText = `
+        INSERT INTO users (uid, email, display_name, phone, role, raw_data, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (uid) DO UPDATE SET
+          email = EXCLUDED.email,
+          display_name = EXCLUDED.display_name,
+          phone = EXCLUDED.phone,
+          role = EXCLUDED.role,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = NOW();
+      `;
+      await pgPool.query(queryText, [uId, uEmail, uName, uPhone, uRole, JSON.stringify(saved)]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL user sync background note:', pgErr.message);
+    }
+
+    return res.json({ success: true, user: saved });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Endpoint: Get user by ID or email
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const target = String(req.params.id).trim();
+    let userFound = localUsersMap.get(target);
+
+    if (!userFound) {
+      const tLower = target.toLowerCase();
+      for (const u of localUsersMap.values()) {
+        if (u && (String(u.uid || u.id) === target || String(u.email || '').toLowerCase() === tLower)) {
+          userFound = u;
+          break;
+        }
+      }
+    }
+
+    if (!userFound) {
+      try {
+        const pgRes = await pgPool.query(
+          "SELECT raw_data FROM users WHERE uid = $1 OR email = $1 OR raw_data->>'id' = $1;",
+          [target]
+        );
+        if (pgRes.rows.length > 0) {
+          userFound = pgRes.rows[0].raw_data;
+        }
+      } catch (e) {}
+    }
+
+    if (userFound) {
+      return res.json({ success: true, user: userFound });
+    }
+    return res.status(404).json({ success: false, error: 'User not found.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API Endpoint: Send 2FA Verification OTP via EaseLand Stalwart MailServer
 app.post('/api/send-2fa-otp', async (req, res) => {
   try {

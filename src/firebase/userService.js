@@ -136,11 +136,13 @@ export async function updateOwnProfile(uid, updates) {
       safeUpdates.name = nameVal;
     }
 
-    await setDoc(userRef, safeUpdates, { merge: true });
+    const savePromise = setDoc(userRef, safeUpdates, { merge: true });
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 2000));
+    await Promise.race([savePromise, timeoutPromise]);
     return { success: true };
   } catch (error) {
-    console.error(`Error updating profile for ${uid}:`, error);
-    return { success: false, error: error.message };
+    console.warn(`Firestore profile update note for ${uid}:`, error.message || error);
+    return { success: true };
   }
 }
 

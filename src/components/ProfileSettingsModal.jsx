@@ -16,12 +16,27 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
   };
 
   // Profile Form State
-  const [profileData, setProfileData] = useState({
-    name: profile?.displayName || profile?.name || user?.displayName || user?.name || '',
-    email: profile?.email || user?.email || '',
-    phone: sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || ''),
-    city: profile?.city || profile?.location || user?.city || user?.location || ''
-  });
+  const getInitialProfileState = () => {
+    const uid = user?.uid || user?.id;
+    let localStored = {};
+    if (typeof window !== 'undefined' && uid) {
+      try {
+        const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
+        if (storedStr) localStored = JSON.parse(storedStr);
+      } catch (e) {}
+    }
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+
+    return {
+      name: profile?.displayName || profile?.name || user?.displayName || user?.name || localStored.displayName || localStored.name || '',
+      email: profile?.email || user?.email || localStored.email || '',
+      phone: sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone),
+      city: profile?.city || profile?.location || user?.city || user?.location || localStored.city || localStored.location || adminCity
+    };
+  };
+
+  const [profileData, setProfileData] = useState(getInitialProfileState);
 
   // Security Form State
   const [securityData, setSecurityData] = useState({
@@ -39,10 +54,21 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
 
   React.useEffect(() => {
     if (isOpen) {
-      const activeName = profile?.displayName || profile?.name || user?.displayName || user?.name || '';
-      const activeEmail = profile?.email || user?.email || '';
-      const activePhone = sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || '');
-      const activeCity = profile?.city || profile?.location || user?.city || user?.location || '';
+      const uid = user?.uid || user?.id;
+      let localStored = {};
+      if (typeof window !== 'undefined' && uid) {
+        try {
+          const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
+          if (storedStr) localStored = JSON.parse(storedStr);
+        } catch (e) {}
+      }
+      const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+      const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+
+      const activeName = profile?.displayName || profile?.name || user?.displayName || user?.name || localStored.displayName || localStored.name || '';
+      const activeEmail = profile?.email || user?.email || localStored.email || '';
+      const activePhone = sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone);
+      const activeCity = profile?.city || profile?.location || user?.city || user?.location || localStored.city || localStored.location || adminCity;
       setProfileData({
         name: activeName,
         email: activeEmail,
@@ -58,7 +84,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       setError(null);
       setSuccessMsg(null);
     }
-  }, [isOpen]);
+  }, [isOpen, user?.uid, user?.phone, profile?.phone]);
 
   if (!isOpen) return null;
 
@@ -108,6 +134,51 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     if (!result.success) {
       setError(result.error);
       return;
+    }
+
+    const finalPhone = cleanPhone || profileData.phone.trim();
+    const finalCity = (profileData.city || '').trim();
+    const finalName = profileData.name.trim();
+    const finalEmail = profileData.email.trim();
+
+    if (typeof window !== 'undefined') {
+      const uid = user?.uid || user?.id;
+      if (uid) {
+        try {
+          const uKey = 'easeland_user_profile_' + uid;
+          const cur = JSON.parse(localStorage.getItem(uKey) || '{}');
+          localStorage.setItem(uKey, JSON.stringify({
+            ...cur,
+            name: finalName,
+            displayName: finalName,
+            email: finalEmail,
+            phone: finalPhone,
+            phoneNumber: finalPhone,
+            city: finalCity,
+            location: finalCity
+          }));
+        } catch (e) {}
+      }
+      try {
+        const sess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+        localStorage.setItem('easeland_session_user', JSON.stringify({
+          ...sess,
+          name: finalName,
+          displayName: finalName,
+          email: finalEmail,
+          phone: finalPhone,
+          phoneNumber: finalPhone,
+          city: finalCity,
+          location: finalCity
+        }));
+      } catch (e) {}
+      if (localStorage.getItem('easeland_admin_authenticated') === 'true' || user?.email?.includes('admin')) {
+        localStorage.setItem('easeland_admin_phone', finalPhone);
+        localStorage.setItem('easeland_admin_city', finalCity);
+      }
+      window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', {
+        detail: { name: finalName, email: finalEmail, phone: finalPhone, city: finalCity }
+      }));
     }
 
     if (onUserUpdated) onUserUpdated();

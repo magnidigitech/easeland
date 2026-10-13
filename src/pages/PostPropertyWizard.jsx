@@ -24,11 +24,24 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   };
 
   const checkProfileCriteria = () => {
+    // If editing an existing property, never block wizard
+    if (resumePropertyId || propertyId) return [];
+
     const missing = [];
-    const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || '').trim();
-    const email = (user?.email || profile?.email || '').trim();
-    const phone = sanitizePhone(user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || '');
-    const city = (user?.city || user?.location || profile?.city || profile?.location || '').trim();
+    const uid = user?.uid || user?.id;
+    const stored = uid && typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('easeland_user_profile_' + uid) || '{}') : {};
+    const adminPhone = typeof window !== 'undefined' ? localStorage.getItem('easeland_admin_phone') : '';
+    const sessionUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('easeland_session_user') || '{}') : {};
+
+    const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || stored?.name || stored?.displayName || sessionUser?.name || sessionUser?.displayName || '').trim();
+    const email = (user?.email || profile?.email || stored?.email || sessionUser?.email || '').trim();
+    const phone = sanitizePhone(
+      user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber ||
+      stored?.phone || stored?.phoneNumber ||
+      adminPhone ||
+      sessionUser?.phone || sessionUser?.phoneNumber || ''
+    );
+    const city = (user?.city || user?.location || profile?.city || profile?.location || stored?.city || stored?.location || sessionUser?.city || sessionUser?.location || '').trim();
 
     if (!name) missing.push('Full Name');
     if (!email) missing.push('Email Address');
@@ -87,43 +100,88 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   });
 
   // Helper: Apply loaded property data into wizard state
-  const applyPropertyToForm = (p) => {
-    if (!p) return;
-    const pId = p.propertyId || p.id;
+  const applyPropertyToForm = (propCandidate) => {
+    if (!propCandidate) return;
+    const p = propCandidate.rawProperty || propCandidate;
+    const pId = p.propertyId || p.id || propCandidate.propertyId || propCandidate.id;
     if (pId) setPropertyId(pId);
-    if (p.referenceId) setReferenceId(p.referenceId);
+    const ref = p.referenceId || propCandidate.referenceId;
+    if (ref) setReferenceId(ref);
 
-    let cachedLoc = p.location || null;
-    if (typeof window !== 'undefined') {
+    // Parse location if string or object
+    let locCandidate = p.location || propCandidate.location || null;
+    if (typeof locCandidate === 'string') {
+      locCandidate = {
+        locality: locCandidate,
+        city: locCandidate,
+        state: 'Andhra Pradesh',
+        address: locCandidate
+      };
+    }
+    let cachedLoc = locCandidate;
+    if (typeof window !== 'undefined' && pId) {
       try {
         const storedLoc = localStorage.getItem(`easeland_wizard_location_${pId}`) || localStorage.getItem(`easeland_wizard_location_${user?.uid}`);
         if (storedLoc) cachedLoc = JSON.parse(storedLoc);
       } catch (e) {}
     }
 
+    // Parse clean numeric price
+    let rawP = p.price !== undefined && p.price !== null ? p.price : propCandidate.price;
+    let cleanPrice = '';
+    if (typeof rawP === 'number') {
+      cleanPrice = String(rawP);
+    } else if (typeof rawP === 'string') {
+      const lower = rawP.toLowerCase();
+      if (lower.includes('crore')) {
+        const num = parseFloat(lower.replace(/[^0-9.]/g, '')) || 0;
+        cleanPrice = String(Math.round(num * 10000000));
+      } else if (lower.includes('lakh')) {
+        const num = parseFloat(lower.replace(/[^0-9.]/g, '')) || 0;
+        cleanPrice = String(Math.round(num * 100000));
+      } else {
+        cleanPrice = rawP.replace(/[^0-9.]/g, '');
+      }
+    }
+
+    // Parse clean numeric area
+    let rawA = p.area !== undefined && p.area !== null ? p.area : propCandidate.area;
+    let cleanArea = '';
+    if (typeof rawA === 'number') {
+      cleanArea = String(rawA);
+    } else if (typeof rawA === 'string') {
+      cleanArea = rawA.replace(/[^0-9.]/g, '');
+    }
+
+    const resolvedPropType = p.propertyType || p.type || p.category || propCandidate.propertyType || propCandidate.type || PropertyType.OPEN_PLOT;
+    const resolvedPurpose = p.purpose || propCandidate.purpose || Purpose.SALE;
+    const mediaList = Array.isArray(p.media) ? p.media : (Array.isArray(propCandidate.media) ? propCandidate.media : (Array.isArray(p.photos) ? p.photos : []));
+    const photosList = Array.isArray(p.photos) ? p.photos : mediaList.filter(m => m.type === 'PHOTO');
+
     setFormData({
-      title: p.title || '',
-      propertyType: p.propertyType || PropertyType.OPEN_PLOT,
-      otherPropertyType: p.otherPropertyType || '',
-      purpose: p.purpose || Purpose.SALE,
-      price: p.price !== undefined && p.price !== null ? String(p.price) : '',
-      area: p.area !== undefined && p.area !== null ? String(p.area) : '',
-      areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT,
-      description: p.description || '',
+      title: p.title || propCandidate.title || '',
+      propertyType: resolvedPropType,
+      otherPropertyType: p.otherPropertyType || propCandidate.otherPropertyType || '',
+      purpose: resolvedPurpose,
+      price: cleanPrice,
+      area: cleanArea,
+      areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT,
+      description: p.description || propCandidate.description || '',
       specs: {
         ...(p.specs || {}),
-        areaUnit: p.areaUnit || p.specs?.areaUnit || AreaUnit.SQ_FT
+        ...(propCandidate.specs || {}),
+        areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT
       },
-      amenities: Array.isArray(p.amenities) ? p.amenities : [],
-      media: Array.isArray(p.media) ? p.media : (Array.isArray(p.photos) ? p.photos : []),
-      photos: Array.isArray(p.photos) ? p.photos : (Array.isArray(p.media) ? p.media.filter(m => m.type === 'PHOTO') : []),
-      documents: Array.isArray(p.documents) ? p.documents : [],
-      videoUrl: p.videoUrl || p.videoLink || null,
-      videoLink: p.videoLink || p.videoUrl || null,
-      embeddedVideoUrl: p.embeddedVideoUrl || null,
+      amenities: Array.isArray(p.amenities) ? p.amenities : (Array.isArray(propCandidate.amenities) ? propCandidate.amenities : []),
+      media: mediaList,
+      photos: photosList,
+      documents: Array.isArray(p.documents) ? p.documents : (Array.isArray(propCandidate.documents) ? propCandidate.documents : []),
+      videoUrl: p.videoUrl || p.videoLink || propCandidate.videoUrl || null,
+      videoLink: p.videoLink || p.videoUrl || propCandidate.videoLink || null,
+      embeddedVideoUrl: p.embeddedVideoUrl || propCandidate.embeddedVideoUrl || null,
       location: cachedLoc,
-      boundary: p.boundary || p.ownerSubmittedBoundary || null,
-      ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || null
+      boundary: p.boundary || p.ownerSubmittedBoundary || propCandidate.boundary || null,
+      ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || propCandidate.ownerSubmittedBoundary || null
     });
     setStep(1);
     setShowResumeModal(false);
@@ -132,38 +190,40 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   // Load existing owner drafts or target resume property on mount
   useEffect(() => {
     if (user?.uid) {
-      if (resumePropertyId) {
+      let cachedProp = null;
+      if (typeof window !== 'undefined') {
+        try {
+          const rawCached = sessionStorage.getItem('easeland_editing_property');
+          if (rawCached) {
+            cachedProp = JSON.parse(rawCached);
+          }
+        } catch (e) {}
+      }
+
+      if (resumePropertyId || cachedProp) {
         const loadTargetProperty = async () => {
           let foundProp = null;
 
-          // 1. Instant cache check from sessionStorage
-          if (typeof window !== 'undefined') {
+          // 1. Instant cache check from sessionStorage (Primary for Edit Listing)
+          if (cachedProp) {
+            foundProp = cachedProp;
+            applyPropertyToForm(cachedProp);
+          }
+
+          // 2. Fetch latest from getPropertyById if resumePropertyId is present
+          if (resumePropertyId) {
             try {
-              const rawCached = sessionStorage.getItem('easeland_editing_property');
-              if (rawCached) {
-                const parsed = JSON.parse(rawCached);
-                const cId = String(parsed.propertyId || parsed.id || parsed.referenceId || '').toLowerCase().trim();
-                const rId = String(resumePropertyId || '').toLowerCase().trim();
-                if (cId && (cId === rId || !resumePropertyId)) {
-                  foundProp = parsed;
-                  applyPropertyToForm(parsed);
-                }
+              const res = await getPropertyById(resumePropertyId, user.uid, false, user.email);
+              if (res.success && res.property) {
+                foundProp = res.property;
+                applyPropertyToForm(res.property);
+                return;
               }
             } catch (e) {}
           }
 
-          // 2. Fetch latest from getPropertyById
-          try {
-            const res = await getPropertyById(resumePropertyId, user.uid, false, user.email);
-            if (res.success && res.property) {
-              foundProp = res.property;
-              applyPropertyToForm(res.property);
-              return;
-            }
-          } catch (e) {}
-
           // 3. Fallback: Search in owner drafts (the same method used by the modal)
-          if (!foundProp) {
+          if (!foundProp && resumePropertyId) {
             try {
               const dRes = await getOwnerDrafts(user.uid);
               if (dRes.success && Array.isArray(dRes.drafts)) {
@@ -186,7 +246,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           }
 
           // 4. Fallback: Search in mockApi
-          if (!foundProp) {
+          if (!foundProp && resumePropertyId) {
             try {
               const { mockApi } = await import('../services/mockApi.js');
               const targetStr = String(resumePropertyId).toLowerCase().trim();
@@ -216,7 +276,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         });
       }
     }
-  }, [user, resumePropertyId]);
+  }, [user?.uid, resumePropertyId]);
 
   // Resume selected draft
   const handleResumeDraft = (draft) => {
@@ -589,14 +649,47 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-          List Your Property on EaseLand
+          {resumePropertyId || propertyId ? `Edit Property Listing: ${formData.title || 'Untitled'}` : 'List Your Property on EaseLand'}
         </h1>
         <p className="text-xs text-slate-600 font-semibold mt-1">
-          Direct Property Owner Draft Workflow — Step {step} of 8.
+          {resumePropertyId || propertyId
+            ? `Editing existing property (Ref: ${referenceId || propertyId || 'Draft'}). All saved details loaded — click any step to edit directly.`
+            : `Direct Property Owner Draft Workflow — Step ${step} of 8.`}
         </p>
 
+        {/* INTERACTIVE STEP JUMP PILLS */}
+        <div className="flex flex-wrap gap-1.5 pt-3">
+          {[
+            { num: 1, label: 'Type & Purpose' },
+            { num: 2, label: 'Title & Price' },
+            { num: 3, label: 'Location' },
+            { num: 4, label: 'Specs' },
+            { num: 5, label: 'Media & Photos' },
+            { num: 6, label: 'Documents' },
+            { num: 7, label: 'Boundary' },
+            { num: 8, label: 'Review & Submit' }
+          ].map((s) => (
+            <button
+              key={s.num}
+              type="button"
+              onClick={() => {
+                setErrorMsg(null);
+                setFieldErrors({});
+                setStep(s.num);
+              }}
+              className={`px-2.5 py-1 text-[11px] font-extrabold rounded-lg transition-all cursor-pointer ${
+                step === s.num
+                  ? 'bg-brand-navy text-brand-yellow shadow-sm ring-2 ring-brand-yellow/50'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <span>{s.num}. {s.label}</span>
+            </button>
+          ))}
+        </div>
+
         {/* STEPPER PROGRESS BAR */}
-        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-4">
+        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-3">
           <div
             className="bg-teal-500 h-full transition-all duration-300"
             style={{ width: `${(step / 8) * 100}%` }}
@@ -667,6 +760,40 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               <Building2 className="w-5 h-5 text-brand-yellow" />
               <span>1. Property Type & Transaction Purpose</span>
             </h3>
+
+            {(resumePropertyId || propertyId || formData.title) && (
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white px-2.5 py-0.5 rounded-md shadow-xs">
+                      Editing Property Listing
+                    </span>
+                    <span className="text-xs font-mono font-bold text-blue-900 bg-white/80 px-2 py-0.5 rounded border border-blue-200">
+                      Ref: {referenceId || propertyId || 'Draft'}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-extrabold text-slate-900 mt-1.5 line-clamp-1">
+                    {formData.title || 'Untitled Property'}
+                  </h4>
+                  <p className="text-xs text-slate-600 font-bold mt-0.5">
+                    Price: <span className="text-emerald-700">{getPriceDisplay()}</span> • Total Area: <span className="text-slate-800">{getAreaDisplay()}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMsg(null);
+                      setFieldErrors({});
+                      setStep(2);
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Edit Title &amp; Price →</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">

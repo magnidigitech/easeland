@@ -207,13 +207,19 @@ export function AuthProvider({ children }) {
           });
         } else {
           setPending2FASession(null);
+          const resolvedPhone = userProfileData?.phone || userProfileData?.phoneNumber || (currentUser ? currentUser.phoneNumber : '') || '';
+          const resolvedCity = userProfileData?.city || userProfileData?.location || '';
+          const resolvedName = currentUser.displayName || userProfileData?.displayName || userProfileData?.name || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
           const activeUserObj = {
             uid: currentUser.uid,
             id: currentUser.uid,
-            displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
-            name: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
-            email: currentUser.email || '',
-            phone: currentUser.phoneNumber || '',
+            displayName: resolvedName,
+            name: resolvedName,
+            email: currentUser.email || userProfileData?.email || '',
+            phone: resolvedPhone,
+            phoneNumber: resolvedPhone,
+            city: resolvedCity,
+            location: resolvedCity,
             emailVerified: currentUser.emailVerified,
             role: isAdmin ? 'ADMIN' : (currentUser.role || 'USER')
           };
@@ -223,6 +229,12 @@ export function AuthProvider({ children }) {
           } catch(e) {}
           setProfile({
             ...userProfileData,
+            displayName: resolvedName,
+            name: resolvedName,
+            phone: resolvedPhone,
+            phoneNumber: resolvedPhone,
+            city: resolvedCity,
+            location: resolvedCity,
             role: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? 'ADMIN' : (userProfileData?.role || 'USER'),
             adminRole: isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole,
             capabilities: (isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole) ? ['ADMIN', 'CUSTOMER', 'OWNER'] : (userProfileData?.capabilities || ['CUSTOMER', 'OWNER'])
@@ -614,12 +626,11 @@ export function AuthProvider({ children }) {
     } catch (e) {}
 
     try {
-      const dbResult = await updateOwnProfile(user.uid, updatesToSave);
-      if (!dbResult.success) {
-        console.warn('Firestore profile update warning:', dbResult.error);
-      }
+      updateOwnProfile(user.uid, updatesToSave).catch(e => {
+        console.warn('Firestore profile update background note:', e);
+      });
     } catch (e) {
-      console.error('Error updating Firestore profile:', e);
+      console.warn('Error initiating Firestore profile update:', e);
     }
 
     if (typeof window !== 'undefined') {

@@ -172,26 +172,63 @@ export default function UserDashboard({
   };
 
   // Account settings form state
-  const [profileForm, setProfileForm] = useState({
-    name: user?.name || user?.displayName || '',
-    email: user?.email || '',
-    phone: sanitizePhone(user?.phone || user?.phoneNumber) || '',
-    city: user?.city || user?.location || '',
-    accountType: 'Verified Property Owner & Buyer'
-  });
+  const getInitialProfileState = () => {
+    const uid = user?.uid || user?.id;
+    let localStored = {};
+    if (typeof window !== 'undefined' && uid) {
+      try {
+        const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
+        if (storedStr) localStored = JSON.parse(storedStr);
+      } catch (e) {}
+    }
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+
+    const ph = sanitizePhone(user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone);
+    const ct = (user?.city || user?.location || localStored.city || localStored.location || adminCity).trim();
+    const nm = user?.name || user?.displayName || localStored.displayName || localStored.name || '';
+    const em = user?.email || localStored.email || '';
+
+    return {
+      name: nm,
+      email: em,
+      phone: ph,
+      city: ct,
+      accountType: 'Verified Property Owner & Buyer'
+    };
+  };
+
+  const [profileForm, setProfileForm] = useState(getInitialProfileState);
   const [myPropertiesList, setMyPropertiesList] = useState([]);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    setProfileForm(prev => ({
-      name: user?.name || user?.displayName || prev.name || '',
-      email: user?.email || prev.email || '',
-      phone: sanitizePhone(user?.phone || user?.phoneNumber) || prev.phone || '',
-      city: user?.city || user?.location || prev.city || '',
-      accountType: 'Verified Property Owner & Buyer'
-    }));
+    const uid = user?.uid || user?.id;
+    let localStored = {};
+    if (typeof window !== 'undefined' && uid) {
+      try {
+        const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
+        if (storedStr) localStored = JSON.parse(storedStr);
+      } catch (e) {}
+    }
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+
+    setProfileForm(prev => {
+      const ph = sanitizePhone(user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone) || prev.phone || '';
+      const ct = (user?.city || user?.location || localStored.city || localStored.location || adminCity || prev.city || '').trim();
+      const nm = user?.name || user?.displayName || localStored.displayName || localStored.name || prev.name || '';
+      const em = user?.email || localStored.email || prev.email || '';
+      return {
+        ...prev,
+        name: nm,
+        email: em,
+        phone: ph,
+        city: ct
+      };
+    });
   }, [user?.uid, user?.id, user?.email, user?.name, user?.displayName, user?.phone, user?.city]);
 
   useEffect(() => {
@@ -579,6 +616,52 @@ export default function UserDashboard({
       });
       if (res && res.success) {
         setSavedSuccess(true);
+        setProfileForm(prev => ({
+          ...prev,
+          name: nameVal,
+          email: emailVal,
+          phone: phoneVal,
+          city: cityVal
+        }));
+        if (typeof window !== 'undefined') {
+          const uid = user?.uid || user?.id;
+          if (uid) {
+            try {
+              const uKey = 'easeland_user_profile_' + uid;
+              const cur = JSON.parse(localStorage.getItem(uKey) || '{}');
+              localStorage.setItem(uKey, JSON.stringify({
+                ...cur,
+                name: nameVal,
+                displayName: nameVal,
+                email: emailVal,
+                phone: phoneVal,
+                phoneNumber: phoneVal,
+                city: cityVal,
+                location: cityVal
+              }));
+            } catch (e) {}
+          }
+          try {
+            const sess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+            localStorage.setItem('easeland_session_user', JSON.stringify({
+              ...sess,
+              name: nameVal,
+              displayName: nameVal,
+              email: emailVal,
+              phone: phoneVal,
+              phoneNumber: phoneVal,
+              city: cityVal,
+              location: cityVal
+            }));
+          } catch (e) {}
+          if (localStorage.getItem('easeland_admin_authenticated') === 'true' || user?.email?.includes('admin')) {
+            localStorage.setItem('easeland_admin_phone', phoneVal);
+            localStorage.setItem('easeland_admin_city', cityVal);
+          }
+          window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', {
+            detail: { name: nameVal, email: emailVal, phone: phoneVal, city: cityVal }
+          }));
+        }
         setTimeout(() => setSavedSuccess(false), 3000);
       } else if (res && res.error) {
         setProfileSaveError(`Error updating profile: ${res.error}`);
@@ -1197,10 +1280,11 @@ export default function UserDashboard({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  const propToSave = prop.rawProperty || prop;
                                   try {
-                                    sessionStorage.setItem('easeland_editing_property', JSON.stringify(prop));
+                                    sessionStorage.setItem('easeland_editing_property', JSON.stringify(propToSave));
                                   } catch (err) {}
-                                  onPostProperty(prop.propertyId || prop.id || prop.referenceId || prop);
+                                  onPostProperty(propToSave);
                                 }}
                                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
                                 title="Edit property details, files, or media"
@@ -1215,10 +1299,11 @@ export default function UserDashboard({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  const propToSave = prop.rawProperty || prop;
                                   try {
-                                    sessionStorage.setItem('easeland_editing_property', JSON.stringify(prop));
+                                    sessionStorage.setItem('easeland_editing_property', JSON.stringify(propToSave));
                                   } catch (err) {}
-                                  onPostProperty(prop.propertyId || prop.id || prop.referenceId || prop);
+                                  onPostProperty(propToSave);
                                 }}
                                 className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer"
                               >
@@ -1233,10 +1318,11 @@ export default function UserDashboard({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    const propToSave = prop.rawProperty || prop;
                                     try {
-                                      sessionStorage.setItem('easeland_editing_property', JSON.stringify(prop));
+                                      sessionStorage.setItem('easeland_editing_property', JSON.stringify(propToSave));
                                     } catch (err) {}
-                                    onPostProperty(prop.propertyId || prop.id || prop.referenceId || prop);
+                                    onPostProperty(propToSave);
                                   }}
                                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
                                   title="Edit property details. New changes will be submitted for Admin re-audit while existing live details remain published."

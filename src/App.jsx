@@ -98,12 +98,49 @@ export default function App() {
     return str;
   };
 
+  const [profileRefreshTick, setProfileRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      setProfileRefreshTick(t => t + 1);
+      setIsProfileWarningOpen(false);
+    };
+    window.addEventListener('easeland-user-profile-updated', handleProfileUpdate);
+    window.addEventListener('easeland-admin-updated', handleProfileUpdate);
+    window.addEventListener('storage', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('easeland-user-profile-updated', handleProfileUpdate);
+      window.removeEventListener('easeland-admin-updated', handleProfileUpdate);
+      window.removeEventListener('storage', handleProfileUpdate);
+    };
+  }, []);
+
   const currentUser = useMemo(() => {
     if (!authUser) return null;
-    const activeName = authProfile?.displayName || authProfile?.name || authUser.displayName || authUser.name || (isAdminSession ? 'EaseLand Admin' : 'EaseLand User');
-    const activeEmail = authProfile?.email || authUser.email || '';
-    const activePhone = sanitizePhone(authProfile?.phone || authProfile?.phoneNumber || authUser?.phoneNumber || authUser?.phone || '');
-    const activeCity = (authProfile?.city || authProfile?.location || authUser?.city || authUser?.location || (isAdminSession ? (localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh') : '')).trim();
+    let localStored = {};
+    if (typeof window !== 'undefined' && authUser?.uid) {
+      try {
+        const storedStr = localStorage.getItem('easeland_user_profile_' + authUser.uid) || localStorage.getItem('easeland_session_user');
+        if (storedStr) localStored = JSON.parse(storedStr);
+      } catch (e) {}
+    }
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh') : 'Guntur, Andhra Pradesh';
+
+    const activeName = authProfile?.displayName || authProfile?.name || authUser.displayName || authUser.name || localStored.displayName || localStored.name || (isAdminSession ? 'EaseLand Admin' : 'EaseLand User');
+    const activeEmail = authProfile?.email || authUser.email || localStored.email || '';
+    const activePhone = sanitizePhone(
+      authProfile?.phone || authProfile?.phoneNumber ||
+      authUser?.phoneNumber || authUser?.phone ||
+      localStored.phone || localStored.phoneNumber ||
+      (isAdminSession ? adminPhone : '')
+    );
+    const activeCity = (
+      authProfile?.city || authProfile?.location ||
+      authUser?.city || authUser?.location ||
+      localStored.city || localStored.location ||
+      (isAdminSession ? adminCity : '')
+    ).trim();
 
     return {
       uid: authUser.uid,
@@ -134,7 +171,8 @@ export default function App() {
     authProfile?.location,
     authProfile?.role,
     authProfile?.ownerVerificationState,
-    isAdminSession
+    isAdminSession,
+    profileRefreshTick
   ]);
 
   // Auth & Profile Modal State
@@ -565,10 +603,31 @@ export default function App() {
 
   const checkProfileComplete = (u, p) => {
     const missing = [];
-    const name = (u?.name || u?.displayName || p?.name || p?.displayName || '').trim();
-    const email = (u?.email || p?.email || '').trim();
-    const phone = sanitizePhone(u?.phone || u?.phoneNumber || p?.phone || p?.phoneNumber || '');
-    const city = (u?.city || u?.location || p?.city || p?.location || '').trim();
+    const uid = u?.uid || p?.uid || authUser?.uid;
+    let localStored = {};
+    if (typeof window !== 'undefined' && uid) {
+      try {
+        const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
+        if (storedStr) localStored = JSON.parse(storedStr);
+      } catch (e) {}
+    }
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+
+    const name = (u?.name || u?.displayName || p?.name || p?.displayName || localStored.displayName || localStored.name || '').trim();
+    const email = (u?.email || p?.email || localStored.email || '').trim();
+    const phone = sanitizePhone(
+      u?.phone || u?.phoneNumber ||
+      p?.phone || p?.phoneNumber ||
+      localStored.phone || localStored.phoneNumber ||
+      adminPhone
+    );
+    const city = (
+      u?.city || u?.location ||
+      p?.city || p?.location ||
+      localStored.city || localStored.location ||
+      adminCity
+    ).trim();
 
     if (!name) missing.push('Full Name');
     if (!email) missing.push('Email Address');
@@ -580,25 +639,39 @@ export default function App() {
 
   const handlePostPropertyClick = (propParam = null) => {
     let targetPropId = null;
+    let targetPropObj = null;
     if (propParam !== null && propParam !== undefined) {
       if (typeof propParam === 'string' || typeof propParam === 'number') {
         targetPropId = String(propParam).trim();
       } else if (typeof propParam === 'object') {
+        targetPropObj = propParam;
         targetPropId = String(propParam.propertyId || propParam.id || propParam.referenceId || '').trim();
+        try {
+          sessionStorage.setItem('easeland_editing_property', JSON.stringify(propParam));
+        } catch (e) {}
       }
     }
     setEditingPropertyId(targetPropId || null);
+
     if (!currentUser) {
       setAuthIntent('post-property');
       setIsAuthModalOpen(true);
+      return;
+    }
+
+    // Editing existing property: NEVER block with profile criteria warning modal!
+    if (targetPropId || targetPropObj) {
+      setIsProfileWarningOpen(false);
+      changeActivePage('post-property');
+      return;
+    }
+
+    const missingFields = checkProfileComplete(currentUser, authProfile);
+    if (missingFields.length > 0) {
+      setIncompleteProfileFields(missingFields);
+      setIsProfileWarningOpen(true);
     } else {
-      const missingFields = checkProfileComplete(currentUser, authProfile);
-      if (missingFields.length > 0) {
-        setIncompleteProfileFields(missingFields);
-        setIsProfileWarningOpen(true);
-      } else {
-        changeActivePage('post-property');
-      }
+      changeActivePage('post-property');
     }
   };
 
@@ -1204,6 +1277,7 @@ export default function App() {
       <ProfileSettingsModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
+        onUserUpdated={() => setIsProfileWarningOpen(false)}
       />
 
       {/* INCOMPLETE PROFILE CRITERIA WARNING MODAL FOR POST PROPERTY */}
