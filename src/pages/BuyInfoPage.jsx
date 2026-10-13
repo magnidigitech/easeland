@@ -35,7 +35,7 @@ export default function BuyInfoPage({ onExploreClick }) {
               if (onExploreClick) onExploreClick({ purpose: 'SALE' });
               else window.location.href = '/properties?purpose=SALE';
             }}
-            className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-sm px-8 py-4 rounded-xl shadow-xl inline-flex items-center gap-2 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-sm px-8 py-4 rounded-xl shadow-xl inline-flex items-center gap-2 transition-all cursor-pointer animate-smooth-zoom"
           >
             <Search className="w-5 h-5 stroke-[2.5]" />
             <span>Explore Properties on Interactive Map</span>

@@ -399,6 +399,30 @@ select.bg-gray-50 option {
   animation-play-state: paused !important;
 }
 
+/* SMOOTH SIMPLE ZOOM IN - ZOOM OUT ANIMATION (CALM, GENTLE & UNINTRUSIVE) */
+@keyframes smoothZoomInOut {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.animate-smooth-zoom {
+  animation: smoothZoomInOut 3s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-smooth-zoom:hover {
+  animation-play-state: paused;
+  transform: scale(1.05) translateY(-2px);
+}
+
+.animate-smooth-zoom:active {
+  transform: scale(0.98);
+}
+
 /* GLOBAL SPINNER ARROW REMOVAL ON NUMBER INPUTS */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
