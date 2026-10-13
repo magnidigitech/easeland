@@ -1305,19 +1305,8 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5 text-[11px] text-gray-400 font-semibold">
-            <div>
-              {siteConfig?.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}
-            </div>
-            <button
-              onClick={scrollToTop}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-amber-400 hover:text-slate-950 text-gray-300 font-extrabold text-xs transition-all border border-white/10 hover:border-amber-400 shadow-sm group cursor-pointer"
-              title="Scroll to top of current page"
-              aria-label="Scroll to top of current page"
-            >
-              <span>Back to Top</span>
-              <ChevronUp className="w-4 h-4 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform" />
-            </button>
+          <div className="text-center text-[11px] text-gray-500 font-semibold">
+            {siteConfig?.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}
           </div>
         </div>
       </footer>
