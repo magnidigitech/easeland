@@ -281,6 +281,26 @@ export default function UniversalMapEngine({
     };
   }, [filters?.userLat]);
 
+  // Center and smooth-zoom map onto Reference Place if selected
+  useEffect(() => {
+    if (filters?.referenceLat && filters?.referenceLng && mapInstanceRef.current) {
+      const refLat = Number(filters.referenceLat);
+      const refLng = Number(filters.referenceLng);
+      if (!isNaN(refLat) && !isNaN(refLng)) {
+        let zoomLevel = 13;
+        if (filters?.radiusKm) {
+          const r = Number(filters.radiusKm);
+          if (r <= 2) zoomLevel = 15;
+          else if (r <= 5) zoomLevel = 14;
+          else if (r <= 10) zoomLevel = 13;
+          else if (r <= 25) zoomLevel = 11;
+          else zoomLevel = 10;
+        }
+        mapInstanceRef.current.setView([refLat, refLng], zoomLevel, { animate: true });
+      }
+    }
+  }, [filters?.referenceLat, filters?.referenceLng, filters?.radiusKm]);
+
   // Update Base Tile Layer when mapType, showLabels, or activeDetail changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;

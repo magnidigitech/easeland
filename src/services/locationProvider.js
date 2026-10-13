@@ -326,3 +326,101 @@ export function extractCoordinates(item) {
   return { lat, lng };
 }
 
+/**
+ * Canonical coordinates dictionary for known hubs and cities across AP, Telangana, and Pan-India
+ */
+export const KNOWN_PLACE_COORDS = {
+  // Andhra Pradesh
+  'amaravati': { lat: 16.5131, lng: 80.5165, name: 'Amaravati' },
+  'amaravathi': { lat: 16.5131, lng: 80.5165, name: 'Amaravati' },
+  'guntur': { lat: 16.3067, lng: 80.4365, name: 'Guntur' },
+  'vijayawada': { lat: 16.5062, lng: 80.6480, name: 'Vijayawada' },
+  'mangalagiri': { lat: 16.4300, lng: 80.5600, name: 'Mangalagiri' },
+  'tenali': { lat: 16.2430, lng: 80.6400, name: 'Tenali' },
+  'tadepalli': { lat: 16.4800, lng: 80.6000, name: 'Tadepalli' },
+  'brodipet': { lat: 16.3090, lng: 80.4370, name: 'Brodipet, Guntur' },
+  'arundelpet': { lat: 16.3080, lng: 80.4320, name: 'Arundelpet, Guntur' },
+  'kannavarithota': { lat: 16.3010, lng: 80.4420, name: 'Kannavarithota, Guntur' },
+  'pattabhipuram': { lat: 16.3040, lng: 80.4280, name: 'Pattabhipuram, Guntur' },
+  'syndicate nagar': { lat: 16.3150, lng: 80.4250, name: 'Syndicate Nagar, Guntur' },
+  'kaza': { lat: 16.4020, lng: 80.5520, name: 'Kaza' },
+  'navuluru': { lat: 16.4400, lng: 80.5500, name: 'Navuluru, Mangalagiri' },
+  'namburu': { lat: 16.3800, lng: 80.5200, name: 'Namburu' },
+  'benz circle': { lat: 16.4998, lng: 80.6543, name: 'Benz Circle, Vijayawada' },
+  'kanuru': { lat: 16.4900, lng: 80.6900, name: 'Kanuru, Vijayawada' },
+  'poranki': { lat: 16.4800, lng: 80.7100, name: 'Poranki, Vijayawada' },
+  'gannavaram': { lat: 16.5380, lng: 80.8030, name: 'Gannavaram' },
+  'visakhapatnam': { lat: 17.6868, lng: 83.2185, name: 'Visakhapatnam' },
+  'vizag': { lat: 17.6868, lng: 83.2185, name: 'Visakhapatnam' },
+  'tirupati': { lat: 13.6288, lng: 79.4192, name: 'Tirupati' },
+  'rajahmundry': { lat: 17.0005, lng: 81.8040, name: 'Rajahmundry' },
+  'kakinada': { lat: 16.9891, lng: 82.2475, name: 'Kakinada' },
+  'nellore': { lat: 14.4426, lng: 79.9865, name: 'Nellore' },
+  'kurnool': { lat: 15.8281, lng: 78.0373, name: 'Kurnool' },
+  'kadapa': { lat: 14.4673, lng: 78.8242, name: 'Kadapa' },
+  'anantapur': { lat: 14.6819, lng: 77.6006, name: 'Anantapur' },
+  'ongole': { lat: 15.5057, lng: 80.0499, name: 'Ongole' },
+  'eluru': { lat: 16.7107, lng: 81.0952, name: 'Eluru' },
+  'machilipatnam': { lat: 16.1875, lng: 81.1389, name: 'Machilipatnam' },
+
+  // Telangana
+  'hyderabad': { lat: 17.3850, lng: 78.4867, name: 'Hyderabad' },
+  'secunderabad': { lat: 17.4399, lng: 78.4983, name: 'Secunderabad' },
+  'gachibowli': { lat: 17.4401, lng: 78.3489, name: 'Gachibowli, Hyderabad' },
+  'hitec city': { lat: 17.4474, lng: 78.3762, name: 'Hitec City, Hyderabad' },
+  'madhapur': { lat: 17.4483, lng: 78.3915, name: 'Madhapur, Hyderabad' },
+  'kondapur': { lat: 17.4699, lng: 78.3578, name: 'Kondapur, Hyderabad' },
+  'jubilee hills': { lat: 17.4319, lng: 78.4073, name: 'Jubilee Hills, Hyderabad' },
+  'banjara hills': { lat: 17.4156, lng: 78.4350, name: 'Banjara Hills, Hyderabad' },
+  'kukatpally': { lat: 17.4849, lng: 78.4138, name: 'Kukatpally, Hyderabad' },
+  'miyapur': { lat: 17.4968, lng: 78.3614, name: 'Miyapur, Hyderabad' },
+  'manikonda': { lat: 17.3986, lng: 78.3847, name: 'Manikonda, Hyderabad' },
+  'tellapur': { lat: 17.4589, lng: 78.2750, name: 'Tellapur, Hyderabad' },
+  'narsingi': { lat: 17.3860, lng: 78.3560, name: 'Narsingi, Hyderabad' },
+  'shamshabad': { lat: 17.2403, lng: 78.4294, name: 'Shamshabad, Hyderabad' },
+  'warangal': { lat: 17.9689, lng: 79.5941, name: 'Warangal' },
+
+  // Pan-India Metros
+  'bengaluru': { lat: 12.9716, lng: 77.5946, name: 'Bengaluru' },
+  'bangalore': { lat: 12.9716, lng: 77.5946, name: 'Bengaluru' },
+  'whitefield': { lat: 12.9698, lng: 77.7500, name: 'Whitefield, Bengaluru' },
+  'indiranagar': { lat: 12.9784, lng: 77.6408, name: 'Indiranagar, Bengaluru' },
+  'chennai': { lat: 13.0827, lng: 80.2707, name: 'Chennai' },
+  'mumbai': { lat: 19.0760, lng: 72.8777, name: 'Mumbai' },
+  'delhi': { lat: 28.6139, lng: 77.2090, name: 'Delhi' },
+  'pune': { lat: 18.5204, lng: 73.8567, name: 'Pune' },
+  'kolkata': { lat: 22.5726, lng: 88.3639, name: 'Kolkata' }
+};
+
+/**
+ * Resolve canonical coordinates for a place name string from known hubs or partial matching
+ */
+export function resolvePlaceCoordinates(placeName) {
+  if (!placeName || typeof placeName !== 'string') return null;
+  const cleaned = placeName.trim().toLowerCase();
+  if (KNOWN_PLACE_COORDS[cleaned]) {
+    return KNOWN_PLACE_COORDS[cleaned];
+  }
+  const keyMatch = Object.keys(KNOWN_PLACE_COORDS).find(k => cleaned.includes(k) || k.includes(cleaned));
+  if (keyMatch) {
+    return KNOWN_PLACE_COORDS[keyMatch];
+  }
+  return null;
+}
+
+/**
+ * Calculate Spherical Haversine Distance between two coordinates in kilometers
+ */
+export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity;
+  const R = 6371; // Earth's mean radius in km
+  const dLat = (Number(lat2) - Number(lat1)) * (Math.PI / 180);
+  const dLon = (Number(lon2) - Number(lon1)) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(Number(lat1) * (Math.PI / 180)) * Math.cos(Number(lat2) * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+

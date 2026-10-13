@@ -9,7 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { searchPublicProperties, validateSortCompatibility } from '../firebase/searchService.js';
 import { searchStateToUrlParams, urlParamsToSearchState } from '../firebase/searchUrl.js';
 import { getUserWishlist, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
-import { searchLocationQuery } from '../services/locationProvider.js';
+import { searchLocationQuery, extractCoordinates, resolvePlaceCoordinates, calculateDistanceKm } from '../services/locationProvider.js';
+import { convertAreaToSqFt } from '../firebase/propertyService.js';
 import {
   Search, Filter, SlidersHorizontal, ArrowUpDown, ChevronLeft, ChevronRight,
   MapPin, Map as MapIcon, List, RotateCcw, AlertCircle, Sparkles, Building, Loader2
@@ -84,17 +85,78 @@ export function matchesSearchFilters(p, searchState = {}) {
     }
   }
 
-  // 4. Location Search (City & Locality)
+  // Helper: Extract comprehensive location searchable blob
+  const extractLocationBlob = (item) => {
+    const loc = item.location;
+    const parts = [];
+    if (typeof loc === 'string') {
+      parts.push(loc);
+    } else if (loc && typeof loc === 'object') {
+      parts.push(
+        loc.city, loc.locality, loc.subLocality, loc.mandal, loc.district,
+        loc.state, loc.village, loc.colony, loc.road, loc.landmark,
+        loc.address, loc.formattedAddress, loc.postalCode
+      );
+    }
+    parts.push(
+      item.city, item.locality, item.address, item.locationString,
+      item.district, item.state, item.title, item.description
+    );
+    return parts.filter(Boolean).join(' ').toLowerCase();
+  };
+
+  // 4. Location Search (City)
   if (searchState.city && searchState.city.trim()) {
-    const cityTarget = searchState.city.trim().toLowerCase();
-    const pCity = String(p.location?.city || p.location?.district || p.location?.state || p.city || '').toLowerCase();
-    if (!pCity.includes(cityTarget)) return false;
+    const cityTokens = searchState.city.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const blob = extractLocationBlob(p);
+    const matches = cityTokens.some(tok => blob.includes(tok));
+    if (!matches) return false;
   }
 
+  // 4b. Location Search (Locality)
   if (searchState.locality && searchState.locality.trim()) {
-    const locTarget = searchState.locality.trim().toLowerCase();
-    const pLocality = String(p.location?.locality || p.locality || p.address || '').toLowerCase();
-    if (!pLocality.includes(locTarget)) return false;
+    const locTokens = searchState.locality.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const blob = extractLocationBlob(p);
+    const matches = locTokens.some(tok => blob.includes(tok));
+    if (!matches) return false;
+  }
+
+  // 4c. Nearby Radius Search (Radius & Reference Place)
+  if (searchState.radiusKm && Number(searchState.radiusKm) > 0) {
+    const radiusNum = Number(searchState.radiusKm);
+    let refLat = searchState.referenceLat != null ? Number(searchState.referenceLat) : null;
+    let refLng = searchState.referenceLng != null ? Number(searchState.referenceLng) : null;
+
+    if ((refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) && searchState.referencePlace && searchState.referencePlace.trim()) {
+      const resolved = resolvePlaceCoordinates(searchState.referencePlace.trim());
+      if (resolved) {
+        refLat = resolved.lat;
+        refLng = resolved.lng;
+      }
+    }
+
+    if ((refLat == null || isNaN(refLat)) && searchState.userLat != null && searchState.userLng != null) {
+      refLat = Number(searchState.userLat);
+      refLng = Number(searchState.userLng);
+    }
+
+    if (refLat != null && !isNaN(refLat) && refLng != null && !isNaN(refLng)) {
+      const pCoords = extractCoordinates(p);
+      if (!isNaN(pCoords.lat) && !isNaN(pCoords.lng)) {
+        const distKm = calculateDistanceKm(refLat, refLng, pCoords.lat, pCoords.lng);
+        if (distKm > radiusNum) return false;
+      }
+    } else if (searchState.referencePlace && searchState.referencePlace.trim()) {
+      const placeTokens = searchState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const blob = extractLocationBlob(p);
+      const matches = placeTokens.some(tok => blob.includes(tok));
+      if (!matches) return false;
+    }
+  } else if (searchState.referencePlace && searchState.referencePlace.trim()) {
+    const placeTokens = searchState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const blob = extractLocationBlob(p);
+    const matches = placeTokens.some(tok => blob.includes(tok));
+    if (!matches) return false;
   }
 
   // 5. Search Query keyword token check
@@ -103,14 +165,13 @@ export function matchesSearchFilters(p, searchState = {}) {
     if (q !== 'near me') {
       const title = String(p.title || '').toLowerCase();
       const desc = String(p.description || '').toLowerCase();
-      const city = String(p.location?.city || p.location?.district || p.location?.state || '').toLowerCase();
-      const locality = String(p.location?.locality || '').toLowerCase();
+      const blob = extractLocationBlob(p);
       const cat = String(p.category || p.propertyType || '').toLowerCase();
       const refId = String(p.referenceId || p.propertyId || p.id || '').toLowerCase();
 
-      const blob = `${title} ${desc} ${city} ${locality} ${cat} ${refId}`;
+      const fullBlob = [title, desc, blob, cat, refId].join(' ');
       const tokens = q.split(/\s+/).filter(Boolean);
-      const matches = tokens.every(token => blob.includes(token));
+      const matches = tokens.every(token => fullBlob.includes(token));
       if (!matches) return false;
     }
   }
@@ -125,16 +186,25 @@ export function matchesSearchFilters(p, searchState = {}) {
     if (price > 0 && price > Number(searchState.maxPrice)) return false;
   }
 
-  // 7. Area range
-  const minAreaVal = searchState.minAreaSqFt || searchState.minArea;
-  if (minAreaVal != null && minAreaVal !== '') {
-    const area = Number(p.area || p.areaSqFt) || 0;
-    if (area > 0 && area < Number(minAreaVal)) return false;
-  }
-  const maxAreaVal = searchState.maxAreaSqFt || searchState.maxArea;
-  if (maxAreaVal != null && maxAreaVal !== '') {
-    const area = Number(p.area || p.areaSqFt) || 0;
-    if (area > 0 && area > Number(maxAreaVal)) return false;
+  // 7. Area range (Multi-unit conversion to standard Sq Ft)
+  const currentUnit = searchState.areaUnit || 'sq ft';
+  const rawMinArea = (searchState.minArea != null && searchState.minArea !== '')
+    ? Number(searchState.minArea)
+    : ((searchState.minAreaSqFt != null && searchState.minAreaSqFt !== '') ? Number(searchState.minAreaSqFt) : null);
+  const rawMaxArea = (searchState.maxArea != null && searchState.maxArea !== '')
+    ? Number(searchState.maxArea)
+    : ((searchState.maxAreaSqFt != null && searchState.maxAreaSqFt !== '') ? Number(searchState.maxAreaSqFt) : null);
+
+  if (rawMinArea != null || rawMaxArea != null) {
+    const propUnit = p.areaUnit || p.specs?.areaUnit || 'sq ft';
+    const propRawArea = Number(p.area) || Number(p.areaSqFt) || 0;
+    const propAreaSqFt = Number(p.areaSqFt) || convertAreaToSqFt(propRawArea, propUnit);
+
+    const filterMinSqFt = rawMinArea != null ? convertAreaToSqFt(rawMinArea, currentUnit) : null;
+    const filterMaxSqFt = rawMaxArea != null ? convertAreaToSqFt(rawMaxArea, currentUnit) : null;
+
+    if (filterMinSqFt != null && propAreaSqFt > 0 && propAreaSqFt < filterMinSqFt) return false;
+    if (filterMaxSqFt != null && propAreaSqFt > 0 && propAreaSqFt > filterMaxSqFt) return false;
   }
 
   // 8. Bedrooms / BHK
@@ -447,7 +517,7 @@ export default function PropertiesSearchPage({
     if (searchState.bedrooms && searchState.bedrooms !== 'ANY' && searchState.bedrooms !== 'ALL') count++;
     if (searchState.facing && searchState.facing !== 'ALL' && searchState.facing !== 'ANY') count++;
     if (searchState.furnishing && searchState.furnishing !== 'ALL' && searchState.furnishing !== 'ANY') count++;
-    if (searchState.radiusKm) count++;
+    if (searchState.radiusKm || searchState.referencePlace) count++;
     if (searchState.amenities && searchState.amenities.length > 0) count += searchState.amenities.length;
     return count;
   }, [searchState]);

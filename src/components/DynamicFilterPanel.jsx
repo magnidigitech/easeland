@@ -1,6 +1,39 @@
 import React from 'react';
 import { X, Filter, RotateCcw, Check, Navigation, AlertCircle } from 'lucide-react';
 import { PropertyType, Purpose } from '../firebase/schema.js';
+import { resolvePlaceCoordinates } from '../services/locationProvider.js';
+
+export const AREA_UNIT_OPTIONS = [
+  { label: 'Sq Ft', value: 'sq ft' },
+  { label: 'Sq Yards', value: 'sq yds' },
+  { label: 'Acres', value: 'acres' },
+  { label: 'Cents', value: 'cents' },
+  { label: 'Gunthas', value: 'guntas' },
+  { label: 'Ankanams', value: 'ankanams' }
+];
+
+export function formatPriceInWords(val) {
+  if (val === null || val === undefined || val === '') return '';
+  const num = Number(val);
+  if (isNaN(num) || num <= 0) return '';
+
+  if (num >= 10000000) {
+    const cr = num / 10000000;
+    const formatted = cr % 1 === 0 ? String(cr) : cr.toFixed(2).replace(/0$/, '');
+    return 'Rs. ' + formatted + ' Crore' + (cr > 1 ? 's' : '') + ' (' + num.toLocaleString('en-IN') + ')';
+  }
+  if (num >= 100000) {
+    const lk = num / 100000;
+    const formatted = lk % 1 === 0 ? String(lk) : lk.toFixed(2).replace(/0$/, '');
+    return 'Rs. ' + formatted + ' Lakh' + (lk > 1 ? 's' : '') + ' (' + num.toLocaleString('en-IN') + ')';
+  }
+  if (num >= 1000) {
+    const th = num / 1000;
+    const formatted = th % 1 === 0 ? String(th) : th.toFixed(1).replace(/0$/, '');
+    return 'Rs. ' + formatted + ' Thousand (' + num.toLocaleString('en-IN') + ')';
+  }
+  return 'Rs. ' + num.toLocaleString('en-IN');
+}
 
 const FACING_OPTIONS = [
   { label: 'Any Direction', value: '' },
@@ -84,6 +117,9 @@ export default function DynamicFilterPanel({
       maxPrice: '',
       minArea: '',
       maxArea: '',
+      minAreaSqFt: '',
+      maxAreaSqFt: '',
+      areaUnit: 'sq ft',
       bedrooms: '',
       bathrooms: '',
       facing: '',
@@ -91,6 +127,8 @@ export default function DynamicFilterPanel({
       amenities: [],
       radiusKm: null,
       referencePlace: '',
+      referenceLat: null,
+      referenceLng: null,
       sortBy: 'newest'
     });
   };
@@ -112,11 +150,14 @@ export default function DynamicFilterPanel({
   if (filters.locality) activeChips.push({ label: `Locality: ${filters.locality}`, key: 'locality', val: '' });
   if (filters.minPrice) activeChips.push({ label: `Min Price: Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`, key: 'minPrice', val: '' });
   if (filters.maxPrice) activeChips.push({ label: `Max Price: Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`, key: 'maxPrice', val: '' });
-  if (filters.minAreaSqFt || filters.minArea) activeChips.push({ label: `Min Area: ${filters.minAreaSqFt || filters.minArea} sq ft`, key: 'minArea', val: '' });
-  if (filters.maxAreaSqFt || filters.maxArea) activeChips.push({ label: `Max Area: ${filters.maxAreaSqFt || filters.maxArea} sq ft`, key: 'maxArea', val: '' });
+  
+  const currentAreaUnit = filters.areaUnit || 'sq ft';
+  if (filters.minArea || filters.minAreaSqFt) activeChips.push({ label: `Min Area: ${filters.minArea || filters.minAreaSqFt} ${currentAreaUnit}`, key: 'minArea', val: '' });
+  if (filters.maxArea || filters.maxAreaSqFt) activeChips.push({ label: `Max Area: ${filters.maxArea || filters.maxAreaSqFt} ${currentAreaUnit}`, key: 'maxArea', val: '' });
   if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY' && filters.bedrooms !== 'ALL') activeChips.push({ label: `BHK: ${filters.bedrooms}+`, key: 'bedrooms', val: '' });
   if (filters.facing && filters.facing !== 'ALL' && filters.facing !== 'ANY') activeChips.push({ label: `Facing: ${filters.facing}`, key: 'facing', val: '' });
   if (filters.furnishing && filters.furnishing !== 'ALL' && filters.furnishing !== 'ANY') activeChips.push({ label: `Furnishing: ${filters.furnishing}`, key: 'furnishing', val: '' });
+  if (filters.referencePlace) activeChips.push({ label: `Near: ${filters.referencePlace}`, key: 'referencePlace', val: '' });
   if (filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
   if (filters.amenities && filters.amenities.length > 0) {
     filters.amenities.forEach(a => {
@@ -239,8 +280,20 @@ export default function DynamicFilterPanel({
             <input
               type="text"
               placeholder="Enter Nearby Place"
-              value={filters.referencePlace || filters.city || ''}
-              onChange={(e) => handleChange('referencePlace', e.target.value)}
+              value={filters.referencePlace || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleChange('referencePlace', val);
+                const coords = resolvePlaceCoordinates(val);
+                if (coords) {
+                  setFilters(prev => ({
+                    ...prev,
+                    referencePlace: val,
+                    referenceLat: coords.lat,
+                    referenceLng: coords.lng
+                  }));
+                }
+              }}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
             />
             <select
@@ -296,6 +349,11 @@ export default function DynamicFilterPanel({
                 onChange={(e) => handleChange('minPrice', e.target.value)}
                 className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
               />
+              {filters.minPrice && formatPriceInWords(filters.minPrice) && (
+                <div className="mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 leading-tight">
+                  {formatPriceInWords(filters.minPrice)}
+                </div>
+              )}
             </div>
             <div>
               <span className="text-[10px] text-gray-400 font-medium">Max Price (Rs.)</span>
@@ -306,30 +364,55 @@ export default function DynamicFilterPanel({
                 onChange={(e) => handleChange('maxPrice', e.target.value)}
                 className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
               />
+              {filters.maxPrice && formatPriceInWords(filters.maxPrice) && (
+                <div className="mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 leading-tight">
+                  {formatPriceInWords(filters.maxPrice)}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Plot / Property Area */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
-            Area (in Sq Ft)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
+              Area
+            </label>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-500 font-bold uppercase">Unit:</span>
+              <select
+                value={filters.areaUnit || 'sq ft'}
+                onChange={(e) => handleChange('areaUnit', e.target.value)}
+                className="p-1 bg-gray-50 border border-gray-200 rounded-md text-xs font-bold text-brand-charcoal focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+              >
+                {AREA_UNIT_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              placeholder="Enter Min Area"
-              value={filters.minArea || filters.minAreaSqFt || ''}
-              onChange={(e) => handleChange('minArea', e.target.value)}
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
-            />
-            <input
-              type="number"
-              placeholder="Enter Max Area"
-              value={filters.maxArea || filters.maxAreaSqFt || ''}
-              onChange={(e) => handleChange('maxArea', e.target.value)}
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
-            />
+            <div>
+              <span className="text-[10px] text-gray-400 font-medium">Min Area ({filters.areaUnit || 'sq ft'})</span>
+              <input
+                type="number"
+                placeholder={'Enter Min (' + (filters.areaUnit || 'sq ft') + ')'}
+                value={filters.minArea || filters.minAreaSqFt || ''}
+                onChange={(e) => handleChange('minArea', e.target.value)}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+              />
+            </div>
+            <div>
+              <span className="text-[10px] text-gray-400 font-medium">Max Area ({filters.areaUnit || 'sq ft'})</span>
+              <input
+                type="number"
+                placeholder={'Enter Max (' + (filters.areaUnit || 'sq ft') + ')'}
+                value={filters.maxArea || filters.maxAreaSqFt || ''}
+                onChange={(e) => handleChange('maxArea', e.target.value)}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+              />
+            </div>
           </div>
         </div>
 

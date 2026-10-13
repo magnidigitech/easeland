@@ -8,7 +8,8 @@ export const AreaUnit = {
   SQ_YDS: 'sq yds',
   ACRES: 'acres',
   CENTS: 'cents',
-  GUNTAS: 'guntas'
+  GUNTAS: 'guntas',
+  ANKANAMS: 'ankanams'
 };
 
 export const FacingDirection = {

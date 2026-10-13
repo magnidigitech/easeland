@@ -47,12 +47,18 @@ export function searchStateToUrlParams(searchState = {}) {
     params.set('maxPrice', String(searchState.maxPrice));
   }
 
-  if (searchState.minAreaSqFt !== null && searchState.minAreaSqFt !== undefined && searchState.minAreaSqFt !== '') {
-    params.set('minArea', String(searchState.minAreaSqFt));
+  const minAreaToSave = searchState.minArea ?? searchState.minAreaSqFt;
+  if (minAreaToSave !== null && minAreaToSave !== undefined && minAreaToSave !== '') {
+    params.set('minArea', String(minAreaToSave));
   }
 
-  if (searchState.maxAreaSqFt !== null && searchState.maxAreaSqFt !== undefined && searchState.maxAreaSqFt !== '') {
-    params.set('maxArea', String(searchState.maxAreaSqFt));
+  const maxAreaToSave = searchState.maxArea ?? searchState.maxAreaSqFt;
+  if (maxAreaToSave !== null && maxAreaToSave !== undefined && maxAreaToSave !== '') {
+    params.set('maxArea', String(maxAreaToSave));
+  }
+
+  if (searchState.areaUnit && searchState.areaUnit !== 'sq ft') {
+    params.set('areaUnit', searchState.areaUnit);
   }
 
   if (searchState.bedrooms && searchState.bedrooms !== 'ANY') {
@@ -116,6 +122,7 @@ export function urlParamsToSearchState(searchString = '') {
   const amenitiesParam = params.get('amenities');
   const radiusParam = params.get('radius');
   const nearParam = params.get('near');
+  const areaUnitParam = params.get('areaUnit') || 'sq ft';
   const sortParam = params.get('sort');
 
   // Validate Purpose Enum
@@ -142,8 +149,11 @@ export function urlParamsToSearchState(searchString = '') {
     locality: localityParam,
     minPrice: (minPriceParam && !isNaN(Number(minPriceParam))) ? Number(minPriceParam) : '',
     maxPrice: (maxPriceParam && !isNaN(Number(maxPriceParam))) ? Number(maxPriceParam) : '',
+    minArea: (minAreaParam && !isNaN(Number(minAreaParam))) ? Number(minAreaParam) : '',
+    maxArea: (maxAreaParam && !isNaN(Number(maxAreaParam))) ? Number(maxAreaParam) : '',
     minAreaSqFt: (minAreaParam && !isNaN(Number(minAreaParam))) ? Number(minAreaParam) : '',
     maxAreaSqFt: (maxAreaParam && !isNaN(Number(maxAreaParam))) ? Number(maxAreaParam) : '',
+    areaUnit: areaUnitParam,
     bedrooms: bhkParam || 'ANY',
     bathrooms: bathsParam || 'ANY',
     facing: facingParam || 'ALL',

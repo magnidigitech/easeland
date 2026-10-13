@@ -100,7 +100,10 @@ export function convertAreaToSqFt(areaValue, unit) {
   switch (u) {
     case 'sq yds':
     case 'sq yds.':
+    case 'sq yd':
+    case 'sq yards':
     case 'yards':
+    case 'gajam':
       return num * 9;
     case 'acres':
     case 'acre':
@@ -110,9 +113,16 @@ export function convertAreaToSqFt(areaValue, unit) {
       return num * 435.6;
     case 'guntas':
     case 'gunta':
+    case 'gunthas':
+    case 'guntha':
       return num * 1089;
+    case 'ankanams':
+    case 'ankanam':
+      return num * 72;
     case 'sq ft':
     case 'sqft':
+    case 'square feet':
+    case 'square foot':
     default:
       return num;
   }
