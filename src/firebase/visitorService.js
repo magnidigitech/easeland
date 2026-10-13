@@ -40,7 +40,7 @@ export async function submitVisitorLead(visitorData) {
       name: (visitorData.name || 'Site Visitor').trim(),
       phone: (visitorData.phone || '').trim(),
       email: (visitorData.email || '').trim(),
-      preferredPropertyType: visitorData.preferredPropertyType || 'Open Plots',
+      preferredPropertyType: visitorData.preferredPropertyType || 'Open Plot Ventures',
       preferredLocation: visitorData.preferredLocation || 'Amaravati / Guntur',
       stayDurationSeconds: Number(visitorData.stayDurationSeconds) || 60,
       source: visitorData.source || '1_MIN_ENGAGEMENT_POPUP',

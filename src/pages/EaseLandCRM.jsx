@@ -136,7 +136,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
     source: CrmLeadSources.WEBSITE_ENQUIRY,
     score: CrmLeadScores.HOT,
     preferredLocation: 'Guntur / Amaravati Region',
-    preferredPropertyType: 'Open Plots',
+    preferredPropertyType: 'Open Plot Ventures',
     budgetMin: 3000000,
     budgetMax: 6000000,
     assignedAgent: DEFAULT_CRM_AGENTS[0].name,
@@ -1708,11 +1708,14 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, preferredPropertyType: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none cursor-pointer"
                   >
-                    <option value="Open Plots">Open Plots</option>
-                    <option value="Agricultural Land">Agricultural Land</option>
-                    <option value="Commercial Land">Commercial Land</option>
-                    <option value="Houses & Villas">Houses & Villas</option>
-                    <option value="Apartments">Apartments</option>
+                    <option value="Open Plot Ventures">Open Plot Ventures</option>
+                    <option value="Open Plot (City)">Open Plot (City)</option>
+                    <option value="Apartments/Flat">Apartments/Flat</option>
+                    <option value="Independent House/Villa">Independent House/Villa</option>
+                    <option value="Commerical Property">Commerical Property</option>
+                    <option value="Agricultural Lands">Agricultural Lands</option>
+                    <option value="Amaravathi LPS layout plots">Amaravathi LPS layout plots</option>
+                    <option value="Others">Others</option>
                   </select>
                 </div>
               </div>

@@ -247,6 +247,28 @@ export default function DynamicFilterPanel({
           </div>
         </div>
 
+        {/* Category Select */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
+            Property Category
+          </label>
+          <select
+            value={filters.category || 'All'}
+            onChange={(e) => handleChange('category', e.target.value)}
+            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal focus:ring-2 focus:ring-brand-yellow focus:outline-none"
+          >
+            <option value="All">All Categories</option>
+            <option value="Open Plot Ventures">Open Plot Ventures</option>
+            <option value="Open Plot (City)">Open Plot (City)</option>
+            <option value="Apartments/Flat">Apartments/Flat</option>
+            <option value="Independent House/Villa">Independent House/Villa</option>
+            <option value="Commerical Property">Commerical Property</option>
+            <option value="Agricultural Lands">Agricultural Lands</option>
+            <option value="Amaravathi LPS layout plots">Amaravathi LPS layout plots</option>
+            <option value="Others">Others</option>
+          </select>
+        </div>
+
         {/* Property Type Select */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
@@ -258,13 +280,13 @@ export default function DynamicFilterPanel({
             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal focus:ring-2 focus:ring-brand-yellow focus:outline-none"
           >
             <option value="">All Property Types</option>
-            <option value={PropertyType.OPEN_PLOT}>Open Plot</option>
-            <option value={PropertyType.HOUSE}>House / Independent House</option>
-            <option value={PropertyType.APARTMENT}>Apartment / Flat</option>
+            <option value={PropertyType.OPEN_PLOT}>Open Plot Ventures / City</option>
+            <option value={PropertyType.HOUSE}>Independent House / Villa</option>
+            <option value={PropertyType.APARTMENT}>Apartments / Flat</option>
             <option value={PropertyType.VILLA}>Villa</option>
-            <option value={PropertyType.COMMERCIAL}>Commercial Property</option>
-            <option value={PropertyType.LAND}>Agricultural Land</option>
-            <option value={PropertyType.OTHER}>Other</option>
+            <option value={PropertyType.COMMERCIAL}>Commerical Property</option>
+            <option value={PropertyType.LAND}>Agricultural Lands</option>
+            <option value={PropertyType.OTHER}>Others</option>
           </select>
         </div>
 

@@ -1,5 +1,6 @@
 import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData';
 import { extractCoordinates } from './locationProvider';
+import { getCategoryBadgeLabel } from '../utils/categoryUtils';
 
 export const safeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -262,11 +263,14 @@ export const DEFAULT_SITE_CONFIG = {
     badgeText: 'POST PROPERTY FOR FREE'
   },
   categories: [
-    { id: 'cat-1', title: 'Open Plots', countText: 'Pan-India Plot Listings', icon: 'MapPin', imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80' },
-    { id: 'cat-2', title: 'Houses & Villas', countText: 'Independent Villas & Gated Houses', icon: 'Building2', imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80' },
-    { id: 'cat-3', title: 'Apartments', countText: 'High-Rise Modern Flats', icon: 'Building', imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80' },
-    { id: 'cat-4', title: 'Commercial', countText: 'Commercial Plots & Offices', icon: 'Briefcase', imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80' },
-    { id: 'cat-5', title: 'Rentals', countText: 'Furnished Rental Flats & Homes', icon: 'Key', imageUrl: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80' }
+    { id: 'cat-1', title: 'Open Plot Ventures', countText: 'Layout & Gated Ventures', icon: 'MapPin', imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-2', title: 'Open Plot (City)', countText: 'In-City Residential Plots', icon: 'MapPin', imageUrl: 'https://images.unsplash.com/photo-1592595896551-12b371d546d5?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-3', title: 'Apartments/Flat', countText: 'High-Rise Modern Flats', icon: 'Building', imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-4', title: 'Independent House/Villa', countText: 'Independent Villas & Gated Houses', icon: 'Building2', imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-5', title: 'Commerical Property', countText: 'Commercial Plots & Offices', icon: 'Briefcase', imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-6', title: 'Agricultural Lands', countText: 'Farmlands & Agri Acreages', icon: 'Trees', imageUrl: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-7', title: 'Amaravathi LPS layout plots', countText: 'CRDA Amaravathi LPS Plots', icon: 'LandPlot', imageUrl: 'https://images.unsplash.com/photo-1628744448840-55bdb2497bd4?auto=format&fit=crop&w=600&q=80' },
+    { id: 'cat-8', title: 'Others', countText: 'Warehouses & Mixed Use', icon: 'Compass', imageUrl: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80' }
   ],
   faqs: [
     { id: 'faq-1', question: 'How does EaseLand verify property titles and land boundaries?', answer: 'EaseLand deploys field inspection specialists who perform physical site visits, capture GeoJSON plot boundary coordinates, and audit land records (Pahani, Adangal, Encumbrance Certificates) before publishing listings live.' },
@@ -443,7 +447,42 @@ export const mockApi = {
 
     // Category Filter
     if (filters.category && filters.category !== 'All') {
-      result = result.filter(p => p.category === filters.category || p.propertyType === filters.category);
+      const targetCat = String(filters.category).toLowerCase().trim();
+      result = result.filter(p => {
+        if (!p) return false;
+        const pBadge = String(getCategoryBadgeLabel(p)).toLowerCase();
+        if (pBadge === targetCat) return true;
+        const pCat = String(p.category || '').toLowerCase();
+        const pType = String(p.propertyType || '').toLowerCase();
+        const pTitle = String(p.title || '').toLowerCase();
+        if (pCat === targetCat || pType === targetCat) return true;
+
+        if (targetCat.includes('amaravathi') || targetCat.includes('lps')) {
+          return pCat.includes('amaravathi') || pTitle.includes('amaravathi') || pCat.includes('lps') || pTitle.includes('lps');
+        }
+        if (targetCat.includes('agricultural') || targetCat.includes('farm')) {
+          return pCat.includes('agri') || pType.includes('land') || pTitle.includes('agri') || pTitle.includes('farm');
+        }
+        if (targetCat.includes('commercial')) {
+          return pCat.includes('commercial') || pType.includes('commercial') || pCat.includes('shop') || pCat.includes('office');
+        }
+        if (targetCat.includes('apartment') || targetCat.includes('flat')) {
+          return pCat.includes('apartment') || pCat.includes('flat') || pType === 'apartment';
+        }
+        if (targetCat.includes('house') || targetCat.includes('villa') || targetCat.includes('independent')) {
+          return pCat.includes('house') || pCat.includes('villa') || pType === 'house' || pType === 'villa';
+        }
+        if (targetCat.includes('city') && targetCat.includes('plot')) {
+          return (pCat.includes('city') || pTitle.includes('city')) && (pType.includes('plot') || pCat.includes('plot'));
+        }
+        if (targetCat.includes('venture') || targetCat.includes('plot')) {
+          return pType.includes('plot') || pCat.includes('plot') || pCat.includes('venture');
+        }
+        if (targetCat.includes('other')) {
+          return pType === 'other' || pCat.includes('other');
+        }
+        return false;
+      });
     }
 
     // Purpose Filter (buy vs rent)

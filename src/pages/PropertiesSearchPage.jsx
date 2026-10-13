@@ -11,6 +11,7 @@ import { searchStateToUrlParams, urlParamsToSearchState } from '../firebase/sear
 import { getUserWishlist, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { searchLocationQuery, extractCoordinates, resolvePlaceCoordinates, calculateDistanceKm } from '../services/locationProvider.js';
 import { convertAreaToSqFt } from '../firebase/propertyService.js';
+import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
 import {
   Search, Filter, SlidersHorizontal, ArrowUpDown, ChevronLeft, ChevronRight,
   MapPin, Map as MapIcon, List, RotateCcw, AlertCircle, Sparkles, Building, Loader2
@@ -64,24 +65,36 @@ export function matchesSearchFilters(p, searchState = {}) {
 
   // 3. Category string fallback check
   if (searchState.category && searchState.category !== 'All' && searchState.category !== 'ALL') {
-    const pType = String(p.propertyType || p.type || '').toUpperCase();
-    const pCat = String(p.category || p.title || '').toUpperCase();
-    const catStr = String(searchState.category).toLowerCase();
-    const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
+    const targetCat = String(searchState.category).toLowerCase().trim();
+    const pBadge = String(getCategoryBadgeLabel(p)).toLowerCase();
+    if (pBadge !== targetCat) {
+      const pType = String(p.propertyType || p.type || '').toUpperCase();
+      const pCat = String(p.category || p.title || '').toUpperCase();
+      const pTitle = String(p.title || '').toUpperCase();
+      const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
-    if (catStr.includes('plot')) {
-      if (isCommercialProp) return false;
-      if (!pType.includes('PLOT') && !pCat.includes('PLOT') && !pCat.includes('LAND')) return false;
-    } else if (catStr.includes('house') || catStr.includes('villa')) {
-      if (isCommercialProp) return false;
-      if (!pType.includes('HOUSE') && !pType.includes('VILLA') && !pCat.includes('HOUSE') && !pCat.includes('VILLA')) return false;
-    } else if (catStr.includes('apartment') || catStr.includes('flat')) {
-      if (isCommercialProp) return false;
-      if (!pType.includes('APARTMENT') && !pType.includes('FLAT') && !pCat.includes('APARTMENT') && !pCat.includes('FLAT')) return false;
-    } else if (catStr.includes('commercial')) {
-      if (!isCommercialProp) return false;
-    } else if (catStr.includes('rent')) {
-      if (!pType.includes('RENT') && !pCat.includes('RENT') && !String(p.purpose || '').toUpperCase().includes('RENT')) return false;
+      if (targetCat.includes('amaravathi') || targetCat.includes('lps')) {
+        if (!pCat.includes('AMARAVATHI') && !pTitle.includes('AMARAVATHI') && !pCat.includes('LPS') && !pTitle.includes('LPS')) return false;
+      } else if (targetCat.includes('agricultural') || targetCat.includes('farm')) {
+        if (!pType.includes('LAND') && !pCat.includes('AGRI') && !pCat.includes('FARM') && !pTitle.includes('AGRI') && !pTitle.includes('FARM')) return false;
+      } else if (targetCat.includes('commercial')) {
+        if (!isCommercialProp) return false;
+      } else if (targetCat.includes('apartment') || targetCat.includes('flat')) {
+        if (isCommercialProp) return false;
+        if (!pType.includes('APARTMENT') && !pType.includes('FLAT') && !pCat.includes('APARTMENT') && !pCat.includes('FLAT')) return false;
+      } else if (targetCat.includes('house') || targetCat.includes('villa') || targetCat.includes('independent')) {
+        if (isCommercialProp) return false;
+        if (!pType.includes('HOUSE') && !pType.includes('VILLA') && !pCat.includes('HOUSE') && !pCat.includes('VILLA')) return false;
+      } else if (targetCat.includes('city') && targetCat.includes('plot')) {
+        if (isCommercialProp) return false;
+        if (!pType.includes('PLOT') && !pCat.includes('PLOT')) return false;
+        if (!pCat.includes('CITY') && !pTitle.includes('CITY') && !pCat.includes('COLONY')) return false;
+      } else if (targetCat.includes('venture') || targetCat.includes('plot')) {
+        if (isCommercialProp) return false;
+        if (!pType.includes('PLOT') && !pCat.includes('PLOT') && !pCat.includes('VENTURE')) return false;
+      } else if (targetCat.includes('other')) {
+        if (!pType.includes('OTHER') && !pCat.includes('OTHER')) return false;
+      }
     }
   }
 

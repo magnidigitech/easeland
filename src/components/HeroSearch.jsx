@@ -5,19 +5,30 @@ import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 
 function normalizeCategoryValue(val, purpVal) {
   if (!val || val === 'All' || val === 'ALL') {
-    return purpVal === 'RENT' ? 'Rentals' : 'All';
+    return 'All';
   }
-  const lower = String(val).toLowerCase();
-  if (lower.includes('plot')) return 'Open Plots';
-  if (lower.includes('house') || lower.includes('villa')) return 'Houses';
-  if (lower.includes('apartment') || lower.includes('flat')) return 'Apartments';
-  if (lower.includes('commercial')) return 'Commercial';
-  if (lower.includes('rent')) return 'Rentals';
-  if (val === 'OPEN_PLOT' || val === 'OPEN_PLOTS') return 'Open Plots';
-  if (val === 'HOUSE' || val === 'VILLA' || val === 'HOUSES') return 'Houses';
-  if (val === 'APARTMENT' || val === 'FLAT' || val === 'APARTMENTS') return 'Apartments';
-  if (val === 'COMMERCIAL') return 'Commercial';
-  if (val === 'RENTAL') return 'Rentals';
+  const clean = String(val).trim();
+  const lower = clean.toLowerCase();
+
+  // Direct exact matches
+  if (lower === 'open plot ventures') return 'Open Plot Ventures';
+  if (lower === 'open plot (city)' || lower === 'open plot city') return 'Open Plot (City)';
+  if (lower === 'apartments/flat' || lower === 'apartment/flat' || lower === 'apartments' || lower === 'apartment') return 'Apartments/Flat';
+  if (lower === 'independent house/villa' || lower === 'independent house / villa' || lower === 'houses & villas' || lower === 'houses' || lower === 'villa') return 'Independent House/Villa';
+  if (lower === 'commerical property' || lower === 'commercial property' || lower === 'commercial') return 'Commerical Property';
+  if (lower === 'agricultural lands' || lower === 'agricultural land') return 'Agricultural Lands';
+  if (lower.includes('amaravathi') || lower.includes('lps')) return 'Amaravathi LPS layout plots';
+  if (lower === 'others' || lower === 'other') return 'Others';
+
+  // Keyword inferences
+  if (lower.includes('agricultural') || lower.includes('farmland') || lower.includes('farm')) return 'Agricultural Lands';
+  if (lower.includes('commercial') || lower.includes('office') || lower.includes('shop')) return 'Commerical Property';
+  if (lower.includes('apartment') || lower.includes('flat')) return 'Apartments/Flat';
+  if (lower.includes('house') || lower.includes('villa') || lower.includes('independent')) return 'Independent House/Villa';
+  if (lower.includes('city') && lower.includes('plot')) return 'Open Plot (City)';
+  if (lower.includes('plot') || lower.includes('venture') || lower === 'open_plot' || lower === 'open_plots') return 'Open Plot Ventures';
+  if (lower.includes('rent')) return 'Others';
+
   return 'All';
 }
 
@@ -76,10 +87,14 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     let purp = currentPurpose === 'buy' ? 'SALE' : (currentPurpose === 'rent' ? 'RENT' : currentPurpose);
 
     const catStr = String(currentCategory || '').toLowerCase();
-    if (catStr.includes('plot') || catStr === 'open plots') propType = 'OPEN_PLOT';
-    else if (catStr.includes('house') || catStr.includes('villa') || catStr === 'houses') propType = 'HOUSE';
-    else if (catStr.includes('apartment') || catStr.includes('flat') || catStr === 'apartments') propType = 'APARTMENT';
+    if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
     else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
+    else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
+    else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('venture') || catStr.includes('plot')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('other')) propType = 'OTHER';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
     onSearch({
@@ -183,12 +198,15 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           }}
           className="py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
         >
-          <option value="All" className="bg-slate-900 text-white">All Categories</option>
-          <option value="Open Plots" className="bg-slate-900 text-white">Open Plots</option>
-          <option value="Houses" className="bg-slate-900 text-white">Houses & Villas</option>
-          <option value="Apartments" className="bg-slate-900 text-white">Apartments</option>
-          <option value="Commercial" className="bg-slate-900 text-white">Commercial</option>
-          <option value="Rentals" className="bg-slate-900 text-white">Rentals</option>
+          <option value="All" className="bg-slate-900 text-white font-semibold">All Categories</option>
+          <option value="Open Plot Ventures" className="bg-slate-900 text-white font-semibold">Open Plot Ventures</option>
+          <option value="Open Plot (City)" className="bg-slate-900 text-white font-semibold">Open Plot (City)</option>
+          <option value="Apartments/Flat" className="bg-slate-900 text-white font-semibold">Apartments/Flat</option>
+          <option value="Independent House/Villa" className="bg-slate-900 text-white font-semibold">Independent House/Villa</option>
+          <option value="Commerical Property" className="bg-slate-900 text-white font-semibold">Commerical Property</option>
+          <option value="Agricultural Lands" className="bg-slate-900 text-white font-semibold">Agricultural Lands</option>
+          <option value="Amaravathi LPS layout plots" className="bg-slate-900 text-white font-semibold">Amaravathi LPS layout plots</option>
+          <option value="Others" className="bg-slate-900 text-white font-semibold">Others</option>
         </select>
 
         <button
@@ -307,11 +325,14 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
               >
                 <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
-                <option value="Open Plots" className="bg-slate-900 text-white font-bold">Open Plots</option>
-                <option value="Houses" className="bg-slate-900 text-white font-bold">Houses & Villas</option>
-                <option value="Apartments" className="bg-slate-900 text-white font-bold">Apartments</option>
-                <option value="Commercial" className="bg-slate-900 text-white font-bold">Commercial</option>
-                <option value="Rentals" className="bg-slate-900 text-white font-bold">Rentals</option>
+                <option value="Open Plot Ventures" className="bg-slate-900 text-white font-bold">Open Plot Ventures</option>
+                <option value="Open Plot (City)" className="bg-slate-900 text-white font-bold">Open Plot (City)</option>
+                <option value="Apartments/Flat" className="bg-slate-900 text-white font-bold">Apartments/Flat</option>
+                <option value="Independent House/Villa" className="bg-slate-900 text-white font-bold">Independent House/Villa</option>
+                <option value="Commerical Property" className="bg-slate-900 text-white font-bold">Commerical Property</option>
+                <option value="Agricultural Lands" className="bg-slate-900 text-white font-bold">Agricultural Lands</option>
+                <option value="Amaravathi LPS layout plots" className="bg-slate-900 text-white font-bold">Amaravathi LPS layout plots</option>
+                <option value="Others" className="bg-slate-900 text-white font-bold">Others</option>
               </select>
             </div>
 

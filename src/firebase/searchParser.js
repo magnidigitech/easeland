@@ -77,24 +77,27 @@ export function parseNaturalLanguageQuery(queryString = '') {
   }
 
   // 3. Property Type Intent
-  if (/\b(open plot|plot|plots|layout plot)\b/.test(text)) {
+  if (/\b(amaravathi lps|amaravati lps|lps plot|lps plots)\b/.test(text)) {
     propertyType = PropertyType.OPEN_PLOT;
-    text = text.replace(/\b(open plot|plot|plots|layout plot)\b/g, '');
+    text = text.replace(/\b(amaravathi lps|amaravati lps|lps plot|lps plots)\b/g, '');
+  } else if (/\b(open plot|plot|plots|layout plot|venture|ventures)\b/.test(text)) {
+    propertyType = PropertyType.OPEN_PLOT;
+    text = text.replace(/\b(open plot|plot|plots|layout plot|venture|ventures)\b/g, '');
   } else if (/\b(villa|villas|duplex villa)\b/.test(text)) {
     propertyType = PropertyType.VILLA;
     text = text.replace(/\b(villa|villas|duplex villa)\b/g, '');
   } else if (/\b(apartment|apartments|flat|flats)\b/.test(text)) {
     propertyType = PropertyType.APARTMENT;
     text = text.replace(/\b(apartment|apartments|flat|flats)\b/g, '');
-  } else if (/\b(house|houses|home|independent house)\b/.test(text)) {
+  } else if (/\b(house|houses|home|independent house|independent house\/villa)\b/.test(text)) {
     propertyType = PropertyType.HOUSE;
-    text = text.replace(/\b(house|houses|home|independent house)\b/g, '');
-  } else if (/\b(commercial|shop|office|godown|warehouse)\b/.test(text)) {
+    text = text.replace(/\b(house|houses|home|independent house|independent house\/villa)\b/g, '');
+  } else if (/\b(commercial|commerical|shop|office|godown|warehouse)\b/.test(text)) {
     propertyType = PropertyType.COMMERCIAL;
-    text = text.replace(/\b(commercial|shop|office|godown|warehouse)\b/g, '');
-  } else if (/\b(land|agricultural land|farm land)\b/.test(text)) {
+    text = text.replace(/\b(commercial|commerical|shop|office|godown|warehouse)\b/g, '');
+  } else if (/\b(land|agricultural land|agricultural lands|farm land|farmland)\b/.test(text)) {
     propertyType = PropertyType.LAND;
-    text = text.replace(/\b(land|agricultural land|farm land)\b/g, '');
+    text = text.replace(/\b(land|agricultural land|agricultural lands|farm land|farmland)\b/g, '');
   }
 
   // 4. Radius / Distance Intent e.g. "within 5 km of Vijayawada Airport"

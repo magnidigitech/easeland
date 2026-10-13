@@ -514,10 +514,14 @@ export default function App() {
     let purp = searchPayload?.purpose || 'ALL';
 
     const catStr = String(searchPayload?.category || '').toLowerCase();
-    if (catStr.includes('plot') || catStr === 'open plots') propType = 'OPEN_PLOT';
-    else if (catStr.includes('house') || catStr.includes('villa') || catStr === 'houses') propType = 'HOUSE';
-    else if (catStr.includes('apartment') || catStr.includes('flat') || catStr === 'apartments') propType = 'APARTMENT';
+    if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
     else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
+    else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
+    else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('venture') || catStr.includes('plot')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('other')) propType = 'OTHER';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
     const newFilters = {
@@ -545,10 +549,14 @@ export default function App() {
     let purp = 'ALL';
 
     const catStr = String(catTitle || '').toLowerCase();
-    if (catStr.includes('plot') || catStr === 'open plots') propType = 'OPEN_PLOT';
-    else if (catStr.includes('house') || catStr.includes('villa') || catStr === 'houses') propType = 'HOUSE';
-    else if (catStr.includes('apartment') || catStr.includes('flat') || catStr === 'apartments') propType = 'APARTMENT';
+    if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
     else if (catStr.includes('commercial')) propType = 'COMMERCIAL';
+    else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
+    else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
+    else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('venture') || catStr.includes('plot')) propType = 'OPEN_PLOT';
+    else if (catStr.includes('other')) propType = 'OTHER';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
     const updatedFilters = {

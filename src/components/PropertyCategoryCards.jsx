@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LandPlot, Home, Building2, Store, Key, ArrowRight } from 'lucide-react';
+import { LandPlot, Home, Building2, Store, Trees, MapPin, Sparkles, Compass, ArrowRight } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 
 export default function PropertyCategoryCards({ onSelectCategory }) {
@@ -13,49 +13,76 @@ export default function PropertyCategoryCards({ onSelectCategory }) {
 
   const categories = [
     {
-      id: 'open-plots',
-      name: 'Open Plots',
-      category: 'Open Plots',
-      count: 'DTCP & HMDA Approved Plots',
+      id: 'open-plot-ventures',
+      name: 'Open Plot Ventures',
+      category: 'Open Plot Ventures',
+      count: 'Layout & Gated Ventures',
       icon: LandPlot,
-      description: 'Gated residential plots, corner plots, and layouts across AP, TS & Pan-India.',
+      description: 'DTCP & RERA approved venture plots, gated layouts, and highway-facing projects.',
       badge: 'High Demand'
     },
     {
-      id: 'houses',
-      name: 'Houses & Villas',
-      category: 'Houses',
-      count: 'Independent Villas & Houses',
-      icon: Home,
-      description: 'Standalone G+1/G+2 houses, duplex villas, and family homes.',
-      badge: 'Direct Owner'
+      id: 'open-plot-city',
+      name: 'Open Plot (City)',
+      category: 'Open Plot (City)',
+      count: 'In-City Residential Plots',
+      icon: MapPin,
+      description: 'Individual residential plots within city limits, established colonies, and municipal layouts.',
+      badge: 'Prime Location'
     },
     {
-      id: 'apartments',
-      name: 'Apartments',
-      category: 'Apartments',
-      count: 'Multi-storey Flats',
+      id: 'apartments-flat',
+      name: 'Apartments/Flat',
+      category: 'Apartments/Flat',
+      count: 'Gated Flats & High-Rises',
       icon: Building2,
-      description: '2 BHK, 3 BHK luxury flats in modern residential towers with amenities.',
+      description: '2 BHK, 3 BHK luxury flats and apartments in modern residential towers with amenities.',
       badge: 'Khata Verified'
     },
     {
-      id: 'commercial',
-      name: 'Commercial',
-      category: 'Commercial',
+      id: 'independent-house-villa',
+      name: 'Independent House/Villa',
+      category: 'Independent House/Villa',
+      count: 'Independent Houses & Villas',
+      icon: Home,
+      description: 'Standalone G+1/G+2 individual houses, duplex villas, and family homes.',
+      badge: 'Direct Owner'
+    },
+    {
+      id: 'commerical-property',
+      name: 'Commerical Property',
+      category: 'Commerical Property',
       count: 'Shops & Office Spaces',
       icon: Store,
-      description: 'Commercial plots, main-road shop spaces, and office floors.',
+      description: 'Commercial plots, main-road retail shop spaces, complexes, and office floors.',
       badge: 'High ROI'
     },
     {
-      id: 'rentals',
-      name: 'Rentals',
-      category: 'Rentals',
-      count: 'Rental Homes & Offices',
-      icon: Key,
-      description: 'Fully-furnished rental apartments, independent houses, and PG rooms.',
-      badge: 'Zero Brokerage'
+      id: 'agricultural-lands',
+      name: 'Agricultural Lands',
+      category: 'Agricultural Lands',
+      count: 'Farmlands & Agri Acreages',
+      icon: Trees,
+      description: 'Fertile agricultural lands, farm plots, and greenery directly from farmers.',
+      badge: 'Direct Farmer'
+    },
+    {
+      id: 'amaravathi-lps',
+      name: 'Amaravathi LPS layout plots',
+      category: 'Amaravathi LPS layout plots',
+      count: 'CRDA Amaravathi LPS Plots',
+      icon: Sparkles,
+      description: 'Government-allotted CRDA Land Pooling Scheme (LPS) residential and commercial plots.',
+      badge: 'CRDA Approved'
+    },
+    {
+      id: 'others',
+      name: 'Others',
+      category: 'Others',
+      count: 'Warehouses & Mixed Use',
+      icon: Compass,
+      description: 'Warehouses, industrial plots, farmhouses, and miscellaneous property listings.',
+      badge: 'Verified'
     }
   ];
 
@@ -76,7 +103,7 @@ export default function PropertyCategoryCards({ onSelectCategory }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {categories.map((cat) => {
           const IconComponent = cat.icon;
           return (

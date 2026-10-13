@@ -85,6 +85,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   // Form State (Clean initialized state with 0 defaults)
   const [formData, setFormData] = useState({
     title: '',
+    category: 'Open Plot Ventures',
     propertyType: PropertyType.OPEN_PLOT,
     otherPropertyType: '',
     purpose: Purpose.SALE,
@@ -160,6 +161,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
     setFormData({
       title: p.title || propCandidate.title || '',
+      category: p.category || propCandidate.category || 'Open Plot Ventures',
       propertyType: resolvedPropType,
       otherPropertyType: p.otherPropertyType || propCandidate.otherPropertyType || '',
       purpose: resolvedPurpose,
@@ -474,6 +476,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           phone: ownerPhone
         },
         title: customUpdates?.title !== undefined ? customUpdates.title : formData.title,
+        category: customUpdates?.category !== undefined ? customUpdates.category : (formData.category || 'Open Plot Ventures'),
         propertyType: customUpdates?.propertyType !== undefined ? customUpdates.propertyType : formData.propertyType,
         otherPropertyType: customUpdates?.otherPropertyType !== undefined ? customUpdates.otherPropertyType : (formData.otherPropertyType || ''),
         purpose: customUpdates?.purpose !== undefined ? customUpdates.purpose : formData.purpose,
@@ -823,24 +826,25 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                Property Type
+                Property Category
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Open Plot', value: PropertyType.OPEN_PLOT },
-                  { label: 'House / Villa', value: PropertyType.HOUSE },
-                  { label: 'Apartment', value: PropertyType.APARTMENT },
-                  { label: 'Villa', value: PropertyType.VILLA },
-                  { label: 'Commercial', value: PropertyType.COMMERCIAL },
-                  { label: 'Land', value: PropertyType.LAND },
-                  { label: 'Other', value: PropertyType.OTHER }
+                  { label: 'Open Plot Ventures', category: 'Open Plot Ventures', value: PropertyType.OPEN_PLOT },
+                  { label: 'Open Plot (City)', category: 'Open Plot (City)', value: PropertyType.OPEN_PLOT },
+                  { label: 'Apartments/Flat', category: 'Apartments/Flat', value: PropertyType.APARTMENT },
+                  { label: 'Independent House/Villa', category: 'Independent House/Villa', value: PropertyType.HOUSE },
+                  { label: 'Commerical Property', category: 'Commerical Property', value: PropertyType.COMMERCIAL },
+                  { label: 'Agricultural Lands', category: 'Agricultural Lands', value: PropertyType.LAND },
+                  { label: 'Amaravathi LPS layout plots', category: 'Amaravathi LPS layout plots', value: PropertyType.OPEN_PLOT },
+                  { label: 'Others', category: 'Others', value: PropertyType.OTHER }
                 ].map((item) => (
                   <button
-                    key={item.value}
+                    key={item.category}
                     type="button"
-                    onClick={() => setFormData({ ...formData, propertyType: item.value })}
+                    onClick={() => setFormData({ ...formData, propertyType: item.value, category: item.category })}
                     className={`p-3 rounded-xl border text-xs font-bold transition-all ${
-                      formData.propertyType === item.value
+                      (formData.category === item.category || (!formData.category && formData.propertyType === item.value))
                         ? 'bg-brand-navy border-brand-navy text-brand-yellow shadow-md scale-105'
                         : 'bg-white border-gray-300 text-slate-700 hover:bg-gray-50'
                     }`}
@@ -850,7 +854,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 ))}
               </div>
 
-              {formData.propertyType === PropertyType.OTHER && (
+              {(formData.category === 'Others' || formData.propertyType === PropertyType.OTHER) && (
                 <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 animate-in fade-in slide-in-from-top-2">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                     Mention Your Property Type *

@@ -23,6 +23,10 @@ export function searchStateToUrlParams(searchState = {}) {
     params.set('type', searchState.propertyType);
   }
 
+  if (searchState.category && searchState.category !== 'All') {
+    params.set('category', searchState.category);
+  }
+
   if (searchState.state && searchState.state.trim()) {
     params.set('state', searchState.state.trim());
   }
@@ -131,12 +135,15 @@ export function urlParamsToSearchState(searchString = '') {
   // Validate PropertyType Enum
   const validPropertyType = Object.values(PropertyType).includes(typeParam) ? typeParam : 'ALL';
 
-  let resolvedCategory = 'All';
-  if (validPropertyType === 'OPEN_PLOT') resolvedCategory = 'Open Plots';
-  else if (validPropertyType === 'HOUSE' || validPropertyType === 'VILLA') resolvedCategory = 'Houses';
-  else if (validPropertyType === 'APARTMENT') resolvedCategory = 'Apartments';
-  else if (validPropertyType === 'COMMERCIAL') resolvedCategory = 'Commercial';
-  else if (validPurpose === 'RENT') resolvedCategory = 'Rentals';
+  const catParam = params.get('category');
+  let resolvedCategory = catParam || 'All';
+  if (!catParam || catParam === 'All') {
+    if (validPropertyType === 'OPEN_PLOT') resolvedCategory = 'Open Plot Ventures';
+    else if (validPropertyType === 'HOUSE' || validPropertyType === 'VILLA') resolvedCategory = 'Independent House/Villa';
+    else if (validPropertyType === 'APARTMENT') resolvedCategory = 'Apartments/Flat';
+    else if (validPropertyType === 'COMMERCIAL') resolvedCategory = 'Commerical Property';
+    else if (validPropertyType === 'LAND') resolvedCategory = 'Agricultural Lands';
+  }
 
   return {
     query: q,

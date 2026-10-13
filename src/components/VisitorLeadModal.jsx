@@ -13,7 +13,7 @@ export default function VisitorLeadModal({ currentUser }) {
     name: '',
     phone: '',
     email: '',
-    propertyType: 'Open Plots',
+    propertyType: 'Open Plot Ventures',
     location: ''
   });
 
@@ -257,12 +257,14 @@ export default function VisitorLeadModal({ currentUser }) {
                       onChange={(e) => setFormData({ ...formData, propertyType: e.target.value })}
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white cursor-pointer"
                     >
-                      <option value="Open Plots">Open Plots</option>
-                      <option value="Residential Plot">Residential Plot</option>
-                      <option value="Commercial Land">Commercial Land</option>
-                      <option value="Agricultural Land">Agricultural Land</option>
-                      <option value="Villa / House">Villa / House</option>
-                      <option value="Highway Commercial Bit">Highway Commercial Bit</option>
+                      <option value="Open Plot Ventures">Open Plot Ventures</option>
+                      <option value="Open Plot (City)">Open Plot (City)</option>
+                      <option value="Apartments/Flat">Apartments/Flat</option>
+                      <option value="Independent House/Villa">Independent House/Villa</option>
+                      <option value="Commerical Property">Commerical Property</option>
+                      <option value="Agricultural Lands">Agricultural Lands</option>
+                      <option value="Amaravathi LPS layout plots">Amaravathi LPS layout plots</option>
+                      <option value="Others">Others</option>
                     </select>
                   </div>
                 </div>

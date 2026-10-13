@@ -1,68 +1,125 @@
 /**
  * Normalizes and formats raw property category / type strings into clean human-readable Category Tags.
  * Supported standard category tags:
- * - Open Plots
- * - Houses & Villas
- * - Apartments
- * - Commercial
- * - Rentals
+ * - Open Plot Ventures
+ * - Open Plot (City)
+ * - Apartments/Flat
+ * - Independent House/Villa
+ * - Commerical Property
+ * - Agricultural Lands
+ * - Amaravathi LPS layout plots
+ * - Others
  */
+export const STANDARD_CATEGORIES = [
+  'Open Plot Ventures',
+  'Open Plot (City)',
+  'Apartments/Flat',
+  'Independent House/Villa',
+  'Commerical Property',
+  'Agricultural Lands',
+  'Amaravathi LPS layout plots',
+  'Others'
+];
+
 export function getCategoryBadgeLabel(property) {
-  if (!property) return 'Open Plots';
+  if (!property) return 'Open Plot Ventures';
 
   const raw = property.category || property.propertyType || property.type || '';
-  const str = String(raw).trim().toUpperCase();
-  const purpose = String(property.purpose || '').trim().toUpperCase();
+  const rawClean = String(raw).trim();
+  const str = rawClean.toUpperCase();
 
-  if (purpose === 'RENT' || str.includes('RENT')) {
-    return 'Rentals';
+  // 1. Direct match with standard categories (case-insensitive)
+  const exactMatch = STANDARD_CATEGORIES.find(c => c.toUpperCase() === str);
+  if (exactMatch) return exactMatch;
+
+  // Handle common spelling / formatting variations
+  if (str === 'COMMERCIAL PROPERTY' || str === 'COMMERCIAL') {
+    return 'Commerical Property';
+  }
+  if (str === 'APARTMENT' || str === 'APARTMENTS' || str === 'FLAT' || str === 'FLATS') {
+    return 'Apartments/Flat';
+  }
+  if (str === 'HOUSE' || str === 'VILLA' || str === 'HOUSES' || str === 'VILLAS' || str === 'INDEPENDENT HOUSE' || str === 'HOUSES & VILLAS') {
+    return 'Independent House/Villa';
+  }
+  if (str === 'AGRICULTURAL LAND' || str === 'FARMLAND' || str === 'FARM LAND' || str === 'AGRI LAND') {
+    return 'Agricultural Lands';
+  }
+  if (str === 'AMARAVATHI LPS' || str === 'AMARAVATI LPS' || str.includes('AMARAVATHI LPS') || str.includes('AMARAVATI LPS')) {
+    return 'Amaravathi LPS layout plots';
+  }
+  if (str === 'OPEN PLOT' || str === 'OPEN PLOTS' || str === 'OPEN_PLOT' || str === 'OPEN_PLOTS') {
+    return 'Open Plot Ventures';
+  }
+
+  // 2. Keyword matching in category, title, or property type
+  const titleStr = String(property.title || '').toUpperCase();
+  const combined = `${str} ${titleStr}`;
+
+  if (combined.includes('AMARAVATHI') || combined.includes('AMARAVATI') || combined.includes('LPS')) {
+    return 'Amaravathi LPS layout plots';
+  }
+
+  if (combined.includes('AGRICULTURAL') || combined.includes('FARMLAND') || combined.includes('FARM') || str === 'LAND') {
+    return 'Agricultural Lands';
   }
 
   if (
-    str.includes('PLOT') ||
-    str.includes('LAND') ||
-    str.includes('AGRICULTURAL') ||
-    str === 'OPEN_PLOT' ||
-    str === 'OPEN PLOT' ||
-    str === 'FARMLAND'
+    combined.includes('COMMERCIAL') ||
+    combined.includes('OFFICE') ||
+    combined.includes('RETAIL') ||
+    combined.includes('WAREHOUSE') ||
+    combined.includes('SHOP')
   ) {
-    return 'Open Plots';
+    return 'Commerical Property';
   }
 
   if (
-    str.includes('VILLA') ||
-    str.includes('HOUSE') ||
-    str.includes('INDEPENDENT') ||
-    str === 'HOUSES & VILLAS'
+    combined.includes('APARTMENT') ||
+    combined.includes('FLAT') ||
+    combined.includes('PENTHOUSE')
   ) {
-    return 'Houses & Villas';
+    return 'Apartments/Flat';
   }
 
   if (
-    str.includes('APARTMENT') ||
-    str.includes('FLAT') ||
-    str.includes('PENTHOUSE') ||
-    str === 'APARTMENTS'
+    combined.includes('VILLA') ||
+    combined.includes('HOUSE') ||
+    combined.includes('INDEPENDENT') ||
+    combined.includes('DUPLEX')
   ) {
-    return 'Apartments';
+    return 'Independent House/Villa';
   }
 
   if (
-    str.includes('COMMERCIAL') ||
-    str.includes('OFFICE') ||
-    str.includes('RETAIL') ||
-    str.includes('WAREHOUSE') ||
-    str.includes('SHOP')
+    (combined.includes('PLOT') || str === 'OPEN_PLOT') &&
+    (combined.includes('CITY') || combined.includes('MUNICIPAL') || combined.includes('COLONY') || combined.includes('TOWN'))
   ) {
-    return 'Commercial';
+    return 'Open Plot (City)';
   }
 
-  // Fallback cleanly if readable string exists
+  if (
+    combined.includes('VENTURE') ||
+    combined.includes('LAYOUT') ||
+    combined.includes('DTCP') ||
+    combined.includes('HMDA') ||
+    combined.includes('RERA') ||
+    combined.includes('PLOT') ||
+    str === 'OPEN_PLOT'
+  ) {
+    return 'Open Plot Ventures';
+  }
+
+  if (combined.includes('OTHER') || combined.includes('OTHERS')) {
+    return 'Others';
+  }
+
+  // Fallback cleanly if readable string exists in property.category
   if (property.category && typeof property.category === 'string' && property.category.trim()) {
     return property.category.trim();
   }
 
-  return 'Open Plots';
+  return 'Open Plot Ventures';
 }
 
 /**
@@ -71,14 +128,26 @@ export function getCategoryBadgeLabel(property) {
 export function getCategoryFallbackImage(property) {
   const cat = getCategoryBadgeLabel(property);
   switch (cat) {
+    case 'Open Plot Ventures':
     case 'Open Plots':
       return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80';
-    case 'Houses & Villas':
-      return 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80';
+    case 'Open Plot (City)':
+      return 'https://images.unsplash.com/photo-1592595896551-12b371d546d5?auto=format&fit=crop&w=800&q=80';
+    case 'Apartments/Flat':
     case 'Apartments':
       return 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+    case 'Independent House/Villa':
+    case 'Houses & Villas':
+      return 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80';
+    case 'Commerical Property':
+    case 'Commercial Property':
     case 'Commercial':
       return 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80';
+    case 'Agricultural Lands':
+      return 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80';
+    case 'Amaravathi LPS layout plots':
+      return 'https://images.unsplash.com/photo-1628744448840-55bdb2497bd4?auto=format&fit=crop&w=800&q=80';
+    case 'Others':
     case 'Rentals':
       return 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80';
     default:

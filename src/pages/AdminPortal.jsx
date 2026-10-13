@@ -4813,7 +4813,7 @@ export default function AdminPortal({ onNavigate }) {
                               <div className="bg-white p-2.5 rounded-xl border border-gray-200">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Interested In</span>
                                 <span className="font-extrabold text-brand-navy truncate block">
-                                  {vis.preferredPropertyType || 'Open Plots'} • {vis.preferredLocation || 'AP Region'}
+                                  {vis.preferredPropertyType || 'Open Plot Ventures'} • {vis.preferredLocation || 'AP Region'}
                                 </span>
                               </div>
                             </div>
