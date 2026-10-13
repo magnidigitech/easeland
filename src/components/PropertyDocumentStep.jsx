@@ -3,9 +3,23 @@ import { Lock, FileText, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, S
 import { DocumentType, VerificationStatus } from '../firebase/schema.js';
 import { uploadConfidentialPropertyDocument, getPropertyDocuments, removeConfidentialPropertyDocument } from '../firebase/documentService.js';
 
-export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocuments }) {
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function PropertyDocumentStep({ propertyId, ownerId, documentsList = [], onUpdateDocuments }) {
+  const getInitialDocs = () => {
+    if (Array.isArray(documentsList) && documentsList.length > 0) return documentsList;
+    if (typeof window !== 'undefined' && propertyId) {
+      try {
+        const cached = localStorage.getItem(`easeland_wizard_documents_${propertyId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return [];
+  };
+
+  const [documents, setDocuments] = useState(getInitialDocs);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -15,16 +29,44 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
+  // Sync with parent documentsList when updated
+  useEffect(() => {
+    if (Array.isArray(documentsList) && documentsList.length > 0) {
+      setDocuments(prev => {
+        const docMap = new Map();
+        [...prev, ...documentsList].forEach(d => {
+          if (!d) return;
+          const k = String(d.docId || d.mediaId || d.id || d.url || d.publicUrl || d.name || '').toLowerCase();
+          if (k) docMap.set(k, d);
+        });
+        return Array.from(docMap.values());
+      });
+    }
+  }, [documentsList]);
+
   // Load existing confidential documents for this property
   const fetchDocuments = async () => {
     if (!propertyId || !ownerId) return;
     setLoading(true);
     const res = await getPropertyDocuments(propertyId, ownerId);
-    if (res.success) {
-      const docList = res.documents || [];
-      setDocuments(docList);
-      if (onUpdateDocuments) onUpdateDocuments(docList);
-    } else {
+    if (res.success && Array.isArray(res.documents) && res.documents.length > 0) {
+      setDocuments(prev => {
+        const docMap = new Map();
+        [...prev, ...res.documents].forEach(d => {
+          if (!d) return;
+          const k = String(d.docId || d.mediaId || d.id || d.url || d.publicUrl || d.name || '').toLowerCase();
+          if (k) docMap.set(k, d);
+        });
+        const merged = Array.from(docMap.values());
+        if (onUpdateDocuments) onUpdateDocuments(merged);
+        try {
+          if (propertyId) {
+            localStorage.setItem(`easeland_wizard_documents_${propertyId}`, JSON.stringify(merged));
+          }
+        } catch (e) {}
+        return merged;
+      });
+    } else if (res.error) {
       setErrorMsg(res.error);
     }
     setLoading(false);
@@ -60,8 +102,41 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
     setUploading(false);
     if (result.success) {
       setSuccessMsg('Confidential document uploaded. Saved securely for Admin verification.');
-      setTimeout(() => setSuccessMsg(null), 3000);
-      await fetchDocuments();
+      setTimeout(() => setSuccessMsg(null), 3500);
+
+      // Immediately build document item and update UI at 0ms latency
+      const newlyCreatedDoc = result.document || {
+        docId: result.docId || `doc-${Date.now()}`,
+        documentName: docTitleToUse || file.name,
+        name: docTitleToUse || file.name,
+        fileName: file.name,
+        documentType: documentType || DocumentType.TITLE_DEED,
+        type: documentType || DocumentType.TITLE_DEED,
+        fileSize: file.size,
+        size: file.size,
+        publicUrl: result.publicUrl || '#',
+        url: result.publicUrl || '#',
+        verificationStatus: VerificationStatus.PENDING
+      };
+
+      setDocuments(prev => {
+        const filtered = prev.filter(d => {
+          if (!d) return false;
+          const curId = String(d.docId || d.mediaId || d.id || '');
+          return curId !== String(newlyCreatedDoc.docId);
+        });
+        const updated = [...filtered, newlyCreatedDoc];
+        if (onUpdateDocuments) onUpdateDocuments(updated);
+        try {
+          if (propertyId) {
+            localStorage.setItem(`easeland_wizard_documents_${propertyId}`, JSON.stringify(updated));
+          }
+        } catch (e) {}
+        return updated;
+      });
+
+      // Background sync with server
+      fetchDocuments();
     } else {
       setErrorMsg(result.error);
     }
@@ -85,7 +160,6 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
 
       if (docId && dId && dId === String(docId).toLowerCase()) return false;
       if (docUrl && dUrl && dUrl === String(docUrl).toLowerCase()) return false;
-      if (targetId && (dId === String(targetId).toLowerCase() || dUrl === String(targetId).toLowerCase())) return false;
 
       if (targetNormName && dName) {
         const normD = dName.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
@@ -99,6 +173,11 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
     setDocuments(prev => {
       const updated = filterOutTarget(prev);
       if (onUpdateDocuments) onUpdateDocuments(updated);
+      try {
+        if (propertyId) {
+          localStorage.setItem(`easeland_wizard_documents_${propertyId}`, JSON.stringify(updated));
+        }
+      } catch (e) {}
       return updated;
     });
 
@@ -106,7 +185,6 @@ export default function PropertyDocumentStep({ propertyId, ownerId, onUpdateDocu
     if (res.success) {
       setSuccessMsg('Document removed successfully.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      // Local state & formData.documents are already filtered - no re-fetch needed
     } else {
       setErrorMsg(res.error || 'Failed to remove document.');
       fetchDocuments();

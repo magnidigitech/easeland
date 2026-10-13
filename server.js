@@ -554,8 +554,15 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             existingProp.videoLink = publicUrl;
             existingProp.embeddedVideoUrl = publicUrl;
           }
-        }
         saveLocalProperty(existingProp);
+
+        // Sync directly to PostgreSQL properties table raw_data so getPropertyById has it immediately
+        try {
+          pgPool.query(
+            "UPDATE properties SET raw_data = $1, updated_at = NOW() WHERE property_id = $2 OR reference_id = $2 OR raw_data->>'id' = $2 OR raw_data->>'propertyId' = $2;",
+            [JSON.stringify(existingProp), propertyId]
+          ).catch(pgSyncErr => console.warn('PostgreSQL property doc/media update note:', pgSyncErr.message));
+        } catch (e) {}
       }
     } catch (attachErr) {
       console.warn('Local property attach note:', attachErr.message);
@@ -748,7 +755,21 @@ app.get('/api/properties/:id', async (req, res) => {
   }
 
   if (localProp || pgProp) {
-    const property = { ...(localProp || {}), ...(pgProp || {}) };
+    const mergedDocs = [
+      ...(Array.isArray(localProp?.documents) ? localProp.documents : []),
+      ...(Array.isArray(pgProp?.documents) ? pgProp.documents : [])
+    ];
+    const seenDocKeys = new Set();
+    const finalDocs = [];
+    mergedDocs.forEach(d => {
+      if (!d) return;
+      const key = String(d.docId || d.mediaId || d.id || d.url || d.publicUrl || d.name || d.fileName || '').toLowerCase().trim();
+      if (!key || seenDocKeys.has(key)) return;
+      seenDocKeys.add(key);
+      finalDocs.push(d);
+    });
+
+    const property = { ...(pgProp || {}), ...(localProp || {}), documents: finalDocs };
     return res.json({ success: true, property });
   }
 
@@ -814,6 +835,44 @@ app.delete('/api/properties/:id/documents', async (req, res) => {
     return res.json({ success: true, message: 'Document removed from server property.' });
   } catch (err) {
     return res.json({ success: true });
+  }
+});
+
+// API Endpoint: Get Property Confidential Documents directly
+app.get('/api/properties/:id/documents', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    if (!targetId) return res.json({ success: true, documents: [] });
+
+    let docs = [];
+    const localProp = localPropsMap.get(targetId);
+    if (localProp && Array.isArray(localProp.documents)) {
+      docs.push(...localProp.documents);
+    }
+
+    try {
+      const pgRes = await pgPool.query(
+        "SELECT raw_data FROM properties WHERE property_id = $1 OR reference_id = $1 OR raw_data->>'id' = $1 OR raw_data->>'propertyId' = $1;",
+        [targetId]
+      );
+      if (pgRes.rows.length > 0 && Array.isArray(pgRes.rows[0].raw_data?.documents)) {
+        docs.push(...pgRes.rows[0].raw_data.documents);
+      }
+    } catch (e) {}
+
+    const seen = new Set();
+    const uniqueDocs = [];
+    docs.forEach(d => {
+      if (!d) return;
+      const key = String(d.docId || d.mediaId || d.id || d.url || d.publicUrl || d.name || d.fileName || '').toLowerCase().trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      uniqueDocs.push(d);
+    });
+
+    return res.json({ success: true, documents: uniqueDocs });
+  } catch (err) {
+    return res.json({ success: true, documents: [] });
   }
 });
 

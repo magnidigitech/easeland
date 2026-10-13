@@ -930,8 +930,10 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           <PropertyDocumentStep
             propertyId={propertyId}
             ownerId={user?.uid}
+            documentsList={formData.documents || []}
             onUpdateDocuments={(updatedDocs) => {
               setFormData(prev => ({ ...prev, documents: updatedDocs }));
+              handleSaveDraft(6, { documents: updatedDocs });
             }}
           />
         )}

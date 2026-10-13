@@ -139,50 +139,82 @@ export async function getPropertyDocuments(propertyId, ownerId) {
   try {
     if (!propertyId) return { success: true, documents: [] };
 
-    const res = await fetch(`/api/properties/${propertyId}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.property && Array.isArray(data.property.documents)) {
-        const seenKeys = new Set();
-        const normalizedDocs = [];
+    let fetchedDocs = [];
 
-        data.property.documents.forEach(d => {
-          if (!d) return;
-          const urlStr = (d.publicUrl || d.url || d.storagePath || '').trim();
-          const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
-          const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
-
-          const normName = normalizeDocString(nameStr);
-          const dedupKey = normName || (urlStr.toLowerCase() !== '#' ? urlStr.toLowerCase() : '') || docIdStr.toLowerCase();
-
-          if (!dedupKey || seenKeys.has(dedupKey)) return;
-          seenKeys.add(dedupKey);
-
-          const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
-          const docType = d.documentType || d.type || 'TITLE_DEED';
-          const fileSizeNum = Number(d.fileSize || d.size) || 0;
-          const docUrl = urlStr || '#';
-
-          normalizedDocs.push({
-            ...d,
-            docId: d.docId || d.mediaId || d.id || `doc-${normalizedDocs.length + 1}`,
-            documentName: docName,
-            name: docName,
-            fileName: d.fileName || docName,
-            documentType: docType,
-            type: docType,
-            fileSize: fileSizeNum,
-            size: fileSizeNum,
-            publicUrl: docUrl,
-            url: docUrl,
-            verificationStatus: d.verificationStatus || 'PENDING'
-          });
-        });
-
-        return { success: true, documents: normalizedDocs };
+    // 1. Try dedicated documents endpoint (/api/properties/:id/documents)
+    try {
+      const docRes = await fetch(`/api/properties/${encodeURIComponent(propertyId)}/documents`);
+      if (docRes.ok) {
+        const docData = await docRes.json();
+        if (docData.success && Array.isArray(docData.documents) && docData.documents.length > 0) {
+          fetchedDocs = docData.documents;
+        }
       }
+    } catch (e) {}
+
+    // 2. Try property endpoint (/api/properties/:id)
+    if (fetchedDocs.length === 0) {
+      try {
+        const res = await fetch(`/api/properties/${encodeURIComponent(propertyId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.property && Array.isArray(data.property.documents)) {
+            fetchedDocs = data.property.documents;
+          }
+        }
+      } catch (e) {}
     }
-    return { success: true, documents: [] };
+
+    // 3. Fallback to localStorage if available
+    if (fetchedDocs.length === 0 && typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`easeland_wizard_documents_${propertyId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            fetchedDocs = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    const seenKeys = new Set();
+    const normalizedDocs = [];
+
+    fetchedDocs.forEach(d => {
+      if (!d) return;
+      const urlStr = (d.publicUrl || d.url || d.storagePath || '').trim();
+      const nameStr = (d.documentName || d.name || d.fileName || d.title || '').trim();
+      const docIdStr = String(d.docId || d.mediaId || d.id || '').trim();
+
+      const normName = normalizeDocString(nameStr);
+      const dedupKey = normName || (urlStr.toLowerCase() !== '#' ? urlStr.toLowerCase() : '') || docIdStr.toLowerCase();
+
+      if (!dedupKey || seenKeys.has(dedupKey)) return;
+      seenKeys.add(dedupKey);
+
+      const docName = d.documentName || d.name || d.fileName || 'Confidential Property Document';
+      const docType = d.documentType || d.type || 'TITLE_DEED';
+      const fileSizeNum = Number(d.fileSize || d.size) || 0;
+      const docUrl = urlStr || '#';
+
+      normalizedDocs.push({
+        ...d,
+        docId: d.docId || d.mediaId || d.id || `doc-${normalizedDocs.length + 1}`,
+        documentName: docName,
+        name: docName,
+        fileName: d.fileName || docName,
+        documentType: docType,
+        type: docType,
+        fileSize: fileSizeNum,
+        size: fileSizeNum,
+        publicUrl: docUrl,
+        url: docUrl,
+        verificationStatus: d.verificationStatus || 'PENDING'
+      });
+    });
+
+    return { success: true, documents: normalizedDocs };
   } catch (e) {
     return { success: true, documents: [] };
   }

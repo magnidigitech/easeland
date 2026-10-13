@@ -99,6 +99,24 @@ export default function PropertyReviewStep({
 
   // Fetch confidential documents for this property
   useEffect(() => {
+    if (Array.isArray(formData.documents) && formData.documents.length > 0) {
+      setDocuments(formData.documents);
+      setLoadingDocs(false);
+      return;
+    }
+    if (propertyId && typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`easeland_wizard_documents_${propertyId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDocuments(parsed);
+            setLoadingDocs(false);
+            return;
+          }
+        }
+      } catch (e) {}
+    }
     if (propertyId && ownerId) {
       setLoadingDocs(true);
       getPropertyDocuments(propertyId, ownerId).then((res) => {
@@ -110,7 +128,7 @@ export default function PropertyReviewStep({
     } else {
       setLoadingDocs(false);
     }
-  }, [propertyId, ownerId]);
+  }, [propertyId, ownerId, formData.documents]);
 
   // Active Location Object
   const activeLoc = reviewLocation || formData.location;
