@@ -4,6 +4,7 @@
  */
 
 import { Purpose, PropertyType } from './schema.js';
+import { parseNaturalLanguageQuery } from './searchParser.js';
 
 /**
  * Convert search state object to URL query parameters string
@@ -129,11 +130,17 @@ export function urlParamsToSearchState(searchString = '') {
   const areaUnitParam = params.get('areaUnit') || 'sq ft';
   const sortParam = params.get('sort');
 
+  const parsedNL = (q && q.trim()) ? parseNaturalLanguageQuery(q) : {};
+
   // Validate Purpose Enum
-  const validPurpose = Object.values(Purpose).includes(purposeParam) ? purposeParam : 'ALL';
+  const validPurpose = Object.values(Purpose).includes(purposeParam)
+    ? purposeParam
+    : (parsedNL.purpose && parsedNL.purpose !== 'ALL' ? parsedNL.purpose : 'ALL');
 
   // Validate PropertyType Enum
-  const validPropertyType = Object.values(PropertyType).includes(typeParam) ? typeParam : 'ALL';
+  const validPropertyType = Object.values(PropertyType).includes(typeParam)
+    ? typeParam
+    : (parsedNL.propertyType && parsedNL.propertyType !== 'ALL' ? parsedNL.propertyType : 'ALL');
 
   const catParam = params.get('category');
   let resolvedCategory = 'All';
@@ -150,8 +157,22 @@ export function urlParamsToSearchState(searchString = '') {
     else resolvedCategory = catParam.trim();
   }
 
+  const resolvedMinPrice = (minPriceParam && !isNaN(Number(minPriceParam)) && Number(minPriceParam) >= 0)
+    ? Math.max(0, Number(minPriceParam))
+    : (parsedNL.minPrice !== undefined && parsedNL.minPrice !== '' ? parsedNL.minPrice : '');
+
+  const resolvedMaxPrice = (maxPriceParam && !isNaN(Number(maxPriceParam)) && Number(maxPriceParam) >= 0)
+    ? Math.max(0, Number(maxPriceParam))
+    : (parsedNL.maxPrice !== undefined && parsedNL.maxPrice !== '' ? parsedNL.maxPrice : '');
+
+  const resolvedBedrooms = (bhkParam && bhkParam !== 'ANY')
+    ? bhkParam
+    : (parsedNL.bedrooms && parsedNL.bedrooms !== 'ANY' ? parsedNL.bedrooms : 'ANY');
+
   return {
     query: q,
+    cleanKeywords: parsedNL.cleanKeywords,
+    isLocationSpecific: parsedNL.isLocationSpecific,
     purpose: validPurpose,
     propertyType: validPropertyType,
     category: resolvedCategory,
@@ -159,20 +180,20 @@ export function urlParamsToSearchState(searchString = '') {
     district: districtParam,
     city: cityParam,
     locality: localityParam,
-    minPrice: (minPriceParam && !isNaN(Number(minPriceParam)) && Number(minPriceParam) >= 0) ? Math.max(0, Number(minPriceParam)) : '',
-    maxPrice: (maxPriceParam && !isNaN(Number(maxPriceParam)) && Number(maxPriceParam) >= 0) ? Math.max(0, Number(maxPriceParam)) : '',
+    minPrice: resolvedMinPrice,
+    maxPrice: resolvedMaxPrice,
     minArea: (minAreaParam && !isNaN(Number(minAreaParam)) && Number(minAreaParam) >= 0) ? Math.max(0, Number(minAreaParam)) : '',
     maxArea: (maxAreaParam && !isNaN(Number(maxAreaParam)) && Number(maxAreaParam) >= 0) ? Math.max(0, Number(maxAreaParam)) : '',
     minAreaSqFt: (minAreaParam && !isNaN(Number(minAreaParam)) && Number(minAreaParam) >= 0) ? Math.max(0, Number(minAreaParam)) : '',
     maxAreaSqFt: (maxAreaParam && !isNaN(Number(maxAreaParam)) && Number(maxAreaParam) >= 0) ? Math.max(0, Number(maxAreaParam)) : '',
     areaUnit: areaUnitParam,
-    bedrooms: bhkParam || 'ANY',
+    bedrooms: resolvedBedrooms,
     bathrooms: bathsParam || 'ANY',
     facing: facingParam || 'ALL',
     furnishing: furnishingParam || 'ALL',
     amenities: amenitiesParam ? amenitiesParam.split(',').filter(Boolean) : [],
-    radiusKm: (radiusParam && !isNaN(Number(radiusParam))) ? Number(radiusParam) : null,
-    referencePlace: nearParam || '',
+    radiusKm: (radiusParam && !isNaN(Number(radiusParam))) ? Number(radiusParam) : (parsedNL.radiusKm || null),
+    referencePlace: nearParam || parsedNL.referencePlace || '',
     sortBy: sortParam || 'newest'
   };
 }

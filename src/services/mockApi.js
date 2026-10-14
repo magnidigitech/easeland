@@ -1,6 +1,7 @@
 import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData';
 import { extractCoordinates } from './locationProvider';
 import { getCategoryBadgeLabel } from '../utils/categoryUtils';
+import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS } from '../firebase/searchParser.js';
 
 export const safeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -397,7 +398,10 @@ export const mockApi = {
       }
     } catch (e) {}
 
-    const combined = [...INITIAL_PROPERTIES, ...properties, ...localProps];
+    const baseList = (typeof mockApi !== 'undefined' && typeof mockApi.getProperties === 'function')
+      ? mockApi.getProperties()
+      : properties;
+    const combined = [...INITIAL_PROPERTIES, ...baseList, ...localProps];
     const candidateMap = new Map();
     combined.forEach(p => {
       if (!p) return;
@@ -491,34 +495,59 @@ export const mockApi = {
       });
     }
 
+    // Natural Language Query Extraction for Casual Searches
+    let effectiveFilters = filters;
+    if (filters.query && typeof filters.query === 'string' && filters.query.trim().toLowerCase() !== 'near me') {
+      const parsed = parseNaturalLanguageQuery(filters.query);
+      effectiveFilters = {
+        ...parsed,
+        ...filters,
+        maxPrice: filters.maxPrice || parsed.maxPrice,
+        minPrice: filters.minPrice || parsed.minPrice,
+        propertyType: (filters.propertyType && filters.propertyType !== 'ALL') ? filters.propertyType : parsed.propertyType,
+        purpose: (filters.purpose && filters.purpose !== 'ALL') ? filters.purpose : parsed.purpose,
+        cleanKeywords: filters.cleanKeywords !== undefined ? filters.cleanKeywords : parsed.cleanKeywords
+      };
+    }
+
     // Purpose Filter (buy vs rent)
-    if (filters.purpose) {
-      result = result.filter(p => p.purpose === filters.purpose.toLowerCase());
+    if (effectiveFilters.purpose && effectiveFilters.purpose !== 'ALL' && effectiveFilters.purpose !== 'ANY') {
+      const targetPurp = String(effectiveFilters.purpose).toLowerCase();
+      result = result.filter(p => {
+        const pPurp = String(p.purpose || 'sale').toLowerCase();
+        if (targetPurp === 'rent') return pPurp.includes('rent');
+        if (targetPurp === 'sale') return pPurp.includes('sale') || (!pPurp.includes('rent') && !pPurp.includes('lease'));
+        return true;
+      });
     }
 
     // Deep 12-Tier Spatial & Multi-Token Text Search Query Engine
-    const rawQuery = (filters.query || filters.address || '').toLowerCase().trim();
+    const rawQuery = (effectiveFilters.query || effectiveFilters.address || '').toLowerCase().trim();
     if (rawQuery) {
       if (rawQuery === 'near me' || rawQuery.includes('near me')) {
-        if (filters.userLat && filters.userLng) {
+        if (effectiveFilters.userLat && effectiveFilters.userLng) {
           result.sort((a, b) => {
             const latA = a.location?.lat || 0;
             const lngA = a.location?.lng || 0;
             const latB = b.location?.lat || 0;
             const lngB = b.location?.lng || 0;
-            const distA = Math.hypot(latA - filters.userLat, lngA - filters.userLng);
-            const distB = Math.hypot(latB - filters.userLat, lngB - filters.userLng);
+            const distA = Math.hypot(latA - effectiveFilters.userLat, lngA - effectiveFilters.userLng);
+            const distB = Math.hypot(latB - effectiveFilters.userLat, lngB - effectiveFilters.userLng);
             return distA - distB;
           });
         }
       } else if (rawQuery === 'india' || rawQuery.includes('india')) {
         // Return all Indian properties
       } else {
-        const stopWords = new Set(['in', 'at', 'for', 'and', 'near', 'the', 'a', 'an', 'with', 'by', 'of', 'to', 'is', 'on']);
-        const tokens = rawQuery
-          .split(/[\s,/\-]+/)
-          .map(t => t.trim())
-          .filter(t => t.length > 0 && !stopWords.has(t));
+        let tokens = [];
+        if (effectiveFilters.cleanKeywords !== undefined) {
+          tokens = effectiveFilters.cleanKeywords ? effectiveFilters.cleanKeywords.toLowerCase().split(/\s+/).filter(Boolean) : [];
+        } else {
+          tokens = rawQuery
+            .split(/[\s,/\-]+/)
+            .map(t => t.trim())
+            .filter(t => t.length > 1 && !REAL_ESTATE_STOPWORDS.has(t) && !/^\d+$/.test(t));
+        }
 
         if (tokens.length > 0) {
           result = result.filter(p => {
@@ -561,20 +590,22 @@ export const mockApi = {
     }
 
     // Price Filter Range
-    if (filters.minPrice) result = result.filter(p => p.price >= Number(filters.minPrice));
-    if (filters.maxPrice) result = result.filter(p => p.price <= Number(filters.maxPrice));
+    if (effectiveFilters.minPrice) result = result.filter(p => p.price >= Number(effectiveFilters.minPrice));
+    if (effectiveFilters.maxPrice) result = result.filter(p => p.price <= Number(effectiveFilters.maxPrice));
 
     // Area Filter Range
-    if (filters.minArea) result = result.filter(p => p.area >= Number(filters.minArea));
-    if (filters.maxArea) result = result.filter(p => p.area <= Number(filters.maxArea));
+    if (effectiveFilters.minArea) result = result.filter(p => p.area >= Number(effectiveFilters.minArea));
+    if (effectiveFilters.maxArea) result = result.filter(p => p.area <= Number(effectiveFilters.maxArea));
 
     // Specific Filters
-    if (filters.bedrooms && filters.bedrooms !== 'Any') {
-      const beds = parseInt(filters.bedrooms);
-      result = result.filter(p => p.bedrooms >= beds);
+    if (effectiveFilters.bedrooms && effectiveFilters.bedrooms !== 'Any' && effectiveFilters.bedrooms !== 'ANY') {
+      const beds = parseInt(effectiveFilters.bedrooms);
+      if (!isNaN(beds)) {
+        result = result.filter(p => (Number(p.bedrooms || p.bhk || 0)) >= beds);
+      }
     }
-    if (filters.cornerPlot) result = result.filter(p => p.cornerPlot === true);
-    if (filters.gatedCommunity) result = result.filter(p => p.gatedCommunity === true);
+    if (effectiveFilters.cornerPlot) result = result.filter(p => p.cornerPlot === true);
+    if (effectiveFilters.gatedCommunity) result = result.filter(p => p.gatedCommunity === true);
 
     // Location Filters (State, District, City, Locality)
     if (filters.state && filters.state.trim()) {
@@ -628,6 +659,8 @@ export const mockApi = {
 
     return result;
   },
+
+  getProperties: () => properties,
 
   getPropertyById: (id) => {
     if (!id) return null;

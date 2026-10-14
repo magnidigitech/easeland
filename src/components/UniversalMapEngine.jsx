@@ -7,6 +7,7 @@ import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon, geocodePlaceWithHierarchy } from '../services/locationProvider';
 import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
 import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
+import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -634,22 +635,41 @@ export default function UniversalMapEngine({
                   if (e.key === 'Enter') {
                     const q = (filters?.query || filters?.address || '').trim();
                     if (q) {
-                      const geo = await geocodePlaceWithHierarchy(q);
-                      if (geo) {
-                        setFilters(prev => ({
-                          ...prev,
-                          cleared: false,
+                      const parsed = parseNaturalLanguageQuery(q);
+                      const isLocation = parsed.isLocationSpecific && parsed.locationQuery;
+                      let geo = null;
+                      if (isLocation) {
+                        try {
+                          geo = await geocodePlaceWithHierarchy(parsed.locationQuery);
+                        } catch (err) {
+                          console.warn('Geocoding locationQuery fallback:', err);
+                        }
+                      }
+
+                      setFilters(prev => ({
+                        ...prev,
+                        cleared: false,
+                        query: q,
+                        address: q,
+                        purpose: (parsed.purpose && parsed.purpose !== 'ALL') ? parsed.purpose : prev.purpose,
+                        propertyType: (parsed.propertyType && parsed.propertyType !== 'ALL') ? parsed.propertyType : prev.propertyType,
+                        minPrice: parsed.minPrice !== '' ? parsed.minPrice : prev.minPrice,
+                        maxPrice: parsed.maxPrice !== '' ? parsed.maxPrice : prev.maxPrice,
+                        bedrooms: (parsed.bedrooms && parsed.bedrooms !== 'ANY') ? parsed.bedrooms : prev.bedrooms,
+                        cleanKeywords: parsed.cleanKeywords,
+                        ...(geo ? {
                           referenceLat: geo.lat,
                           referenceLng: geo.lng,
-                          referencePlace: geo.displayName || q,
+                          referencePlace: geo.displayName || parsed.locationQuery,
                           city: geo.city || prev.city,
                           locality: geo.locality || prev.locality,
                           state: geo.state || prev.state,
                           district: geo.district || prev.district
-                        }));
-                        if (mapInstanceRef.current) {
-                          mapInstanceRef.current.setView([geo.lat, geo.lng], 14, { animate: true });
-                        }
+                        } : {})
+                      }));
+
+                      if (geo && mapInstanceRef.current) {
+                        mapInstanceRef.current.setView([geo.lat, geo.lng], 14, { animate: true });
                       }
                     }
                   }

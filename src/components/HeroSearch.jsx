@@ -97,12 +97,21 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     else if (catStr.includes('other')) propType = 'OTHER';
     else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
 
+    const resolvedPropertyType = (propType !== 'ALL')
+      ? propType
+      : (parsedNL.propertyType && parsedNL.propertyType !== 'ALL' ? parsedNL.propertyType : 'ALL');
+
+    const resolvedPurpose = (parsedNL.purpose && parsedNL.purpose !== 'ALL')
+      ? parsedNL.purpose
+      : purp;
+
     onSearch({
-      query: textQuery,
-      purpose: purp,
-      propertyType: propType,
-      category: currentCategory,
       ...parsedNL,
+      purpose: resolvedPurpose,
+      propertyType: resolvedPropertyType,
+      category: currentCategory,
+      query: textQuery,
+      address: textQuery,
       ...extraData
     });
   };

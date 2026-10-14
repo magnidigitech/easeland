@@ -1,6 +1,7 @@
 import { getCategoryBadgeLabel } from './categoryUtils.js';
 import { extractCoordinates, resolvePlaceCoordinates, calculateDistanceKm } from '../services/locationProvider.js';
 import { convertAreaToSqFt } from '../firebase/propertyService.js';
+import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS } from '../firebase/searchParser.js';
 
 /**
  * Helper: Extract comprehensive location searchable blob
@@ -31,10 +32,29 @@ export const extractLocationBlob = (item) => {
 export function matchesSearchFilters(p, searchState = {}) {
   if (!p) return false;
 
+  // Resolve natural language criteria if query contains intent not yet parsed into searchState
+  let effectiveState = searchState;
+  if (searchState.query && typeof searchState.query === 'string' && searchState.query.trim().toLowerCase() !== 'near me') {
+    const rawQ = searchState.query.trim();
+    if (!searchState.maxPrice && !searchState.minPrice && (!searchState.propertyType || searchState.propertyType === 'ALL')) {
+      const parsed = parseNaturalLanguageQuery(rawQ);
+      effectiveState = {
+        ...parsed,
+        ...searchState,
+        maxPrice: searchState.maxPrice || parsed.maxPrice,
+        minPrice: searchState.minPrice || parsed.minPrice,
+        propertyType: (searchState.propertyType && searchState.propertyType !== 'ALL') ? searchState.propertyType : parsed.propertyType,
+        purpose: (searchState.purpose && searchState.purpose !== 'ALL') ? searchState.purpose : parsed.purpose,
+        bedrooms: (searchState.bedrooms && searchState.bedrooms !== 'ANY') ? searchState.bedrooms : parsed.bedrooms,
+        cleanKeywords: searchState.cleanKeywords !== undefined ? searchState.cleanKeywords : parsed.cleanKeywords
+      };
+    }
+  }
+
   // 1. Purpose filter (SALE vs RENT vs LEASE)
-  if (searchState.purpose && searchState.purpose !== 'ALL' && searchState.purpose !== 'ANY') {
+  if (effectiveState.purpose && effectiveState.purpose !== 'ALL' && effectiveState.purpose !== 'ANY') {
     const pPurpose = String(p.purpose || 'SALE').toUpperCase();
-    const targetPurpose = String(searchState.purpose).toUpperCase();
+    const targetPurpose = String(effectiveState.purpose).toUpperCase();
     if (targetPurpose === 'RENT') {
       const isRental = pPurpose.includes('RENT') || String(p.priceDisplay || '').toLowerCase().includes('month') || String(p.category || '').toLowerCase().includes('rental');
       if (!isRental) return false;
@@ -48,10 +68,10 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 2. Property Type filter
-  if (searchState.propertyType && searchState.propertyType !== 'ALL' && searchState.propertyType !== 'ANY') {
+  if (effectiveState.propertyType && effectiveState.propertyType !== 'ALL' && effectiveState.propertyType !== 'ANY') {
     const pType = String(p.propertyType || p.type || '').toUpperCase();
     const pCat = String(p.category || p.title || '').toUpperCase();
-    const targetType = String(searchState.propertyType).toUpperCase();
+    const targetType = String(effectiveState.propertyType).toUpperCase();
     const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('COMMERIC') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
     if (targetType === 'OPEN_PLOT' || targetType === 'PLOT') {
@@ -78,8 +98,8 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 3. Category string fallback check
-  if (searchState.category && searchState.category !== 'All' && searchState.category !== 'ALL') {
-    const targetCat = String(searchState.category).toLowerCase().trim();
+  if (effectiveState.category && effectiveState.category !== 'All' && effectiveState.category !== 'ALL') {
+    const targetCat = String(effectiveState.category).toLowerCase().trim();
     const pBadge = String(getCategoryBadgeLabel(p)).toLowerCase();
 
     let isCategoryMatch = false;
@@ -123,30 +143,30 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 4a. Location Search (State)
-  if (searchState.state && searchState.state.trim()) {
-    const stateVal = searchState.state.trim().toLowerCase();
+  if (effectiveState.state && effectiveState.state.trim()) {
+    const stateVal = effectiveState.state.trim().toLowerCase();
     const blob = extractLocationBlob(p);
     if (!blob.includes(stateVal)) return false;
   }
 
   // 4b. Location Search (District)
-  if (searchState.district && searchState.district.trim()) {
-    const distVal = searchState.district.trim().toLowerCase();
+  if (effectiveState.district && effectiveState.district.trim()) {
+    const distVal = effectiveState.district.trim().toLowerCase();
     const blob = extractLocationBlob(p);
     if (!blob.includes(distVal)) return false;
   }
 
   // 4c. Location Search (City)
-  if (searchState.city && searchState.city.trim()) {
-    const cityTokens = searchState.city.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (effectiveState.city && effectiveState.city.trim()) {
+    const cityTokens = effectiveState.city.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const blob = extractLocationBlob(p);
     const matches = cityTokens.some(tok => blob.includes(tok));
     if (!matches) return false;
   }
 
   // 4d. Location Search (Locality)
-  if (searchState.locality && searchState.locality.trim()) {
-    const locClean = searchState.locality.trim().toLowerCase();
+  if (effectiveState.locality && effectiveState.locality.trim()) {
+    const locClean = effectiveState.locality.trim().toLowerCase();
     const locTokens = locClean.split(/[\s,]+/).filter(tok => tok.length > 1);
     const blob = extractLocationBlob(p);
     const directMatch = blob.includes(locClean);
@@ -155,22 +175,22 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 4e. Nearby Radius Search (Radius & Reference Place)
-  if (searchState.radiusKm && Number(searchState.radiusKm) > 0) {
-    const radiusNum = Number(searchState.radiusKm);
-    let refLat = searchState.referenceLat != null ? Number(searchState.referenceLat) : null;
-    let refLng = searchState.referenceLng != null ? Number(searchState.referenceLng) : null;
+  if (effectiveState.radiusKm && Number(effectiveState.radiusKm) > 0) {
+    const radiusNum = Number(effectiveState.radiusKm);
+    let refLat = effectiveState.referenceLat != null ? Number(effectiveState.referenceLat) : null;
+    let refLng = effectiveState.referenceLng != null ? Number(effectiveState.referenceLng) : null;
 
-    if ((refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) && searchState.referencePlace && searchState.referencePlace.trim()) {
-      const resolved = resolvePlaceCoordinates(searchState.referencePlace.trim());
+    if ((refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) && effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
+      const resolved = resolvePlaceCoordinates(effectiveState.referencePlace.trim());
       if (resolved) {
         refLat = resolved.lat;
         refLng = resolved.lng;
       }
     }
 
-    if ((refLat == null || isNaN(refLat)) && searchState.userLat != null && searchState.userLng != null) {
-      refLat = Number(searchState.userLat);
-      refLng = Number(searchState.userLng);
+    if ((refLat == null || isNaN(refLat)) && effectiveState.userLat != null && effectiveState.userLng != null) {
+      refLat = Number(effectiveState.userLat);
+      refLng = Number(effectiveState.userLng);
     }
 
     if (refLat != null && !isNaN(refLat) && refLng != null && !isNaN(refLng)) {
@@ -179,54 +199,65 @@ export function matchesSearchFilters(p, searchState = {}) {
         const distKm = calculateDistanceKm(refLat, refLng, pCoords.lat, pCoords.lng);
         if (distKm > radiusNum) return false;
       }
-    } else if (searchState.referencePlace && searchState.referencePlace.trim()) {
-      const placeTokens = searchState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    } else if (effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
+      const placeTokens = effectiveState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
       const blob = extractLocationBlob(p);
       const matches = placeTokens.some(tok => blob.includes(tok));
       if (!matches) return false;
     }
-  } else if (searchState.referencePlace && searchState.referencePlace.trim()) {
-    const placeTokens = searchState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  } else if (effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
+    const placeTokens = effectiveState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const blob = extractLocationBlob(p);
     const matches = placeTokens.some(tok => blob.includes(tok));
     if (!matches) return false;
   }
 
-  // 5. Search Query keyword token check
-  if (searchState.query && searchState.query.trim()) {
-    const q = searchState.query.trim().toLowerCase();
+  // 5. Search Query keyword token check (with smart stopword omission)
+  if (effectiveState.query && effectiveState.query.trim()) {
+    const q = effectiveState.query.trim().toLowerCase();
     if (q !== 'near me') {
-      const title = String(p.title || '').toLowerCase();
-      const desc = String(p.description || '').toLowerCase();
-      const blob = extractLocationBlob(p);
-      const cat = String(p.category || p.propertyType || '').toLowerCase();
-      const refId = String(p.referenceId || p.propertyId || p.id || '').toLowerCase();
+      let tokensToCheck = [];
+      if (effectiveState.cleanKeywords !== undefined) {
+        tokensToCheck = effectiveState.cleanKeywords ? effectiveState.cleanKeywords.toLowerCase().split(/\s+/).filter(Boolean) : [];
+      } else {
+        tokensToCheck = q
+          .split(/[\s,/\-]+/)
+          .map(t => t.trim())
+          .filter(t => t.length > 1 && !REAL_ESTATE_STOPWORDS.has(t) && !/^\d+$/.test(t));
+      }
 
-      const fullBlob = [title, desc, blob, cat, refId].join(' ');
-      const tokens = q.split(/\s+/).filter(Boolean);
-      const matches = tokens.every(token => fullBlob.includes(token));
-      if (!matches) return false;
+      if (tokensToCheck.length > 0) {
+        const title = String(p.title || '').toLowerCase();
+        const desc = String(p.description || '').toLowerCase();
+        const blob = extractLocationBlob(p);
+        const cat = String(p.category || p.propertyType || '').toLowerCase();
+        const refId = String(p.referenceId || p.propertyId || p.id || '').toLowerCase();
+
+        const fullBlob = [title, desc, blob, cat, refId].join(' ');
+        const matches = tokensToCheck.every(token => fullBlob.includes(token));
+        if (!matches) return false;
+      }
     }
   }
 
   // 6. Price range
-  if (searchState.minPrice != null && searchState.minPrice !== '' && Number(searchState.minPrice) >= 0) {
+  if (effectiveState.minPrice != null && effectiveState.minPrice !== '' && Number(effectiveState.minPrice) >= 0) {
     const price = Number(p.price) || 0;
-    if (price > 0 && price < Number(searchState.minPrice)) return false;
+    if (price > 0 && price < Number(effectiveState.minPrice)) return false;
   }
-  if (searchState.maxPrice != null && searchState.maxPrice !== '' && Number(searchState.maxPrice) >= 0) {
+  if (effectiveState.maxPrice != null && effectiveState.maxPrice !== '' && Number(effectiveState.maxPrice) >= 0) {
     const price = Number(p.price) || 0;
-    if (price > 0 && price > Number(searchState.maxPrice)) return false;
+    if (price > 0 && price > Number(effectiveState.maxPrice)) return false;
   }
 
   // 7. Area range (Multi-unit conversion to standard Sq Ft)
-  const currentUnit = searchState.areaUnit || 'sq ft';
-  const rawMinArea = (searchState.minArea != null && searchState.minArea !== '')
-    ? Number(searchState.minArea)
-    : ((searchState.minAreaSqFt != null && searchState.minAreaSqFt !== '') ? Number(searchState.minAreaSqFt) : null);
-  const rawMaxArea = (searchState.maxArea != null && searchState.maxArea !== '')
-    ? Number(searchState.maxArea)
-    : ((searchState.maxAreaSqFt != null && searchState.maxAreaSqFt !== '') ? Number(searchState.maxAreaSqFt) : null);
+  const currentUnit = effectiveState.areaUnit || 'sq ft';
+  const rawMinArea = (effectiveState.minArea != null && effectiveState.minArea !== '')
+    ? Number(effectiveState.minArea)
+    : ((effectiveState.minAreaSqFt != null && effectiveState.minAreaSqFt !== '') ? Number(effectiveState.minAreaSqFt) : null);
+  const rawMaxArea = (effectiveState.maxArea != null && effectiveState.maxArea !== '')
+    ? Number(effectiveState.maxArea)
+    : ((effectiveState.maxAreaSqFt != null && effectiveState.maxAreaSqFt !== '') ? Number(effectiveState.maxAreaSqFt) : null);
 
   if (rawMinArea != null || rawMaxArea != null) {
     const propUnit = p.areaUnit || p.specs?.areaUnit || 'sq ft';
@@ -241,8 +272,8 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 8. Bedrooms / BHK
-  if (searchState.bedrooms && searchState.bedrooms !== 'ANY' && searchState.bedrooms !== 'ALL') {
-    const targetBhk = Number(searchState.bedrooms);
+  if (effectiveState.bedrooms && effectiveState.bedrooms !== 'ANY' && effectiveState.bedrooms !== 'ALL') {
+    const targetBhk = Number(effectiveState.bedrooms);
     if (!isNaN(targetBhk) && targetBhk > 0) {
       const pBhk = Number(p.bedrooms || p.bhk || p.specifications?.bedrooms || 0);
       if (pBhk < targetBhk) return false;
@@ -250,23 +281,23 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 9. Facing Direction
-  if (searchState.facing && searchState.facing !== 'ANY' && searchState.facing !== 'ALL') {
-    const targetFacing = String(searchState.facing).toUpperCase();
+  if (effectiveState.facing && effectiveState.facing !== 'ANY' && effectiveState.facing !== 'ALL') {
+    const targetFacing = String(effectiveState.facing).toUpperCase();
     const pFacing = String(p.facing || p.specifications?.facing || '').toUpperCase();
     if (pFacing && !pFacing.includes(targetFacing)) return false;
   }
 
   // 10. Furnishing Status
-  if (searchState.furnishing && searchState.furnishing !== 'ANY' && searchState.furnishing !== 'ALL') {
-    const targetFurnishing = String(searchState.furnishing).toUpperCase();
+  if (effectiveState.furnishing && effectiveState.furnishing !== 'ANY' && effectiveState.furnishing !== 'ALL') {
+    const targetFurnishing = String(effectiveState.furnishing).toUpperCase();
     const pFurnishing = String(p.furnishing || p.furnishingStatus || p.specifications?.furnishing || '').toUpperCase();
     if (pFurnishing && !pFurnishing.includes(targetFurnishing)) return false;
   }
 
   // 11. Amenities
-  if (Array.isArray(searchState.amenities) && searchState.amenities.length > 0) {
+  if (Array.isArray(effectiveState.amenities) && effectiveState.amenities.length > 0) {
     const pAmenities = (p.amenities || []).map(a => String(a).toLowerCase());
-    const hasAll = searchState.amenities.every(req =>
+    const hasAll = effectiveState.amenities.every(req =>
       pAmenities.some(pa => pa.includes(String(req).toLowerCase()))
     );
     if (!hasAll) return false;
