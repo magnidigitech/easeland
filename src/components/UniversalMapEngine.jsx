@@ -3,11 +3,18 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass,
-  Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink
+  Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink, Video
 } from 'lucide-react';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
-import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList } from '../utils/categoryUtils';
+import {
+  getCategoryBadgeLabel,
+  getFirstUploadedImage,
+  getCategoryFallbackImage,
+  getPropertyMediaList,
+  getPropertyPhotosList,
+  getPropertyVideosList
+} from '../utils/categoryUtils';
 import { CANONICAL_AMENITIES } from '../firebase/specificationsConfig';
 import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
 
@@ -604,17 +611,20 @@ export default function UniversalMapEngine({
     }
   }, [displayProperties, filters?.userLat]);
 
-  // Memoized media list for pop-up preview card
-  const previewMediaItems = useMemo(() => {
+  // Memoized photo list for pop-up preview card (strictly genuine photos, zero dummy fallback padding)
+  const previewPhotos = useMemo(() => {
     if (!selectedPropertyPreview) return [];
-    const list = getPropertyMediaList(selectedPropertyPreview);
-    if (Array.isArray(list) && list.length > 0) return list;
-    const fallback = getFirstUploadedImage(selectedPropertyPreview) || getCategoryFallbackImage(selectedPropertyPreview);
-    return [{ url: fallback, publicUrl: fallback, mediaType: 'PHOTO', caption: selectedPropertyPreview.title || 'Property' }];
+    return getPropertyPhotosList(selectedPropertyPreview);
   }, [selectedPropertyPreview]);
 
-  const activeMedia = previewMediaItems[previewMediaIndex] || previewMediaItems[0] || null;
-  const activeMediaUrl = activeMedia?.url || activeMedia?.publicUrl || getFirstUploadedImage(selectedPropertyPreview) || getCategoryFallbackImage(selectedPropertyPreview);
+  // Memoized video list for pop-up preview card
+  const previewVideos = useMemo(() => {
+    if (!selectedPropertyPreview) return [];
+    return getPropertyVideosList(selectedPropertyPreview);
+  }, [selectedPropertyPreview]);
+
+  const activePhoto = previewPhotos[previewMediaIndex] || previewPhotos[0] || null;
+  const activePhotoUrl = activePhoto?.url || activePhoto?.publicUrl || getFirstUploadedImage(selectedPropertyPreview);
 
   // Key specifications for pop-up preview card
   const previewSpecs = useMemo(() => {
@@ -1108,7 +1118,7 @@ export default function UniversalMapEngine({
               {/* 1. PHOTO GALLERY CAROUSEL */}
               <div className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden bg-slate-950 shrink-0 select-none shadow-inner">
                 <img
-                  src={activeMediaUrl}
+                  src={activePhotoUrl}
                   alt={selectedPropertyPreview.title}
                   onError={(e) => {
                     e.target.onerror = null;
@@ -1138,13 +1148,13 @@ export default function UniversalMapEngine({
                   <Heart className="w-4 h-4 fill-current" />
                 </button>
 
-                {/* Carousel Navigation Buttons */}
-                {previewMediaItems.length > 1 && (
+                {/* Carousel Navigation Buttons (Strictly for genuine photos) */}
+                {previewPhotos.length > 1 && (
                   <>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPreviewMediaIndex(prev => (prev - 1 + previewMediaItems.length) % previewMediaItems.length);
+                        setPreviewMediaIndex(prev => (prev - 1 + previewPhotos.length) % previewPhotos.length);
                       }}
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-lg cursor-pointer"
                       title="Previous Photo"
@@ -1155,7 +1165,7 @@ export default function UniversalMapEngine({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPreviewMediaIndex(prev => (prev + 1) % previewMediaItems.length);
+                        setPreviewMediaIndex(prev => (prev + 1) % previewPhotos.length);
                       }}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-lg cursor-pointer"
                       title="Next Photo"
@@ -1165,11 +1175,30 @@ export default function UniversalMapEngine({
 
                     {/* Photo Counter Pill */}
                     <div className="absolute bottom-2.5 left-2.5 bg-slate-950/80 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/10">
-                      {previewMediaIndex + 1} / {previewMediaItems.length} Photos
+                      {previewMediaIndex + 1} / {previewPhotos.length} Photos
                     </div>
                   </>
                 )}
+
+                {previewPhotos.length === 1 && (
+                  <div className="absolute bottom-2.5 left-2.5 bg-slate-950/80 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/10">
+                    1 Photo
+                  </div>
+                )}
               </div>
+
+              {/* Videos Availability Notice (if property has walkthrough / drone videos) */}
+              {previewVideos.length > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-amber-100/60 border border-amber-200/90 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-bold text-amber-900">
+                  <div className="flex items-center gap-2">
+                    <Video className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{previewVideos.length} {previewVideos.length === 1 ? 'Video' : 'Videos'} (Walkthrough / Drone)</span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-200/60 px-2 py-0.5 rounded">
+                    Watch on Full Page
+                  </span>
+                </div>
+              )}
 
               {/* 2. TITLE & LOCATION */}
               <div>

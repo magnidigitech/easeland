@@ -281,11 +281,159 @@ export function getPropertyMediaList(property) {
 }
 
 /**
- * Safely extracts the FIRST uploaded image from any property payload.
+ * Safely inspects whether an item or URL is a genuine photo (and NOT a video or document).
+ */
+export function isPhotoMedia(item) {
+  if (!item) return false;
+  let url = null;
+  let mediaType = null;
+
+  if (typeof item === 'string') {
+    url = item.trim();
+  } else if (typeof item === 'object') {
+    url = item.publicUrl || item.url || item.mediaUrl || item.fileUrl || item.photoUrl || item.src || item.path || '';
+    mediaType = item.mediaType || item.type;
+    if (item.provider === 'youtube' || item.provider === 'gdrive' || item.videoId || item.fileId || item.embedUrl) {
+      return false;
+    }
+    if (item.contentType && (item.contentType.startsWith('video/') || item.contentType.startsWith('application/'))) {
+      return false;
+    }
+  }
+
+  if (!url || typeof url !== 'string') return false;
+  const lowerUrl = url.toLowerCase().trim();
+  if (!lowerUrl) return false;
+
+  if (
+    mediaType === 'WALKTHROUGH_VIDEO' ||
+    mediaType === 'DRONE_VIDEO' ||
+    mediaType === 'VIDEO' ||
+    mediaType === 'DOCUMENT' ||
+    lowerUrl.includes('youtube.com') ||
+    lowerUrl.includes('youtu.be') ||
+    lowerUrl.includes('drive.google.com') ||
+    lowerUrl.endsWith('.mp4') ||
+    lowerUrl.endsWith('.webm') ||
+    lowerUrl.endsWith('.mov') ||
+    lowerUrl.endsWith('.avi') ||
+    lowerUrl.endsWith('.mkv') ||
+    lowerUrl.endsWith('.pdf') ||
+    lowerUrl.endsWith('.doc') ||
+    lowerUrl.endsWith('.docx')
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Safely extracts a DEDUPLICATED list of ONLY actual uploaded PHOTOS.
+ * Dynamically filters out all videos, walkthroughs, drone footage, and documents.
+ * Guarantees zero duplicate dummy images or fallback padding when real photos exist.
+ */
+export function getPropertyPhotosList(property) {
+  if (!property) {
+    const fallback = getCategoryFallbackImage(null);
+    return [{ url: fallback, publicUrl: fallback, mediaType: 'PHOTO', caption: 'Property Image' }];
+  }
+
+  const title = property.title || 'Property Photo';
+  const seenUrls = new Set();
+  const photosList = [];
+
+  const addPhotoItem = (item) => {
+    if (!item) return;
+    let url = null;
+    let caption = title;
+
+    if (typeof item === 'string') {
+      url = item.trim();
+    } else if (typeof item === 'object') {
+      url = item.publicUrl || item.url || item.mediaUrl || item.fileUrl || item.photoUrl || item.src || item.path;
+      caption = item.caption || item.name || title;
+    }
+
+    if (!url || typeof url !== 'string') return;
+    url = url.trim();
+    if (!url) return;
+
+    if (!isPhotoMedia(item)) return;
+
+    if (!seenUrls.has(url)) {
+      seenUrls.add(url);
+      photosList.push({
+        url,
+        publicUrl: url,
+        mediaType: 'PHOTO',
+        caption
+      });
+    }
+  };
+
+  // 1. Process photos and media arrays
+  const arraysToProcess = [
+    property.photos,
+    property.media,
+    property.publicApprovedMedia,
+    property.images
+  ];
+
+  for (const arr of arraysToProcess) {
+    if (Array.isArray(arr) && arr.length > 0) {
+      for (const item of arr) {
+        addPhotoItem(item);
+      }
+    }
+  }
+
+  // 2. Process thumbnail / single image fields
+  addPhotoItem(property.approvedThumbnail);
+  addPhotoItem(property.image);
+  addPhotoItem(property.imageUrl);
+  addPhotoItem(property.coverImage);
+  addPhotoItem(property.photoUrl);
+
+  // 3. Process documents if image files exist
+  const docs = Array.isArray(property.documents)
+    ? property.documents
+    : (Array.isArray(property.propertyDocuments) ? property.propertyDocuments : []);
+  for (const d of docs) {
+    if (!d) continue;
+    if (typeof d === 'string' && /\.(jpg|jpeg|png|webp|svg)/i.test(d)) addPhotoItem(d);
+    else if (typeof d === 'object') {
+      const u = d.publicUrl || d.url || d.fileUrl || d.path;
+      if (u && typeof u === 'string' && /\.(jpg|jpeg|png|webp|svg)/i.test(u)) addPhotoItem(d);
+    }
+  }
+
+  // If real photos exist, return ONLY those real photos! Zero dummy fallback padding!
+  if (photosList.length > 0) {
+    return photosList;
+  }
+
+  // If truly zero real photos exist, return exactly ONE fallback image
+  const fallback = getCategoryFallbackImage(property);
+  return [{ url: fallback, publicUrl: fallback, mediaType: 'PHOTO', caption: `${title} - Overview` }];
+}
+
+/**
+ * Safely extracts a DEDUPLICATED list of ONLY VIDEOS (walkthroughs, drone, youtube, mp4).
+ */
+export function getPropertyVideosList(property) {
+  if (!property) return [];
+  const mediaList = getPropertyMediaList(property);
+  return mediaList.filter(m => !isPhotoMedia(m));
+}
+
+/**
+ * Safely extracts the FIRST genuine uploaded image from any property payload.
+ * Avoids picking a video URL as the primary image thumbnail.
  */
 export function getFirstUploadedImage(property) {
-  const list = getPropertyMediaList(property);
-  return list[0]?.url || getCategoryFallbackImage(property);
+  const photos = getPropertyPhotosList(property);
+  return photos[0]?.url || getCategoryFallbackImage(property);
 }
 
 /**

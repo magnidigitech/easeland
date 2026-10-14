@@ -19,6 +19,7 @@ import { ListingStatus, MediaStatus, Purpose, PropertyType } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 import { encodeGeohash, convertAreaToSqFt } from './propertyService.js';
 import { propertyHasAmenity } from '../utils/filterMatchingUtils.js';
+import { isPhotoMedia } from '../utils/categoryUtils.js';
 
 export { convertAreaToSqFt, encodeGeohash };
 
@@ -505,7 +506,9 @@ export async function searchPublicProperties({
         amenitiesMap: d.amenitiesMap || null,
         specifications: d.specifications || null,
         features: d.features || null,
-        photos: Array.isArray(d.photos) && d.photos.length > 0 ? d.photos : (Array.isArray(d.media) ? d.media.map(m => typeof m === 'string' ? m : (m.publicUrl || m.url)).filter(Boolean) : []),
+        photos: (Array.isArray(d.photos) && d.photos.length > 0)
+          ? d.photos.filter(isPhotoMedia)
+          : (Array.isArray(d.media) ? d.media.filter(isPhotoMedia).map(m => typeof m === 'string' ? m : (m.publicUrl || m.url)).filter(Boolean) : []),
         approvedThumbnail: getApprovedPrimaryThumbnail(mediaList),
         createdAt: d.createdAt
       };
