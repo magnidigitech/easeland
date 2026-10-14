@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
@@ -15,6 +15,36 @@ import PropertyReviewStep from '../components/PropertyReviewStep.jsx';
 export default function PostPropertyWizard({ onComplete, onCancel, resumePropertyId = null }) {
   const { user, profile } = useAuth();
 
+  const [step, setStep] = useState(1);
+  const [propertyId, setPropertyId] = useState(null);
+  const [referenceId, setReferenceId] = useState(null);
+
+  // Resume Draft State
+  const [draftsList, setDraftsList] = useState([]);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // Form State (Clean initialized state with 0 defaults)
+  const [formData, setFormData] = useState({
+    title: '',
+    category: 'Open Plot Ventures',
+    propertyType: PropertyType.OPEN_PLOT,
+    otherPropertyType: '',
+    purpose: Purpose.SALE,
+    price: '',
+    area: '',
+    areaUnit: AreaUnit.SQ_FT,
+    description: '',
+    specs: { areaUnit: AreaUnit.SQ_FT },
+    amenities: [],
+    media: [],
+    location: null,
+    boundary: null
+  });
+
   const sanitizePhone = (ph) => {
     if (!ph) return '';
     const str = String(ph).trim();
@@ -23,7 +53,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     return str;
   };
 
-  const checkProfileCriteria = () => {
+  const missingProfileCriteria = useMemo(() => {
     // If editing an existing property, never block wizard
     if (resumePropertyId || propertyId) return [];
 
@@ -49,21 +79,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     if (!city) missing.push('City / Location');
 
     return missing;
-  };
-
-  const missingProfileCriteria = checkProfileCriteria();
-
-  const [step, setStep] = useState(1);
-  const [propertyId, setPropertyId] = useState(null);
-  const [referenceId, setReferenceId] = useState(null);
-
-  // Resume Draft State
-  const [draftsList, setDraftsList] = useState([]);
-  const [showResumeModal, setShowResumeModal] = useState(false);
-  const [savingDraft, setSavingDraft] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [successMsg, setSuccessMsg] = useState(null);
-  const [fieldErrors, setFieldErrors] = useState({});
+  }, [resumePropertyId, propertyId, user, profile]);
 
   // Clear step-specific validation errors when changing steps
   useEffect(() => {
@@ -81,24 +97,6 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showResumeModal]);
-
-  // Form State (Clean initialized state with 0 defaults)
-  const [formData, setFormData] = useState({
-    title: '',
-    category: 'Open Plot Ventures',
-    propertyType: PropertyType.OPEN_PLOT,
-    otherPropertyType: '',
-    purpose: Purpose.SALE,
-    price: '',
-    area: '',
-    areaUnit: AreaUnit.SQ_FT,
-    description: '',
-    specs: { areaUnit: AreaUnit.SQ_FT },
-    amenities: [],
-    media: [],
-    location: null,
-    boundary: null
-  });
 
   // Helper: Apply loaded property data into wizard state
   const applyPropertyToForm = (propCandidate) => {
