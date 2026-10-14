@@ -261,6 +261,7 @@ export default function DynamicFilterPanel({
   const activeChips = [];
   if (filters.purpose && filters.purpose !== 'ALL' && filters.purpose !== 'ANY') activeChips.push({ label: `Purpose: ${filters.purpose}`, key: 'purpose', val: '' });
   if (filters.propertyType && filters.propertyType !== 'ALL' && filters.propertyType !== 'ANY') activeChips.push({ label: `Type: ${filters.propertyType.replace(/_/g, ' ')}`, key: 'propertyType', val: '' });
+  if (filters.category && filters.category !== 'All') activeChips.push({ label: `Category: ${filters.category}`, key: 'category', val: 'All' });
   if (filters.state) activeChips.push({ label: `State: ${filters.state}`, key: 'state', val: '' });
   if (filters.district) activeChips.push({ label: `District: ${filters.district}`, key: 'district', val: '' });
   if (filters.city) activeChips.push({ label: `City: ${filters.city}`, key: 'city', val: '' });
@@ -368,50 +369,6 @@ export default function DynamicFilterPanel({
           </div>
         </div>
 
-        {/* Category Select */}
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
-            Property Category
-          </label>
-          <select
-            value={filters.category || 'All'}
-            onChange={(e) => {
-              const selectedCat = e.target.value;
-              let correspondingType = filters.propertyType || '';
-              if (selectedCat === 'Open Plot Ventures' || selectedCat === 'Open Plot (City)' || selectedCat === 'Amaravathi LPS layout plots') {
-                correspondingType = PropertyType.OPEN_PLOT;
-              } else if (selectedCat === 'Apartments/Flat') {
-                correspondingType = PropertyType.APARTMENT;
-              } else if (selectedCat === 'Independent House/Villa') {
-                correspondingType = PropertyType.HOUSE;
-              } else if (selectedCat === 'Commerical Property') {
-                correspondingType = PropertyType.COMMERCIAL;
-              } else if (selectedCat === 'Agricultural Lands') {
-                correspondingType = PropertyType.LAND;
-              } else if (selectedCat === 'Others') {
-                correspondingType = PropertyType.OTHER;
-              }
-              setFilters(prev => ({
-                ...prev,
-                cleared: false,
-                category: selectedCat,
-                propertyType: correspondingType
-              }));
-            }}
-            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-          >
-            <option value="All">All Categories</option>
-            <option value="Open Plot Ventures">Open Plot Ventures</option>
-            <option value="Open Plot (City)">Open Plot (City)</option>
-            <option value="Apartments/Flat">Apartments/Flat</option>
-            <option value="Independent House/Villa">Independent House/Villa</option>
-            <option value="Commerical Property">Commerical Property</option>
-            <option value="Agricultural Lands">Agricultural Lands</option>
-            <option value="Amaravathi LPS layout plots">Amaravathi LPS layout plots</option>
-            <option value="Others">Others</option>
-          </select>
-        </div>
-
         {/* Property Type Select */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
@@ -421,25 +378,11 @@ export default function DynamicFilterPanel({
             value={filters.propertyType || ''}
             onChange={(e) => {
               const selectedType = e.target.value;
-              let catToKeep = filters.category || 'All';
-              if (selectedType === PropertyType.OPEN_PLOT && !['Open Plot Ventures', 'Open Plot (City)', 'Amaravathi LPS layout plots', 'All'].includes(catToKeep)) {
-                catToKeep = 'All';
-              } else if (selectedType === PropertyType.APARTMENT && !['Apartments/Flat', 'All'].includes(catToKeep)) {
-                catToKeep = 'All';
-              } else if ((selectedType === PropertyType.HOUSE || selectedType === PropertyType.VILLA) && !['Independent House/Villa', 'All'].includes(catToKeep)) {
-                catToKeep = 'All';
-              } else if (selectedType === PropertyType.COMMERCIAL && !['Commerical Property', 'All'].includes(catToKeep)) {
-                catToKeep = 'All';
-              } else if (selectedType === PropertyType.LAND && !['Agricultural Lands', 'All'].includes(catToKeep)) {
-                catToKeep = 'All';
-              } else if (selectedType === PropertyType.OTHER && !['Others', 'All'].includes(catToKeep)) {
-                catToKeep = 'All';
-              }
               setFilters(prev => ({
                 ...prev,
                 cleared: false,
                 propertyType: selectedType,
-                category: catToKeep
+                category: 'All'
               }));
             }}
             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal focus:ring-2 focus:ring-brand-yellow focus:outline-none"
@@ -449,7 +392,7 @@ export default function DynamicFilterPanel({
             <option value={PropertyType.HOUSE}>Independent House / Villa</option>
             <option value={PropertyType.APARTMENT}>Apartments / Flat</option>
             <option value={PropertyType.VILLA}>Villa</option>
-            <option value={PropertyType.COMMERCIAL}>Commerical Property</option>
+            <option value={PropertyType.COMMERCIAL}>Commercial Property</option>
             <option value={PropertyType.LAND}>Agricultural Lands</option>
             <option value={PropertyType.OTHER}>Others</option>
           </select>
