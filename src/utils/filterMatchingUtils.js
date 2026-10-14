@@ -26,6 +26,206 @@ export const extractLocationBlob = (item) => {
   return parts.filter(Boolean).join(' ').toLowerCase();
 };
 
+// Canonical Amenity Matching Dictionary & Semantic Rules
+export const AMENITY_MATCH_RULES = [
+  {
+    keys: ['gated_community', 'gatedcommunity', 'gated'],
+    ids: ['GATED_COMMUNITY'],
+    labels: ['gated community', 'gated community layout', 'gated layout', 'gated township'],
+    mapKeys: ['gatedCommunity', 'GATED_COMMUNITY', 'gated_community']
+  },
+  {
+    keys: ['24/7 security', 'security_24x7', 'security24x7', '24x7 security', 'security', 'cctv'],
+    ids: ['SECURITY_24X7', 'CCTV_SURVEILLANCE'],
+    labels: ['24/7 security', '24/7 security guards', 'security guards', 'cctv camera surveillance', 'security', 'cctv'],
+    mapKeys: ['security', 'security24x7', 'SECURITY_24X7', 'cctv', 'cctvSurveillance']
+  },
+  {
+    keys: ['water supply', 'water_supply', 'water_supply_24x7', 'watersupply', 'water'],
+    ids: ['WATER_SUPPLY_24X7'],
+    labels: ['water supply', '24/7 municipal & borewell water', 'borewell water', 'municipal water', 'drinking water', 'water'],
+    mapKeys: ['waterSupply', 'waterSupply24x7', 'WATER_SUPPLY_24X7', 'water']
+  },
+  {
+    keys: ['electricity connection', 'electricity', 'electricity_connection', 'power', 'eb connection'],
+    ids: ['POWER_BACKUP'],
+    labels: ['electricity connection', 'electricity', 'power backup', '100% generator power backup', 'power'],
+    mapKeys: ['electricity', 'electricityConnection', 'powerBackup', 'POWER_BACKUP']
+  },
+  {
+    keys: ['power backup', 'power_backup', 'powerbackup', 'generator'],
+    ids: ['POWER_BACKUP'],
+    labels: ['power backup', '100% generator power backup', 'generator power backup', 'generator', 'ups'],
+    mapKeys: ['powerBackup', 'POWER_BACKUP']
+  },
+  {
+    keys: ['clubhouse', 'club_house', 'club house'],
+    ids: ['CLUBHOUSE'],
+    labels: ['clubhouse', 'residents clubhouse & event hall', 'club house', 'community hall'],
+    mapKeys: ['clubhouse', 'clubHouse', 'CLUBHOUSE']
+  },
+  {
+    keys: ['swimming pool', 'swimming_pool', 'swimmingpool', 'pool'],
+    ids: ['SWIMMING_POOL'],
+    labels: ['swimming pool', 'pool'],
+    mapKeys: ['swimmingPool', 'SWIMMING_POOL']
+  },
+  {
+    keys: ['gym', 'gymnasium', 'fitness'],
+    ids: ['GYMNASIUM'],
+    labels: ['gym', 'gymnasium', 'equipped fitness gym', 'fitness gym', 'health club'],
+    mapKeys: ['gym', 'gymnasium', 'GYMNASIUM']
+  },
+  {
+    keys: ['park', 'children_play_area', 'children play area', 'play area', 'garden'],
+    ids: ['CHILDREN_PLAY_AREA'],
+    labels: ['park', 'children’s play area & park', 'childrens play area & park', 'children play area', 'play area', 'kids park', 'garden'],
+    mapKeys: ['park', 'childrenPlayArea', 'CHILDREN_PLAY_AREA', 'garden']
+  },
+  {
+    keys: ['car parking', 'covered_parking', 'parking', 'car_parking'],
+    ids: ['COVERED_PARKING'],
+    labels: ['car parking', 'reserved covered car parking', 'covered parking', 'parking'],
+    mapKeys: ['carParking', 'coveredParking', 'COVERED_PARKING', 'parking']
+  },
+  {
+    keys: ['lift', 'elevator', 'lift_elevator'],
+    ids: ['LIFT_ELEVATOR'],
+    labels: ['lift', 'high-speed elevators / lifts', 'elevator', 'elevators', 'lifts'],
+    mapKeys: ['lift', 'elevator', 'liftElevator', 'LIFT_ELEVATOR']
+  },
+  {
+    keys: ['boundary wall', 'boundary_wall', 'compound wall'],
+    ids: ['BOUNDARY_WALL'],
+    labels: ['compound / boundary wall built', 'boundary wall', 'compound wall'],
+    mapKeys: ['boundaryWall', 'BOUNDARY_WALL']
+  },
+  {
+    keys: ['corner plot', 'corner_plot'],
+    ids: ['CORNER_PLOT'],
+    labels: ['corner plot (dual approach road)', 'corner plot'],
+    mapKeys: ['cornerPlot', 'CORNER_PLOT']
+  },
+  {
+    keys: ['wide approach road', 'wide_approach_road', 'wide road'],
+    ids: ['WIDE_APPROACH_ROAD'],
+    labels: ['wide blacktop approach road', 'wide road', 'approach road'],
+    mapKeys: ['wideApproachRoad', 'WIDE_APPROACH_ROAD']
+  },
+  {
+    keys: ['high speed internet', 'high_speed_internet', 'internet', 'wifi'],
+    ids: ['HIGH_SPEED_INTERNET'],
+    labels: ['fiber broadband internet ready', 'internet', 'wifi'],
+    mapKeys: ['internet', 'highSpeedInternet', 'HIGH_SPEED_INTERNET']
+  },
+  {
+    keys: ['central ac', 'central_ac', 'ac'],
+    ids: ['CENTRAL_AC'],
+    labels: ['central air conditioning', 'central ac', 'ac'],
+    mapKeys: ['centralAc', 'CENTRAL_AC']
+  },
+  {
+    keys: ['fire safety system', 'fire_safety_system', 'fire safety'],
+    ids: ['FIRE_SAFETY_SYSTEM'],
+    labels: ['fire hydrant & safety system', 'fire safety system', 'fire safety'],
+    mapKeys: ['fireSafety', 'FIRE_SAFETY_SYSTEM']
+  }
+];
+
+export function propertyHasAmenity(p, reqAmenity) {
+  if (!p || !reqAmenity) return false;
+  const cleanReq = String(reqAmenity).toLowerCase().trim();
+  const alphaReq = cleanReq.replace(/[^a-z0-9]/g, '');
+  if (!alphaReq) return true;
+
+  // 1. Prioritize exact alphanumeric match on ids, keys, or labels
+  let rule = AMENITY_MATCH_RULES.find(r =>
+    r.ids.some(id => id.toLowerCase().replace(/[^a-z0-9]/g, '') === alphaReq) ||
+    r.keys.some(k => k.replace(/[^a-z0-9]/g, '') === alphaReq) ||
+    r.labels.some(l => l.replace(/[^a-z0-9]/g, '') === alphaReq)
+  );
+
+  // 2. Secondary fallback for compound queries
+  if (!rule) {
+    rule = AMENITY_MATCH_RULES.find(r =>
+      r.keys.some(k => {
+        const kAlpha = k.replace(/[^a-z0-9]/g, '');
+        return kAlpha.length >= 4 && (alphaReq.includes(kAlpha) || kAlpha.includes(alphaReq));
+      }) ||
+      r.labels.some(l => {
+        const lAlpha = l.replace(/[^a-z0-9]/g, '');
+        return lAlpha.length >= 4 && (alphaReq.includes(lAlpha) || lAlpha.includes(alphaReq));
+      })
+    );
+  }
+
+  const rawList = [];
+  if (Array.isArray(p.amenities)) {
+    p.amenities.forEach(a => {
+      if (typeof a === 'string') rawList.push(a);
+      else if (a && typeof a === 'object') {
+        if (a.id) rawList.push(a.id);
+        if (a.label) rawList.push(a.label);
+        if (a.name) rawList.push(a.name);
+      }
+    });
+  } else if (typeof p.amenities === 'string') {
+    p.amenities.split(/[,;|]+/).forEach(s => rawList.push(s.trim()));
+  }
+
+  const specAmenities = p.specifications?.amenities || p.specs?.amenities;
+  if (Array.isArray(specAmenities)) {
+    specAmenities.forEach(a => rawList.push(typeof a === 'string' ? a : (a?.id || a?.label || a?.name)));
+  }
+
+  if (Array.isArray(p.features)) {
+    p.features.forEach(f => rawList.push(typeof f === 'string' ? f : (f?.id || f?.label || f?.name)));
+  } else if (typeof p.features === 'string') {
+    p.features.split(/[,;|]+/).forEach(s => rawList.push(s.trim()));
+  }
+
+  const propStrings = rawList.filter(Boolean).map(s => String(s).toLowerCase().trim());
+  const propAlphas = propStrings.map(s => s.replace(/[^a-z0-9]/g, ''));
+
+  if (rule) {
+    if (rule.ids.some(id => propStrings.includes(id.toLowerCase()) || propAlphas.includes(id.toLowerCase().replace(/[^a-z0-9]/g, '')))) {
+      return true;
+    }
+    if (rule.labels.concat(rule.keys).some(item => {
+      const itemAlpha = item.replace(/[^a-z0-9]/g, '');
+      return propAlphas.some(pa => pa === itemAlpha || pa.includes(itemAlpha) || itemAlpha.includes(pa));
+    })) {
+      return true;
+    }
+    if (p.amenitiesMap && typeof p.amenitiesMap === 'object') {
+      if (rule.mapKeys.some(mk => p.amenitiesMap[mk] === true || p.amenitiesMap[mk] === 1 || p.amenitiesMap[mk] === 'true')) {
+        return true;
+      }
+    }
+  }
+
+  if (propAlphas.some(pa => pa === alphaReq || pa.includes(alphaReq) || alphaReq.includes(pa))) {
+    return true;
+  }
+  if (propStrings.some(ps => ps.includes(cleanReq) || cleanReq.includes(ps))) {
+    return true;
+  }
+
+  // Text fallback in title, description, category, tagline
+  const descBlob = [p.title, p.description, p.category, p.tagline].filter(Boolean).join(' ').toLowerCase();
+  if (descBlob.includes(cleanReq)) {
+    return true;
+  }
+  if (rule) {
+    const validPhrases = rule.labels.concat(rule.keys).filter(k => k.length >= 4 && k !== 'pool' && k !== 'power' && k !== 'water');
+    if (validPhrases.some(phrase => descBlob.includes(phrase.toLowerCase()))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Pure search filter evaluator across property record
  */
@@ -299,12 +499,10 @@ export function matchesSearchFilters(p, searchState = {}) {
 
   // 11. Amenities
   if (Array.isArray(effectiveState.amenities) && effectiveState.amenities.length > 0) {
-    const pAmenities = (p.amenities || []).map(a => String(a).toLowerCase());
-    const hasAll = effectiveState.amenities.every(req =>
-      pAmenities.some(pa => pa.includes(String(req).toLowerCase()))
-    );
+    const hasAll = effectiveState.amenities.every(req => propertyHasAmenity(p, req));
     if (!hasAll) return false;
   }
 
   return true;
 }
+

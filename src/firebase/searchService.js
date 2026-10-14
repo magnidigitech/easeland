@@ -18,6 +18,7 @@ import { db } from './config.js';
 import { ListingStatus, MediaStatus, Purpose, PropertyType } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 import { encodeGeohash, convertAreaToSqFt } from './propertyService.js';
+import { propertyHasAmenity } from '../utils/filterMatchingUtils.js';
 
 export { convertAreaToSqFt, encodeGeohash };
 
@@ -424,20 +425,6 @@ export async function searchPublicProperties({
       }
     }
 
-    // Amenities Map Boolean Query (Max 2 required)
-    if (Array.isArray(amenities) && amenities.length > 0) {
-      const top5Canonical = ['gatedCommunity', 'swimmingPool', 'clubhouse', 'powerBackup', 'carParking'];
-      const activeAmenities = amenities.slice(0, 2);
-      activeAmenities.forEach(am => {
-        const canonicalKey = top5Canonical.find(k => k.toLowerCase() === String(am).toLowerCase().replace(/[^a-z]/g, ''));
-        if (canonicalKey) {
-          q = query(q, where(`amenitiesMap.${canonicalKey}`, '==', true));
-        } else {
-          q = query(q, where('amenities', 'array-contains', am));
-        }
-      });
-    }
-
     // Structured Range Inequality Filters
     if (minPrice != null) {
       q = query(q, where('price', '>=', Number(minPrice)));
@@ -514,6 +501,10 @@ export async function searchPublicProperties({
         listingStatus: d.listingStatus || d.status || 'LIVE',
         isPlatformVerified: Boolean(d.isPlatformVerified),
         verificationStatus: d.verificationStatus || 'Platform Verified',
+        amenities: Array.isArray(d.amenities) ? d.amenities : (Array.isArray(d.specifications?.amenities) ? d.specifications.amenities : []),
+        amenitiesMap: d.amenitiesMap || null,
+        specifications: d.specifications || null,
+        features: d.features || null,
         photos: Array.isArray(d.photos) && d.photos.length > 0 ? d.photos : (Array.isArray(d.media) ? d.media.map(m => typeof m === 'string' ? m : (m.publicUrl || m.url)).filter(Boolean) : []),
         approvedThumbnail: getApprovedPrimaryThumbnail(mediaList),
         createdAt: d.createdAt
@@ -527,6 +518,12 @@ export async function searchPublicProperties({
         const loc = p.location || {};
         const locBlob = [loc.locality, loc.subLocality, loc.colony, loc.mandal, loc.address, p.title].filter(Boolean).join(' ').toLowerCase();
         return locBlob.includes(locClean);
+      });
+    }
+
+    if (Array.isArray(amenities) && amenities.length > 0) {
+      filteredProperties = filteredProperties.filter(p => {
+        return amenities.every(am => propertyHasAmenity(p, am));
       });
     }
 

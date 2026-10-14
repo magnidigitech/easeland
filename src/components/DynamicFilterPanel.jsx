@@ -205,8 +205,10 @@ export default function DynamicFilterPanel({
   const handleAmenityToggle = (amenity) => {
     setFilters(prev => {
       const current = prev.amenities || [];
-      const updated = current.includes(amenity)
-        ? current.filter(a => a !== amenity)
+      const cleanTarget = String(amenity).toLowerCase().trim();
+      const exists = current.some(a => String(a).toLowerCase().trim() === cleanTarget);
+      const updated = exists
+        ? current.filter(a => String(a).toLowerCase().trim() !== cleanTarget)
         : [...current, amenity];
       return {
         ...prev,
@@ -890,7 +892,7 @@ export default function DynamicFilterPanel({
           </label>
           <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
             {CANONICAL_AMENITIES_LIST.map(amenity => {
-              const selected = (filters.amenities || []).includes(amenity);
+              const selected = (filters.amenities || []).some(a => String(a).toLowerCase().trim() === String(amenity).toLowerCase().trim());
               return (
                 <button
                   key={amenity}
