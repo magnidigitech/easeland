@@ -58,25 +58,43 @@ describe('Smart Marker Clustering & Data Integrity Suite', () => {
 
   it('calculates proper cluster badge dimensions and typography scaling across count tiers', () => {
     const getBadgeConfig = (count) => {
-      let size = 42;
-      let fontSize = 13;
+      let size = 26;
+      let fontSize = 11.5;
+      let strokeWidth = 1.5;
       if (count >= 100) {
-        size = 52;
-        fontSize = 14;
-      } else if (count >= 20) {
-        size = 48;
-        fontSize = 13.5;
-      } else if (count >= 10) {
-        size = 44;
+        size = 38;
         fontSize = 13;
+        strokeWidth = 2;
+      } else if (count >= 50) {
+        size = 34;
+        fontSize = 12.5;
+        strokeWidth = 2;
+      } else if (count >= 10) {
+        size = 30;
+        fontSize = 12;
+        strokeWidth = 2;
       }
-      return { size, fontSize };
+      return { size, fontSize, strokeWidth };
     };
 
-    expect(getBadgeConfig(5)).toEqual({ size: 42, fontSize: 13 });
-    expect(getBadgeConfig(15)).toEqual({ size: 44, fontSize: 13 });
-    expect(getBadgeConfig(45)).toEqual({ size: 48, fontSize: 13.5 });
-    expect(getBadgeConfig(150)).toEqual({ size: 52, fontSize: 14 });
+    expect(getBadgeConfig(5)).toEqual({ size: 26, fontSize: 11.5, strokeWidth: 1.5 });
+    expect(getBadgeConfig(15)).toEqual({ size: 30, fontSize: 12, strokeWidth: 2 });
+    expect(getBadgeConfig(60)).toEqual({ size: 34, fontSize: 12.5, strokeWidth: 2 });
+    expect(getBadgeConfig(150)).toEqual({ size: 38, fontSize: 13, strokeWidth: 2 });
+  });
+
+  it('enforces numbers visibility rule: hidden on global/continental zoom (< 5) and visible within India (>= 5)', () => {
+    const isClusterVisible = (zoom) => zoom >= 5;
+
+    // Zoom 0 to 4 (World & Continent view) -> strictly false
+    expect(isClusterVisible(1)).toBe(false);
+    expect(isClusterVisible(3)).toBe(false);
+    expect(isClusterVisible(4)).toBe(false);
+
+    // Zoom 5 to 18 (India National, State, District, City view) -> true
+    expect(isClusterVisible(5)).toBe(true);
+    expect(isClusterVisible(8)).toBe(true);
+    expect(isClusterVisible(13)).toBe(true);
   });
 
 });

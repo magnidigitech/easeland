@@ -24,19 +24,23 @@ import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
 function createEaseLandClusterIcon(cluster) {
   const count = cluster.getChildCount();
 
-  let size = 42;
-  let fontSize = 13;
-  let strokeWidth = 2.5;
+  // Compact, refined badge dimensions to keep clusters clean and within territorial bounds
+  let size = 26;
+  let fontSize = 11.5;
+  let strokeWidth = 1.5;
 
   if (count >= 100) {
-    size = 52;
-    fontSize = 14;
-  } else if (count >= 20) {
-    size = 48;
-    fontSize = 13.5;
-  } else if (count >= 10) {
-    size = 44;
+    size = 38;
     fontSize = 13;
+    strokeWidth = 2;
+  } else if (count >= 50) {
+    size = 34;
+    fontSize = 12.5;
+    strokeWidth = 2;
+  } else if (count >= 10) {
+    size = 30;
+    fontSize = 12;
+    strokeWidth = 2;
   }
 
   return L.divIcon({
@@ -54,7 +58,7 @@ function createEaseLandClusterIcon(cluster) {
           border-radius: 50%;
           background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
           border: ${strokeWidth}px solid #ffffff;
-          box-shadow: 0 4px 14px rgba(11, 37, 69, 0.4), 0 0 0 3px rgba(245, 158, 11, 0.35);
+          box-shadow: 0 2px 8px rgba(11, 37, 69, 0.35);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -62,6 +66,7 @@ function createEaseLandClusterIcon(cluster) {
           font-family: 'Plus Jakarta Sans', sans-serif;
           font-weight: 800;
           font-size: ${fontSize}px;
+          line-height: 1;
           letter-spacing: -0.2px;
           user-select: none;
           cursor: pointer;
@@ -204,17 +209,22 @@ export default function UniversalMapEngine({
     L.control.zoom({ position: 'topright' }).addTo(map);
 
     // Layer groups for markers & polygons (Smart Clustering for Markers)
-    markersLayerRef.current = L.markerClusterGroup({
+    const clusterGroup = L.markerClusterGroup({
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
       spiderfyOnMaxZoom: true,
       removeOutsideVisibleBounds: true,
       animate: true,
       animateAddingMarkers: false,
-      maxClusterRadius: 45,
+      maxClusterRadius: 40,
       disableClusteringAtZoom: 18,
       iconCreateFunction: createEaseLandClusterIcon
-    }).addTo(map);
+    });
+
+    if (initialZoom >= 5) {
+      clusterGroup.addTo(map);
+    }
+    markersLayerRef.current = clusterGroup;
     polygonLayerRef.current = L.layerGroup().addTo(map);
 
     mapInstanceRef.current = map;
@@ -223,6 +233,21 @@ export default function UniversalMapEngine({
     const handleZoomChange = () => {
       const activeZoom = map.getZoom();
       setCurrentZoom(activeZoom);
+
+      // Numbers Visibility Threshold:
+      // When zoomed out to global or continental scales (zoom < 5), hide numbers so they do not overflow out of India.
+      // As soon as the user zooms into India (zoom >= 5), restore numbers visibility.
+      if (markersLayerRef.current) {
+        if (activeZoom < 5) {
+          if (map.hasLayer(markersLayerRef.current)) {
+            map.removeLayer(markersLayerRef.current);
+          }
+        } else {
+          if (!map.hasLayer(markersLayerRef.current)) {
+            map.addLayer(markersLayerRef.current);
+          }
+        }
+      }
 
       if (userLocationMarkerRef.current) {
         const isAdjusted = filters?.locationAdjusted;
@@ -679,6 +704,20 @@ export default function UniversalMapEngine({
         markersLayerRef.current.addLayers(markersToAdd);
       } else if (markersLayerRef.current) {
         markersToAdd.forEach(m => markersLayerRef.current.addLayer(m));
+      }
+    }
+
+    // Numbers Visibility Threshold: Ensure cluster layer is mounted only when active zoom is within India (>= 5)
+    if (mapInstanceRef.current && markersLayerRef.current) {
+      const currentMapZoom = mapInstanceRef.current.getZoom();
+      if (currentMapZoom < 5) {
+        if (mapInstanceRef.current.hasLayer(markersLayerRef.current)) {
+          mapInstanceRef.current.removeLayer(markersLayerRef.current);
+        }
+      } else {
+        if (!mapInstanceRef.current.hasLayer(markersLayerRef.current)) {
+          mapInstanceRef.current.addLayer(markersLayerRef.current);
+        }
       }
     }
 
