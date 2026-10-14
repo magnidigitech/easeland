@@ -293,21 +293,31 @@ export default function DynamicFilterPanel({
   }
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-96 bg-white shadow-2xl border-l border-gray-200 flex flex-col transform transition-transform duration-300">
+    <>
+      {/* Click-outside backdrop overlay strictly covering map canvas */}
+      <div
+        className="absolute inset-0 bg-black/25 backdrop-blur-[0.5px] z-30 transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-      {/* HEADER */}
-      <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-brand-charcoal text-white">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-brand-yellow" />
-          <h3 className="text-lg font-bold">Property Filters</h3>
+      {/* FILTER SLIDE-OVER DRAWER (Contained within map canvas, strictly below Navbar & Search bar) */}
+      <div className="absolute inset-y-0 right-0 z-40 w-full sm:w-96 bg-white shadow-2xl border-l border-gray-200 flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right duration-200">
+
+        {/* HEADER */}
+        <div className="p-4 sm:p-5 border-b border-gray-800 flex items-center justify-between bg-brand-charcoal text-white shrink-0 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-brand-yellow" />
+            <h3 className="text-base sm:text-lg font-bold tracking-tight">Property Filters</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            title="Close filters"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 text-gray-400 hover:text-white rounded-lg transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
 
       {/* SORT COMPATIBILITY USER NOTICE */}
       {sortCompatibility && !sortCompatibility.compatible && (
@@ -938,6 +948,7 @@ export default function DynamicFilterPanel({
       </div>
 
     </div>
+  </>
   );
 }
 
