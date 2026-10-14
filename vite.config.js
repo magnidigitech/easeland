@@ -13,7 +13,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor-leaflet': ['leaflet'],
+          'vendor-leaflet': ['leaflet', 'leaflet.markercluster'],
           'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
           'vendor-icons': ['lucide-react']
         }

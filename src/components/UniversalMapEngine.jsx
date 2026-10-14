@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import L from '../utils/leafletGlobal';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import {
   ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass,
   Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink, Video
@@ -18,13 +20,62 @@ import {
 import { CANONICAL_AMENITIES } from '../firebase/specificationsConfig';
 import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
 
-// Fix default Leaflet marker icon asset URLs in React Vite
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// Helper: Create custom EaseLand circular cluster badge with property count
+function createEaseLandClusterIcon(cluster) {
+  const count = cluster.getChildCount();
+
+  let size = 42;
+  let fontSize = 13;
+  let strokeWidth = 2.5;
+
+  if (count >= 100) {
+    size = 52;
+    fontSize = 14;
+  } else if (count >= 20) {
+    size = 48;
+    fontSize = 13.5;
+  } else if (count >= 10) {
+    size = 44;
+    fontSize = 13;
+  }
+
+  return L.divIcon({
+    html: `
+      <div class="easeland-cluster-badge-wrapper" style="
+        width: ${size}px;
+        height: ${size}px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div class="easeland-cluster-badge" style="
+          width: ${size}px;
+          height: ${size}px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+          border: ${strokeWidth}px solid #ffffff;
+          box-shadow: 0 4px 14px rgba(11, 37, 69, 0.4), 0 0 0 3px rgba(245, 158, 11, 0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-weight: 800;
+          font-size: ${fontSize}px;
+          letter-spacing: -0.2px;
+          user-select: none;
+          cursor: pointer;
+        " title="${count} Verified Properties">
+          <span>${count}</span>
+        </div>
+      </div>
+    `,
+    className: 'easeland-cluster-custom-icon',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
+  });
+}
+
 
 export default function UniversalMapEngine({
   properties = [],
@@ -152,8 +203,18 @@ export default function UniversalMapEngine({
     // Add Zoom Control top right
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // Layer groups for markers & polygons
-    markersLayerRef.current = L.layerGroup().addTo(map);
+    // Layer groups for markers & polygons (Smart Clustering for Markers)
+    markersLayerRef.current = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      spiderfyOnMaxZoom: true,
+      removeOutsideVisibleBounds: true,
+      animate: true,
+      animateAddingMarkers: false,
+      maxClusterRadius: 45,
+      disableClusteringAtZoom: 18,
+      iconCreateFunction: createEaseLandClusterIcon
+    }).addTo(map);
     polygonLayerRef.current = L.layerGroup().addTo(map);
 
     mapInstanceRef.current = map;
@@ -203,6 +264,12 @@ export default function UniversalMapEngine({
       map.off('zoomend', handleZoomChange);
       map.off('zoom', handleZoomChange);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
+      if (markersLayerRef.current) {
+        try { markersLayerRef.current.clearLayers(); } catch (e) {}
+      }
+      if (polygonLayerRef.current) {
+        try { polygonLayerRef.current.clearLayers(); } catch (e) {}
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -488,6 +555,7 @@ export default function UniversalMapEngine({
     if (displayProperties.length === 0) return;
 
     const bounds = [];
+    const markersToAdd = [];
 
     displayProperties.forEach((prop) => {
       if (!prop) return;
@@ -583,7 +651,7 @@ export default function UniversalMapEngine({
         handleSelectPropertyForPreview(prop);
       });
 
-      markersLayerRef.current.addLayer(marker);
+      markersToAdd.push(marker);
 
       // Render Approved GeoJSON Boundary Polygon with Purpose-Differentiated Colors (Sale vs Rent vs Lease)
       if (formattedPoly.length >= 3) {
@@ -605,6 +673,14 @@ export default function UniversalMapEngine({
         }
       }
     });
+
+    if (markersToAdd.length > 0) {
+      if (markersLayerRef.current && markersLayerRef.current.addLayers) {
+        markersLayerRef.current.addLayers(markersToAdd);
+      } else if (markersLayerRef.current) {
+        markersToAdd.forEach(m => markersLayerRef.current.addLayer(m));
+      }
+    }
 
     if (!focusedProperty && !filters?.userLat && bounds.length > 0) {
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
