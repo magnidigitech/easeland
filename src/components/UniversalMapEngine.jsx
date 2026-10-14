@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Navigation, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
+import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
 import DynamicFilterPanel from './DynamicFilterPanel';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
-import { extractCoordinates, extractBoundaryPolygon, geocodePlaceWithHierarchy } from '../services/locationProvider';
+import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
 import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
 import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
-import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -583,126 +582,33 @@ export default function UniversalMapEngine({
           isSidePanelOpen ? 'ml-0' : '-ml-[100%] md:-ml-[380px] lg:-ml-[400px]'
         }`}>
           
-          {/* LIST HEADER WITH CLOSE TOGGLE BUTTON & ADDRESS SEARCH */}
-          <div className="p-4 border-b border-gray-100 bg-brand-charcoal text-white flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-1.5 text-xs text-brand-yellow font-extrabold uppercase tracking-wider">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Universal Map Discovery</span>
-                </div>
-                <h2 className="text-lg font-extrabold text-white">
-                  {filters?.cleared ? '0 Properties (Filters Cleared)' : `${displayProperties.length} Properties Found`}
-                </h2>
+          {/* LIST HEADER WITH CLOSE TOGGLE BUTTON */}
+          <div className="p-4 border-b border-gray-100 bg-brand-charcoal text-white flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs text-brand-yellow font-extrabold uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Universal Map Discovery</span>
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setFilterPanelOpen(true)}
-                  className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow"
-                >
-                  <Filter className="w-3.5 h-3.5 stroke-[2.5]" />
-                  Filters
-                </button>
-
-                <button
-                  onClick={() => setIsSidePanelOpen(false)}
-                  className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-                  title="Collapse Side Panel"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-              </div>
+              <h2 className="text-lg font-extrabold text-white">
+                {filters?.cleared ? '0 Properties (Filters Cleared)' : `${displayProperties.length} Properties Found`}
+              </h2>
             </div>
 
-            {/* Deep Address & Locality Quick Search Input Bar with Detect Location Button */}
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-brand-yellow absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search locality, city, or landmark..."
-                value={filters?.query || filters?.address || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFilters(prev => ({
-                    ...prev,
-                    cleared: false,
-                    query: val,
-                    address: val
-                  }));
-                }}
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    const q = (filters?.query || filters?.address || '').trim();
-                    if (q) {
-                      const parsed = parseNaturalLanguageQuery(q);
-                      const isLocation = parsed.isLocationSpecific && parsed.locationQuery;
-                      let geo = null;
-                      if (isLocation) {
-                        try {
-                          geo = await geocodePlaceWithHierarchy(parsed.locationQuery);
-                        } catch (err) {
-                          console.warn('Geocoding locationQuery fallback:', err);
-                        }
-                      }
-
-                      setFilters(prev => ({
-                        ...prev,
-                        cleared: false,
-                        query: q,
-                        address: q,
-                        purpose: (parsed.purpose && parsed.purpose !== 'ALL') ? parsed.purpose : prev.purpose,
-                        propertyType: (parsed.propertyType && parsed.propertyType !== 'ALL') ? parsed.propertyType : prev.propertyType,
-                        minPrice: parsed.minPrice !== '' ? parsed.minPrice : prev.minPrice,
-                        maxPrice: parsed.maxPrice !== '' ? parsed.maxPrice : prev.maxPrice,
-                        bedrooms: (parsed.bedrooms && parsed.bedrooms !== 'ANY') ? parsed.bedrooms : prev.bedrooms,
-                        cleanKeywords: parsed.cleanKeywords,
-                        ...(geo ? {
-                          referenceLat: geo.lat,
-                          referenceLng: geo.lng,
-                          referencePlace: geo.displayName || parsed.locationQuery,
-                          city: geo.city || prev.city,
-                          locality: geo.locality || prev.locality,
-                          state: geo.state || prev.state,
-                          district: geo.district || prev.district
-                        } : {})
-                      }));
-
-                      if (geo && mapInstanceRef.current) {
-                        mapInstanceRef.current.setView([geo.lat, geo.lng], 14, { animate: true });
-                      }
-                    }
-                  }
-                }}
-                className="w-full pl-9 pr-10 py-2 bg-white/10 border border-white/20 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-              />
+            <div className="flex items-center gap-2">
               <button
-                type="button"
-                onClick={() => {
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        const { latitude, longitude } = pos.coords;
-                        if (mapInstanceRef.current) {
-                          mapInstanceRef.current.setView([latitude, longitude], 20, { animate: true });
-                        }
-                        setFilters(prev => ({
-                          ...prev,
-                          cleared: false,
-                          query: 'Near Me',
-                          address: 'Near Me',
-                          userLat: latitude,
-                          userLng: longitude
-                        }));
-                      },
-                      () => alert('Could not access device GPS. Displaying properties in current view.')
-                    );
-                  }
-                }}
-                title="Detect My Current Location"
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 flex items-center justify-center transition-colors"
+                onClick={() => setFilterPanelOpen(true)}
+                className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow"
               >
-                <Navigation className="w-3.5 h-3.5 text-blue-300" />
+                <Filter className="w-3.5 h-3.5 stroke-[2.5]" />
+                Filters
+              </button>
+
+              <button
+                onClick={() => setIsSidePanelOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                title="Collapse Side Panel"
+              >
+                <ChevronLeft className="w-5 h-5" />
               </button>
             </div>
           </div>
