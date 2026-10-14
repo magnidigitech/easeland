@@ -68,7 +68,6 @@ export default function PropertiesSearchPage({
 
   // 4. UI View Mode (Responsive Split vs Mobile Toggle)
   const [viewMode, setViewMode] = useState('split'); // 'split', 'list', 'map'
-  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [focusedProperty, setFocusedProperty] = useState(null);
 
@@ -303,85 +302,65 @@ export default function PropertiesSearchPage({
 
       {/* SEARCH HEADER & NAVIGATION BAR */}
       <div className="sticky top-20 z-40 bg-brand-charcoal text-white border-b border-gray-800 shrink-0 shadow-md">
-        <div className="w-full flex flex-col md:flex-row items-stretch">
+        <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
 
-          {/* Left Column: Aligned exactly with Side Panel (380px on md, 400px on lg) */}
-          <div className={`hidden md:flex items-center justify-between px-4 py-2.5 border-r border-gray-800 shrink-0 transition-all duration-300 ease-in-out ${
-            isSidePanelOpen ? 'md:w-[380px] lg:w-[400px]' : 'w-0 px-0 overflow-hidden border-r-0'
-          }`}>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-brand-yellow/10 text-brand-yellow flex items-center justify-center border border-brand-yellow/20 shrink-0">
-                <MapPin className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xs font-black uppercase tracking-wider text-white truncate">Properties Search</h1>
-                <p className="text-[10px] text-gray-400 font-medium truncate">100% Direct Owner Verified</p>
-              </div>
-            </div>
+          {/* Quick Search Controls */}
+          <div className="w-full md:w-auto flex items-center gap-2 flex-1 max-w-2xl">
+            <HeroSearch
+              initialState={searchState}
+              onSearch={handleQuickSearch}
+              isCompact={true}
+            />
           </div>
 
-          {/* Right Column: Search Bar & Filters (Moved to the right, starting at the right end of the side panel above map canvas) */}
-          <div className="flex-1 flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-2.5 min-w-0">
+          {/* Filter & View Mode Controls */}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+            <button
+              onClick={() => setFilterPanelOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold border border-gray-700 transition-all"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-brand-yellow" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 bg-brand-yellow text-brand-charcoal rounded-full text-[10px] font-extrabold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
-            {/* Quick Search Controls (All three: Search input, All Categories, Search button) */}
-            <div className="w-full md:w-auto flex items-center gap-2 flex-1 max-w-3xl min-w-0">
-              <HeroSearch
-                initialState={searchState}
-                onSearch={handleQuickSearch}
-                isCompact={true}
-              />
-            </div>
-
-            {/* Filter & View Mode Controls */}
-            <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
-              <button
-                onClick={() => setFilterPanelOpen(true)}
-                className="flex items-center gap-2 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold border border-gray-700 transition-all shrink-0"
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={searchState.sortBy || 'newest'}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="appearance-none bg-slate-900 text-white text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer"
               >
-                <SlidersHorizontal className="w-4 h-4 text-brand-yellow" />
-                <span>Filters</span>
-                {activeFilterCount > 0 && (
-                  <span className="w-5 h-5 bg-brand-yellow text-brand-charcoal rounded-full text-[10px] font-extrabold flex items-center justify-center">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Sort Dropdown */}
-              <div className="relative shrink-0">
-                <select
-                  value={searchState.sortBy || 'newest'}
-                  onChange={(e) => handleSortChange(e.target.value)}
-                  className="appearance-none bg-slate-900 text-white text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer"
-                >
-                  <option value="newest" className="bg-slate-900 text-white font-bold">Newest First</option>
-                  <option value="price_asc" className="bg-slate-900 text-white font-bold">Price: Low to High</option>
-                  <option value="price_desc" className="bg-slate-900 text-white font-bold">Price: High to Low</option>
-                  <option value="area_asc" className="bg-slate-900 text-white font-bold">Area: Small to Large</option>
-                  <option value="area_desc" className="bg-slate-900 text-white font-bold">Area: Large to Small</option>
-                </select>
-                <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
-              </div>
-
-              {/* Mobile View Switcher (List vs Map) */}
-              <div className="flex md:hidden items-center bg-gray-800 p-0.5 rounded-xl border border-gray-700">
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'list' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
-                    }`}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('map')}
-                  className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'map' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
-                    }`}
-                >
-                  <MapIcon className="w-4 h-4" />
-                </button>
-              </div>
+                <option value="newest" className="bg-slate-900 text-white font-bold">Newest First</option>
+                <option value="price_asc" className="bg-slate-900 text-white font-bold">Price: Low to High</option>
+                <option value="price_desc" className="bg-slate-900 text-white font-bold">Price: High to Low</option>
+                <option value="area_asc" className="bg-slate-900 text-white font-bold">Area: Small to Large</option>
+                <option value="area_desc" className="bg-slate-900 text-white font-bold">Area: Large to Small</option>
+              </select>
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
             </div>
 
+            {/* Mobile View Switcher (List vs Map) */}
+            <div className="flex md:hidden items-center bg-gray-800 p-0.5 rounded-xl border border-gray-700">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'list' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
+                  }`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('map')}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'map' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
+                  }`}
+              >
+                <MapIcon className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
         </div>
@@ -406,8 +385,6 @@ export default function PropertiesSearchPage({
       <div className="w-full h-[calc(100dvh-148px)] relative overflow-hidden shrink-0">
         <UniversalMapEngine
           hideSidePanel={false}
-          isSidePanelOpen={isSidePanelOpen}
-          setIsSidePanelOpen={setIsSidePanelOpen}
           properties={properties}
           filters={searchState}
           setFilters={setSearchState}

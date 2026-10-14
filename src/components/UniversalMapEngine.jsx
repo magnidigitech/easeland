@@ -24,9 +24,7 @@ export default function UniversalMapEngine({
   isWishlisted,
   focusedProperty = null,
   hideSidePanel = false,
-  onApplyFilters = null,
-  isSidePanelOpen: controlledSidePanelOpen,
-  setIsSidePanelOpen: setControlledSidePanelOpen,
+  onApplyFilters = null
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -42,9 +40,7 @@ export default function UniversalMapEngine({
     return raw.filter(p => matchesSearchFilters(p, filters));
   }, [properties, filters]);
 
-  const [internalSidePanelOpen, setInternalSidePanelOpen] = useState(!hideSidePanel);
-  const isSidePanelOpen = controlledSidePanelOpen !== undefined ? controlledSidePanelOpen : internalSidePanelOpen;
-  const setIsSidePanelOpen = setControlledSidePanelOpen || setInternalSidePanelOpen;
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(!hideSidePanel);
   const [selectedPropertyPreview, setSelectedPropertyPreview] = useState(null);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
