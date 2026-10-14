@@ -1,7 +1,7 @@
 import { getCategoryBadgeLabel } from './categoryUtils.js';
 import { extractCoordinates, resolvePlaceCoordinates, calculateDistanceKm } from '../services/locationProvider.js';
 import { convertAreaToSqFt } from '../firebase/propertyService.js';
-import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS } from '../firebase/searchParser.js';
+import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
 
 /**
  * Helper: Extract comprehensive location searchable blob
@@ -36,19 +36,19 @@ export function matchesSearchFilters(p, searchState = {}) {
   let effectiveState = searchState;
   if (searchState.query && typeof searchState.query === 'string' && searchState.query.trim().toLowerCase() !== 'near me') {
     const rawQ = searchState.query.trim();
-    if (!searchState.maxPrice && !searchState.minPrice && (!searchState.propertyType || searchState.propertyType === 'ALL')) {
-      const parsed = parseNaturalLanguageQuery(rawQ);
-      effectiveState = {
-        ...parsed,
-        ...searchState,
-        maxPrice: searchState.maxPrice || parsed.maxPrice,
-        minPrice: searchState.minPrice || parsed.minPrice,
-        propertyType: (searchState.propertyType && searchState.propertyType !== 'ALL') ? searchState.propertyType : parsed.propertyType,
-        purpose: (searchState.purpose && searchState.purpose !== 'ALL') ? searchState.purpose : parsed.purpose,
-        bedrooms: (searchState.bedrooms && searchState.bedrooms !== 'ANY') ? searchState.bedrooms : parsed.bedrooms,
-        cleanKeywords: searchState.cleanKeywords !== undefined ? searchState.cleanKeywords : parsed.cleanKeywords
-      };
-    }
+    const parsed = parseNaturalLanguageQuery(rawQ);
+    effectiveState = {
+      ...parsed,
+      ...searchState,
+      maxPrice: (searchState.maxPrice != null && searchState.maxPrice !== '') ? searchState.maxPrice : parsed.maxPrice,
+      minPrice: (searchState.minPrice != null && searchState.minPrice !== '') ? searchState.minPrice : parsed.minPrice,
+      propertyType: (searchState.propertyType && searchState.propertyType !== 'ALL') ? searchState.propertyType : parsed.propertyType,
+      purpose: (searchState.purpose && searchState.purpose !== 'ALL') ? searchState.purpose : parsed.purpose,
+      bedrooms: (searchState.bedrooms && searchState.bedrooms !== 'ANY') ? searchState.bedrooms : parsed.bedrooms,
+      cleanKeywords: searchState.cleanKeywords !== undefined ? searchState.cleanKeywords : parsed.cleanKeywords,
+      isLocationSpecific: searchState.isLocationSpecific !== undefined ? searchState.isLocationSpecific : parsed.isLocationSpecific,
+      referencePlace: searchState.referencePlace || parsed.referencePlace
+    };
   }
 
   // 1. Purpose filter (SALE vs RENT vs LEASE)
@@ -234,7 +234,10 @@ export function matchesSearchFilters(p, searchState = {}) {
         const refId = String(p.referenceId || p.propertyId || p.id || '').toLowerCase();
 
         const fullBlob = [title, desc, blob, cat, refId].join(' ');
-        const matches = tokensToCheck.every(token => fullBlob.includes(token));
+        const matches = tokensToCheck.every(token => {
+          const syns = getSemanticSynonyms(token);
+          return syns.some(syn => fullBlob.includes(syn));
+        });
         if (!matches) return false;
       }
     }

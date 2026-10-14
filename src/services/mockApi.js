@@ -1,7 +1,7 @@
 import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData';
 import { extractCoordinates } from './locationProvider';
 import { getCategoryBadgeLabel } from '../utils/categoryUtils';
-import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS } from '../firebase/searchParser.js';
+import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
 
 export const safeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -449,9 +449,24 @@ export const mockApi = {
     });
     result = deduplicateProperties(result);
 
+    // Natural Language Query Extraction for Casual Searches
+    let effectiveFilters = filters;
+    if (filters.query && typeof filters.query === 'string' && filters.query.trim().toLowerCase() !== 'near me') {
+      const parsed = parseNaturalLanguageQuery(filters.query);
+      effectiveFilters = {
+        ...parsed,
+        ...filters,
+        maxPrice: (filters.maxPrice != null && filters.maxPrice !== '') ? filters.maxPrice : parsed.maxPrice,
+        minPrice: (filters.minPrice != null && filters.minPrice !== '') ? filters.minPrice : parsed.minPrice,
+        propertyType: (filters.propertyType && filters.propertyType !== 'ALL') ? filters.propertyType : parsed.propertyType,
+        purpose: (filters.purpose && filters.purpose !== 'ALL') ? filters.purpose : parsed.purpose,
+        cleanKeywords: filters.cleanKeywords !== undefined ? filters.cleanKeywords : parsed.cleanKeywords
+      };
+    }
+
     // Category Filter
-    if (filters.category && filters.category !== 'All') {
-      const targetCat = String(filters.category).toLowerCase().trim();
+    if (effectiveFilters.category && effectiveFilters.category !== 'All') {
+      const targetCat = String(effectiveFilters.category).toLowerCase().trim();
       result = result.filter(p => {
         if (!p) return false;
         const pBadge = String(getCategoryBadgeLabel(p)).toLowerCase();
@@ -495,19 +510,29 @@ export const mockApi = {
       });
     }
 
-    // Natural Language Query Extraction for Casual Searches
-    let effectiveFilters = filters;
-    if (filters.query && typeof filters.query === 'string' && filters.query.trim().toLowerCase() !== 'near me') {
-      const parsed = parseNaturalLanguageQuery(filters.query);
-      effectiveFilters = {
-        ...parsed,
-        ...filters,
-        maxPrice: filters.maxPrice || parsed.maxPrice,
-        minPrice: filters.minPrice || parsed.minPrice,
-        propertyType: (filters.propertyType && filters.propertyType !== 'ALL') ? filters.propertyType : parsed.propertyType,
-        purpose: (filters.purpose && filters.purpose !== 'ALL') ? filters.purpose : parsed.purpose,
-        cleanKeywords: filters.cleanKeywords !== undefined ? filters.cleanKeywords : parsed.cleanKeywords
-      };
+    // Property Type Filter (Structured or NLP Inferred)
+    if (effectiveFilters.propertyType && effectiveFilters.propertyType !== 'ALL' && effectiveFilters.propertyType !== 'ANY') {
+      const targetType = String(effectiveFilters.propertyType).toUpperCase();
+      result = result.filter(p => {
+        const pType = String(p.propertyType || '').toUpperCase();
+        const pCat = String(p.category || '').toUpperCase();
+        if (targetType === 'LAND') {
+          return pType.includes('LAND') || pCat.includes('LAND') || pCat.includes('AGRI') || pCat.includes('FARM');
+        }
+        if (targetType === 'OPEN_PLOT') {
+          return pType.includes('PLOT') || (pCat.includes('PLOT') && !pCat.includes('COMMERCIAL'));
+        }
+        if (targetType === 'APARTMENT') {
+          return pType.includes('APARTMENT') || pType.includes('FLAT') || pCat.includes('APARTMENT') || pCat.includes('FLAT');
+        }
+        if (targetType === 'HOUSE' || targetType === 'VILLA') {
+          return pType.includes('HOUSE') || pType.includes('VILLA') || pCat.includes('HOUSE') || pCat.includes('VILLA');
+        }
+        if (targetType === 'COMMERCIAL') {
+          return pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('OFFICE') || pCat.includes('SHOP');
+        }
+        return true;
+      });
     }
 
     // Purpose Filter (buy vs rent)
@@ -582,8 +607,11 @@ export const mockApi = {
             // Direct exact phrase check
             if (searchableBlob.includes(rawQuery)) return true;
 
-            // Multi-token match: EVERY search keyword token must be found inside the property's searchableBlob
-            return tokens.every(token => searchableBlob.includes(token));
+            // Multi-token match: EVERY search keyword token (or its semantic synonyms) must match searchableBlob
+            return tokens.every(token => {
+              const syns = getSemanticSynonyms(token);
+              return syns.some(syn => searchableBlob.includes(syn));
+            });
           });
         }
       }
