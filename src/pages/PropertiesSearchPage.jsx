@@ -336,9 +336,7 @@ export default function PropertiesSearchPage({
                 <SlidersHorizontal className={`w-4 h-4 ${filterPanelOpen ? 'text-brand-charcoal' : 'text-brand-yellow'}`} />
                 <span>Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className={`w-5 h-5 rounded-full text-[10px] font-extrabold flex items-center justify-center ${
-                    filterPanelOpen ? 'bg-brand-charcoal text-white' : 'bg-brand-yellow text-brand-charcoal'
-                  }`}>
+                  <span className="w-5 h-5 bg-white text-slate-900 rounded-full text-[10px] font-black flex items-center justify-center shadow-sm">
                     {activeFilterCount}
                   </span>
                 )}
