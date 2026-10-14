@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
+import {
+  ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass,
+  Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink
+} from 'lucide-react';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
-import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
+import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList } from '../utils/categoryUtils';
+import { CANONICAL_AMENITIES } from '../firebase/specificationsConfig';
 import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
 
 // Fix default Leaflet marker icon asset URLs in React Vite
@@ -46,7 +50,38 @@ export default function UniversalMapEngine({
   const isSidePanelOpen = controlledSidePanelOpen !== undefined ? controlledSidePanelOpen : internalSidePanelOpen;
   const setIsSidePanelOpen = setControlledSidePanelOpen || setInternalSidePanelOpen;
   const [selectedPropertyPreview, setSelectedPropertyPreview] = useState(null);
+  const [previewMediaIndex, setPreviewMediaIndex] = useState(0);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
+
+  // Smooth pan to property with standard zoom (level 17) and open preview card
+  const handleSelectPropertyForPreview = (prop) => {
+    if (!prop) return;
+    setSelectedPropertyPreview(prop);
+    setPreviewMediaIndex(0);
+
+    const coords = extractCoordinates(prop);
+    const lat = coords?.lat;
+    const lng = coords?.lng;
+
+    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+      if (mapInstanceRef.current) {
+        // Standard Zoom (level 17): High resolution view of plot, boundary and street context without tile distortion
+        mapInstanceRef.current.setView([lat, lng], 17, { animate: true });
+      }
+    }
+
+    // On mobile screens (< 768px), collapse side panel drawer so the user immediately sees the map and details pop up card
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidePanelOpen(false);
+    }
+  };
+
+  // Sync with focusedProperty if passed from parent
+  useEffect(() => {
+    if (focusedProperty) {
+      handleSelectPropertyForPreview(focusedProperty);
+    }
+  }, [focusedProperty]);
 
   // Google Maps Layers State
   const [mapType, setMapType] = useState('satellite'); // 'satellite' by default, 'default' (roadmap)
@@ -536,12 +571,9 @@ export default function UniversalMapEngine({
 
       marker.bindPopup(popupContent, { offset: [0, -45] });
 
-      // Marker Click -> Ultra-Deep MAX Zoom (Level 22) + Open Preview Card Modal
+      // Marker Click -> Standard Zoom (Level 17) + Open Preview Card Modal
       marker.on('click', () => {
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
-        }
-        setSelectedPropertyPreview(prop);
+        handleSelectPropertyForPreview(prop);
       });
 
       markersLayerRef.current.addLayer(marker);
@@ -559,10 +591,7 @@ export default function UniversalMapEngine({
         });
         polygon.bindTooltip(`Approved Plot Boundary [${polyStyle.typeLabel}] (${prop.title || 'Plot'})`, { sticky: true });
         polygon.on('click', () => {
-          if (mapInstanceRef.current) {
-            mapInstanceRef.current.setView([lat, lng], 22, { animate: true });
-          }
-          setSelectedPropertyPreview(prop);
+          handleSelectPropertyForPreview(prop);
         });
         if (polygonLayerRef.current) {
           polygonLayerRef.current.addLayer(polygon);
@@ -574,6 +603,112 @@ export default function UniversalMapEngine({
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
   }, [displayProperties, filters?.userLat]);
+
+  // Memoized media list for pop-up preview card
+  const previewMediaItems = useMemo(() => {
+    if (!selectedPropertyPreview) return [];
+    const list = getPropertyMediaList(selectedPropertyPreview);
+    if (Array.isArray(list) && list.length > 0) return list;
+    const fallback = getFirstUploadedImage(selectedPropertyPreview) || getCategoryFallbackImage(selectedPropertyPreview);
+    return [{ url: fallback, publicUrl: fallback, mediaType: 'PHOTO', caption: selectedPropertyPreview.title || 'Property' }];
+  }, [selectedPropertyPreview]);
+
+  const activeMedia = previewMediaItems[previewMediaIndex] || previewMediaItems[0] || null;
+  const activeMediaUrl = activeMedia?.url || activeMedia?.publicUrl || getFirstUploadedImage(selectedPropertyPreview) || getCategoryFallbackImage(selectedPropertyPreview);
+
+  // Key specifications for pop-up preview card
+  const previewSpecs = useMemo(() => {
+    if (!selectedPropertyPreview) return [];
+    const p = selectedPropertyPreview;
+    const s = p.specifications || {};
+    const chips = [];
+
+    const bhk = s.bedrooms || p.bedrooms || p.bhk;
+    if (bhk) chips.push({ label: 'Bedrooms', value: `${bhk} BHK`, icon: 'bed' });
+
+    const baths = s.bathrooms || p.bathrooms;
+    if (baths) chips.push({ label: 'Bathrooms', value: `${baths} Baths`, icon: 'bath' });
+
+    const facing = s.facing || p.facing;
+    if (facing) chips.push({ label: 'Facing', value: `${facing} Facing`, icon: 'compass' });
+
+    const furnishing = s.furnishing || p.furnishing;
+    if (furnishing) chips.push({ label: 'Furnishing', value: furnishing, icon: 'sofa' });
+
+    const road = s.approachRoadWidth || p.approachRoadWidth || p.roadWidth;
+    if (road) chips.push({ label: 'Approach Road', value: `${road} ft Road`, icon: 'car' });
+
+    const age = s.propertyAge || p.propertyAge;
+    if (age) chips.push({ label: 'Property Age', value: age, icon: 'calendar' });
+
+    const floor = s.floor !== undefined && s.floor !== '' ? s.floor : p.floor;
+    const totalFloors = s.totalFloors !== undefined && s.totalFloors !== '' ? s.totalFloors : p.totalFloors;
+    if (floor !== undefined && floor !== null && floor !== '') {
+      chips.push({ label: 'Floor Level', value: `Floor ${floor}${totalFloors ? ` of ${totalFloors}` : ''}`, icon: 'layers' });
+    }
+
+    const parking = s.parkingType || p.parkingType || p.parking;
+    if (parking) chips.push({ label: 'Parking', value: parking, icon: 'car' });
+
+    const possession = s.possessionStatus || p.possessionStatus;
+    if (possession) chips.push({ label: 'Possession', value: possession, icon: 'check' });
+
+    const corner = s.cornerPlot || p.cornerPlot;
+    if (corner) chips.push({ label: 'Plot Feature', value: 'Corner Plot', icon: 'building' });
+
+    const boundary = s.boundaryWall || p.boundaryWall;
+    if (boundary) chips.push({ label: 'Boundary', value: 'Compound Wall Built', icon: 'shield' });
+
+    return chips;
+  }, [selectedPropertyPreview]);
+
+  // Normalized amenities for pop-up preview card
+  const previewAmenities = useMemo(() => {
+    if (!selectedPropertyPreview) return [];
+    const p = selectedPropertyPreview;
+    const s = p.specifications || {};
+    const raw = p.amenities || s.amenities || [];
+    const list = Array.isArray(raw)
+      ? raw
+      : (raw && typeof raw === 'object' ? Object.keys(raw).filter(k => raw[k]) : []);
+
+    return list.map(item => {
+      const match = CANONICAL_AMENITIES.find(a => a.id === item || a.label.toLowerCase() === String(item).toLowerCase());
+      return match ? match.label : String(item).replace(/_/g, ' ');
+    });
+  }, [selectedPropertyPreview]);
+
+  // Rate per sq ft calculation
+  const ratePerSqFt = useMemo(() => {
+    if (!selectedPropertyPreview) return null;
+    const priceNum = Number(selectedPropertyPreview.price);
+    const areaNum = Number(selectedPropertyPreview.area);
+    if (!isNaN(priceNum) && !isNaN(areaNum) && priceNum > 0 && areaNum > 0) {
+      return `Rs. ${Math.round(priceNum / areaNum).toLocaleString('en-IN')} / sq ft`;
+    }
+    return null;
+  }, [selectedPropertyPreview]);
+
+  // Location hierarchy breakdown
+  const locationDetails = useMemo(() => {
+    if (!selectedPropertyPreview?.location) return null;
+    const loc = selectedPropertyPreview.location;
+    return {
+      locality: loc.locality,
+      city: loc.city,
+      mandal: loc.mandal,
+      district: loc.district,
+      state: loc.state,
+      pincode: loc.pincode,
+      fullText: [loc.locality, loc.city, loc.state].filter(Boolean).join(', ') || 'India'
+    };
+  }, [selectedPropertyPreview]);
+
+  // Description / overview
+  const previewDescription = selectedPropertyPreview?.description ||
+    selectedPropertyPreview?.details?.description ||
+    selectedPropertyPreview?.aboutProperty ||
+    null;
 
   return (
     <div className="relative w-full h-full bg-gray-100 flex flex-row overflow-hidden">
@@ -631,7 +766,7 @@ export default function UniversalMapEngine({
               displayProperties.map((prop) => (
                 <div
                   key={prop.id}
-                  onClick={() => setSelectedPropertyPreview(prop)}
+                  onClick={() => handleSelectPropertyForPreview(prop)}
                   className={`group bg-white rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col mx-0.5 sm:mx-0 shadow-sm hover:shadow-md ${
                     selectedPropertyPreview?.id === prop.id
                       ? 'border-brand-yellow ring-2 ring-brand-yellow/30 shadow-lg'
@@ -715,7 +850,7 @@ export default function UniversalMapEngine({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onSelectProperty(prop);
+                          handleSelectPropertyForPreview(prop);
                         }}
                         className="w-full mt-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer group"
                       >
@@ -942,54 +1077,272 @@ export default function UniversalMapEngine({
           )}
         </div>
 
-        {/* PROPERTY PREVIEW CARD OVERLAY ON MAP MARKER CLICK */}
+        {/* PROPERTY PREVIEW DETAILS CARD OVERLAY ON MAP */}
         {selectedPropertyPreview && (
-          <div className="absolute bottom-6 right-6 z-30 w-80 bg-white rounded-2xl p-4 shadow-2xl border border-brand-bordergray animate-in fade-in slide-in-from-bottom-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-extrabold bg-brand-charcoal text-brand-yellow px-2 py-0.5 rounded uppercase">
-                {selectedPropertyPreview.verificationStatus}
-              </span>
+          <div className="absolute bottom-2 right-2 left-2 sm:left-auto sm:bottom-6 sm:right-6 z-30 w-auto sm:w-[420px] max-w-[460px] max-h-[calc(100%-24px)] sm:max-h-[calc(100%-48px)] flex flex-col bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+            
+            {/* CARD HEADER (STICKY TOP) */}
+            <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0 pr-2">
+                <div className="flex items-center gap-1 bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{selectedPropertyPreview.verificationStatus || 'PLATFORM VERIFIED'}</span>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border shrink-0 ${getBoundaryStyle(selectedPropertyPreview).badgeClass}`}>
+                  {getBoundaryStyle(selectedPropertyPreview).typeLabel}
+                </span>
+              </div>
+
               <button
                 onClick={() => setSelectedPropertyPreview(null)}
-                className="p-1 text-gray-400 hover:text-brand-charcoal"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                title="Close Details Card"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <img
-              src={getFirstUploadedImage(selectedPropertyPreview)}
-              alt={selectedPropertyPreview.title}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = getCategoryFallbackImage(selectedPropertyPreview);
-              }}
-              className="w-full h-32 object-cover rounded-xl mb-3"
-            />
+            {/* SCROLLABLE CARD BODY */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain">
+              
+              {/* 1. PHOTO GALLERY CAROUSEL */}
+              <div className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden bg-slate-950 shrink-0 select-none shadow-inner">
+                <img
+                  src={activeMediaUrl}
+                  alt={selectedPropertyPreview.title}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = getCategoryFallbackImage(selectedPropertyPreview);
+                  }}
+                  className="w-full h-full object-cover transition-opacity duration-200"
+                />
 
-            <h4 className="text-sm font-bold text-brand-charcoal line-clamp-1 mb-1">
-              {selectedPropertyPreview.title}
-            </h4>
+                {/* Category Badge overlay on image */}
+                <div className="absolute top-3 left-3 bg-slate-900/90 text-amber-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md backdrop-blur-sm">
+                  {getCategoryBadgeLabel(selectedPropertyPreview)}
+                </div>
 
-            <p className="text-xs text-gray-500 font-medium mb-3">
-              {[selectedPropertyPreview.location?.locality, selectedPropertyPreview.location?.city, selectedPropertyPreview.location?.state].filter(Boolean).join(', ') || 'India'}
-            </p>
+                {/* Wishlist Button on image */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onWishlistToggle(selectedPropertyPreview.id);
+                  }}
+                  className={`absolute top-3 right-3 p-2 rounded-full shadow-md transition-colors ${
+                    (typeof isWishlisted === 'function' ? isWishlisted(selectedPropertyPreview.id) : Boolean(isWishlisted))
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white/90 text-gray-700 hover:bg-white'
+                  }`}
+                  title="Wishlist"
+                >
+                  <Heart className="w-4 h-4 fill-current" />
+                </button>
 
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100 mb-3">
-              <span className="text-sm font-extrabold text-emerald-700">
-                {selectedPropertyPreview.priceDisplay}
-              </span>
-              <span className="text-xs font-bold text-gray-600">
-                {selectedPropertyPreview.areaDisplay}
-              </span>
+                {/* Carousel Navigation Buttons */}
+                {previewMediaItems.length > 1 && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewMediaIndex(prev => (prev - 1 + previewMediaItems.length) % previewMediaItems.length);
+                      }}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-lg cursor-pointer"
+                      title="Previous Photo"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewMediaIndex(prev => (prev + 1) % previewMediaItems.length);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-sm transition-all border border-white/20 shadow-lg cursor-pointer"
+                      title="Next Photo"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    {/* Photo Counter Pill */}
+                    <div className="absolute bottom-2.5 left-2.5 bg-slate-950/80 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/10">
+                      {previewMediaIndex + 1} / {previewMediaItems.length} Photos
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 2. TITLE & LOCATION */}
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 line-clamp-2 leading-snug">
+                  {selectedPropertyPreview.title}
+                </h3>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mt-1">
+                  <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="line-clamp-1">
+                    {locationDetails?.fullText || 'India'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 3. PRICE & AREA HIGHLIGHT BOX */}
+              <div className="bg-gradient-to-br from-slate-50 to-slate-100/80 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Listed Price</span>
+                  <span className="text-lg font-black text-emerald-700 block">
+                    {selectedPropertyPreview.priceDisplay || (selectedPropertyPreview.price ? `Rs. ${Number(selectedPropertyPreview.price).toLocaleString('en-IN')}` : 'Price on Request')}
+                  </span>
+                  {ratePerSqFt && (
+                    <span className="text-[10px] font-bold text-slate-500">
+                      {ratePerSqFt}
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Property Area</span>
+                  <span className="text-sm font-black text-slate-800 block">
+                    {selectedPropertyPreview.areaDisplay || (selectedPropertyPreview.area ? `${selectedPropertyPreview.area} sq ft` : 'N/A')}
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 inline-block mt-0.5">
+                    Direct Owner
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. KEY SPECIFICATIONS */}
+              {previewSpecs.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Key Specifications</span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {previewSpecs.map((chip, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                          {chip.icon === 'bed' && <Bed className="w-3.5 h-3.5" />}
+                          {chip.icon === 'bath' && <Bath className="w-3.5 h-3.5" />}
+                          {chip.icon === 'compass' && <Compass className="w-3.5 h-3.5" />}
+                          {chip.icon === 'sofa' && <Sofa className="w-3.5 h-3.5" />}
+                          {chip.icon === 'car' && <Car className="w-3.5 h-3.5" />}
+                          {chip.icon === 'calendar' && <Calendar className="w-3.5 h-3.5" />}
+                          {chip.icon === 'layers' && <Layers className="w-3.5 h-3.5" />}
+                          {chip.icon === 'check' && <Check className="w-3.5 h-3.5" />}
+                          {chip.icon === 'building' && <Building className="w-3.5 h-3.5" />}
+                          {chip.icon === 'shield' && <ShieldCheck className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-slate-400 font-bold block truncate">{chip.label}</span>
+                          <span className="text-xs font-extrabold text-slate-800 block truncate">{chip.value}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. AMENITIES */}
+              {previewAmenities.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Amenities & Facilities</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {previewAmenities.map((amenityLabel, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-emerald-200/60"
+                      >
+                        <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{amenityLabel}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. LOCATION & ADMINISTRATIVE HIERARCHY */}
+              {locationDetails && (locationDetails.mandal || locationDetails.district || locationDetails.state || locationDetails.pincode) && (
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Location & Administration</span>
+                  </h4>
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs space-y-1.5">
+                    {locationDetails.locality && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">Locality:</span>
+                        <span className="text-slate-800 font-extrabold">{locationDetails.locality}</span>
+                      </div>
+                    )}
+                    {locationDetails.city && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">City / Town:</span>
+                        <span className="text-slate-800 font-extrabold">{locationDetails.city}</span>
+                      </div>
+                    )}
+                    {locationDetails.mandal && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">Mandal / Taluk:</span>
+                        <span className="text-slate-800 font-extrabold">{locationDetails.mandal}</span>
+                      </div>
+                    )}
+                    {locationDetails.district && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">District:</span>
+                        <span className="text-slate-800 font-extrabold">{locationDetails.district}</span>
+                      </div>
+                    )}
+                    {locationDetails.state && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">State:</span>
+                        <span className="text-slate-800 font-extrabold">{locationDetails.state}</span>
+                      </div>
+                    )}
+                    {locationDetails.pincode && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-bold">PIN Code:</span>
+                        <span className="text-slate-800 font-extrabold">{locationDetails.pincode}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 7. PROPERTY OVERVIEW DESCRIPTION */}
+              {previewDescription && (
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-2">
+                    Property Overview
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50/70 p-3 rounded-xl border border-slate-100 whitespace-pre-line">
+                    {previewDescription}
+                  </p>
+                </div>
+              )}
+
+              {/* 8. TRUST & VERIFICATION GUARANTEE BANNER */}
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 flex items-center gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="text-[11px] text-amber-900 font-bold leading-snug">
+                  100% Platform Verified Listing with direct owner contact and 0 middleman brokerage.
+                </div>
+              </div>
+
             </div>
 
-            <button
-              onClick={() => onSelectProperty(selectedPropertyPreview)}
-              className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs py-2.5 rounded-xl shadow transition-all text-center"
-            >
-              View Dedicated Property Page
-            </button>
+            {/* CARD FOOTER (STICKY BOTTOM ACTION BUTTON) */}
+            <div className="p-3.5 bg-white border-t border-slate-100 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+              <button
+                onClick={() => onSelectProperty(selectedPropertyPreview)}
+                className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-slate-900 font-black text-xs py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 group cursor-pointer"
+              >
+                <span>View Dedicated Property Page</span>
+                <ChevronRight className="w-4 h-4 shrink-0 text-slate-900 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+
           </div>
         )}
 
