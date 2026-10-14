@@ -497,6 +497,10 @@ export default function App() {
   useEffect(() => {
     const handleScroll = () => {
       if (typeof window === 'undefined') return;
+      if (activePage === 'map' || activePage === 'properties') {
+        setShowScrollTop(false);
+        return;
+      }
       const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
       const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
       const documentHeight = Math.max(
@@ -1416,20 +1420,22 @@ export default function App() {
       {/* ENGAGEMENT VISITOR LEAD POPUP MODAL (1-MIN ENGAGEMENT FOR UNAUTHENTICATED VISITORS) */}
       <VisitorLeadModal currentUser={currentUser} />
 
-      {/* SCROLL TO TOP ARROW HEAD BUTTON */}
-      <button
-        id="scroll-to-top-btn"
-        onClick={scrollToTop}
-        aria-label="Scroll to top of current page"
-        title="Scroll to top of page"
-        className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
-          showScrollTop
-            ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
-            : 'opacity-0 translate-y-8 scale-75 pointer-events-none'
-        }`}
-      >
-        <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform duration-200" />
-      </button>
+      {/* SCROLL TO TOP ARROW HEAD BUTTON (Hidden on Map Page) */}
+      {activePage !== 'map' && activePage !== 'properties' && (
+        <button
+          id="scroll-to-top-btn"
+          onClick={scrollToTop}
+          aria-label="Scroll to top of current page"
+          title="Scroll to top of page"
+          className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
+            showScrollTop
+              ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+              : 'opacity-0 translate-y-8 scale-75 pointer-events-none'
+          }`}
+        >
+          <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform duration-200" />
+        </button>
+      )}
 
     </div>
   );
