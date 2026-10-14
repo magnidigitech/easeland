@@ -1470,7 +1470,7 @@ export default function UniversalMapEngine({
               <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 flex items-center gap-2.5">
                 <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
                 <div className="text-[11px] text-amber-900 font-bold leading-snug">
-                  100% Platform Verified Listing with direct owner contact and 0 middleman brokerage.
+                  100% Platform Verified Listing with authenticated property records and complete transaction support.
                 </div>
               </div>
 

@@ -975,7 +975,7 @@ export default function App() {
 
                 <div className="inline-flex flex-wrap justify-center gap-6 text-xs font-bold text-brand-yellow">
                   <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> 100% Admin Verified</span>
-                  <span className="flex items-center gap-1.5"><Building2 className="w-4 h-4" /> Zero Broker Commissions</span>
+                  <span className="flex items-center gap-1.5"><Building2 className="w-4 h-4" /> Transparent & Safe Transactions</span>
                   <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> Deep Pan-India Geospatial Engine</span>
                 </div>
               </div>
@@ -1275,7 +1275,7 @@ export default function App() {
                 </div>
               </div>
               <p className="text-gray-400 leading-relaxed font-medium">
-                {siteConfig?.footer?.tagline || 'EaseLand is India\'s premier direct property discovery and verification marketplace. Zero brokerage, 100% verified land titles and plot boundaries.'}
+                {siteConfig?.footer?.tagline || 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, verified land titles, and precise plot boundaries.'}
               </p>
             </div>
 

@@ -78,7 +78,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                     </p>
                     <div className="pt-2 border-t border-amber-100 flex flex-wrap gap-1.5">
                       <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-amber-500" /> 0% Brokerage
+                        <CheckCircle2 className="w-3 h-3 text-amber-500" /> 100% Verified
                       </span>
                       <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
                         <Sparkles className="w-3 h-3 text-amber-500" /> Land Verified
@@ -170,7 +170,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                       <span>List Property Free</span>
                     </div>
                     <p className="text-[11px] text-slate-600 leading-snug">
-                      Reach 50,000+ verified buyers across South India with zero commission fees.
+                      Reach 50,000+ verified buyers across South India with premium listing visibility.
                     </p>
                     <div className="pt-2 border-t border-rose-100 flex flex-wrap gap-1.5">
                       <span className="text-[10px] font-bold bg-rose-50 text-rose-800 px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1">
@@ -348,7 +348,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               <Search className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
               <span>BUY PROPERTIES</span>
             </div>
-            <span className="text-[10px] bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full font-extrabold">0% Brokerage</span>
+            <span className="text-[10px] bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full font-extrabold">100% Verified</span>
           </button>
 
           {/* RENT (ROYAL PURPLE GLOW MOBILE) */}

@@ -250,7 +250,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         </h1>
         
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-8 font-medium">
-          {siteConfig?.homepage?.heroSubtitle || 'Zero agents. Zero commission. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'}
+          {siteConfig?.homepage?.heroSubtitle || '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'}
         </p>
 
         {/* DEEP SEARCH CARD */}

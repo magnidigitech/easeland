@@ -447,7 +447,7 @@ export default function EaseLandCRM({ onReturnToAdmin, onNavigateToMarketplace }
   const handleTriggerWhatsApp = (phone, name, propTitle = '') => {
     if (!phone) return;
     const cleanPh = phone.replace(/[^0-9]/g, '');
-    const greeting = 'Hello ' + (name || 'Sir/Madam') + ', this is EaseLand Real Estate Brokerage regarding ' + (propTitle ? ('your inquiry on ' + propTitle) : 'verified property listings in Guntur / Amaravati region') + '.';
+    const greeting = 'Hello ' + (name || 'Sir/Madam') + ', this is EaseLand Verified Properties regarding ' + (propTitle ? ('your inquiry on ' + propTitle) : 'verified property listings in Guntur / Amaravati region') + '.';
     const encoded = encodeURIComponent(greeting);
     const waUrl = 'https://wa.me/' + (cleanPh.length === 10 ? ('91' + cleanPh) : cleanPh) + '?text=' + encoded;
     if (typeof window !== 'undefined') {

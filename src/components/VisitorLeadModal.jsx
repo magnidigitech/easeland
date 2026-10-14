@@ -154,7 +154,7 @@ export default function VisitorLeadModal({ currentUser }) {
               Thank You, {formData.name}!
             </h3>
             <p className="text-xs text-gray-600 max-w-sm mx-auto leading-relaxed">
-              Your details have been saved directly to our verified registry. An EaseLand property specialist will reach out with verified zero-brokerage options matching your criteria.
+              Your details have been saved directly to our verified registry. An EaseLand property specialist will reach out with curated, high-match verified options matching your criteria.
             </p>
             <div className="pt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-full border border-emerald-200">
@@ -176,7 +176,7 @@ export default function VisitorLeadModal({ currentUser }) {
                 Looking for the Right Land Plot in AP?
               </h3>
               <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                You've been exploring EaseLand! Connect directly with verified land owners and get curated zero-brokerage plot deals tailored to your exact budget &amp; location.
+                You've been exploring EaseLand! Connect directly with verified land owners and get curated, premium plot deals tailored to your exact budget &amp; location.
               </p>
             </div>
 

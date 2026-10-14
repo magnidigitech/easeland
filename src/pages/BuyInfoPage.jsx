@@ -27,7 +27,7 @@ export default function BuyInfoPage({ onExploreClick }) {
           </h1>
 
           <p className="text-base sm:text-lg text-emerald-100/90 max-w-2xl mx-auto mb-8 font-medium leading-relaxed">
-            {siteConfig?.buyPage?.subtitle || 'Discover verified open plots, independent houses, villas, and apartments directly from owners. Zero real-estate agents or brokers involved.'}
+            {siteConfig?.buyPage?.subtitle || 'Discover verified open plots, independent houses, villas, and apartments with authenticated documentation and precise plot boundaries.'}
           </p>
 
           <button
@@ -91,7 +91,7 @@ export default function BuyInfoPage({ onExploreClick }) {
             </div>
             <h3 className="text-base font-bold text-slate-900 mb-2">Direct Owner Connection</h3>
             <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              Submit your enquiry directly to the property owner with zero broker interference.
+              Connect directly with verified owners backed by thorough property documentation and clear site coordinates.
             </p>
           </div>
         </div>

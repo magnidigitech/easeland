@@ -222,7 +222,7 @@ export const DEFAULT_SITE_CONFIG = {
     heroTagline: 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform',
     heroTitlePrefix: 'Find, Explore & Verify Properties ',
     heroTitleHighlight: 'Directly from Owners',
-    heroSubtitle: 'Zero agents. Zero commission. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.',
+    heroSubtitle: '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.',
     showSearchCard: true,
     showPopularSearches: true,
     heroBackgroundImage: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80'
@@ -239,7 +239,7 @@ export const DEFAULT_SITE_CONFIG = {
     stickyNavbar: true
   },
   footer: {
-    tagline: 'EaseLand is India\'s premier direct property discovery and verification marketplace. Zero brokerage, 100% verified land titles and plot boundaries.',
+    tagline: 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, verified land titles, and precise plot boundaries.',
     officeAddress: 'Door No. 4-12-89, 4th Line Main, Brodipet, Guntur Central Mandal, Guntur, AP - 522002, India',
     supportPhone: '+91 98765 43210',
     supportEmail: 'support@easeland.in',
@@ -255,11 +255,11 @@ export const DEFAULT_SITE_CONFIG = {
   },
   rentPage: {
     title: 'Rent Verified Apartments & Independent Houses',
-    subtitle: 'Find rental properties with zero brokerage fees, transparent owner contacts, and instant agreement support.',
+    subtitle: 'Find rental properties with verified property details, authenticated owners, and complete agreement support.',
     badgeText: 'DIRECT TENANT CONNECT'
   },
   sellPage: {
-    title: 'List Your Property Directly — Zero Brokerage Commission',
+    title: 'List Your Property — Connect with Verified Serious Buyers',
     subtitle: 'Post your open plot, villa, apartment, or commercial land in under 3 minutes. Our verification specialist inspects your property within 24 hours.',
     badgeText: 'POST PROPERTY FOR FREE'
   },
@@ -275,7 +275,7 @@ export const DEFAULT_SITE_CONFIG = {
   ],
   faqs: [
     { id: 'faq-1', question: 'How does EaseLand verify property titles and land boundaries?', answer: 'EaseLand deploys field inspection specialists who perform physical site visits, capture GeoJSON plot boundary coordinates, and audit land records (Pahani, Adangal, Encumbrance Certificates) before publishing listings live.' },
-    { id: 'faq-2', question: 'Are there any brokerage or hidden agent commissions?', answer: 'No. EaseLand is a 100% direct buyer-to-owner platform. Buyers contact property owners directly with zero middleman commissions.' },
+    { id: 'faq-2', question: 'How does EaseLand ensure a safe and smooth property transaction?', answer: 'EaseLand conducts rigorous on-ground verification, reviews title documents, maps precise plot boundaries, and connects genuine buyers with verified owners for a seamless transaction experience.' },
     { id: 'faq-3', question: 'How long does property verification take after posting?', answer: 'Property verification is completed within 24 hours of document submission. Our legal auditors inspect documents and publish the verified listing.' },
     { id: 'faq-4', question: 'Are confidential land title documents accessible to public users?', answer: 'No. Property title deeds and Pahani extracts are stored in an encrypted vault accessible only to EaseLand legal auditors and verified property owners.' }
   ],
@@ -290,7 +290,7 @@ export const DEFAULT_SITE_CONFIG = {
     logoUrl: '/easeland_logo.png',
     emblemUrl: '/easeland_emblem_transparent.png',
     brandTagline: 'India\'s Direct Property & Verified Land Discovery Platform',
-    slogan: 'Zero Brokerage. 100% Verified.'
+    slogan: '100% Verified. Transparent Deals.'
   },
   theme: {
     primaryColor: '#eab308',
@@ -317,8 +317,8 @@ export const DEFAULT_SITE_CONFIG = {
   },
   seo: {
     metaTitle: 'EaseLand — Pan-India Verified Property & Land Marketplace',
-    metaDescription: 'Discover and verify open plots, villas, apartments, and agricultural lands directly from owners. Zero brokerage, verified title deeds, and Leaflet Google satellite map polygons.',
-    keywords: 'land plots, buy land, guntur real estate, hyderabad plots, zero brokerage, verified property, plot boundary, real estate india',
+    metaDescription: 'Discover and verify open plots, villas, apartments, and agricultural lands. 100% verified title deeds, precise plot boundaries, and Leaflet Google satellite map polygons.',
+    keywords: 'land plots, buy land, guntur real estate, hyderabad plots, verified property, transparent deals, plot boundary, real estate india',
     ogImageUrl: '/easeland_logo.png',
     canonicalUrl: 'https://easeland.in'
   },

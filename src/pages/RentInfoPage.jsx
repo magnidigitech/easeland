@@ -27,7 +27,7 @@ export default function RentInfoPage({ onExploreClick }) {
           </h1>
 
           <p className="text-base sm:text-lg text-purple-100/90 max-w-2xl mx-auto mb-8 font-medium leading-relaxed">
-            {siteConfig?.rentPage?.subtitle || 'Save on high brokerage fees. EaseLand connects tenants directly with verified house owners and landlords across India.'}
+            {siteConfig?.rentPage?.subtitle || 'Discover premium rental homes, modern apartments, and villas with authenticated owners and complete agreement support.'}
           </p>
 
           <button
@@ -50,9 +50,9 @@ export default function RentInfoPage({ onExploreClick }) {
             <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-900 flex items-center justify-center mb-4">
               <Key className="w-6 h-6 text-purple-700" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Zero Brokerage Fees</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Transparent & Fair Terms</h3>
             <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              Talk directly with property landlords without paying 1-2 months of rent to middleman brokers.
+              Connect with verified landlords with clear rental agreements, authenticated property records, and complete transaction guidance.
             </p>
           </div>
 

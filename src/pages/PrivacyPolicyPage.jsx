@@ -46,9 +46,9 @@ export default function PrivacyPolicyPage({ onBackToHome }) {
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 flex items-start gap-4">
             <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-bold text-emerald-900">Zero Brokerage & Zero Data Monitization Policy</h3>
+              <h3 className="text-sm font-bold text-emerald-900">User Privacy &amp; Data Protection Commitment</h3>
               <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                EaseLand is built as a direct owner-to-customer property discovery platform. We NEVER sell, rent, trade, or share your personal profile data, email address, or contact numbers with real estate agencies, brokers, telemarketers, or third-party lead aggregators.
+                EaseLand is committed to transparent property discovery. We NEVER sell, rent, trade, or monetize your personal profile data, email address, or contact numbers with telemarketers or third-party lead aggregators.
               </p>
             </div>
           </div>
@@ -94,7 +94,7 @@ export default function PrivacyPolicyPage({ onBackToHome }) {
               </div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-1">
                 <span className="text-xs font-bold text-brand-charcoal block">Direct Connection</span>
-                <p className="text-[11px] text-gray-500">To connect verified buyers directly with property owners without intermediary brokerage intervention.</p>
+                <p className="text-[11px] text-gray-500">To enable verified buyers and property owners to connect with authenticated listing details and transaction support.</p>
               </div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-1">
                 <span className="text-xs font-bold text-brand-charcoal block">Property Verification</span>
