@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Filter, ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
-import DynamicFilterPanel from './DynamicFilterPanel';
+import { ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass, Check, Car, Bus, Bike, Mountain } from 'lucide-react';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
 import { getCategoryBadgeLabel, getFirstUploadedImage, getCategoryFallbackImage } from '../utils/categoryUtils';
@@ -41,7 +40,6 @@ export default function UniversalMapEngine({
     return raw.filter(p => matchesSearchFilters(p, filters));
   }, [properties, filters]);
 
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(!hideSidePanel);
   const [selectedPropertyPreview, setSelectedPropertyPreview] = useState(null);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
@@ -594,23 +592,13 @@ export default function UniversalMapEngine({
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setFilterPanelOpen(true)}
-                className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow"
-              >
-                <Filter className="w-3.5 h-3.5 stroke-[2.5]" />
-                Filters
-              </button>
-
-              <button
-                onClick={() => setIsSidePanelOpen(false)}
-                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-                title="Collapse Side Panel"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              onClick={() => setIsSidePanelOpen(false)}
+              className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              title="Collapse Side Panel"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
           </div>
 
           {/* PROPERTY LIST CARDS */}
@@ -1146,19 +1134,6 @@ export default function UniversalMapEngine({
         </div>
       )}
 
-      {/* DYNAMIC FILTER PANEL SLIDE OUT */}
-      <DynamicFilterPanel
-        isOpen={filterPanelOpen}
-        onClose={() => setFilterPanelOpen(false)}
-        filters={filters}
-        setFilters={setFilters}
-        onApplyFilters={() => {
-          if (typeof onApplyFilters === 'function') {
-            onApplyFilters();
-          }
-        }}
-        totalCount={displayProperties.length}
-      />
 
     </div>
   );
