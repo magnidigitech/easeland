@@ -112,6 +112,8 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   const tileLayerRef = useRef(null);
   const polygonLayerRef = useRef(null);
   const markersLayerGroupRef = useRef(null);
+  const locationMarkerRef = useRef(null);
+  const hasInitialCenteredRef = useRef(false);
 
   // GPS Session State
   const [gpsActive, setGpsActive] = useState(false);
@@ -122,9 +124,65 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  // Initial Center Coordinates derived from propertyLocation
-  const centerLat = Number(propertyLocation?.geoPoint?.latitude || propertyLocation?.lat || propertyLocation?.latitude || 17.3850);
-  const centerLng = Number(propertyLocation?.geoPoint?.longitude || propertyLocation?.lng || propertyLocation?.longitude || 78.4867);
+  // Extract Pinned Property Location Coordinates (from Step 3 Location Setup)
+  const pinLat = Number(
+    propertyLocation?.geoPoint?.latitude ??
+    propertyLocation?.lat ??
+    propertyLocation?.latitude ??
+    propertyLocation?.coordinates?.lat ??
+    propertyLocation?.location?.lat
+  );
+  const pinLng = Number(
+    propertyLocation?.geoPoint?.longitude ??
+    propertyLocation?.lng ??
+    propertyLocation?.longitude ??
+    propertyLocation?.coordinates?.lng ??
+    propertyLocation?.location?.lng
+  );
+  const hasValidLocationPin = !isNaN(pinLat) && !isNaN(pinLng) && (pinLat !== 0 || pinLng !== 0) && (pinLat !== 20.5937 || pinLng !== 78.9629);
+
+  // Fallback: check localStorage wizard location if prop is pending or editing draft
+  const resolvedPinLat = hasValidLocationPin ? pinLat : (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('easeland_wizard_location_')) {
+            const val = JSON.parse(localStorage.getItem(key) || '{}');
+            const lLat = Number(val?.geoPoint?.latitude ?? val?.lat ?? val?.latitude);
+            const lLng = Number(val?.geoPoint?.longitude ?? val?.lng ?? val?.longitude);
+            if (!isNaN(lLat) && !isNaN(lLng) && (lLat !== 0 || lLng !== 0) && (lLat !== 20.5937 || lLng !== 78.9629)) {
+              return lLat;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  })();
+
+  const resolvedPinLng = hasValidLocationPin ? pinLng : (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('easeland_wizard_location_')) {
+            const val = JSON.parse(localStorage.getItem(key) || '{}');
+            const lLat = Number(val?.geoPoint?.latitude ?? val?.lat ?? val?.latitude);
+            const lLng = Number(val?.geoPoint?.longitude ?? val?.lng ?? val?.longitude);
+            if (!isNaN(lLat) && !isNaN(lLng) && (lLat !== 0 || lLng !== 0) && (lLat !== 20.5937 || lLng !== 78.9629)) {
+              return lLng;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  })();
+
+  // Initial Center Coordinates derived from location pin
+  const centerLat = resolvedPinLat ?? 16.3124;
+  const centerLng = resolvedPinLng ?? 80.4285;
 
   // Compute map-estimated area (approximate)
   const estimatedAreaSqFt = calculateApproximatePolygonAreaSqFt(vertices);
@@ -134,9 +192,11 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     if (method !== 'DRAW' || !mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
+      const targetCenterLat = resolvedPinLat ?? centerLat;
+      const targetCenterLng = resolvedPinLng ?? centerLng;
       const map = L.map(mapContainerRef.current, {
-        center: [centerLat, centerLng],
-        zoom: 17,
+        center: [targetCenterLat, targetCenterLng],
+        zoom: 18,
         zoomControl: false
       });
 
@@ -258,6 +318,12 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
     }, 150);
 
     return () => {
+      if (locationMarkerRef.current) {
+        try {
+          if (mapInstanceRef.current) mapInstanceRef.current.removeLayer(locationMarkerRef.current);
+        } catch (e) {}
+        locationMarkerRef.current = null;
+      }
       if (mapInstanceRef.current && method !== 'DRAW') {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -283,6 +349,107 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
     tileLayerRef.current = newLayer;
   }, [mapType]);
+
+  // Render & maintain pinned property location marker pin from Step 3 Location Setup
+  useEffect(() => {
+    if (!mapInstanceRef.current || method !== 'DRAW') return;
+    const map = mapInstanceRef.current;
+
+    const targetLat = resolvedPinLat ?? centerLat;
+    const targetLng = resolvedPinLng ?? centerLng;
+    const isValid = targetLat != null && targetLng != null && !isNaN(targetLat) && !isNaN(targetLng) && (targetLat !== 0 || targetLng !== 0) && (targetLat !== 20.5937 || targetLng !== 78.9629);
+
+    if (locationMarkerRef.current) {
+      try {
+        map.removeLayer(locationMarkerRef.current);
+      } catch (e) {}
+      locationMarkerRef.current = null;
+    }
+
+    if (isValid) {
+      const locationPinIcon = L.divIcon({
+        className: 'custom-location-pin',
+        html: `
+          <div style="
+            position: relative;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+          ">
+            <div style="
+              position: absolute;
+              bottom: -2px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 22px;
+              height: 7px;
+              background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.6) 0%, rgba(245, 158, 11, 0) 70%);
+              border-radius: 50%;
+              pointer-events: none;
+            "></div>
+            <div style="
+              width: 38px;
+              height: 38px;
+              background: #0f172a;
+              border: 3px solid #f59e0b;
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <div style="
+                width: 12px;
+                height: 12px;
+                background: #f59e0b;
+                border-radius: 50%;
+                transform: rotate(45deg);
+              "></div>
+            </div>
+          </div>
+        `,
+        iconSize: [38, 38],
+        iconAnchor: [19, 38],
+        popupAnchor: [0, -38]
+      });
+
+      const pinMarker = L.marker([targetLat, targetLng], {
+        icon: locationPinIcon,
+        zIndexOffset: 2500 // Ensure pin remains clearly visible above vertex node markers
+      }).addTo(map);
+
+      pinMarker.bindTooltip('📍 Pinned Property Location (Step 3)', {
+        direction: 'top',
+        offset: [0, -36]
+      });
+
+      const popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', -apple-system, BlinkMacSystemFont, sans-serif; background: #ffffff; padding: 10px 12px; border-radius: 12px; text-align: center; min-width: 180px;">' +
+        '<div style="font-size: 9px; font-weight: 800; text-transform: uppercase; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 7px; border-radius: 6px; display: inline-block; margin-bottom: 4px;">' +
+          'PROPERTY LOCATION' +
+        '</div>' +
+        '<div style="font-size: 12.5px; font-weight: 800; color: #0f172a;">' +
+          'Pinned Property Location' +
+        '</div>' +
+        '<div style="font-size: 10.5px; font-weight: 600; color: #64748b; margin-top: 3px;">' +
+          'Draw your plot boundary around this pin' +
+        '</div>' +
+      '</div>';
+
+      pinMarker.bindPopup(popupHtml, { offset: [0, -36] });
+
+      locationMarkerRef.current = pinMarker;
+
+      if (!hasInitialCenteredRef.current) {
+        map.setView([targetLat, targetLng], 18);
+        hasInitialCenteredRef.current = true;
+      }
+    }
+  }, [method, resolvedPinLat, resolvedPinLng, centerLat, centerLng]);
 
   // Render Polygon Lines, Draggable Markers, and Mid-Point Splitter Handles whenever vertices array updates
   useEffect(() => {
@@ -505,11 +672,28 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
   const handleRecenterMap = () => {
     if (mapInstanceRef.current) {
+      const pinPoint = (resolvedPinLat != null && resolvedPinLng != null) ? [resolvedPinLat, resolvedPinLng] : null;
       if (vertices.length >= 2) {
-        const bounds = L.latLngBounds(vertices.map(v => [v.lat, v.lng]));
+        const allPoints = vertices.map(v => [v.lat, v.lng]);
+        if (pinPoint) allPoints.push(pinPoint);
+        const bounds = L.latLngBounds(allPoints);
         mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40] });
+      } else if (pinPoint) {
+        mapInstanceRef.current.setView(pinPoint, 18, { animate: true });
+        if (locationMarkerRef.current) locationMarkerRef.current.openPopup();
       } else {
-        mapInstanceRef.current.setView([centerLat, centerLng], 17);
+        mapInstanceRef.current.setView([centerLat, centerLng], 17, { animate: true });
+      }
+    }
+  };
+
+  const handleCenterOnPin = () => {
+    if (mapInstanceRef.current) {
+      const targetLat = resolvedPinLat ?? centerLat;
+      const targetLng = resolvedPinLng ?? centerLng;
+      mapInstanceRef.current.setView([targetLat, targetLng], 18, { animate: true });
+      if (locationMarkerRef.current) {
+        locationMarkerRef.current.openPopup();
       }
     }
   };
@@ -751,6 +935,18 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
 
           {/* MAP ACTION CONTROLS FLOATING BAR */}
           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-gray-200">
+            {(resolvedPinLat != null || hasValidLocationPin) && (
+              <button
+                type="button"
+                onClick={handleCenterOnPin}
+                title="Center on Pinned Property Location"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-lg transition-colors border border-amber-300 shadow-xs"
+              >
+                <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                <span>Center on Pin</span>
+              </button>
+            )}
+
             {vertices.length > 4 && (
               <button
                 type="button"
