@@ -246,6 +246,18 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
               <span className="text-2xl sm:text-3xl font-extrabold text-emerald-700">
                 {property.priceDisplay}
               </span>
+              {(() => {
+                const pNum = Number(property.price);
+                const aNum = Number(property.area);
+                const unit = property.areaUnit || property.specs?.areaUnit || 'sq ft';
+                const ppu = property.pricePerUnit || (pNum > 0 && aNum > 0 ? Math.round(pNum / aNum) : null);
+                if (!ppu) return null;
+                return (
+                  <span className="text-xs font-bold text-slate-500 block mt-0.5">
+                    Rs. {Number(ppu).toLocaleString('en-IN')} / {unit}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* VIEW ON MAP BUTTON */}
@@ -445,6 +457,21 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                   <span className="text-gray-400 font-medium block">Area / Size</span>
                   <span className="text-sm font-bold text-brand-charcoal">{property.areaDisplay || property.area + ' sq ft'}</span>
                 </div>
+                {(() => {
+                  const pNum = Number(property.price);
+                  const aNum = Number(property.area);
+                  const unit = property.areaUnit || property.specs?.areaUnit || 'sq ft';
+                  const ppu = property.pricePerUnit || (pNum > 0 && aNum > 0 ? Math.round(pNum / aNum) : null);
+                  if (!ppu) return null;
+                  return (
+                    <div className="p-3 bg-gray-50 rounded-xl">
+                      <span className="text-gray-400 font-medium block">Price per Unit</span>
+                      <span className="text-sm font-bold text-emerald-700">
+                        Rs. {Number(ppu).toLocaleString('en-IN')} / {unit}
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div className="p-3 bg-gray-50 rounded-xl">
                   <span className="text-gray-400 font-medium block">Facing Direction</span>
                   <span className="text-sm font-bold text-brand-charcoal">{property.facing || 'East'}</span>

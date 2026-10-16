@@ -115,7 +115,7 @@ export default function PropertyCard({
       <div className="p-4 flex-1 flex flex-col justify-between bg-white border-t border-slate-100">
         <div>
           {/* Price Header */}
-          <div className="flex items-baseline justify-between gap-2 mb-1.5">
+          <div className="flex items-baseline justify-between gap-2 mb-1">
             <h3 className="text-xl font-extrabold text-blue-950 group-hover:text-amber-600 transition-colors">
               {priceDisplay}
             </h3>
@@ -125,6 +125,18 @@ export default function PropertyCard({
               </span>
             )}
           </div>
+          {(() => {
+            const pNum = Number(property.price);
+            const aNum = Number(property.area);
+            const unit = property.areaUnit || property.specs?.areaUnit || 'sq ft';
+            const ppu = property.pricePerUnit || (pNum > 0 && aNum > 0 ? Math.round(pNum / aNum) : null);
+            if (!ppu) return null;
+            return (
+              <div className="text-[11px] font-semibold text-slate-500 -mt-0.5 mb-1.5">
+                Rs. {Number(ppu).toLocaleString('en-IN')} / {unit}
+              </div>
+            );
+          })()}
 
           {/* Title */}
           <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mb-2 group-hover:text-amber-600 transition-colors">

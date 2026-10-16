@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2, Settings, Calculator } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
 import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById, deletePropertyListing } from '../firebase/propertyService.js';
@@ -35,6 +35,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     otherPropertyType: '',
     purpose: Purpose.SALE,
     price: '',
+    pricePerUnit: '',
     area: '',
     areaUnit: AreaUnit.SQ_FT,
     description: '',
@@ -152,6 +153,17 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       cleanArea = rawA.replace(/[^0-9.]/g, '');
     }
 
+    // Parse clean numeric price per unit
+    let rawPPU = p.pricePerUnit !== undefined && p.pricePerUnit !== null ? p.pricePerUnit : propCandidate.pricePerUnit;
+    let cleanPPU = '';
+    if (typeof rawPPU === 'number') {
+      cleanPPU = String(rawPPU);
+    } else if (typeof rawPPU === 'string') {
+      cleanPPU = rawPPU.replace(/[^0-9.]/g, '');
+    } else if (cleanPrice && cleanArea && Number(cleanArea) > 0) {
+      cleanPPU = String(Math.round(Number(cleanPrice) / Number(cleanArea)));
+    }
+
     const resolvedPropType = p.propertyType || p.type || p.category || propCandidate.propertyType || propCandidate.type || PropertyType.OPEN_PLOT;
     const resolvedPurpose = p.purpose || propCandidate.purpose || Purpose.SALE;
     const mediaList = Array.isArray(p.media) ? p.media : (Array.isArray(propCandidate.media) ? propCandidate.media : (Array.isArray(p.photos) ? p.photos : []));
@@ -164,6 +176,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       otherPropertyType: p.otherPropertyType || propCandidate.otherPropertyType || '',
       purpose: resolvedPurpose,
       price: cleanPrice,
+      pricePerUnit: cleanPPU,
       area: cleanArea,
       areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT,
       description: p.description || propCandidate.description || '',
@@ -320,7 +333,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   const getPriceDisplay = () => {
     const p = Number(formData.price) || 0;
     if (formData.purpose === Purpose.RENT) {
-      return `Rs. ${p.toLocaleString()} / month`;
+      return `Rs. ${p.toLocaleString('en-IN')} / month`;
     }
     if (p >= 10000000) {
       return `Rs. ${(p / 10000000).toFixed(2)} Crores`;
@@ -328,13 +341,22 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     if (p >= 100000) {
       return `Rs. ${(p / 100000).toFixed(2)} Lakhs`;
     }
-    return `Rs. ${p.toLocaleString()}`;
+    return `Rs. ${p.toLocaleString('en-IN')}`;
+  };
+
+  const getPricePerUnitDisplay = () => {
+    const a = Number(formData.area) || 0;
+    const p = Number(formData.price) || 0;
+    const ppu = Number(formData.pricePerUnit) || (a > 0 && p > 0 ? Math.round(p / a) : 0);
+    const unit = formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT;
+    if (ppu <= 0) return '';
+    return `Rs. ${ppu.toLocaleString('en-IN')} / ${unit}`;
   };
 
   const getAreaDisplay = () => {
     const a = Number(formData.area) || 0;
     const unit = formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT;
-    return `${a.toLocaleString()} ${unit}`;
+    return `${a.toLocaleString('en-IN')} ${unit}`;
   };
 
   // Step Validations
@@ -359,8 +381,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         errors.title = 'Property Title is required (minimum 2 characters).';
       }
       const priceNum = Number(formData.price);
-      if (!formData.price || isNaN(priceNum) || priceNum <= 0) {
-        errors.price = 'Please enter a valid positive price amount.';
+      const ppuNum = Number(formData.pricePerUnit);
+      if ((!formData.price && !formData.pricePerUnit) || (isNaN(priceNum) && isNaN(ppuNum)) || (priceNum <= 0 && ppuNum <= 0)) {
+        errors.price = 'Please enter a valid price or price per unit.';
       }
       const areaNum = Number(formData.area);
       if (!formData.area || isNaN(areaNum) || areaNum <= 0) {
@@ -453,6 +476,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     try {
       const priceNum = Number(customUpdates?.price !== undefined ? customUpdates.price : formData.price) || 0;
       const areaNum = Number(customUpdates?.area !== undefined ? customUpdates.area : formData.area) || 0;
+      const ppuNum = Number(customUpdates?.pricePerUnit !== undefined ? customUpdates.pricePerUnit : formData.pricePerUnit) || (areaNum > 0 && priceNum > 0 ? Math.round(priceNum / areaNum) : 0);
 
       const ownerName = profile?.displayName || profile?.name || user?.displayName || user?.name || user?.email || 'EaseLand User';
       const ownerPhone = profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phone || user?.phoneNumber || '';
@@ -480,6 +504,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         purpose: customUpdates?.purpose !== undefined ? customUpdates.purpose : formData.purpose,
         price: priceNum,
         priceDisplay: getPriceDisplay(),
+        pricePerUnit: ppuNum > 0 ? ppuNum : null,
+        pricePerUnitDisplay: ppuNum > 0 ? `Rs. ${ppuNum.toLocaleString('en-IN')} / ${formData.areaUnit || AreaUnit.SQ_FT}` : '',
         area: areaNum,
         areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
         areaDisplay: getAreaDisplay(),
@@ -916,53 +942,18 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 1. TOTAL AREA (TOTAL UNITS) */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Expected Price (INR) *
+                  Total Area (Total Units) *
                 </label>
                 <input
                   type="number"
                   min="0"
+                  step="any"
                   required
-                  placeholder="Enter your price"
-                  value={formData.price}
-                  onKeyDown={(e) => {
-                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
-                      e.preventDefault();
-                    }
-                  }}
-                  onChange={(e) => {
-                    const clean = e.target.value.replace(/[^0-9]/g, '');
-                    setFormData({ ...formData, price: clean });
-                    if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                  className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
-                    fieldErrors.price ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
-                  }`}
-                />
-                {formData.price && !fieldErrors.price && (
-                  <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
-                    Display: {getPriceDisplay()}
-                  </span>
-                )}
-                {fieldErrors.price && (
-                  <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
-                    ⚠️ {fieldErrors.price}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Total Area *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="Enter Total Area"
+                  placeholder="Enter Total Area / Units"
                   value={formData.area}
                   onKeyDown={(e) => {
                     if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
@@ -971,8 +962,22 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   }}
                   onChange={(e) => {
                     const clean = e.target.value.replace(/[^0-9.]/g, '');
-                    setFormData({ ...formData, area: clean });
+                    const newArea = clean;
+                    const areaNum = Number(newArea);
+                    const ppuNum = Number(formData.pricePerUnit);
+
+                    let nextPrice = formData.price;
+                    if (areaNum > 0 && ppuNum > 0) {
+                      nextPrice = String(Math.round(areaNum * ppuNum));
+                    }
+
+                    setFormData(prev => ({
+                      ...prev,
+                      area: newArea,
+                      price: nextPrice
+                    }));
                     if (fieldErrors.area) setFieldErrors(prev => ({ ...prev, area: null }));
+                    if (fieldErrors.price && nextPrice) setFieldErrors(prev => ({ ...prev, price: null }));
                     if (errorMsg) setErrorMsg(null);
                   }}
                   className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
@@ -991,6 +996,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 )}
               </div>
 
+              {/* 2. MEASUREMENT AREA UNIT */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Measurement Area Unit
@@ -1018,7 +1024,121 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   Unit: {formData.areaUnit || AreaUnit.SQ_FT}
                 </span>
               </div>
+
+              {/* 3. PRICE PER UNIT */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Price Per {formData.areaUnit || AreaUnit.SQ_FT} (INR)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder={`Enter price per ${formData.areaUnit || 'unit'}`}
+                  value={formData.pricePerUnit || ''}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9.]/g, '');
+                    const newPPU = clean;
+                    const ppuNum = Number(newPPU);
+                    const areaNum = Number(formData.area);
+
+                    let nextPrice = formData.price;
+                    if (ppuNum > 0 && areaNum > 0) {
+                      nextPrice = String(Math.round(areaNum * ppuNum));
+                    }
+
+                    setFormData(prev => ({
+                      ...prev,
+                      pricePerUnit: newPPU,
+                      price: nextPrice
+                    }));
+                    if (fieldErrors.price && nextPrice) setFieldErrors(prev => ({ ...prev, price: null }));
+                    if (errorMsg) setErrorMsg(null);
+                  }}
+                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:ring-amber-400 focus:outline-none transition-all"
+                />
+                {formData.pricePerUnit && Number(formData.pricePerUnit) > 0 && (
+                  <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
+                    Display: Rs. {Number(formData.pricePerUnit).toLocaleString('en-IN')} / {formData.areaUnit || AreaUnit.SQ_FT}
+                  </span>
+                )}
+              </div>
+
+              {/* 4. TOTAL EXPECTED PRICE */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Total Expected Price (INR) *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="Total calculated price"
+                  value={formData.price}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9]/g, '');
+                    const newPrice = clean;
+                    const priceNum = Number(newPrice);
+                    const areaNum = Number(formData.area);
+
+                    let nextPPU = formData.pricePerUnit;
+                    if (priceNum > 0 && areaNum > 0) {
+                      nextPPU = String(Math.round(priceNum / areaNum));
+                    }
+
+                    setFormData(prev => ({
+                      ...prev,
+                      price: newPrice,
+                      pricePerUnit: nextPPU
+                    }));
+                    if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
+                    if (errorMsg) setErrorMsg(null);
+                  }}
+                  className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                    fieldErrors.price ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                  }`}
+                />
+                {formData.price && !fieldErrors.price && (
+                  <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
+                    Display: {getPriceDisplay()}
+                  </span>
+                )}
+                {fieldErrors.price && (
+                  <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                    ⚠️ {fieldErrors.price}
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* INTERACTIVE CALCULATION SUMMARY BANNER */}
+            {Number(formData.area) > 0 && (Number(formData.pricePerUnit) > 0 || Number(formData.price) > 0) && (
+              <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-800">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Calculator className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-slate-600">Total Price Calculation:</span>
+                  <span className="font-mono bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-slate-900 font-extrabold text-[11px]">
+                    {Number(formData.area).toLocaleString('en-IN')} {formData.areaUnit || AreaUnit.SQ_FT} × Rs. {Number(formData.pricePerUnit || (Number(formData.area) > 0 ? Math.round(Number(formData.price) / Number(formData.area)) : 0)).toLocaleString('en-IN')} / {formData.areaUnit || AreaUnit.SQ_FT}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <span className="text-slate-500 text-[11px]">Total:</span>
+                  <span className="text-emerald-700 font-black text-sm">
+                    {getPriceDisplay()}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div>
               <div className="flex items-center justify-between mb-1">

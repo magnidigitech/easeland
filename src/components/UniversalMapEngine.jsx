@@ -803,13 +803,15 @@ export default function UniversalMapEngine({
     });
   }, [selectedPropertyPreview]);
 
-  // Rate per sq ft calculation
+  // Rate per unit calculation
   const ratePerSqFt = useMemo(() => {
     if (!selectedPropertyPreview) return null;
     const priceNum = Number(selectedPropertyPreview.price);
     const areaNum = Number(selectedPropertyPreview.area);
+    const unit = selectedPropertyPreview.areaUnit || selectedPropertyPreview.specs?.areaUnit || 'sq ft';
     if (!isNaN(priceNum) && !isNaN(areaNum) && priceNum > 0 && areaNum > 0) {
-      return `Rs. ${Math.round(priceNum / areaNum).toLocaleString('en-IN')} / sq ft`;
+      const rate = selectedPropertyPreview.pricePerUnit || Math.round(priceNum / areaNum);
+      return `Rs. ${Number(rate).toLocaleString('en-IN')} / ${unit}`;
     }
     return null;
   }, [selectedPropertyPreview]);

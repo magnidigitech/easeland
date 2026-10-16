@@ -319,7 +319,14 @@ export default function PropertyReviewStep({
 
           <div>
             <span className="block text-gray-500 font-bold mb-0.5">Expected Price</span>
-            <span className="font-extrabold text-emerald-700 text-sm">{formData.priceDisplay || `Rs. ${formData.price}`}</span>
+            <span className="font-extrabold text-emerald-700 text-sm">
+              {formData.priceDisplay || `Rs. ${Number(formData.price || 0).toLocaleString('en-IN')}`}
+            </span>
+            {(formData.pricePerUnit || (Number(formData.area) > 0 && Number(formData.price) > 0)) && (
+              <span className="block text-[11px] font-bold text-slate-500 mt-0.5">
+                Rs. {Math.round(Number(formData.pricePerUnit) || (Number(formData.price) / Number(formData.area))).toLocaleString('en-IN')} / {formData.areaUnit || formData.specs?.areaUnit || 'sq ft'}
+              </span>
+            )}
           </div>
 
           <div>
