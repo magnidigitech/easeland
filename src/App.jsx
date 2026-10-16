@@ -26,6 +26,7 @@ import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
+import { trackPageView } from './utils/metaPixel.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User } from 'lucide-react';
 
 const getInitialPageState = () => {
@@ -480,6 +481,7 @@ export default function App() {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      trackPageView();
     }
   }, [activePage, activePropertyId]);
 

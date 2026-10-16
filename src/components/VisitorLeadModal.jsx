@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, Phone, User, Mail, MapPin, Building, CheckCircle2, Sparkles, Clock } from 'lucide-react';
 import { submitVisitorLead } from '../firebase/visitorService';
+import { trackLeadSubmitted } from '../utils/metaPixel.js';
 
 export default function VisitorLeadModal({ currentUser }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -110,6 +111,11 @@ export default function VisitorLeadModal({ currentUser }) {
 
       if (res.success) {
         setSubmitted(true);
+        trackLeadSubmitted({
+          title: formData.propertyType ? `${formData.propertyType} Visitor Lead` : 'General Visitor Lead',
+          category: formData.propertyType || 'General Inbound',
+          id: 'visitor_lead'
+        });
         setTimeout(() => {
           setIsOpen(false);
         }, 2500);

@@ -27,6 +27,7 @@ import { getCategoryFallbackImage, getPropertyMediaList, getVideoThumbnailUrl } 
 import { createEnquiry } from '../firebase/enquiryService.js';
 import { isPropertyWishlisted, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { trackPropertyView, trackLeadSubmitted, trackContactInitiated } from '../utils/metaPixel.js';
 
 export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavigateHome, onNavigateMap }) {
   // Extract propertyId from props or window URL (/property/:propertyId)
@@ -205,7 +206,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
-  const handleContactAction = async () => {
+  const handleContactAction = async (method = 'WhatsApp') => {
+    trackContactInitiated(method, property);
     if (!user || !property) return;
     try {
       await createEnquiry({
@@ -244,6 +246,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         if (!isMounted) return;
         if (res.success && res.property) {
           setProperty(res.property);
+          trackPropertyView(res.property);
           // Set dynamic SEO page title
           document.title = `${res.property.title} | EaseLand Direct Marketplace`;
 
@@ -444,6 +447,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
       const res = await createEnquiry(payload);
       if (res.success) {
         setEnquirySubmitted(true);
+        trackLeadSubmitted(property);
       } else {
         setEnquiryError(res.error || 'Failed to submit enquiry. Please try again.');
       }
@@ -957,7 +961,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                     href={getEaselandWhatsAppUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={handleContactAction}
+                    onClick={() => handleContactAction('WhatsApp')}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <MessageCircle className="w-5 h-5 fill-current" />
@@ -966,7 +970,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
                   <a
                     href="tel:6300691560"
-                    onClick={handleContactAction}
+                    onClick={() => handleContactAction('Phone')}
                     className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <Phone className="w-5 h-5 text-brand-yellow" />

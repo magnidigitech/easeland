@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLeft, Send, Sparkles, Phone, MessageCircle } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList, getVideoThumbnailUrl } from '../utils/categoryUtils.js';
+import { trackPropertyView, trackContactInitiated } from '../utils/metaPixel.js';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
   const mediaList = getPropertyMediaList(property);
@@ -12,6 +13,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
   useEffect(() => {
     if (property) {
       setActiveMedia(getFirstUploadedImage(property));
+      trackPropertyView(property);
     }
   }, [property]);
 
@@ -563,6 +565,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                     href={getEaselandWhatsAppUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackContactInitiated('whatsapp', property)}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <MessageCircle className="w-5 h-5 fill-current" />
@@ -571,6 +574,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
 
                   <a
                     href="tel:6300691560"
+                    onClick={() => trackContactInitiated('phone', property)}
                     className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <Phone className="w-5 h-5 text-brand-yellow" />

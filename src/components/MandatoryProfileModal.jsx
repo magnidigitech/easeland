@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, User, Mail, MapPin, Phone, ArrowRight, CheckCircle2, AlertCircle, Loader2, Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { trackRegistrationComplete } from '../utils/metaPixel.js';
 
 export default function MandatoryProfileModal({ isOpen, onComplete }) {
   const { user, profile, completeUserProfile, logoutUser } = useAuth();
@@ -57,6 +58,7 @@ export default function MandatoryProfileModal({ isOpen, onComplete }) {
       });
 
       if (res.success) {
+        trackRegistrationComplete('profile_completed');
         if (typeof onComplete === 'function') {
           onComplete(res.user);
         }

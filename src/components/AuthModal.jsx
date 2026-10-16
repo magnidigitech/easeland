@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TwoFactorModal from './TwoFactorModal';
+import { trackRegistrationComplete } from '../utils/metaPixel.js';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialIntent = null }) {
   const {
@@ -132,6 +133,9 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       const res = await loginWithMobile(cleanPhone, cleanCode);
       setLoading(false);
       if (res && res.success) {
+        if (res.isNewUser) {
+          trackRegistrationComplete('mobile_otp');
+        }
         if (onAuthSuccess) onAuthSuccess(res.user, initialIntent);
         onClose();
       } else {
@@ -240,6 +244,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         return;
       }
 
+      trackRegistrationComplete('email');
       if (onAuthSuccess) onAuthSuccess(result.user, initialIntent);
       onClose();
     } else {
