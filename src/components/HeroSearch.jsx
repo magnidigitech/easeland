@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2, Sparkles, Plus, X } from 'lucide-react';
+import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2, Sparkles, Plus, X, Trash2 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 import { fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider.js';
@@ -177,6 +177,32 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     });
   };
 
+  const handleClearSearch = () => {
+    setQuery('');
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+    setLocationStatus('');
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (inputRef.current) inputRef.current.focus();
+
+    triggerSearch('', purpose, category, {
+      searchLat: null,
+      searchLng: null,
+      referenceLat: null,
+      referenceLng: null,
+      referencePlace: '',
+      placeName: '',
+      formattedAddress: '',
+      city: '',
+      district: '',
+      state: '',
+      locality: '',
+      userLat: null,
+      userLng: null,
+      radiusKm: null
+    });
+  };
+
   const handleSearchSubmit = async (e) => {
     e?.preventDefault();
     setSuggestionsOpen(false);
@@ -304,18 +330,33 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             onFocus={() => {
               if (suggestions.length > 0) setSuggestionsOpen(true);
             }}
-            placeholder="Search property type, locality, or landmark..."
-            className="w-full pl-10 pr-9 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow"
+            placeholder="Search by locality, city, project name, or property type..."
+            className="w-full pl-10 pr-16 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow"
           />
-          <button
-            type="button"
-            onClick={handleDetectCurrentLocation}
-            disabled={isLocating}
-            title="Detect My Current Location"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center hover:bg-blue-500/30"
-          >
-            {isLocating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
-          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+            {/* BIN ICON TO CLICK AND CLEAR THE SEARCH */}
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              title="Clear search"
+              className={`w-6 h-6 rounded-full flex items-center justify-center transition-all border group cursor-pointer ${
+                query
+                  ? 'bg-slate-700/80 hover:bg-rose-900/60 text-slate-300 hover:text-rose-400 border-slate-600 hover:border-rose-500/50'
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-500 hover:text-slate-300 border-slate-700/80 hover:border-slate-600'
+              }`}
+            >
+              <Trash2 className="w-3 h-3 transition-transform group-hover:scale-110" />
+            </button>
+            <button
+              type="button"
+              onClick={handleDetectCurrentLocation}
+              disabled={isLocating}
+              title="Detect My Current Location"
+              className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center hover:bg-blue-500/30 border border-blue-400/30"
+            >
+              {isLocating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
+            </button>
+          </div>
 
           {/* COMPACT GOOGLE PLACES (NEW) SUGGESTIONS DROPDOWN */}
           {isCompact && suggestionsOpen && suggestions.length > 0 && (
@@ -479,23 +520,40 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                   if (suggestions.length > 0) setSuggestionsOpen(true);
                 }}
                 placeholder="Search by locality, city, project name, or property type..."
-                className="w-full pl-12 pr-12 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
+                className="w-full pl-12 pr-24 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
               />
 
-              {/* DETECT MY CURRENT LOCATION CROSSHAIR BUTTON */}
-              <button
-                type="button"
-                onClick={handleDetectCurrentLocation}
-                disabled={isLocating}
-                title="Detect My Current Location"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center justify-center transition-all shadow-sm group border border-slate-700"
-              >
-                {isLocating ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-                ) : (
-                  <LocateFixed className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-                )}
-              </button>
+              {/* ACTION BUTTONS: CLEAR SEARCH BIN & DETECT CURRENT LOCATION */}
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                {/* BIN ICON TO CLICK AND CLEAR THE SEARCH */}
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  title="Clear search"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm border group cursor-pointer ${
+                    query
+                      ? 'bg-slate-800 hover:bg-rose-950/70 text-slate-400 hover:text-rose-400 border-slate-700 hover:border-rose-500/50'
+                      : 'bg-slate-800/80 hover:bg-slate-800 text-slate-500 hover:text-slate-300 border-slate-700/80 hover:border-slate-600'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                </button>
+
+                {/* DETECT MY CURRENT LOCATION CROSSHAIR BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleDetectCurrentLocation}
+                  disabled={isLocating}
+                  title="Detect My Current Location"
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center justify-center transition-all shadow-sm group border border-slate-700"
+                >
+                  {isLocating ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                  ) : (
+                    <LocateFixed className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                  )}
+                </button>
+              </div>
 
               {/* FULL GOOGLE PLACES (NEW) SUGGESTIONS FLOATING DROPDOWN */}
               {!isCompact && suggestionsOpen && suggestions.length > 0 && (
