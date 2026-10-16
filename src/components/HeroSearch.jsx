@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2 } from 'lucide-react';
+import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2, Sparkles, Plus, X } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
-import { loadGoogleMapsScript } from '../services/locationProvider.js';
+import { fetchGooglePlacesPredictions } from '../services/locationProvider.js';
 
 function normalizeCategoryValue(val, purpVal) {
   if (!val || val === 'All' || val === 'ALL') {
@@ -43,6 +43,12 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
   const inputRef = useRef(null);
 
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const searchContainerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
+
   useEffect(() => {
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
     window.addEventListener('easeland-site-config-updated', handleConfigUpdated);
@@ -58,38 +64,52 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     }
   }, [initialState]);
 
-  // Initialize Google Places Autocomplete restricted to India
+  // Handle clicking outside suggestions dropdown
   useEffect(() => {
-    let isMounted = true;
-    loadGoogleMapsScript()
-      .then((maps) => {
-        if (!isMounted || !maps || !maps.places || !inputRef.current) return;
-        try {
-          const autocomplete = new maps.places.Autocomplete(inputRef.current, {
-            componentRestrictions: { country: 'in' },
-            fields: ['formatted_address', 'geometry', 'name', 'address_components']
-          });
-
-          autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace();
-            if (place && (place.formatted_address || place.name)) {
-              const selectedText = place.formatted_address || place.name;
-              setQuery(selectedText);
-              triggerSearch(selectedText, purpose, category);
-            }
-          });
-        } catch (err) {
-          console.warn('Google Places Autocomplete initialization fallback active:', err);
-        }
-      })
-      .catch((err) => {
-        console.warn('Google Places load error in HeroSearch:', err);
-      });
-
-    return () => {
-      isMounted = false;
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setSuggestionsOpen(false);
+      }
     };
-  }, [purpose, category]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  // Live debounced Google Places Autocomplete input change
+  const handleInputChange = (val) => {
+    setQuery(val);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    if (!val || val.trim().length < 2) {
+      setSuggestions([]);
+      setSuggestionsOpen(false);
+      setIsSuggesting(false);
+      return;
+    }
+
+    setIsSuggesting(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await fetchGooglePlacesPredictions(val);
+        setSuggestions(results);
+        setSuggestionsOpen(results.length > 0);
+      } catch (err) {
+        console.warn('Hero places suggestions error:', err);
+      } finally {
+        setIsSuggesting(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectSuggestion = (item) => {
+    const text = item.mainText || item.description;
+    setQuery(text);
+    setSuggestionsOpen(false);
+    triggerSearch(text, purpose, category);
+  };
 
   const triggerSearch = (textQuery, currentPurpose, currentCategory, extraData = {}) => {
     const parsedNL = parseNaturalLanguageQuery(textQuery);
@@ -188,13 +208,16 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   if (isCompact) {
     return (
       <form onSubmit={handleSearchSubmit} className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full">
-        <div className="relative flex-1 min-w-[200px]">
+        <div ref={isCompact ? searchContainerRef : undefined} className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
           <input
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => {
+              if (suggestions.length > 0) setSuggestionsOpen(true);
+            }}
             placeholder="Search property type, locality, or landmark..."
             className="w-full pl-10 pr-9 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow"
           />
@@ -207,6 +230,46 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           >
             {isLocating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
           </button>
+
+          {/* COMPACT GOOGLE PLACES (NEW) SUGGESTIONS DROPDOWN */}
+          {isCompact && suggestionsOpen && suggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200/95 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-slate-800 text-left">
+              <div className="px-3.5 py-2 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                <span className="text-[10px] font-extrabold text-slate-500 tracking-wider uppercase">
+                  GOOGLE PLACES (NEW) SUGGESTIONS
+                </span>
+                <span className="text-[10px] font-black text-blue-600 tracking-wider uppercase flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-blue-600" />
+                  LIVE SEARCH
+                </span>
+              </div>
+              <div className="max-h-60 overflow-y-auto divide-y divide-gray-100">
+                {suggestions.map((item, idx) => (
+                  <button
+                    key={item.placeId || idx}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(item)}
+                    className="w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-blue-50/70 transition-colors group cursor-pointer"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                      <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <div className="text-xs font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
+                        {item.mainText}
+                      </div>
+                      <div className="text-[10px] text-gray-500 truncate mt-0.5">
+                        {item.secondaryText || item.description}
+                      </div>
+                    </div>
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-blue-500 bg-blue-50/80 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                      <Plus className="w-3 h-3 stroke-[2.5]" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <select
@@ -318,14 +381,17 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           {/* Search Form */}
           <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
             
-            {/* Input with Map Pin Icon, Google Places Autocomplete, & Detect Current Location Button */}
-            <div className="relative flex-1 w-full">
+            {/* Input with Map Pin Icon, Google Places (New) Suggestions, & Detect Current Location Button */}
+            <div ref={!isCompact ? searchContainerRef : undefined} className="relative flex-1 w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-400/80 z-10" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onFocus={() => {
+                  if (suggestions.length > 0) setSuggestionsOpen(true);
+                }}
                 placeholder="Search by locality, city, project name, or property type..."
                 className="w-full pl-12 pr-12 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
               />
@@ -344,6 +410,46 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                   <LocateFixed className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
                 )}
               </button>
+
+              {/* FULL GOOGLE PLACES (NEW) SUGGESTIONS FLOATING DROPDOWN */}
+              {!isCompact && suggestionsOpen && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white text-slate-800 border border-gray-200/95 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-left animate-in fade-in slide-in-from-top-1">
+                  <div className="px-4 py-2.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                    <span className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">
+                      GOOGLE PLACES (NEW) SUGGESTIONS
+                    </span>
+                    <span className="text-[11px] font-black text-blue-600 tracking-wider uppercase flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      LIVE SEARCH
+                    </span>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                    {suggestions.map((item, idx) => (
+                      <button
+                        key={item.placeId || idx}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(item)}
+                        className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                          <MapPin className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
+                            {item.mainText}
+                          </div>
+                          <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                            {item.secondaryText || item.description}
+                          </div>
+                        </div>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-blue-500 bg-blue-50/80 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Category Select Dropdown */}

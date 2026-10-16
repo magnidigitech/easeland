@@ -75,14 +75,18 @@ export function buildEmptyLocationHierarchy(lat = 0, lng = 0) {
  * - Town / Village (Perecherla) -> Taluk / Mandal (Guntur) -> District (Guntur) -> State (AP)
  */
 export function extractGoogleLocationHierarchy(geocodedResult) {
-  if (!geocodedResult || !Array.isArray(geocodedResult.address_components)) {
+  if (!geocodedResult) {
     return buildEmptyLocationHierarchy();
   }
 
-  const components = geocodedResult.address_components;
+  const components = geocodedResult.addressComponents || geocodedResult.address_components;
+  if (!Array.isArray(components)) {
+    return buildEmptyLocationHierarchy();
+  }
+
   const getComp = (type) => {
     const item = components.find(c => Array.isArray(c.types) && c.types.includes(type));
-    return item ? item.long_name : '';
+    return item ? (item.longText || item.long_name || item.name || item.shortText || '') : '';
   };
 
   const rawSubLocality = getComp('sublocality_level_1') || getComp('sublocality') || getComp('neighborhood');
@@ -114,7 +118,7 @@ export function extractGoogleLocationHierarchy(geocodedResult) {
     colony: getComp('premise') || getComp('subpremise'),
     landmark: getComp('landmark') || getComp('point_of_interest'),
     postalCode: getComp('postal_code'),
-    address: geocodedResult.formatted_address || ''
+    address: geocodedResult.formattedAddress || geocodedResult.formatted_address || ''
   };
 }
 
@@ -278,11 +282,8 @@ async function fallbackGeocodeSearch(trimmed) {
   }
 }
 
-let placesAutocompleteServiceInstance = null;
-let placesDetailsServiceInstance = null;
-
 /**
- * Fetch live Google Places Autocomplete predictions (Restricted to India)
+ * Fetch live Google Places (New) Autocomplete predictions (Restricted to India)
  */
 export async function fetchGooglePlacesPredictions(queryStr) {
   if (!queryStr || typeof queryStr !== 'string' || queryStr.trim().length < 2) {
@@ -291,44 +292,42 @@ export async function fetchGooglePlacesPredictions(queryStr) {
 
   const trimmed = queryStr.trim();
 
-  try {
-    const maps = await loadGoogleMapsScript();
-    if (maps && maps.places && maps.places.AutocompleteService) {
-      if (!placesAutocompleteServiceInstance) {
-        placesAutocompleteServiceInstance = new maps.places.AutocompleteService();
-      }
-
-      return new Promise((resolve) => {
-        placesAutocompleteServiceInstance.getPlacePredictions(
-          {
-            input: trimmed,
-            componentRestrictions: { country: 'in' },
-          },
-          (predictions, status) => {
-            if (
-              status === maps.places.PlacesServiceStatus.OK &&
-              Array.isArray(predictions) &&
-              predictions.length > 0
-            ) {
-              const formatted = predictions.map((p) => ({
-                placeId: p.place_id,
-                mainText: p.structured_formatting?.main_text || p.description,
-                secondaryText: p.structured_formatting?.secondary_text || '',
-                description: p.description,
-                types: p.types || []
-              }));
-              resolve(formatted);
-            } else {
-              fallbackGeocodeSearch(trimmed).then(resolve);
-            }
-          }
-        );
+  // 1. Direct call to Google Places API (New) Autocomplete REST endpoint
+  if (GOOGLE_MAPS_KEY) {
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_MAPS_KEY
+        },
+        body: JSON.stringify({
+          input: trimmed,
+          includedRegionCodes: ['in']
+        })
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+          return data.suggestions.map((s) => {
+            const p = s.placePrediction;
+            return {
+              placeId: p.placeId,
+              mainText: p.structuredFormat?.mainText?.text || p.text?.text || trimmed,
+              secondaryText: p.structuredFormat?.secondaryText?.text || '',
+              description: p.text?.text || trimmed,
+              types: p.types || []
+            };
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Google Places (New) Autocomplete REST fetch note:', err.message);
     }
-  } catch (err) {
-    console.warn('Google Places predictions load error:', err.message);
   }
 
+  // 2. Fallback to Google Geocoding API if Places (New) returned zero results or network hiccup
   return fallbackGeocodeSearch(trimmed);
 }
 
@@ -338,74 +337,64 @@ export async function fetchGooglePlacesPredictions(queryStr) {
 export async function fetchGooglePlaceDetails(placeId, fallbackName = '') {
   if (!placeId) return null;
 
-  try {
-    const maps = await loadGoogleMapsScript();
-    if (maps && maps.places) {
-      if (!placesDetailsServiceInstance) {
-        const dummy = document.createElement('div');
-        placesDetailsServiceInstance = new maps.places.PlacesService(dummy);
-      }
+  const cleanId = String(placeId).startsWith('places/') ? placeId.replace('places/', '') : placeId;
 
-      return new Promise((resolve) => {
-        placesDetailsServiceInstance.getDetails(
-          {
-            placeId: placeId,
-            fields: ['geometry', 'address_components', 'formatted_address', 'name']
-          },
-          (place, status) => {
-            if (status === maps.places.PlacesServiceStatus.OK && place && place.geometry) {
-              const loc = place.geometry.location;
-              const lat = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
-              const lng = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
-              const hierarchy = extractGoogleLocationHierarchy(place);
+  // 1. Direct call to Google Places API (New) Place Details REST endpoint
+  if (GOOGLE_MAPS_KEY && !cleanId.startsWith('geo_') && !cleanId.startsWith('direct_')) {
+    try {
+      const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(cleanId)}?fields=id,displayName,formattedAddress,location,addressComponents&key=${GOOGLE_MAPS_KEY}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.location && !data.error) {
+          const lat = Number(data.location.latitude);
+          const lng = Number(data.location.longitude);
+          const hierarchy = extractGoogleLocationHierarchy(data);
+          const name = data.displayName?.text || fallbackName || hierarchy.locality || hierarchy.city;
 
-              resolve({
-                placeId,
-                lat,
-                lng,
-                name: place.name || fallbackName,
-                displayName: place.formatted_address || place.name || fallbackName,
-                hierarchy: {
-                  ...hierarchy,
-                  address: place.formatted_address || hierarchy.address
-                }
-              });
-            } else {
-              // Fallback to Geocoder placeId lookup
-              if (maps.Geocoder) {
-                const geocoder = new maps.Geocoder();
-                geocoder.geocode({ placeId }, (results, gStatus) => {
-                  if (gStatus === 'OK' && results && results[0]) {
-                    const r = results[0];
-                    const loc = r.geometry.location;
-                    const lat = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
-                    const lng = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
-                    const hierarchy = extractGoogleLocationHierarchy(r);
-                    resolve({
-                      placeId,
-                      lat,
-                      lng,
-                      name: fallbackName || r.formatted_address,
-                      displayName: r.formatted_address,
-                      hierarchy: {
-                        ...hierarchy,
-                        address: r.formatted_address
-                      }
-                    });
-                    return;
-                  }
-                  resolve(null);
-                });
-              } else {
-                resolve(null);
-              }
+          return {
+            placeId: cleanId,
+            lat,
+            lng,
+            name,
+            displayName: data.formattedAddress || name,
+            hierarchy: {
+              ...hierarchy,
+              address: data.formattedAddress || hierarchy.address
             }
-          }
-        );
-      });
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Google Places (New) Details REST fetch note:', err.message);
     }
-  } catch (err) {
-    console.warn('Google Place Details error:', err.message);
+
+    // 2. Fallback: Query Google Geocoding API by place_id
+    try {
+      const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${encodeURIComponent(cleanId)}&key=${GOOGLE_MAPS_KEY}`;
+      const gRes = await fetch(geoUrl);
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        if (gData.status === 'OK' && Array.isArray(gData.results) && gData.results.length > 0) {
+          const r = gData.results[0];
+          const loc = r.geometry.location;
+          const hierarchy = extractGoogleLocationHierarchy(r);
+          return {
+            placeId: cleanId,
+            lat: Number(loc.lat),
+            lng: Number(loc.lng),
+            name: fallbackName || r.formatted_address,
+            displayName: r.formatted_address,
+            hierarchy: {
+              ...hierarchy,
+              address: r.formatted_address
+            }
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Google Geocoding place_id fallback note:', err.message);
+    }
   }
 
   return null;
