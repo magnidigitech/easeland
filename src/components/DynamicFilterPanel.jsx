@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Filter, RotateCcw, Check, Navigation, AlertCircle, MapPin, Search, Loader2 } from 'lucide-react';
+import { X, Filter, RotateCcw, Check, Navigation, AlertCircle, MapPin, Search, Loader2, Sparkles } from 'lucide-react';
 import { PropertyType, Purpose } from '../firebase/schema.js';
-import { resolvePlaceCoordinates, geocodePlaceWithHierarchy } from '../services/locationProvider.js';
+import {
+  resolvePlaceCoordinates,
+  geocodePlaceWithHierarchy,
+  fetchGooglePlacesPredictions,
+  fetchGooglePlaceDetails
+} from '../services/locationProvider.js';
 
 export const AREA_UNIT_OPTIONS = [
   { label: 'Sq Ft', value: 'sq ft' },
@@ -82,7 +87,26 @@ export default function DynamicFilterPanel({
   const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType);
 
   const [cityQuery, setCityQuery] = useState(filters?.city || '');
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [isCitySuggesting, setIsCitySuggesting] = useState(false);
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const cityDebounceTimerRef = useRef(null);
+  const cityContainerRef = useRef(null);
+
   const [localityQuery, setLocalityQuery] = useState(filters?.locality || '');
+  const [localitySuggestions, setLocalitySuggestions] = useState([]);
+  const [isLocalitySuggesting, setIsLocalitySuggesting] = useState(false);
+  const [localityDropdownOpen, setLocalityDropdownOpen] = useState(false);
+  const localityDebounceTimerRef = useRef(null);
+  const localityContainerRef = useRef(null);
+
+  const [nearbyQuery, setNearbyQuery] = useState(filters?.referencePlace || '');
+  const [nearbySuggestions, setNearbySuggestions] = useState([]);
+  const [isNearbySuggesting, setIsNearbySuggesting] = useState(false);
+  const [nearbyDropdownOpen, setNearbyDropdownOpen] = useState(false);
+  const nearbyDebounceTimerRef = useRef(null);
+  const nearbyContainerRef = useRef(null);
+
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [locationResolutionStatus, setLocationResolutionStatus] = useState(null);
 
@@ -94,46 +118,355 @@ export default function DynamicFilterPanel({
     setLocalityQuery(filters?.locality || '');
   }, [filters?.locality]);
 
-  const handleCityInputChange = (val) => {
-    setCityQuery(val);
-    setLocationResolutionStatus(null);
+  useEffect(() => {
+    setNearbyQuery(filters?.referencePlace || '');
+  }, [filters?.referencePlace]);
+
+  // Handle outside clicks to close suggestion dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (nearbyContainerRef.current && !nearbyContainerRef.current.contains(e.target)) {
+        setNearbyDropdownOpen(false);
+      }
+      if (cityContainerRef.current && !cityContainerRef.current.contains(e.target)) {
+        setCityDropdownOpen(false);
+      }
+      if (localityContainerRef.current && !localityContainerRef.current.contains(e.target)) {
+        setLocalityDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (nearbyDebounceTimerRef.current) clearTimeout(nearbyDebounceTimerRef.current);
+      if (cityDebounceTimerRef.current) clearTimeout(cityDebounceTimerRef.current);
+      if (localityDebounceTimerRef.current) clearTimeout(localityDebounceTimerRef.current);
+    };
+  }, []);
+
+  /* NEARBY PLACE GOOGLE MAPS AUTOCOMPLETE */
+  const handleNearbyInputChange = (val) => {
+    setNearbyQuery(val);
+    handleChange('referencePlace', val);
+    if (nearbyDebounceTimerRef.current) clearTimeout(nearbyDebounceTimerRef.current);
+
+    if (!val || val.trim().length < 2) {
+      setNearbySuggestions([]);
+      setNearbyDropdownOpen(false);
+      setIsNearbySuggesting(false);
+      return;
+    }
+
+    setIsNearbySuggesting(true);
+    nearbyDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await fetchGooglePlacesPredictions(val);
+        setNearbySuggestions(results);
+        setNearbyDropdownOpen(results.length > 0);
+      } catch (err) {
+        console.warn('Nearby place suggestions error:', err);
+      } finally {
+        setIsNearbySuggesting(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectNearbySuggestion = async (item) => {
+    const text = item.mainText || item.description;
+    setNearbyQuery(text);
+    setNearbyDropdownOpen(false);
+
+    let lat = null;
+    let lng = null;
+    let placeName = text;
+    let formattedAddress = item.description || text;
+
+    if (item.placeId) {
+      try {
+        setIsNearbySuggesting(true);
+        const details = await fetchGooglePlaceDetails(item.placeId, text);
+        if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
+          lat = details.lat;
+          lng = details.lng;
+          placeName = details.name || text;
+          formattedAddress = details.displayName || text;
+        }
+      } catch (err) {
+        console.warn('Nearby place details error:', err);
+      } finally {
+        setIsNearbySuggesting(false);
+      }
+    }
+
+    if (lat === null || lng === null) {
+      const fallbackCoords = resolvePlaceCoordinates(text);
+      if (fallbackCoords) {
+        lat = fallbackCoords.lat;
+        lng = fallbackCoords.lng;
+      }
+    }
+
     setFilters(prev => ({
       ...prev,
       cleared: false,
-      city: val
+      referencePlace: placeName,
+      placeName: placeName,
+      formattedAddress: formattedAddress,
+      referenceLat: lat,
+      referenceLng: lng,
+      searchLat: lat,
+      searchLng: lng,
+      userLat: null,
+      userLng: null,
+      radiusKm: prev.radiusKm || 5
     }));
   };
 
-  const handleLocalityInputChange = (val) => {
-    setLocalityQuery(val);
+  const handleClearNearby = () => {
+    setNearbyQuery('');
+    setNearbySuggestions([]);
+    setNearbyDropdownOpen(false);
+    setFilters(prev => ({
+      ...prev,
+      referencePlace: '',
+      radiusKm: null,
+      ...((prev.city || prev.locality) ? {} : {
+        searchLat: null,
+        searchLng: null,
+        referenceLat: null,
+        referenceLng: null
+      })
+    }));
+  };
+
+  /* CITY GOOGLE MAPS AUTOCOMPLETE */
+  const handleCityInputChange = (val) => {
+    setCityQuery(val);
     setLocationResolutionStatus(null);
+    handleChange('city', val);
+    if (cityDebounceTimerRef.current) clearTimeout(cityDebounceTimerRef.current);
+
+    if (!val || val.trim().length < 2) {
+      setCitySuggestions([]);
+      setCityDropdownOpen(false);
+      setIsCitySuggesting(false);
+      return;
+    }
+
+    setIsCitySuggesting(true);
+    cityDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await fetchGooglePlacesPredictions(val);
+        setCitySuggestions(results);
+        setCityDropdownOpen(results.length > 0);
+      } catch (err) {
+        console.warn('City predictions error:', err);
+      } finally {
+        setIsCitySuggesting(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectCitySuggestion = async (item) => {
+    const text = item.mainText || item.description;
+    setCityDropdownOpen(false);
+
+    let lat = null;
+    let lng = null;
+    let resolvedCity = text;
+    let resolvedDistrict = '';
+    let resolvedState = '';
+    let formattedAddress = item.description || text;
+
+    if (item.placeId) {
+      try {
+        setIsCitySuggesting(true);
+        const details = await fetchGooglePlaceDetails(item.placeId, text);
+        if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
+          lat = details.lat;
+          lng = details.lng;
+          resolvedCity = details.hierarchy?.city || details.name || text;
+          resolvedDistrict = details.hierarchy?.district || '';
+          resolvedState = details.hierarchy?.state || '';
+          formattedAddress = details.displayName || text;
+        }
+      } catch (err) {
+        console.warn('City details error:', err);
+      } finally {
+        setIsCitySuggesting(false);
+      }
+    }
+
+    if (lat === null || lng === null) {
+      const fallback = await geocodePlaceWithHierarchy(text);
+      if (fallback) {
+        lat = fallback.lat;
+        lng = fallback.lng;
+        resolvedCity = fallback.city || text;
+        resolvedDistrict = fallback.district || '';
+        resolvedState = fallback.state || '';
+        formattedAddress = fallback.displayName || text;
+      }
+    }
+
+    setCityQuery(resolvedCity);
     setFilters(prev => ({
       ...prev,
       cleared: false,
-      locality: val
+      city: resolvedCity,
+      district: resolvedDistrict || prev.district,
+      state: resolvedState || prev.state,
+      searchLat: lat,
+      searchLng: lng,
+      referenceLat: lat,
+      referenceLng: lng,
+      referencePlace: resolvedCity,
+      placeName: resolvedCity,
+      formattedAddress: formattedAddress,
+      userLat: null,
+      userLng: null
     }));
+
+    setLocationResolutionStatus({
+      type: 'success',
+      message: `${resolvedCity}${resolvedState ? ', ' + resolvedState : ''} located on Google Maps`
+    });
   };
 
   const handleClearCity = () => {
     setCityQuery('');
+    setCitySuggestions([]);
+    setCityDropdownOpen(false);
     setLocationResolutionStatus(null);
     setFilters(prev => ({
       ...prev,
       city: '',
       district: '',
-      state: ''
+      state: '',
+      ...(prev.locality ? {} : {
+        searchLat: prev.referencePlace ? prev.searchLat : null,
+        searchLng: prev.referencePlace ? prev.searchLng : null,
+        referenceLat: prev.referencePlace ? prev.referenceLat : null,
+        referenceLng: prev.referencePlace ? prev.referenceLng : null
+      })
     }));
+  };
+
+  /* LOCALITY GOOGLE MAPS AUTOCOMPLETE */
+  const handleLocalityInputChange = (val) => {
+    setLocalityQuery(val);
+    setLocationResolutionStatus(null);
+    handleChange('locality', val);
+    if (localityDebounceTimerRef.current) clearTimeout(localityDebounceTimerRef.current);
+
+    if (!val || val.trim().length < 2) {
+      setLocalitySuggestions([]);
+      setLocalityDropdownOpen(false);
+      setIsLocalitySuggesting(false);
+      return;
+    }
+
+    setIsLocalitySuggesting(true);
+    localityDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        const searchVal = cityQuery.trim() ? `${val}, ${cityQuery.trim()}` : val;
+        const results = await fetchGooglePlacesPredictions(searchVal);
+        setLocalitySuggestions(results);
+        setLocalityDropdownOpen(results.length > 0);
+      } catch (err) {
+        console.warn('Locality predictions error:', err);
+      } finally {
+        setIsLocalitySuggesting(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectLocalitySuggestion = async (item) => {
+    const text = item.mainText || item.description;
+    setLocalityDropdownOpen(false);
+
+    let lat = null;
+    let lng = null;
+    let resolvedLocality = text;
+    let resolvedCity = cityQuery;
+    let resolvedDistrict = '';
+    let resolvedState = '';
+    let formattedAddress = item.description || text;
+
+    if (item.placeId) {
+      try {
+        setIsLocalitySuggesting(true);
+        const details = await fetchGooglePlaceDetails(item.placeId, text);
+        if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
+          lat = details.lat;
+          lng = details.lng;
+          resolvedLocality = details.hierarchy?.locality || details.hierarchy?.subLocality || details.name || text;
+          if (details.hierarchy?.city) resolvedCity = details.hierarchy.city;
+          resolvedDistrict = details.hierarchy?.district || '';
+          resolvedState = details.hierarchy?.state || '';
+          formattedAddress = details.displayName || text;
+        }
+      } catch (err) {
+        console.warn('Locality details error:', err);
+      } finally {
+        setIsLocalitySuggesting(false);
+      }
+    }
+
+    if (lat === null || lng === null) {
+      const fallback = await geocodePlaceWithHierarchy(`${text}, ${cityQuery}`.trim());
+      if (fallback) {
+        lat = fallback.lat;
+        lng = fallback.lng;
+        resolvedLocality = fallback.locality || text;
+        if (fallback.city) resolvedCity = fallback.city;
+        resolvedDistrict = fallback.district || '';
+        resolvedState = fallback.state || '';
+        formattedAddress = fallback.displayName || text;
+      }
+    }
+
+    setLocalityQuery(resolvedLocality);
+    if (resolvedCity) setCityQuery(resolvedCity);
+
+    setFilters(prev => ({
+      ...prev,
+      cleared: false,
+      locality: resolvedLocality,
+      city: resolvedCity || prev.city,
+      district: resolvedDistrict || prev.district,
+      state: resolvedState || prev.state,
+      searchLat: lat,
+      searchLng: lng,
+      referenceLat: lat,
+      referenceLng: lng,
+      referencePlace: resolvedLocality,
+      placeName: resolvedLocality,
+      formattedAddress: formattedAddress,
+      userLat: null,
+      userLng: null
+    }));
+
+    setLocationResolutionStatus({
+      type: 'success',
+      message: `${resolvedLocality}${resolvedCity ? ' in ' + resolvedCity : ''}${resolvedState ? ', ' + resolvedState : ''} located on Google Maps`
+    });
   };
 
   const handleClearLocality = () => {
     setLocalityQuery('');
+    setLocalitySuggestions([]);
+    setLocalityDropdownOpen(false);
     setLocationResolutionStatus(null);
     setFilters(prev => ({
       ...prev,
       locality: '',
-      referenceLat: null,
-      referenceLng: null,
-      referencePlace: null
+      ...(prev.city ? {} : {
+        searchLat: prev.referencePlace ? prev.searchLat : null,
+        searchLng: prev.referencePlace ? prev.searchLng : null,
+        referenceLat: prev.referencePlace ? prev.referenceLat : null,
+        referenceLng: prev.referencePlace ? prev.referenceLng : null
+      })
     }));
   };
 
@@ -222,6 +555,13 @@ export default function DynamicFilterPanel({
     setLocationResolutionStatus(null);
     setCityQuery('');
     setLocalityQuery('');
+    setNearbyQuery('');
+    setNearbySuggestions([]);
+    setCitySuggestions([]);
+    setLocalitySuggestions([]);
+    setNearbyDropdownOpen(false);
+    setCityDropdownOpen(false);
+    setLocalityDropdownOpen(false);
     setFilters({
       cleared: false,
       query: '',
@@ -248,6 +588,10 @@ export default function DynamicFilterPanel({
       referencePlace: '',
       referenceLat: null,
       referenceLng: null,
+      searchLat: null,
+      searchLng: null,
+      userLat: null,
+      userLng: null,
       sortBy: 'newest'
     });
   };
@@ -266,8 +610,8 @@ export default function DynamicFilterPanel({
   if (filters.category && filters.category !== 'All') activeChips.push({ label: `Category: ${filters.category}`, key: 'category', val: 'All' });
   if (filters.state) activeChips.push({ label: `State: ${filters.state}`, key: 'state', val: '' });
   if (filters.district) activeChips.push({ label: `District: ${filters.district}`, key: 'district', val: '' });
-  if (filters.city) activeChips.push({ label: `City: ${filters.city}`, key: 'city', val: '' });
-  if (filters.locality) activeChips.push({ label: `Locality: ${filters.locality}`, key: 'locality', val: '' });
+  if (filters.city) activeChips.push({ label: `City: ${filters.city}`, customAction: handleClearCity });
+  if (filters.locality) activeChips.push({ label: `Locality: ${filters.locality}`, customAction: handleClearLocality });
   if (filters.minPrice !== null && filters.minPrice !== undefined && filters.minPrice !== '' && Number(filters.minPrice) >= 0) {
     activeChips.push({ label: `Min Price: Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`, key: 'minPrice', val: '' });
   }
@@ -281,7 +625,7 @@ export default function DynamicFilterPanel({
   if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY' && filters.bedrooms !== 'ALL') activeChips.push({ label: `BHK: ${filters.bedrooms}+`, key: 'bedrooms', val: '' });
   if (filters.facing && filters.facing !== 'ALL' && filters.facing !== 'ANY') activeChips.push({ label: `Facing: ${filters.facing}`, key: 'facing', val: '' });
   if (filters.furnishing && filters.furnishing !== 'ALL' && filters.furnishing !== 'ANY') activeChips.push({ label: `Furnishing: ${filters.furnishing}`, key: 'furnishing', val: '' });
-  if (filters.referencePlace) activeChips.push({ label: `Near: ${filters.referencePlace}`, key: 'referencePlace', val: '' });
+  if (filters.referencePlace) activeChips.push({ label: `Near: ${filters.referencePlace}`, customAction: handleClearNearby });
   if (filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
   if (filters.amenities && filters.amenities.length > 0) {
     filters.amenities.forEach(a => {
@@ -419,29 +763,81 @@ export default function DynamicFilterPanel({
             )}
           </label>
           <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Enter Nearby Place"
-              value={filters.referencePlace || ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                handleChange('referencePlace', val);
-                const coords = resolvePlaceCoordinates(val);
-                if (coords) {
-                  setFilters(prev => ({
-                    ...prev,
-                    referencePlace: val,
-                    referenceLat: coords.lat,
-                    referenceLng: coords.lng
-                  }));
-                }
-              }}
-              className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
-            />
+            {/* NEARBY PLACE INPUT POWERED BY GOOGLE MAPS */}
+            <div ref={nearbyContainerRef} className="relative">
+              <input
+                type="text"
+                placeholder="Enter Nearby Place"
+                value={nearbyQuery}
+                onChange={(e) => handleNearbyInputChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (nearbySuggestions.length > 0) {
+                      handleSelectNearbySuggestion(nearbySuggestions[0]);
+                    }
+                  }
+                }}
+                className="w-full p-2.5 pr-7 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
+              />
+              {isNearbySuggesting && (
+                <div className="absolute right-7 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                </div>
+              )}
+              {nearbyQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearNearby}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                  title="Clear Nearby Place"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* NEARBY PLACE GOOGLE MAPS SUGGESTIONS DROPDOWN */}
+              {nearbyDropdownOpen && nearbySuggestions.length > 0 && (
+                <div className="absolute top-full left-0 w-[300px] max-w-[calc(100vw-3rem)] mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-slate-800 text-left">
+                  <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                    <span className="text-[10px] font-extrabold text-slate-500 tracking-wider uppercase">
+                      Google Maps Places
+                    </span>
+                    <span className="text-[9.5px] font-black text-amber-600 tracking-wider uppercase flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                      Live
+                    </span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+                    {nearbySuggestions.map((item, idx) => (
+                      <button
+                        key={item.placeId || idx}
+                        type="button"
+                        onClick={() => handleSelectNearbySuggestion(item)}
+                        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-amber-50/70 transition-colors group cursor-pointer"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+                          <MapPin className="w-3 h-3 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-gray-800 group-hover:text-amber-700 truncate transition-colors">
+                            {item.mainText}
+                          </div>
+                          <div className="text-[10px] text-gray-500 truncate">
+                            {item.secondaryText || item.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <select
               value={filters.radiusKm || ''}
               onChange={(e) => handleChange('radiusKm', e.target.value ? Number(e.target.value) : null)}
-              className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
+              className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
             >
               <option value="">Any Distance</option>
               <option value="1">Within 1 km</option>
@@ -465,6 +861,7 @@ export default function DynamicFilterPanel({
                 onClick={() => {
                   handleClearCity();
                   handleClearLocality();
+                  handleClearNearby();
                 }}
                 className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline"
               >
@@ -474,8 +871,8 @@ export default function DynamicFilterPanel({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {/* CITY INPUT (CLEAN, NO POPUP SUGGESTIONS) */}
-            <div className="relative">
+            {/* CITY INPUT POWERED BY GOOGLE MAPS */}
+            <div ref={cityContainerRef} className="relative">
               <input
                 type="text"
                 placeholder="Enter City"
@@ -484,11 +881,20 @@ export default function DynamicFilterPanel({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    handleFetchGoogleLocation();
+                    if (citySuggestions.length > 0) {
+                      handleSelectCitySuggestion(citySuggestions[0]);
+                    } else {
+                      handleFetchGoogleLocation();
+                    }
                   }
                 }}
                 className="w-full p-2.5 pr-7 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
               />
+              {isCitySuggesting && (
+                <div className="absolute right-7 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                </div>
+              )}
               {cityQuery && (
                 <button
                   type="button"
@@ -499,10 +905,47 @@ export default function DynamicFilterPanel({
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+
+              {/* CITY GOOGLE MAPS SUGGESTIONS DROPDOWN */}
+              {cityDropdownOpen && citySuggestions.length > 0 && (
+                <div className="absolute top-full left-0 w-[300px] max-w-[calc(100vw-3rem)] mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-slate-800 text-left">
+                  <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                    <span className="text-[10px] font-extrabold text-slate-500 tracking-wider uppercase">
+                      Google Maps Cities
+                    </span>
+                    <span className="text-[9.5px] font-black text-amber-600 tracking-wider uppercase flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                      Live
+                    </span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+                    {citySuggestions.map((item, idx) => (
+                      <button
+                        key={item.placeId || idx}
+                        type="button"
+                        onClick={() => handleSelectCitySuggestion(item)}
+                        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-amber-50/70 transition-colors group cursor-pointer"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+                          <MapPin className="w-3 h-3 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-gray-800 group-hover:text-amber-700 truncate transition-colors">
+                            {item.mainText}
+                          </div>
+                          <div className="text-[10px] text-gray-500 truncate">
+                            {item.secondaryText || item.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* LOCALITY INPUT (CLEAN, NO POPUP SUGGESTIONS) */}
-            <div className="relative">
+            {/* LOCALITY INPUT POWERED BY GOOGLE MAPS */}
+            <div ref={localityContainerRef} className="relative">
               <input
                 type="text"
                 placeholder="Enter Locality"
@@ -511,11 +954,20 @@ export default function DynamicFilterPanel({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    handleFetchGoogleLocation();
+                    if (localitySuggestions.length > 0) {
+                      handleSelectLocalitySuggestion(localitySuggestions[0]);
+                    } else {
+                      handleFetchGoogleLocation();
+                    }
                   }
                 }}
                 className="w-full p-2.5 pr-7 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
               />
+              {isLocalitySuggesting && (
+                <div className="absolute right-7 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                </div>
+              )}
               {localityQuery && (
                 <button
                   type="button"
@@ -525,6 +977,43 @@ export default function DynamicFilterPanel({
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
+              )}
+
+              {/* LOCALITY GOOGLE MAPS SUGGESTIONS DROPDOWN (Right-aligned to remain neatly within drawer) */}
+              {localityDropdownOpen && localitySuggestions.length > 0 && (
+                <div className="absolute top-full right-0 w-[300px] max-w-[calc(100vw-3rem)] mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-slate-800 text-left">
+                  <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                    <span className="text-[10px] font-extrabold text-slate-500 tracking-wider uppercase">
+                      Google Maps Localities
+                    </span>
+                    <span className="text-[9.5px] font-black text-amber-600 tracking-wider uppercase flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                      Live
+                    </span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+                    {localitySuggestions.map((item, idx) => (
+                      <button
+                        key={item.placeId || idx}
+                        type="button"
+                        onClick={() => handleSelectLocalitySuggestion(item)}
+                        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-amber-50/70 transition-colors group cursor-pointer"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+                          <MapPin className="w-3 h-3 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-gray-800 group-hover:text-amber-700 truncate transition-colors">
+                            {item.mainText}
+                          </div>
+                          <div className="text-[10px] text-gray-500 truncate">
+                            {item.secondaryText || item.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -552,7 +1041,7 @@ export default function DynamicFilterPanel({
           )}
 
           {/* Location Resolution Feedback & Active Status Pill */}
-          {(filters.locality || filters.city) && (
+          {(filters.locality || filters.city || filters.referencePlace) && (
             <div className="flex items-center justify-between p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-xl text-xs text-amber-950">
               <div className="flex items-center gap-1.5 min-w-0">
                 <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -566,7 +1055,10 @@ export default function DynamicFilterPanel({
                       {filters.state ? ' (' + filters.state + ')' : ''}
                     </span>
                   )}
-                  {filters.referenceLat && filters.referenceLng && (
+                  {filters.referencePlace && !filters.locality && !filters.city && (
+                    <strong className="font-extrabold text-amber-900">{filters.referencePlace}</strong>
+                  )}
+                  {(filters.referenceLat || filters.searchLat) && (
                     <span className="text-[10px] text-emerald-800 font-extrabold ml-1.5 bg-emerald-100/90 px-1.5 py-0.5 rounded">
                       Google Maps Verified
                     </span>
@@ -578,6 +1070,7 @@ export default function DynamicFilterPanel({
                 onClick={() => {
                   handleClearCity();
                   handleClearLocality();
+                  handleClearNearby();
                 }}
                 className="text-amber-700 hover:text-amber-900 ml-1 p-0.5 rounded hover:bg-amber-100 shrink-0"
                 title="Clear Location Filter"
