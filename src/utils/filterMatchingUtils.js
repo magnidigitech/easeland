@@ -381,6 +381,7 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   const hasRefCoords = refLat != null && !isNaN(refLat) && refLng != null && !isNaN(refLng) && (refLat !== 0 || refLng !== 0);
+  const isSpatialSearch = Boolean(hasRefCoords);
   const hasExplicitRadius = effectiveState.radiusKm != null && effectiveState.radiusKm !== '' && Number(effectiveState.radiusKm) > 0;
   const radiusNum = hasExplicitRadius ? Number(effectiveState.radiusKm) : null;
 

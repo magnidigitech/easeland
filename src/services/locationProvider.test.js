@@ -190,5 +190,20 @@ describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
       radiusKm: null
     };
     assert.strictEqual(matchesSearchFilters(propArundelpet, filterAnyDistance), true);
+
+    // Case 6: Text query with and without spatial search
+    const queryFilterWithoutSpatial = {
+      query: 'Arundelpet Commercial'
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, queryFilterWithoutSpatial), true);
+
+    const queryFilterWithSpatial = {
+      query: 'Commercial Space',
+      referencePlace: 'Brodipet',
+      referenceLat: 16.3090,
+      referenceLng: 80.4370,
+      radiusKm: 5
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, queryFilterWithSpatial), true);
   });
 });
