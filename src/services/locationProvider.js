@@ -18,10 +18,15 @@ export function loadGoogleMapsScript() {
       return resolve(window.google.maps);
     }
     if (document.getElementById('google-maps-js-sdk')) {
+      let attempts = 0;
       const interval = setInterval(() => {
+        attempts++;
         if (window.google && window.google.maps) {
           clearInterval(interval);
           resolve(window.google.maps);
+        } else if (attempts > 80) {
+          clearInterval(interval);
+          resolve(null);
         }
       }, 100);
       return;
@@ -246,6 +251,164 @@ export async function searchLocationQuery(queryStr) {
   }
 
   return [];
+}
+
+/**
+ * Fallback geocode search when Places predictions return ZERO_RESULTS
+ */
+async function fallbackGeocodeSearch(trimmed) {
+  try {
+    const results = await searchLocationQuery(trimmed);
+    return results.map((r, idx) => {
+      const parts = (r.displayName || '').split(',');
+      const mainText = parts[0]?.trim() || trimmed;
+      const secondaryText = parts.slice(1).join(',').trim();
+      return {
+        placeId: `geo_${idx}_${Date.now()}`,
+        mainText,
+        secondaryText,
+        description: r.displayName || trimmed,
+        lat: r.lat,
+        lng: r.lng,
+        hierarchy: r
+      };
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
+let placesAutocompleteServiceInstance = null;
+let placesDetailsServiceInstance = null;
+
+/**
+ * Fetch live Google Places Autocomplete predictions (Restricted to India)
+ */
+export async function fetchGooglePlacesPredictions(queryStr) {
+  if (!queryStr || typeof queryStr !== 'string' || queryStr.trim().length < 2) {
+    return [];
+  }
+
+  const trimmed = queryStr.trim();
+
+  try {
+    const maps = await loadGoogleMapsScript();
+    if (maps && maps.places && maps.places.AutocompleteService) {
+      if (!placesAutocompleteServiceInstance) {
+        placesAutocompleteServiceInstance = new maps.places.AutocompleteService();
+      }
+
+      return new Promise((resolve) => {
+        placesAutocompleteServiceInstance.getPlacePredictions(
+          {
+            input: trimmed,
+            componentRestrictions: { country: 'in' },
+          },
+          (predictions, status) => {
+            if (
+              status === maps.places.PlacesServiceStatus.OK &&
+              Array.isArray(predictions) &&
+              predictions.length > 0
+            ) {
+              const formatted = predictions.map((p) => ({
+                placeId: p.place_id,
+                mainText: p.structured_formatting?.main_text || p.description,
+                secondaryText: p.structured_formatting?.secondary_text || '',
+                description: p.description,
+                types: p.types || []
+              }));
+              resolve(formatted);
+            } else {
+              fallbackGeocodeSearch(trimmed).then(resolve);
+            }
+          }
+        );
+      });
+    }
+  } catch (err) {
+    console.warn('Google Places predictions load error:', err.message);
+  }
+
+  return fallbackGeocodeSearch(trimmed);
+}
+
+/**
+ * Fetch deep Google Place Details with coordinates and administrative hierarchy
+ */
+export async function fetchGooglePlaceDetails(placeId, fallbackName = '') {
+  if (!placeId) return null;
+
+  try {
+    const maps = await loadGoogleMapsScript();
+    if (maps && maps.places) {
+      if (!placesDetailsServiceInstance) {
+        const dummy = document.createElement('div');
+        placesDetailsServiceInstance = new maps.places.PlacesService(dummy);
+      }
+
+      return new Promise((resolve) => {
+        placesDetailsServiceInstance.getDetails(
+          {
+            placeId: placeId,
+            fields: ['geometry', 'address_components', 'formatted_address', 'name']
+          },
+          (place, status) => {
+            if (status === maps.places.PlacesServiceStatus.OK && place && place.geometry) {
+              const loc = place.geometry.location;
+              const lat = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
+              const lng = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
+              const hierarchy = extractGoogleLocationHierarchy(place);
+
+              resolve({
+                placeId,
+                lat,
+                lng,
+                name: place.name || fallbackName,
+                displayName: place.formatted_address || place.name || fallbackName,
+                hierarchy: {
+                  ...hierarchy,
+                  address: place.formatted_address || hierarchy.address
+                }
+              });
+            } else {
+              // Fallback to Geocoder placeId lookup
+              if (maps.Geocoder) {
+                const geocoder = new maps.Geocoder();
+                geocoder.geocode({ placeId }, (results, gStatus) => {
+                  if (gStatus === 'OK' && results && results[0]) {
+                    const r = results[0];
+                    const loc = r.geometry.location;
+                    const lat = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
+                    const lng = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
+                    const hierarchy = extractGoogleLocationHierarchy(r);
+                    resolve({
+                      placeId,
+                      lat,
+                      lng,
+                      name: fallbackName || r.formatted_address,
+                      displayName: r.formatted_address,
+                      hierarchy: {
+                        ...hierarchy,
+                        address: r.formatted_address
+                      }
+                    });
+                    return;
+                  }
+                  resolve(null);
+                });
+              } else {
+                resolve(null);
+              }
+            }
+          }
+        );
+      });
+    }
+  } catch (err) {
+    console.warn('Google Place Details error:', err.message);
+  }
+
+  return null;
 }
 
 /**

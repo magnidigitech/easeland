@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Navigation, Search, CheckCircle2, AlertCircle, RefreshCw, Compass, Building, Map, ChevronDown, Edit3, Layers, Target } from 'lucide-react';
+import { MapPin, Navigation, Search, CheckCircle2, AlertCircle, RefreshCw, Compass, Building, Map, ChevronDown, Edit3, Layers, Target, Sparkles, Plus, X, Loader2 } from 'lucide-react';
 import { GeoPoint } from 'firebase/firestore';
-import { getCurrentDeviceLocation, reverseGeocodeLocation, searchLocationQuery } from '../services/locationProvider.js';
+import {
+  getCurrentDeviceLocation,
+  reverseGeocodeLocation,
+  searchLocationQuery,
+  fetchGooglePlacesPredictions,
+  fetchGooglePlaceDetails,
+  loadGoogleMapsScript
+} from '../services/locationProvider.js';
 import { encodeGeohash } from '../utils/geohash.js';
 import {
   getStatesList,
@@ -48,9 +55,15 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     locality: false
   });
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState(locationData?.address || '');
+  const [predictions, setPredictions] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedPlaceInfo, setSelectedPlaceInfo] = useState(
+    locationData?.confirmed ? { name: locationData.locality || locationData.city, address: locationData.address } : null
+  );
+  const searchContainerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
@@ -273,38 +286,223 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     }
   };
 
-  // Search location trigger
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  // Preload Google Maps JS SDK on mount
+  useEffect(() => {
+    loadGoogleMapsScript().catch(err => {
+      console.warn('Google Maps JS SDK script preload error:', err);
+    });
+  }, []);
+
+  // Close suggestions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  // Debounced input change for Google Places Autocomplete predictions
+  const handleQueryChange = (val) => {
+    setSearchQuery(val);
+    setErrorMsg(null);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (!val || val.trim().length < 2) {
+      setPredictions([]);
+      setDropdownOpen(false);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await fetchGooglePlacesPredictions(val);
+        setPredictions(results);
+        setDropdownOpen(results.length > 0);
+      } catch (err) {
+        console.warn('Google Places predictions error:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+  };
+
+  // Select Place Suggestion & Deep Autofill Hierarchy
+  const handleSelectPrediction = async (item) => {
+    setDropdownOpen(false);
+    setSearchQuery(item.mainText);
     setSearching(true);
     setErrorMsg(null);
-    const results = await searchLocationQuery(searchQuery);
-    setSearching(false);
-    setSearchResults(results);
-    if (results.length === 0) {
-      setErrorMsg('No location matches found. Try entering a city or pincode.');
+
+    try {
+      let placeDetails = null;
+      if (item.lat && item.lng && item.hierarchy) {
+        placeDetails = {
+          lat: item.lat,
+          lng: item.lng,
+          displayName: item.description,
+          hierarchy: item.hierarchy
+        };
+      } else {
+        placeDetails = await fetchGooglePlaceDetails(item.placeId, item.mainText);
+      }
+
+      if (!placeDetails || isNaN(placeDetails.lat) || isNaN(placeDetails.lng)) {
+        const fallbackResults = await searchLocationQuery(item.description || item.mainText);
+        if (fallbackResults && fallbackResults[0]) {
+          placeDetails = fallbackResults[0];
+        }
+      }
+
+      if (placeDetails && !isNaN(placeDetails.lat) && !isNaN(placeDetails.lng)) {
+        const nextLat = Number(placeDetails.lat);
+        const nextLng = Number(placeDetails.lng);
+
+        setLat(nextLat);
+        setLng(nextLng);
+
+        // Center Leaflet map and move pin marker
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([nextLat, nextLng], 17, { duration: 1.2 });
+        }
+        if (markerRef.current) {
+          markerRef.current.setLatLng([nextLat, nextLng]);
+        }
+
+        const h = placeDetails.hierarchy || {};
+        const extractedState = h.state || '';
+        const extractedDistrict = h.district || '';
+        const extractedCity = h.city || '';
+        const extractedMandal = h.mandal || '';
+        const extractedLocality = h.locality || '';
+
+        // Match against dynamic India Location Dataset
+        const allStates = getStatesList();
+        const matchedState = allStates.find(s => s.toLowerCase() === extractedState.toLowerCase()) || extractedState;
+
+        const currentDistricts = getDistrictsList(matchedState);
+        const matchedDistrict = currentDistricts.find(d =>
+          d.toLowerCase() === extractedDistrict.toLowerCase() ||
+          extractedDistrict.toLowerCase().includes(d.toLowerCase()) ||
+          d.toLowerCase().includes(extractedDistrict.toLowerCase())
+        ) || extractedDistrict;
+
+        const currentCities = getCitiesList(matchedState, matchedDistrict);
+        const matchedCity = currentCities.find(c =>
+          c.toLowerCase() === extractedCity.toLowerCase() ||
+          extractedCity.toLowerCase().includes(c.toLowerCase()) ||
+          c.toLowerCase().includes(extractedCity.toLowerCase())
+        ) || extractedCity;
+
+        const currentMandals = getMandalsList(matchedState, matchedDistrict, matchedCity);
+        const matchedMandal = currentMandals.find(m =>
+          m.toLowerCase() === extractedMandal.toLowerCase() ||
+          extractedMandal.toLowerCase().includes(m.toLowerCase())
+        ) || extractedMandal;
+
+        const currentLocalities = getLocalitiesList(matchedState, matchedDistrict, matchedCity, matchedMandal);
+        const matchedLocality = currentLocalities.find(l =>
+          l.toLowerCase() === extractedLocality.toLowerCase() ||
+          extractedLocality.toLowerCase().includes(l.toLowerCase())
+        ) || extractedLocality;
+
+        // Custom mode auto-activation if non-empty and not present in static lists
+        const needCustomState = extractedState && !allStates.includes(matchedState);
+        const needCustomDistrict = extractedDistrict && !currentDistricts.includes(matchedDistrict);
+        const needCustomCity = extractedCity && !currentCities.includes(matchedCity);
+        const needCustomMandal = extractedMandal && !currentMandals.includes(matchedMandal);
+        const needCustomLocality = extractedLocality && !currentLocalities.includes(matchedLocality);
+
+        setCustomMode({
+          state: !!needCustomState,
+          district: !!needCustomDistrict,
+          city: !!needCustomCity,
+          mandal: !!needCustomMandal,
+          locality: !!needCustomLocality
+        });
+
+        setHierarchy(prev => ({
+          ...prev,
+          country: h.country || 'India',
+          state: matchedState || prev.state,
+          district: matchedDistrict || prev.district,
+          city: matchedCity || prev.city,
+          mandal: matchedMandal || prev.mandal,
+          locality: matchedLocality || prev.locality,
+          subLocality: h.subLocality || prev.subLocality,
+          village: h.village || prev.village,
+          road: h.road || prev.road,
+          colony: h.colony || prev.colony,
+          landmark: h.landmark || prev.landmark,
+          postalCode: h.postalCode || prev.postalCode,
+          address: placeDetails.displayName || h.address || prev.address
+        }));
+
+        setSelectedPlaceInfo({
+          name: item.mainText,
+          address: placeDetails.displayName || item.secondaryText
+        });
+        setIsConfirmed(false); // Owner should review & confirm
+      } else {
+        setErrorMsg('Could not resolve precise coordinates for this place. Please refine search.');
+      }
+    } catch (err) {
+      console.warn('Place selection error:', err);
+      setErrorMsg('Failed to fetch place details: ' + err.message);
+    } finally {
+      setSearching(false);
     }
   };
 
-  // Select Search Result
-  const handleSelectSearchResult = (result) => {
-    setLat(result.lat);
-    setLng(result.lng);
-    setHierarchy(prev => ({
-      ...prev,
-      country: result.country || 'India',
-      state: result.state || prev.state,
-      district: result.district || prev.district,
-      city: result.city || prev.city,
-      mandal: result.mandal || prev.mandal,
-      locality: result.locality || prev.locality,
-      postalCode: result.postalCode || prev.postalCode,
-      address: result.displayName
-    }));
-    setSearchResults([]);
-    setSearchQuery('');
-    setIsConfirmed(false); // Must re-confirm
+  // Handle explicit form submission / Find button
+  const handleSearchSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    if (predictions.length > 0) {
+      handleSelectPrediction(predictions[0]);
+      return;
+    }
+
+    setSearching(true);
+    setErrorMsg(null);
+    try {
+      const results = await fetchGooglePlacesPredictions(searchQuery);
+      if (results.length > 0) {
+        setPredictions(results);
+        setDropdownOpen(true);
+      } else {
+        const directGeocode = await searchLocationQuery(searchQuery);
+        if (directGeocode.length > 0) {
+          const r = directGeocode[0];
+          handleSelectPrediction({
+            placeId: `direct_${Date.now()}`,
+            mainText: r.displayName.split(',')[0],
+            secondaryText: r.displayName.split(',').slice(1).join(',').trim(),
+            description: r.displayName,
+            lat: r.lat,
+            lng: r.lng,
+            hierarchy: r
+          });
+        } else {
+          setErrorMsg('No location matches found. Try entering a city or landmark.');
+        }
+      }
+    } catch (err) {
+      setErrorMsg('Search failed: ' + err.message);
+    } finally {
+      setSearching(false);
+    }
   };
 
   // Use Current Location button trigger (Explicit one-time call)
@@ -315,11 +513,23 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
       const pos = await getCurrentDeviceLocation();
       setLat(pos.lat);
       setLng(pos.lng);
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo([pos.lat, pos.lng], 17, { duration: 1.2 });
+      }
+      if (markerRef.current) {
+        markerRef.current.setLatLng([pos.lat, pos.lng]);
+      }
+
       const res = await reverseGeocodeLocation(pos.lat, pos.lng);
       setHierarchy(prev => ({
         ...prev,
         ...res
       }));
+      setSelectedPlaceInfo({
+        name: res.locality || res.city || 'Current GPS Location',
+        address: res.address || `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`
+      });
       setIsConfirmed(false); // Must re-confirm
     } catch (err) {
       setErrorMsg(err.message);
@@ -365,56 +575,148 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
         </div>
       )}
 
-      {/* LOCATION METHOD SELECTION BUTTONS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* METHOD A: SEARCH LOCATION */}
-        <form onSubmit={handleSearch} className="relative">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search City, Locality or PIN code..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-20 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={searching}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-brand-charcoal hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-            >
-              {searching ? 'Searching...' : 'Search'}
-            </button>
+      {/* LOCATION (GOOGLE PLACES SEARCH) HEADER & SEARCH BAR */}
+      <div className="space-y-2">
+        <label className="block text-xs sm:text-sm font-extrabold text-brand-charcoal">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="text-red-500 text-sm">📍</span>
+            <span>Location (Google Places Search)</span>
+          </span>
+        </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+          {/* SEARCH INPUT WITH LIVE GOOGLE PLACES DROPDOWN */}
+          <div ref={searchContainerRef} className="sm:col-span-8 relative">
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+              <input
+                type="text"
+                placeholder="Search address, locality, business or landmark..."
+                value={searchQuery}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                onFocus={() => {
+                  if (predictions.length > 0) setDropdownOpen(true);
+                }}
+                className="w-full pl-11 pr-24 py-3.5 bg-white border-2 border-blue-400 focus:border-blue-600 rounded-full sm:rounded-2xl text-xs sm:text-sm font-semibold shadow-sm focus:ring-4 focus:ring-blue-100 focus:outline-none transition-all placeholder:text-gray-400"
+              />
+
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+                {searching && (
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin mr-1" />
+                )}
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setPredictions([]);
+                      setDropdownOpen(false);
+                      setSelectedPlaceInfo(null);
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 bg-brand-charcoal hover:bg-black text-white text-[11px] font-bold rounded-lg transition-colors"
+                >
+                  Find
+                </button>
+              </div>
+            </form>
+
+            {/* GOOGLE PLACES (NEW) SUGGESTIONS FLOATING DROPDOWN */}
+            {dropdownOpen && predictions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200/90 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 animate-in fade-in slide-in-from-top-1">
+                {/* HEADER BAR */}
+                <div className="px-4 py-2.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                  <span className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">
+                    GOOGLE PLACES (NEW) SUGGESTIONS
+                  </span>
+                  <span className="text-[11px] font-black text-blue-600 tracking-wider uppercase flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    LIVE SEARCH
+                  </span>
+                </div>
+
+                {/* PREDICTIONS LIST */}
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {predictions.map((item, idx) => (
+                    <button
+                      key={item.placeId || idx}
+                      type="button"
+                      onClick={() => handleSelectPrediction(item)}
+                      className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
+                    >
+                      {/* Left icon in blue rounded badge */}
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                        <MapPin className="w-4 h-4 text-blue-600" />
+                      </div>
+
+                      {/* Middle title and address */}
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
+                          {item.mainText}
+                        </div>
+                        <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                          {item.secondaryText || item.description}
+                        </div>
+                      </div>
+
+                      {/* Right plus icon in blue circular badge */}
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-blue-500 bg-blue-50/80 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* SEARCH SUGGESTIONS DROPDOWN */}
-          {searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 max-h-56 overflow-y-auto">
-              {searchResults.map((res, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleSelectSearchResult(res)}
-                  className="w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-brand-yellow/20 border-b border-gray-100 last:border-0 flex items-start gap-2 text-brand-charcoal"
-                >
-                  <MapPin className="w-4 h-4 text-brand-yellow shrink-0 mt-0.5" />
-                  <span className="line-clamp-2">{res.displayName}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </form>
+          {/* METHOD B: USE CURRENT LOCATION BUTTON */}
+          <div className="sm:col-span-4">
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={geoLoading}
+              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-3.5 rounded-xl sm:rounded-2xl shadow-sm transition-all"
+            >
+              <Navigation className={`w-4 h-4 ${geoLoading ? 'animate-spin' : ''}`} />
+              <span>{geoLoading ? 'Acquiring GPS...' : 'Use Current Device GPS'}</span>
+            </button>
+          </div>
+        </div>
 
-        {/* METHOD B: USE CURRENT LOCATION */}
-        <button
-          type="button"
-          onClick={handleUseCurrentLocation}
-          disabled={geoLoading}
-          className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-3 rounded-xl shadow-sm transition-all"
-        >
-          <Navigation className={`w-4 h-4 ${geoLoading ? 'animate-spin' : ''}`} />
-          <span>{geoLoading ? 'Acquiring GPS Position...' : 'Use Current Device Location'}</span>
-        </button>
+        {/* ACTIVE SELECTION CONFIRMATION BADGE */}
+        {selectedPlaceInfo && (
+          <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+              <div className="truncate">
+                <span className="font-extrabold">{selectedPlaceInfo.name}</span>
+                {selectedPlaceInfo.address && (
+                  <span className="text-blue-700 ml-1.5 font-medium truncate">
+                    ({selectedPlaceInfo.address})
+                  </span>
+                )}
+                <span className="ml-2 text-[10px] font-black uppercase tracking-wider bg-blue-200/70 text-blue-800 px-2 py-0.5 rounded-full">
+                  Google Places Autofilled
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedPlaceInfo(null)}
+              className="text-blue-500 hover:text-blue-700 font-bold text-[11px] shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
       </div>
 
       {/* PAN-INDIA DEPENDENT CASCADED HIERARCHY DROPDOWNS */}

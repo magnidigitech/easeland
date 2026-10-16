@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Navigation, MapPin, Layers, CheckCircle2, RotateCcw, AlertCircle, Search, Trash2, Undo2, MousePointerClick, Hexagon, ZoomIn } from 'lucide-react';
+import { Navigation, MapPin, Layers, CheckCircle2, RotateCcw, AlertCircle, Search, Trash2, Undo2, MousePointerClick, Hexagon, ZoomIn, Sparkles, Plus, X, Loader2 } from 'lucide-react';
+import {
+  fetchGooglePlacesPredictions,
+  fetchGooglePlaceDetails,
+  loadGoogleMapsScript
+} from '../services/locationProvider.js';
 
 const MAP_STYLES = {
   googleRoadmap: {
@@ -43,6 +48,13 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
       ? { lat: initialLocation.lat, lng: initialLocation.lng }
       : { lat: 16.3124, lng: 80.4285 } // Default Guntur AP center
   );
+
+  const [searchQuery, setSearchQuery] = useState(initialLocation?.formattedAddress || '');
+  const [predictions, setPredictions] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const searchContainerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState(null);
@@ -236,29 +248,91 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
 
   }, [boundaryPoints]);
 
-  // Google Places Autocomplete Restricted to India
+  // Preload Google Maps JS SDK on mount
   useEffect(() => {
-    if (window.google && window.google.maps && window.google.maps.places && addressInputRef.current) {
-      try {
-        const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-          componentRestrictions: { country: 'in' },
-          fields: ['formatted_address', 'geometry', 'name']
-        });
-
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (place.geometry && place.geometry.location) {
-            const lat = place.geometry.location.lat();
-            const lng = place.geometry.location.lng();
-            setCoords({ lat, lng });
-            setReverseGeocodedAddress(place.formatted_address || place.name || '');
-          }
-        });
-      } catch (e) {
-        console.warn('Google Autocomplete init fallback:', e);
-      }
-    }
+    loadGoogleMapsScript().catch(err => {
+      console.warn('Google Maps JS SDK script preload error in OwnerLocationMarker:', err);
+    });
   }, []);
+
+  // Close suggestions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  // Debounced input change for Google Places Autocomplete predictions
+  const handleQueryChange = (val) => {
+    setSearchQuery(val);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    if (!val || val.trim().length < 2) {
+      setPredictions([]);
+      setDropdownOpen(false);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await fetchGooglePlacesPredictions(val);
+        setPredictions(results);
+        setDropdownOpen(results.length > 0);
+      } catch (err) {
+        console.warn('Google Places predictions error in OwnerLocationMarker:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+  };
+
+  // Select Place Suggestion & Deep Autofill Coordinates + Address
+  const handleSelectPrediction = async (item) => {
+    setDropdownOpen(false);
+    setSearchQuery(item.mainText);
+    setSearching(true);
+
+    try {
+      let placeDetails = null;
+      if (item.lat && item.lng) {
+        placeDetails = {
+          lat: item.lat,
+          lng: item.lng,
+          displayName: item.description
+        };
+      } else {
+        placeDetails = await fetchGooglePlaceDetails(item.placeId, item.mainText);
+      }
+
+      if (placeDetails && !isNaN(placeDetails.lat) && !isNaN(placeDetails.lng)) {
+        const nextLat = Number(placeDetails.lat);
+        const nextLng = Number(placeDetails.lng);
+
+        setCoords({ lat: nextLat, lng: nextLng });
+        setReverseGeocodedAddress(placeDetails.displayName || item.secondaryText || item.mainText);
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([nextLat, nextLng], 18, { duration: 1.2 });
+        }
+        if (markerRef.current) {
+          markerRef.current.setLatLng([nextLat, nextLng]);
+        }
+      }
+    } catch (err) {
+      console.warn('Select prediction error in OwnerLocationMarker:', err);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   // Browser HTML5 Geolocation
   const handleUseCurrentLocation = () => {
@@ -275,6 +349,12 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
         const { latitude, longitude } = position.coords;
         setCoords({ lat: latitude, lng: longitude });
         setGpsLoading(false);
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([latitude, longitude], 18, { duration: 1.2 });
+        }
+        if (markerRef.current) {
+          markerRef.current.setLatLng([latitude, longitude]);
+        }
       },
       (err) => {
         console.warn('GPS location error:', err);
@@ -304,20 +384,91 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
   return (
     <div className="space-y-6">
       
-      {/* 1. Address Search Bar */}
-      <div>
-        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-          Property Address Search (Google Places)
+      {/* 1. Address Search Bar (Google Places) */}
+      <div ref={searchContainerRef} className="relative">
+        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <span className="text-red-500 text-sm">📍</span>
+          <span>Location (Google Places Search)</span>
         </label>
         <div className="relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
           <input
             ref={addressInputRef}
             type="text"
-            placeholder="Search address, locality, road, landmark across India..."
-            className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 pl-10 text-sm font-semibold text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/50 shadow-sm"
+            value={searchQuery}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            onFocus={() => {
+              if (predictions.length > 0) setDropdownOpen(true);
+            }}
+            placeholder="Search address, locality, business or landmark..."
+            className="w-full bg-white border-2 border-blue-400 focus:border-blue-600 rounded-full sm:rounded-2xl px-4 py-3 pl-11 pr-20 text-xs sm:text-sm font-semibold text-brand-charcoal focus:outline-none focus:ring-4 focus:ring-blue-100 shadow-sm transition-all"
           />
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+            {searching && (
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin mr-1" />
+            )}
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setPredictions([]);
+                  setDropdownOpen(false);
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* GOOGLE PLACES (NEW) SUGGESTIONS FLOATING DROPDOWN */}
+        {dropdownOpen && predictions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200/90 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 animate-in fade-in slide-in-from-top-1">
+            {/* HEADER BAR */}
+            <div className="px-4 py-2.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+              <span className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">
+                GOOGLE PLACES (NEW) SUGGESTIONS
+              </span>
+              <span className="text-[11px] font-black text-blue-600 tracking-wider uppercase flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                LIVE SEARCH
+              </span>
+            </div>
+
+            {/* PREDICTIONS LIST */}
+            <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+              {predictions.map((item, idx) => (
+                <button
+                  key={item.placeId || idx}
+                  type="button"
+                  onClick={() => handleSelectPrediction(item)}
+                  className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                  </div>
+
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
+                      {item.mainText}
+                    </div>
+                    <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                      {item.secondaryText || item.description}
+                    </div>
+                  </div>
+
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-blue-500 bg-blue-50/80 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-center gap-4 text-xs font-extrabold text-gray-400 uppercase tracking-widest">

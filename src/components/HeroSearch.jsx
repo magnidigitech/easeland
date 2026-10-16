@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
+import { loadGoogleMapsScript } from '../services/locationProvider.js';
 
 function normalizeCategoryValue(val, purpVal) {
   if (!val || val === 'All' || val === 'ALL') {
@@ -59,25 +60,35 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
 
   // Initialize Google Places Autocomplete restricted to India
   useEffect(() => {
-    if (window.google && window.google.maps && window.google.maps.places && inputRef.current) {
-      try {
-        const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-          componentRestrictions: { country: 'in' },
-          fields: ['formatted_address', 'geometry', 'name', 'address_components']
-        });
+    let isMounted = true;
+    loadGoogleMapsScript()
+      .then((maps) => {
+        if (!isMounted || !maps || !maps.places || !inputRef.current) return;
+        try {
+          const autocomplete = new maps.places.Autocomplete(inputRef.current, {
+            componentRestrictions: { country: 'in' },
+            fields: ['formatted_address', 'geometry', 'name', 'address_components']
+          });
 
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (place && (place.formatted_address || place.name)) {
-            const selectedText = place.formatted_address || place.name;
-            setQuery(selectedText);
-            triggerSearch(selectedText, purpose, category);
-          }
-        });
-      } catch (err) {
-        console.warn('Google Places Autocomplete initialization fallback active:', err);
-      }
-    }
+          autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+            if (place && (place.formatted_address || place.name)) {
+              const selectedText = place.formatted_address || place.name;
+              setQuery(selectedText);
+              triggerSearch(selectedText, purpose, category);
+            }
+          });
+        } catch (err) {
+          console.warn('Google Places Autocomplete initialization fallback active:', err);
+        }
+      })
+      .catch((err) => {
+        console.warn('Google Places load error in HeroSearch:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [purpose, category]);
 
   const triggerSearch = (textQuery, currentPurpose, currentCategory, extraData = {}) => {
