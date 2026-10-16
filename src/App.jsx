@@ -529,7 +529,7 @@ export default function App() {
     
     getSiteConfigAdmin().then(res => {
       if (res && res.success && res.config && Object.keys(res.config).length > 0) {
-        setSiteConfig(prev => ({ ...prev, ...res.config }));
+        setSiteConfig(prev => mockApi.mergeSiteConfigWithDefaults({ ...prev, ...res.config }));
         if (res.config.theme) applySiteTheme(res.config.theme);
       }
     }).catch(err => console.warn('Live CMS config fetch warning:', err));
@@ -1277,7 +1277,13 @@ export default function App() {
                 </div>
               </div>
               <p className="text-gray-400 leading-relaxed font-medium">
-                {siteConfig?.footer?.tagline || 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, verified land titles, and precise plot boundaries.'}
+                {(() => {
+                  const tag = siteConfig?.footer?.tagline;
+                  if (!tag || tag.includes('Zero brokerage') || tag.includes('zero brokerage')) {
+                    return 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, verified land titles, and precise plot boundaries.';
+                  }
+                  return tag;
+                })()}
               </p>
             </div>
 

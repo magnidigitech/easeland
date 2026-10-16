@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config.js';
 import { logAdminActivity } from './verificationService.js';
+import { sanitizeSiteConfig } from '../services/mockApi.js';
 
 const CMS_MODULE_KEYS = [
   'overview', 'homepage', 'navbar', 'footer', 'buyPage',
@@ -24,7 +25,7 @@ export async function getSiteConfigAdmin() {
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.config && Object.keys(json.config).length > 0) {
-        return { success: true, config: json.config };
+        return { success: true, config: sanitizeSiteConfig(json.config) };
       }
     }
   } catch (err) {}
@@ -45,7 +46,7 @@ export async function getSiteConfigAdmin() {
       }
     });
 
-    return { success: true, config };
+    return { success: true, config: sanitizeSiteConfig(config) };
   } catch (error) {
     console.error('Error fetching site config:', error);
     return { success: false, error: error.message, config: {} };

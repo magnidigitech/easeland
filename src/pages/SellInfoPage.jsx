@@ -23,11 +23,23 @@ export default function SellInfoPage({ onPostPropertyClick }) {
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mt-4 mb-6">
-            {siteConfig?.sellPage?.title || 'List Your Property — Connect with Verified Serious Buyers'}
+            {(() => {
+              const title = siteConfig?.sellPage?.title;
+              if (!title || title.includes('Brokerage') || title.includes('brokerage') || title.includes('Commission') || title.includes('commission')) {
+                return 'List Your Property — Connect with Verified Serious Buyers';
+              }
+              return title;
+            })()}
           </h1>
 
           <p className="text-base sm:text-lg text-amber-100/90 max-w-2xl mx-auto mb-8 font-medium leading-relaxed">
-            {siteConfig?.sellPage?.subtitle || 'Post your property once. Upload location, plot boundary, photos, and drone footage. Showcase your listing to thousands of active buyers with complete documentation support.'}
+            {(() => {
+              const sub = siteConfig?.sellPage?.subtitle;
+              if (!sub || sub.includes('broker') || sub.includes('commission') || sub.includes('brokerage')) {
+                return 'Post your property once. Upload location, plot boundary, photos, and drone footage. Showcase your listing to thousands of active buyers with complete documentation support.';
+              }
+              return sub;
+            })()}
           </p>
 
           <button

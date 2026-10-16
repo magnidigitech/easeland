@@ -1,6 +1,6 @@
-import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData';
-import { extractCoordinates } from './locationProvider';
-import { getCategoryBadgeLabel } from '../utils/categoryUtils';
+import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData.js';
+import { extractCoordinates } from './locationProvider.js';
+import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
 import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
 
 export const safeArray = (val) => {
@@ -21,6 +21,7 @@ export const safeArray = (val) => {
 
 // Helper to initialize local storage
 const getStoredData = (key, initial) => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return initial;
   try {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : initial;
@@ -30,10 +31,11 @@ const getStoredData = (key, initial) => {
 };
 
 const setStoredData = (key, data) => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (err) {
-    console.error('LocalStorage write error:', err);
+    console.warn('LocalStorage write note:', err);
   }
 };
 
@@ -336,9 +338,103 @@ export const DEFAULT_SITE_CONFIG = {
   }
 };
 
+export const sanitizeSiteConfig = (cfg) => {
+  if (!cfg || typeof cfg !== 'object') return { ...DEFAULT_SITE_CONFIG };
+
+  const sanitized = JSON.parse(JSON.stringify(cfg));
+
+  // 1. Scrub homepage hero subtitle
+  const heroSub = sanitized.homepage?.heroSubtitle;
+  if (
+    !heroSub ||
+    typeof heroSub !== 'string' ||
+    heroSub.includes('Zero agents') ||
+    heroSub.includes('Zero commission') ||
+    heroSub.includes('Zero brokerage') ||
+    heroSub.includes('zero broker') ||
+    heroSub.includes('zero-brokerage') ||
+    heroSub.includes('zero-commission')
+  ) {
+    if (!sanitized.homepage) sanitized.homepage = {};
+    sanitized.homepage.heroSubtitle = DEFAULT_SITE_CONFIG.homepage.heroSubtitle;
+  }
+
+  // 2. Scrub footer tagline
+  const footerTag = sanitized.footer?.tagline;
+  if (
+    footerTag &&
+    (footerTag.includes('Zero brokerage') || footerTag.includes('zero brokerage'))
+  ) {
+    if (!sanitized.footer) sanitized.footer = {};
+    sanitized.footer.tagline = DEFAULT_SITE_CONFIG.footer.tagline;
+  }
+
+  // 3. Scrub rent page
+  const rentSub = sanitized.rentPage?.subtitle;
+  if (
+    rentSub &&
+    (rentSub.toLowerCase().includes('brokerage') || rentSub.toLowerCase().includes('commission') || rentSub.toLowerCase().includes('middleman'))
+  ) {
+    if (!sanitized.rentPage) sanitized.rentPage = {};
+    sanitized.rentPage.subtitle = DEFAULT_SITE_CONFIG.rentPage.subtitle;
+  }
+
+  // 4. Scrub sell page
+  const sellTitle = sanitized.sellPage?.title;
+  if (
+    sellTitle &&
+    (sellTitle.includes('Zero Brokerage') || sellTitle.includes('zero brokerage') || sellTitle.includes('Zero commission'))
+  ) {
+    if (!sanitized.sellPage) sanitized.sellPage = {};
+    sanitized.sellPage.title = DEFAULT_SITE_CONFIG.sellPage.title;
+  }
+  const sellSub = sanitized.sellPage?.subtitle;
+  if (
+    sellSub &&
+    (sellSub.includes('zero broker') || sellSub.includes('zero commission') || sellSub.includes('zero brokerage'))
+  ) {
+    if (!sanitized.sellPage) sanitized.sellPage = {};
+    sanitized.sellPage.subtitle = DEFAULT_SITE_CONFIG.sellPage.subtitle;
+  }
+
+  // 5. Scrub branding slogan
+  const slogan = sanitized.branding?.slogan;
+  if (
+    slogan &&
+    (slogan.includes('Zero Brokerage') || slogan.includes('zero brokerage') || slogan.includes('Zero commission'))
+  ) {
+    if (!sanitized.branding) sanitized.branding = {};
+    sanitized.branding.slogan = DEFAULT_SITE_CONFIG.branding.slogan;
+  }
+
+  // 6. Scrub FAQs
+  if (Array.isArray(sanitized.faqs)) {
+    sanitized.faqs = sanitized.faqs.map(faq => {
+      if (
+        faq.question?.includes('brokerage or hidden agent commissions') ||
+        faq.answer?.includes('zero middleman') ||
+        faq.answer?.includes('100% direct buyer-to-owner platform')
+      ) {
+        return DEFAULT_SITE_CONFIG.faqs.find(f => f.id === 'faq-2') || faq;
+      }
+      return faq;
+    });
+  }
+
+  // 7. Scrub SEO
+  if (sanitized.seo?.metaDescription && (sanitized.seo.metaDescription.includes('Zero brokerage') || sanitized.seo.metaDescription.includes('zero brokerage'))) {
+    sanitized.seo.metaDescription = DEFAULT_SITE_CONFIG.seo.metaDescription;
+  }
+  if (sanitized.seo?.keywords && (sanitized.seo.keywords.includes('zero brokerage') || sanitized.seo.keywords.includes('zero-brokerage'))) {
+    sanitized.seo.keywords = DEFAULT_SITE_CONFIG.seo.keywords;
+  }
+
+  return sanitized;
+};
+
 export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
   if (!userConfig || typeof userConfig !== 'object') return { ...DEFAULT_SITE_CONFIG };
-  return {
+  const merged = {
     overview: { ...DEFAULT_SITE_CONFIG.overview, ...(userConfig.overview || {}) },
     homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(userConfig.homepage || {}) },
     featuredListings: { ...DEFAULT_SITE_CONFIG.featuredListings, ...(userConfig.featuredListings || {}) },
@@ -361,12 +457,30 @@ export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
     seo: { ...DEFAULT_SITE_CONFIG.seo, ...(userConfig.seo || {}) },
     publish: { ...DEFAULT_SITE_CONFIG.publish, ...(userConfig.publish || {}) }
   };
+  return sanitizeSiteConfig(merged);
 };
 
 let rawUsers = getStoredData('easeland_registered_users', INITIAL_USERS);
 let registeredUsers = rawUsers.filter(u => u && u.status !== 'DELETED' && u.isCustomRegistered);
 
 setStoredData('easeland_registered_users', registeredUsers);
+
+// Auto-scrub stale zero-agent/zero-commission siteConfig from localStorage
+if (typeof window !== 'undefined') {
+  try {
+    const rawConfig = localStorage.getItem('easeland_site_config');
+    if (rawConfig && (
+      rawConfig.includes('Zero agents') ||
+      rawConfig.includes('Zero commission') ||
+      rawConfig.includes('Zero brokerage') ||
+      rawConfig.includes('zero brokerage') ||
+      rawConfig.includes('zero broker')
+    )) {
+      localStorage.removeItem('easeland_site_config');
+    }
+  } catch (e) {}
+}
+
 let siteConfig = mergeSiteConfigWithDefaults(getStoredData('easeland_site_config', DEFAULT_SITE_CONFIG));
 setStoredData('easeland_site_config', siteConfig);
 
@@ -1693,6 +1807,7 @@ export const mockApi = {
   },
 
   mergeSiteConfigWithDefaults: mergeSiteConfigWithDefaults,
+  sanitizeSiteConfig: sanitizeSiteConfig,
 
   getSiteConfig: () => {
     siteConfig = mergeSiteConfigWithDefaults(siteConfig);

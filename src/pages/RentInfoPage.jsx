@@ -27,7 +27,13 @@ export default function RentInfoPage({ onExploreClick }) {
           </h1>
 
           <p className="text-base sm:text-lg text-purple-100/90 max-w-2xl mx-auto mb-8 font-medium leading-relaxed">
-            {siteConfig?.rentPage?.subtitle || 'Discover premium rental homes, modern apartments, and villas with authenticated owners and complete agreement support.'}
+            {(() => {
+              const sub = siteConfig?.rentPage?.subtitle;
+              if (!sub || sub.includes('brokerage') || sub.includes('commission') || sub.includes('middleman')) {
+                return 'Discover premium rental homes, modern apartments, and villas with authenticated owners and complete agreement support.';
+              }
+              return sub;
+            })()}
           </p>
 
           <button

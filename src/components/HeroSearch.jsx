@@ -250,7 +250,20 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         </h1>
         
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-8 font-medium">
-          {siteConfig?.homepage?.heroSubtitle || '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'}
+          {(() => {
+            const sub = siteConfig?.homepage?.heroSubtitle;
+            if (
+              !sub ||
+              sub.includes('Zero agents') ||
+              sub.includes('Zero commission') ||
+              sub.includes('Zero brokerage') ||
+              sub.includes('zero broker') ||
+              sub.includes('zero brokerage')
+            ) {
+              return '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.';
+            }
+            return sub;
+          })()}
         </p>
 
         {/* DEEP SEARCH CARD */}
