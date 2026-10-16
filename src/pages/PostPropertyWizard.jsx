@@ -11,6 +11,9 @@ import PropertyMediaStep from '../components/PropertyMediaStep.jsx';
 import PropertyDocumentStep from '../components/PropertyDocumentStep.jsx';
 import PropertyBoundaryStep from '../components/PropertyBoundaryStep.jsx';
 import PropertyReviewStep from '../components/PropertyReviewStep.jsx';
+import { determineResumeStep } from '../utils/draftResumeUtils.js';
+
+export { determineResumeStep };
 
 export default function PostPropertyWizard({ onComplete, onCancel, resumePropertyId = null }) {
   const { user, profile } = useAuth();
@@ -100,7 +103,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   }, [showResumeModal]);
 
   // Helper: Apply loaded property data into wizard state
-  const applyPropertyToForm = (propCandidate) => {
+  const applyPropertyToForm = (propCandidate, overrideStep = null) => {
     if (!propCandidate) return;
     const p = propCandidate.rawProperty || propCandidate;
     const pId = p.propertyId || p.id || propCandidate.propertyId || propCandidate.id;
@@ -196,7 +199,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       boundary: p.boundary || p.ownerSubmittedBoundary || propCandidate.boundary || null,
       ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || propCandidate.ownerSubmittedBoundary || null
     });
-    setStep(1);
+
+    const targetStep = overrideStep !== null && overrideStep !== undefined
+      ? Number(overrideStep)
+      : determineResumeStep(propCandidate);
+    const clampedStep = Math.min(Math.max(Number(targetStep) || 1, 1), 8);
+    setStep(clampedStep);
     setShowResumeModal(false);
   };
 
@@ -293,7 +301,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
   // Resume selected draft
   const handleResumeDraft = (draft) => {
-    applyPropertyToForm(draft);
+    const resumeStep = determineResumeStep(draft);
+    applyPropertyToForm(draft, resumeStep);
   };
 
   // Delete single draft
@@ -487,6 +496,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       const draftData = {
         ...formData,
         ...(customUpdates || {}),
+        lastStep: targetStep,
         ownerId: user?.uid || user?.id,
         ownerPublicName: ownerName,
         ownerPrivateEmail: ownerEmail,
@@ -505,7 +515,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         price: priceNum,
         priceDisplay: getPriceDisplay(),
         pricePerUnit: ppuNum > 0 ? ppuNum : null,
-        pricePerUnitDisplay: ppuNum > 0 ? `Rs. ${ppuNum.toLocaleString('en-IN')} / ${formData.areaUnit || AreaUnit.SQ_FT}` : '',
+        pricePerUnitDisplay: ppuNum > 0 ? ('Rs. ' + ppuNum.toLocaleString('en-IN') + ' / ' + (formData.areaUnit || AreaUnit.SQ_FT)) : '',
         area: areaNum,
         areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
         areaDisplay: getAreaDisplay(),
@@ -529,11 +539,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
 
       let pId = propertyId;
       if (!pId) {
-        const res = await createPropertyDraft(user.uid, draftData);
+        const res = await createPropertyDraft(user.uid, { ...draftData, lastStep: targetStep });
         if (res.success && res.propertyId) {
           pId = res.propertyId;
           setPropertyId(res.propertyId);
           setReferenceId(res.referenceId);
+          await savePropertyDraftStep(res.propertyId, user.uid, draftData, targetStep);
         } else if (res.error) {
           setErrorMsg(res.error);
           return;
@@ -606,7 +617,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                 <div key={d.propertyId || d.id} className="p-3 bg-gray-50 hover:bg-brand-yellow/10 border border-gray-200 rounded-xl flex items-center justify-between transition-colors">
                   <div>
                     <span className="block text-xs font-bold text-brand-charcoal">{d.title || 'Untitled Draft'}</span>
-                    <span className="block text-[10px] text-gray-500 font-semibold">{d.propertyType} • {d.purpose} • Step {d.lastStep || 1}</span>
+                    <span className="block text-[10px] text-gray-500 font-semibold">{d.propertyType} • {d.purpose} • Step {determineResumeStep(d)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button

@@ -265,6 +265,7 @@ export async function createPropertyDraft(ownerId, propertyData) {
       boundary: propertyData.boundary || null,
 
       // Protected System Fields
+      lastStep: propertyData.lastStep || 1,
       listingStatus: ListingStatus.DRAFT,
       status: ListingStatus.DRAFT,
       isPlatformVerified: false,
