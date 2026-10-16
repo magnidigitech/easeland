@@ -255,13 +255,17 @@ export default function UniversalMapEngine({
         const titleText = isAdjusted ? 'Adjusted Location' : 'YOUR CURRENT LOCATION';
         const bodyText = isAdjusted ? 'Exact Location Confirmed' : '📍 You Are Here';
         
-        userLocationMarkerRef.current.setPopupContent(`
-          <div style="font-family: 'Plus Jakarta Sans', sans-serif; text-align: center; padding: 6px 8px;">
-            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563eb; letter-spacing: 0.5px;">${titleText}</div>
-            <div style="font-size: 13px; font-weight: 800; color: #0b2545; margin-top: 2px;">${bodyText} (Zoom Level ${activeZoom})</div>
-            <div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 4px;">Click pin anytime to zoom to MAX (Level 22)</div>
-          </div>
-        `);
+        userLocationMarkerRef.current.setPopupContent(
+          '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; background: #ffffff; padding: 12px 14px; min-width: 200px; max-width: 270px; border-radius: 14px; text-align: center;">' +
+            '<div style="font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; padding: 2.5px 8px; border-radius: 9999px; display: inline-block; letter-spacing: 0.5px; margin-bottom: 6px;">' +
+              titleText +
+            '</div>' +
+            '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">' +
+              bodyText + ' (Zoom Level ' + activeZoom + ')' +
+            '</div>' +
+            '<div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 5px;">Click pin anytime to zoom to MAX (Level 22)</div>' +
+          '</div>'
+        );
       }
     };
 
@@ -368,13 +372,17 @@ export default function UniversalMapEngine({
         ? `Exact Location Confirmed (Zoom Level ${currentMapZoom})`
         : `📍 You Are Here (Zoom Level ${currentMapZoom})`;
 
-      marker.bindPopup(`
-        <div style="font-family: 'Plus Jakarta Sans', sans-serif; text-align: center; padding: 6px 8px;">
-          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563eb; letter-spacing: 0.5px;">${filters?.locationAdjusted ? 'Adjusted Location' : 'YOUR CURRENT LOCATION'}</div>
-          <div style="font-size: 13px; font-weight: 800; color: #0b2545; margin-top: 2px;">${popupText}</div>
-          <div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 4px;">Click pin anytime to zoom to MAX (Level 22)</div>
-        </div>
-      `, { offset: [0, -10] }).openPopup();
+      const userPopupHtml = '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; background: #ffffff; padding: 12px 14px; min-width: 200px; max-width: 270px; border-radius: 14px; text-align: center;">' +
+        '<div style="font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; padding: 2.5px 8px; border-radius: 9999px; display: inline-block; letter-spacing: 0.5px; margin-bottom: 6px;">' +
+          (filters?.locationAdjusted ? 'Adjusted Location' : 'YOUR CURRENT LOCATION') +
+        '</div>' +
+        '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">' +
+          popupText +
+        '</div>' +
+        '<div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 5px;">Click pin anytime to zoom to MAX (Level 22)</div>' +
+        '</div>';
+
+      marker.bindPopup(userPopupHtml, { offset: [0, -10] }).openPopup();
 
       // Click on location point -> Ultra-Deep MAX Zoom (Level 22)
       marker.on('click', () => {
@@ -465,39 +473,67 @@ export default function UniversalMapEngine({
       const placeLabel = filters?.placeName || filters?.referencePlace || filters?.query || 'Searched Location';
       const addressLabel = filters?.formattedAddress || filters?.address || '';
 
-      // High-visibility animated Search Location Pin
+      // High-visibility 3D Marker Pin (Refined, Compact 32x42px with 3D Depth, Gloss & Ground Shadow)
       const searchPinIcon = L.divIcon({
         className: 'search-location-target-pin',
-        html: `
-          <div style="position: relative; width: 44px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer;">
-            <div style="position: absolute; bottom: 0; width: 34px; height: 34px; background: rgba(244, 197, 66, 0.45); border-radius: 50%; animation: pulse 1.6s infinite;"></div>
-            <svg width="36" height="44" viewBox="0 0 36 44" fill="none" style="filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)); z-index: 2;">
-              <path d="M18 0C8.05887 0 0 8.05887 0 18C0 29.5 18 44 18 44C18 44 36 29.5 36 18C36 8.05887 27.9411 0 18 0Z" fill="#F4C542"/>
-              <path d="M18 2C9.16344 2 2 9.16344 2 18C2 28.2 18 41.5 18 41.5C18 41.5 34 28.2 34 18C34 9.16344 26.8366 2 18 2Z" fill="#0B2545"/>
-              <circle cx="18" cy="18" r="8" fill="#F4C542"/>
-              <circle cx="18" cy="18" r="4" fill="#0B2545"/>
-            </svg>
-          </div>
-        `,
-        iconSize: [44, 52],
-        iconAnchor: [22, 48],
-        popupAnchor: [0, -48]
+        html: '<div style="position: relative; width: 32px; height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.32));">' +
+          '<div style="position: absolute; bottom: -2px; width: 18px; height: 5px; background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0) 75%); border-radius: 50%;"></div>' +
+          '<div style="position: absolute; bottom: -2px; width: 22px; height: 7px; border: 1.5px solid rgba(245, 158, 11, 0.6); border-radius: 50%; animation: pulse 2s infinite;"></div>' +
+          '<svg width="30" height="38" viewBox="0 0 30 38" fill="none" style="z-index: 2; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">' +
+            '<defs>' +
+              '<linearGradient id="pin3dGrad" x1="4" y1="2" x2="26" y2="36" gradientUnits="userSpaceOnUse">' +
+                '<stop offset="0%" stop-color="#FDE047"/>' +
+                '<stop offset="22%" stop-color="#F59E0B"/>' +
+                '<stop offset="68%" stop-color="#D97706"/>' +
+                '<stop offset="100%" stop-color="#78350F"/>' +
+              '</linearGradient>' +
+              '<linearGradient id="pin3dGloss" x1="10" y1="2" x2="18" y2="16" gradientUnits="userSpaceOnUse">' +
+                '<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>' +
+                '<stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>' +
+              '</linearGradient>' +
+              '<radialGradient id="pin3dCore" cx="35%" cy="30%" r="65%">' +
+                '<stop offset="0%" stop-color="#FFFFFF"/>' +
+                '<stop offset="30%" stop-color="#0F172A"/>' +
+                '<stop offset="100%" stop-color="#020617"/>' +
+              '</radialGradient>' +
+            '</defs>' +
+            '<path d="M15 1C7.268 1 1 7.268 1 15C1 24.5 15 37 15 37C15 37 29 24.5 29 15C29 7.268 22.732 1 15 1Z" fill="url(#pin3dGrad)" stroke="#B45309" stroke-width="0.8"/>' +
+            '<path d="M15 1C22.732 1 29 7.268 29 15C29 24.5 15 37 15 37C15 37 23 23 23 15C23 8 18 2 15 1Z" fill="#451A03" opacity="0.22"/>' +
+            '<ellipse cx="11" cy="7.5" rx="7" ry="3.5" transform="rotate(-25 11 7.5)" fill="url(#pin3dGloss)"/>' +
+            '<circle cx="15" cy="14" r="6.2" fill="#FFFFFF" opacity="0.95"/>' +
+            '<circle cx="15" cy="14" r="5" fill="url(#pin3dCore)"/>' +
+            '<circle cx="13.2" cy="12.2" r="1.3" fill="#FFFFFF" opacity="0.95"/>' +
+          '</svg>' +
+        '</div>',
+        iconSize: [32, 42],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -40]
       });
 
       const marker = L.marker([targetLat, targetLng], { icon: searchPinIcon }).addTo(mapInstanceRef.current);
 
-      const popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; text-align: center; padding: 6px 8px; min-width: 180px; max-width: 260px;">' +
-        '<div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #F4C542; background: #0B2545; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; letter-spacing: 0.5px;">' +
-        'SEARCHED LOCATION' +
+      // Clean Modern White Card UI
+      const popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', -apple-system, BlinkMacSystemFont, sans-serif; background: #ffffff; padding: 12px 14px; min-width: 210px; max-width: 290px; border-radius: 16px;">' +
+        '<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">' +
+          '<span style="display: inline-flex; align-items: center; gap: 4.5px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px;">' +
+            '<span style="width: 5px; height: 5px; border-radius: 50%; background: #d97706; display: inline-block;"></span>' +
+            'SEARCHED LOCATION' +
+          '</span>' +
+          '<span style="font-size: 9.5px; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 2px 7px; border-radius: 5px; border: 1px solid #e2e8f0;">' +
+            'Zoom ' + zoomLevel +
+          '</span>' +
         '</div>' +
-        '<div style="font-size: 13px; font-weight: 800; color: #0b2545; line-height: 1.3;">' +
-        placeLabel +
+        '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.35; margin-bottom: 5px; letter-spacing: -0.15px;">' +
+          placeLabel +
         '</div>' +
-        (addressLabel && addressLabel !== placeLabel ? '<div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 4px; line-height: 1.3;">' + addressLabel + '</div>' : '') +
-        '<div style="font-size: 10px; font-weight: 700; color: #d97706; margin-top: 6px;">' +
-        'Zoom Level ' + zoomLevel +
+        (addressLabel && addressLabel !== placeLabel ? 
+          '<div style="font-size: 11px; font-weight: 500; color: #475569; line-height: 1.45; margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9;">' + 
+            addressLabel + 
+          '</div>' : '') +
+        '<div style="display: flex; align-items: center; gap: 4px; margin-top: 8px; padding-top: 6px; border-top: 1px solid #f8fafc; font-size: 10.5px; font-weight: 700; color: #0284c7;">' +
+          '<span>📍 Exact Map Location Fixed</span>' +
         '</div>' +
-        '</div>';
+      '</div>';
 
       marker.bindPopup(popupHtml, { offset: [0, -10] }).openPopup();
 
@@ -752,23 +788,22 @@ export default function UniversalMapEngine({
 
       const marker = L.marker([lat, lng], { icon: customIcon });
 
-      // Clean High-Contrast Hover/Click Popup Card
-      const popupContent = `
-        <div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 2px;">
-          <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #F4C542; background: rgba(244, 197, 66, 0.15); border: 1px solid rgba(244, 197, 66, 0.4); padding: 2.5px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; letter-spacing: 0.5px;">
-            ${prop.verificationStatus || 'PLATFORM VERIFIED'}
-          </div>
-          <div style="font-size: 14px; font-weight: 800; color: #ffffff; margin-bottom: 4px; line-height: 1.2;">
-            ${prop.title || 'Property'}
-          </div>
-          <div style="font-size: 14px; font-weight: 900; color: #34d399; margin-bottom: 2px;">
-            ${priceLabel}
-          </div>
-          <div style="font-size: 11px; font-weight: 600; color: #cbd5e1;">
-            Area: ${prop.areaDisplay || (prop.area ? prop.area + ' sq ft' : '')}
-          </div>
-        </div>
-      `;
+      // Clean High-Contrast Hover/Click Popup Card (Modern White Card)
+      const popupContent = 
+        '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; background: #ffffff; padding: 12px 14px; border-radius: 14px; min-width: 195px; max-width: 260px;">' +
+          '<div style="font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2.5px 7px; border-radius: 6px; display: inline-block; margin-bottom: 6px; letter-spacing: 0.5px;">' +
+            (prop.verificationStatus || 'PLATFORM VERIFIED') +
+          '</div>' +
+          '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px; line-height: 1.3;">' +
+            (prop.title || 'Property') +
+          '</div>' +
+          '<div style="font-size: 14px; font-weight: 900; color: #059669; margin-bottom: 3px;">' +
+            priceLabel +
+          '</div>' +
+          '<div style="font-size: 11px; font-weight: 600; color: #64748b;">' +
+            'Area: ' + (prop.areaDisplay || (prop.area ? prop.area + ' sq ft' : '')) +
+          '</div>' +
+        '</div>';
 
       marker.bindPopup(popupContent, { offset: [0, -45] });
 
