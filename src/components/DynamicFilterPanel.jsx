@@ -148,6 +148,18 @@ export default function DynamicFilterPanel({
   const handleNearbyInputChange = (val) => {
     setNearbyQuery(val);
     handleChange('referencePlace', val);
+    const coords = resolvePlaceCoordinates(val);
+    if (coords) {
+      setFilters(prev => ({
+        ...prev,
+        referencePlace: val,
+        placeName: coords.name || val,
+        referenceLat: coords.lat,
+        referenceLng: coords.lng,
+        searchLat: coords.lat,
+        searchLng: coords.lng
+      }));
+    }
     if (nearbyDebounceTimerRef.current) clearTimeout(nearbyDebounceTimerRef.current);
 
     if (!val || val.trim().length < 2) {
@@ -836,7 +848,41 @@ export default function DynamicFilterPanel({
 
             <select
               value={filters.radiusKm || ''}
-              onChange={(e) => handleChange('radiusKm', e.target.value ? Number(e.target.value) : null)}
+              onChange={(e) => {
+                const val = e.target.value ? Number(e.target.value) : null;
+                handleChange('radiusKm', val);
+                if (val && !filters.referenceLat && !filters.searchLat) {
+                  const placeCandidate = nearbyQuery || localityQuery || cityQuery || filters.referencePlace || filters.locality || filters.city;
+                  if (placeCandidate) {
+                    const resolved = resolvePlaceCoordinates(placeCandidate);
+                    if (resolved) {
+                      setFilters(prev => ({
+                        ...prev,
+                        radiusKm: val,
+                        referenceLat: resolved.lat,
+                        referenceLng: resolved.lng,
+                        searchLat: resolved.lat,
+                        searchLng: resolved.lng,
+                        referencePlace: prev.referencePlace || resolved.name || placeCandidate
+                      }));
+                    } else if (typeof geocodePlaceWithHierarchy === 'function') {
+                      geocodePlaceWithHierarchy(placeCandidate).then(geo => {
+                        if (geo && !isNaN(geo.lat) && !isNaN(geo.lng)) {
+                          setFilters(prev => ({
+                            ...prev,
+                            radiusKm: val,
+                            referenceLat: geo.lat,
+                            referenceLng: geo.lng,
+                            searchLat: geo.lat,
+                            searchLng: geo.lng,
+                            referencePlace: prev.referencePlace || geo.displayName || placeCandidate
+                          }));
+                        }
+                      }).catch(() => {});
+                    }
+                  }
+                }
+              }}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
             >
               <option value="">Any Distance</option>

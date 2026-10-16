@@ -111,4 +111,84 @@ describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
     assert.strictEqual(parsed.searchLat, 16.310243);
     assert.strictEqual(parsed.searchLng, 80.4338427);
   });
+
+  it('measures distance accurately and enforces radius range properly', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+
+    // Reference center: Brodipet, Guntur (16.3090, 80.4370)
+    // Property A: Arundelpet (~0.8 km away)
+    const propArundelpet = {
+      id: 'prop-arundelpet',
+      title: 'Commercial Space in Arundelpet',
+      location: { city: 'Guntur', locality: 'Arundelpet', lat: 16.3035, lng: 80.4402 }
+    };
+
+    // Property B: Perecherla (~11 km away)
+    const propPerecherla = {
+      id: 'prop-perecherla',
+      title: 'Residential Plot in Perecherla',
+      location: { city: 'Guntur', locality: 'Perecherla', lat: 16.2917, lng: 80.3344 }
+    };
+
+    // Property C: Vijayawada (~33 km away)
+    const propVijayawada = {
+      id: 'prop-vijayawada',
+      title: 'Villa in Benz Circle Vijayawada',
+      location: { city: 'Vijayawada', locality: 'Benz Circle', lat: 16.4988, lng: 80.6558 }
+    };
+
+    // Case 1: Radius Within 1 km around Brodipet
+    const filter1km = {
+      referencePlace: 'Brodipet',
+      referenceLat: 16.3090,
+      referenceLng: 80.4370,
+      radiusKm: 1
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, filter1km), true, 'Arundelpet (~0.8km) should be included within 1km');
+    assert.strictEqual(propArundelpet.distKm != null && propArundelpet.distKm <= 1, true, 'distKm should be attached and <= 1');
+    assert.strictEqual(matchesSearchFilters(propPerecherla, filter1km), false, 'Perecherla (~11km) should be excluded within 1km');
+    assert.strictEqual(matchesSearchFilters(propVijayawada, filter1km), false, 'Vijayawada (~33km) should be excluded within 1km');
+
+    // Case 2: Radius Within 5 km around Brodipet
+    const filter5km = {
+      referencePlace: 'Brodipet',
+      referenceLat: 16.3090,
+      referenceLng: 80.4370,
+      radiusKm: 5
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, filter5km), true, 'Arundelpet should be included within 5km');
+    assert.strictEqual(matchesSearchFilters(propPerecherla, filter5km), false, 'Perecherla (~11km) should be excluded within 5km');
+    assert.strictEqual(matchesSearchFilters(propVijayawada, filter5km), false, 'Vijayawada (~33km) should be excluded within 5km');
+
+    // Case 3: Radius Within 25 km around Brodipet
+    const filter25km = {
+      referencePlace: 'Brodipet',
+      referenceLat: 16.3090,
+      referenceLng: 80.4370,
+      radiusKm: 25
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, filter25km), true, 'Arundelpet should be included within 25km');
+    assert.strictEqual(matchesSearchFilters(propPerecherla, filter25km), true, 'Perecherla should be included within 25km');
+    assert.strictEqual(matchesSearchFilters(propVijayawada, filter25km), false, 'Vijayawada (~33km) should be excluded within 25km');
+
+    // Case 4: Radius Within 50 km around Brodipet
+    const filter50km = {
+      referencePlace: 'Brodipet',
+      referenceLat: 16.3090,
+      referenceLng: 80.4370,
+      radiusKm: 50
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, filter50km), true, 'Arundelpet should be included within 50km');
+    assert.strictEqual(matchesSearchFilters(propPerecherla, filter50km), true, 'Perecherla should be included within 50km');
+    assert.strictEqual(matchesSearchFilters(propVijayawada, filter50km), true, 'Vijayawada (~33km) should be included within 50km');
+
+    // Case 5: Any Distance (radiusKm is null) around Brodipet does not reject properties by distance
+    const filterAnyDistance = {
+      referencePlace: 'Brodipet',
+      referenceLat: 16.3090,
+      referenceLng: 80.4370,
+      radiusKm: null
+    };
+    assert.strictEqual(matchesSearchFilters(propArundelpet, filterAnyDistance), true);
+  });
 });

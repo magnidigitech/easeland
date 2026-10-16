@@ -356,66 +356,87 @@ export function matchesSearchFilters(p, searchState = {}) {
     if (!blob.includes(distVal)) return false;
   }
 
-  // 4c. Location Search (City)
-  if (effectiveState.city && effectiveState.city.trim()) {
-    const cityTokens = effectiveState.city.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const blob = extractLocationBlob(p);
-    const matches = cityTokens.some(tok => blob.includes(tok));
-    if (!matches) return false;
-  }
+  // Determine Reference Center Coordinates for Spatial & Radius Distance Matching
+  let refLat = (effectiveState.referenceLat != null && !isNaN(effectiveState.referenceLat))
+    ? Number(effectiveState.referenceLat)
+    : ((effectiveState.searchLat != null && !isNaN(effectiveState.searchLat)) ? Number(effectiveState.searchLat) : null);
+  let refLng = (effectiveState.referenceLng != null && !isNaN(effectiveState.referenceLng))
+    ? Number(effectiveState.referenceLng)
+    : ((effectiveState.searchLng != null && !isNaN(effectiveState.searchLng)) ? Number(effectiveState.searchLng) : null);
 
-  // 4d. Location Search (Locality)
-  if (effectiveState.locality && effectiveState.locality.trim()) {
-    const locClean = effectiveState.locality.trim().toLowerCase();
-    const locTokens = locClean.split(/[\s,]+/).filter(tok => tok.length > 1);
-    const blob = extractLocationBlob(p);
-    const directMatch = blob.includes(locClean);
-    const tokenMatch = locTokens.length > 0 && locTokens.every(tok => blob.includes(tok));
-    if (!directMatch && !tokenMatch) return false;
-  }
-
-  // 4e. Nearby Radius Search (Radius & Reference Place / Search Coordinates)
-  const isSpatialSearch = (effectiveState.searchLat != null && effectiveState.searchLng != null) ||
-                          (effectiveState.referenceLat != null && effectiveState.referenceLng != null);
-
-  const radiusNum = (effectiveState.radiusKm && Number(effectiveState.radiusKm) > 0)
-    ? Number(effectiveState.radiusKm)
-    : (isSpatialSearch ? 35 : null);
-
-  if (radiusNum && radiusNum > 0) {
-    let refLat = effectiveState.searchLat != null ? Number(effectiveState.searchLat) : (effectiveState.referenceLat != null ? Number(effectiveState.referenceLat) : null);
-    let refLng = effectiveState.searchLng != null ? Number(effectiveState.searchLng) : (effectiveState.referenceLng != null ? Number(effectiveState.referenceLng) : null);
-
-    if ((refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) && effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
-      const resolved = resolvePlaceCoordinates(effectiveState.referencePlace.trim());
+  if (refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) {
+    const textTarget = effectiveState.referencePlace || effectiveState.locality || effectiveState.city;
+    if (textTarget && typeof textTarget === 'string' && textTarget.trim()) {
+      const resolved = resolvePlaceCoordinates(textTarget.trim());
       if (resolved) {
         refLat = resolved.lat;
         refLng = resolved.lng;
       }
     }
+  }
 
-    if ((refLat == null || isNaN(refLat)) && effectiveState.userLat != null && effectiveState.userLng != null) {
-      refLat = Number(effectiveState.userLat);
-      refLng = Number(effectiveState.userLng);
-    }
+  if ((refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) && effectiveState.userLat != null && effectiveState.userLng != null) {
+    refLat = Number(effectiveState.userLat);
+    refLng = Number(effectiveState.userLng);
+  }
 
-    if (refLat != null && !isNaN(refLat) && refLng != null && !isNaN(refLng)) {
-      const pCoords = extractCoordinates(p);
-      if (!isNaN(pCoords.lat) && !isNaN(pCoords.lng)) {
-        const distKm = calculateDistanceKm(refLat, refLng, pCoords.lat, pCoords.lng);
-        if (distKm > radiusNum) return false;
+  const hasRefCoords = refLat != null && !isNaN(refLat) && refLng != null && !isNaN(refLng) && (refLat !== 0 || refLng !== 0);
+  const hasExplicitRadius = effectiveState.radiusKm != null && effectiveState.radiusKm !== '' && Number(effectiveState.radiusKm) > 0;
+  const radiusNum = hasExplicitRadius ? Number(effectiveState.radiusKm) : null;
+
+  // Extract property coordinates (boundary polygon centroid, centroid object, location, or place text)
+  const pCoords = extractCoordinates(p);
+  const hasPropCoords = !isNaN(pCoords.lat) && !isNaN(pCoords.lng) && (pCoords.lat !== 0 || pCoords.lng !== 0);
+
+  // Compute exact spherical Haversine distance in km if both reference center and property coordinates exist
+  let calculatedDistKm = null;
+  if (hasRefCoords && hasPropCoords) {
+    calculatedDistKm = calculateDistanceKm(refLat, refLng, pCoords.lat, pCoords.lng);
+    p.distKm = Math.round(calculatedDistKm * 10) / 10;
+  }
+
+  // 4c. Radius Distance Parameter Enforcement
+  if (hasExplicitRadius) {
+    if (hasRefCoords && hasPropCoords && calculatedDistKm != null) {
+      // Strictly enforce radius distance: property must be within the specified radius in km
+      if (calculatedDistKm > radiusNum) {
+        return false;
       }
     } else if (effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
+      // Fallback if property coordinates cannot be resolved: match against reference place text
       const placeTokens = effectiveState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
       const blob = extractLocationBlob(p);
       const matches = placeTokens.some(tok => blob.includes(tok));
       if (!matches) return false;
     }
-  } else if (effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
-    const placeTokens = effectiveState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const blob = extractLocationBlob(p);
-    const matches = placeTokens.some(tok => blob.includes(tok));
-    if (!matches) return false;
+  } else {
+    // When "Any Distance" is chosen, perform standard City, Locality, and Reference Place text matching
+    if (effectiveState.city && effectiveState.city.trim()) {
+      const cityTokens = effectiveState.city.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const blob = extractLocationBlob(p);
+      const matches = cityTokens.some(tok => blob.includes(tok));
+      if (!matches) return false;
+    }
+
+    if (effectiveState.locality && effectiveState.locality.trim()) {
+      const locClean = effectiveState.locality.trim().toLowerCase();
+      const locTokens = locClean.split(/[\s,]+/).filter(tok => tok.length > 1);
+      const blob = extractLocationBlob(p);
+      const directMatch = blob.includes(locClean);
+      const tokenMatch = locTokens.length > 0 && locTokens.every(tok => blob.includes(tok));
+      if (!directMatch && !tokenMatch) return false;
+    }
+
+    if (effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
+      // If reference coordinates are present, distance has already been measured for any distance.
+      // Only do textual substring filtering if coordinates could not be resolved!
+      if (!hasRefCoords) {
+        const placeTokens = effectiveState.referencePlace.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const blob = extractLocationBlob(p);
+        const matches = placeTokens.some(tok => blob.includes(tok));
+        if (!matches) return false;
+      }
+    }
   }
 
   // 5. Search Query keyword token check (with smart stopword omission)

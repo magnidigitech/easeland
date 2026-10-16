@@ -103,11 +103,24 @@ export default function UniversalMapEngine({
   const polygonLayerRef = useRef(null);
   const userLocationMarkerRef = useRef(null);
   const searchLocationMarkerRef = useRef(null);
+  const searchRadiusCircleRef = useRef(null);
 
   // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas, filtered by active search filters
   const displayProperties = useMemo(() => {
     const raw = deduplicateProperties(properties);
-    return raw.filter(p => matchesSearchFilters(p, filters));
+    const filtered = raw.filter(p => matchesSearchFilters(p, filters));
+    const hasDistanceSearch = filters?.radiusKm != null || filters?.referenceLat != null || filters?.nearbyPlace;
+    if (hasDistanceSearch) {
+      filtered.sort((a, b) => {
+        if (a.distKm != null && b.distKm != null) {
+          return a.distKm - b.distKm;
+        }
+        if (a.distKm != null) return -1;
+        if (b.distKm != null) return 1;
+        return 0;
+      });
+    }
+    return filtered;
   }, [properties, filters]);
 
   const [internalSidePanelOpen, setInternalSidePanelOpen] = useState(!hideSidePanel);
@@ -300,6 +313,10 @@ export default function UniversalMapEngine({
       if (polygonLayerRef.current) {
         try { polygonLayerRef.current.clearLayers(); } catch (e) {}
       }
+      if (searchRadiusCircleRef.current && mapInstanceRef.current) {
+        try { mapInstanceRef.current.removeLayer(searchRadiusCircleRef.current); } catch (e) {}
+        searchRadiusCircleRef.current = null;
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -462,8 +479,10 @@ export default function UniversalMapEngine({
         else zoomLevel = 10;
       }
 
-      // Smoothly pan & zoom to the exact searched location
-      mapInstanceRef.current.setView([targetLat, targetLng], zoomLevel, { animate: true });
+      // Smoothly pan & zoom to the exact searched location if no explicit radius circle is active
+      if (!filters?.radiusKm || Number(filters.radiusKm) <= 0) {
+        mapInstanceRef.current.setView([targetLat, targetLng], zoomLevel, { animate: true });
+      }
 
       // Remove existing search location marker if present
       if (searchLocationMarkerRef.current) {
@@ -545,6 +564,55 @@ export default function UniversalMapEngine({
       searchLocationMarkerRef.current = null;
     }
   }, [filters?.searchLat, filters?.searchLng, filters?.referenceLat, filters?.referenceLng, filters?.radiusKm]);
+
+  // Render Visual Leaflet Search Radius Circle & Auto-Frame Bounds
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+
+    if (searchRadiusCircleRef.current) {
+      try {
+        mapInstanceRef.current.removeLayer(searchRadiusCircleRef.current);
+      } catch (e) {}
+      searchRadiusCircleRef.current = null;
+    }
+
+    const rawLat = filters?.searchLat ?? filters?.referenceLat ?? filters?.userLat;
+    const rawLng = filters?.searchLng ?? filters?.referenceLng ?? filters?.userLng;
+    const centerLat = rawLat != null ? Number(rawLat) : null;
+    const centerLng = rawLng != null ? Number(rawLng) : null;
+
+    const hasCenter = centerLat != null && centerLng != null && !isNaN(centerLat) && !isNaN(centerLng) && (centerLat !== 0 || centerLng !== 0);
+    const hasRadius = filters?.radiusKm != null && filters?.radiusKm !== '' && Number(filters.radiusKm) > 0;
+
+    if (hasCenter && hasRadius) {
+      const radiusKm = Number(filters.radiusKm);
+      const radiusMeters = radiusKm * 1000;
+
+      const circle = L.circle([centerLat, centerLng], {
+        radius: radiusMeters,
+        color: '#d97706',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.08,
+        weight: 2,
+        dashArray: '6, 6'
+      }).addTo(mapInstanceRef.current);
+
+      circle.bindTooltip('Search Radius: ' + radiusKm + ' km', {
+        permanent: false,
+        direction: 'top',
+        className: 'easeland-radius-tooltip'
+      });
+
+      searchRadiusCircleRef.current = circle;
+
+      // Auto-frame map bounds to encompass the entire radius circle cleanly with padding
+      mapInstanceRef.current.fitBounds(circle.getBounds(), {
+        padding: [45, 45],
+        maxZoom: 17,
+        animate: true
+      });
+    }
+  }, [filters?.radiusKm, filters?.searchLat, filters?.searchLng, filters?.referenceLat, filters?.referenceLng, filters?.userLat, filters?.userLng]);
 
   // Fallback: If search query text is present but coordinates have not been resolved yet, resolve and pan map!
   useEffect(() => {
@@ -803,6 +871,10 @@ export default function UniversalMapEngine({
           '<div style="font-size: 11px; font-weight: 600; color: #64748b;">' +
             'Area: ' + (prop.areaDisplay || (prop.area ? prop.area + ' sq ft' : '')) +
           '</div>' +
+          (prop.distKm != null && prop.distKm < Infinity ? 
+            '<div style="font-size: 11px; font-weight: 800; color: #b45309; margin-top: 4px; display: flex; align-items: center; gap: 4px;">' +
+              '<span>📍 ' + prop.distKm + ' km away</span>' +
+            '</div>' : '') +
         '</div>';
 
       marker.bindPopup(popupContent, { offset: [0, -45] });
@@ -1082,6 +1154,11 @@ export default function UniversalMapEngine({
                       <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold mb-1">
                         <span>{prop.location?.locality || prop.location?.city || 'India'}</span>
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          {prop.distKm != null && prop.distKm < Infinity && (
+                            <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-amber-200">
+                              {prop.distKm} km away
+                            </span>
+                          )}
                           <span className={`px-2 py-0.5 rounded font-extrabold text-[10px] border ${getBoundaryStyle(prop).badgeClass}`}>
                             {getBoundaryStyle(prop).typeLabel}
                           </span>

@@ -141,6 +141,7 @@ export default function PropertiesSearchPage({
 
       // Sort properties based on sortBy selection
       const sortBy = stateToUse.sortBy || 'newest';
+      const hasDistanceSearch = stateToUse.radiusKm != null || stateToUse.referenceLat != null || stateToUse.searchLat != null || stateToUse.referencePlace;
       combined.sort((a, b) => {
         const priceA = Number(a.price) || 0;
         const priceB = Number(b.price) || 0;
@@ -151,6 +152,16 @@ export default function PropertiesSearchPage({
         if (sortBy === 'price_desc') return priceB - priceA;
         if (sortBy === 'area_asc') return areaA - areaB;
         if (sortBy === 'area_desc') return areaB - areaA;
+
+        // If distance/radius search is active, sort closest properties first
+        if (hasDistanceSearch) {
+          if (a.distKm != null && b.distKm != null) {
+            return a.distKm - b.distKm;
+          }
+          if (a.distKm != null) return -1;
+          if (b.distKm != null) return 1;
+        }
+
         return 0; // Default: preserve search order
       });
 

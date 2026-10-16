@@ -509,6 +509,18 @@ export function extractCoordinates(item) {
     lng = Number(item.lng ?? item.longitude ?? item.centroidLng);
   }
 
+  // 5. Fallback: resolve from locality, city, or address text if coordinate numbers are missing
+  if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+    const textPlace = item.locality || loc?.locality || loc?.subLocality || item.city || loc?.city || item.address || loc?.address;
+    if (textPlace && typeof textPlace === 'string') {
+      const resolved = resolvePlaceCoordinates(textPlace);
+      if (resolved) {
+        lat = resolved.lat;
+        lng = resolved.lng;
+      }
+    }
+  }
+
   return { lat, lng };
 }
 
@@ -529,13 +541,32 @@ export const KNOWN_PLACE_COORDS = {
   'kannavarithota': { lat: 16.3010, lng: 80.4420, name: 'Kannavarithota, Guntur' },
   'pattabhipuram': { lat: 16.3040, lng: 80.4280, name: 'Pattabhipuram, Guntur' },
   'syndicate nagar': { lat: 16.3150, lng: 80.4250, name: 'Syndicate Nagar, Guntur' },
+  'gorantla': { lat: 16.3350, lng: 80.4180, name: 'Gorantla, Guntur' },
+  'gujjanagundla': { lat: 16.2950, lng: 80.4210, name: 'Gujjanagundla, Guntur' },
+  'syamala nagar': { lat: 16.3020, lng: 80.4200, name: 'Syamala Nagar, Guntur' },
+  'koritepadu': { lat: 16.3150, lng: 80.4300, name: 'Koritepadu, Guntur' },
+  'auto nagar': { lat: 16.3200, lng: 80.4600, name: 'Auto Nagar, Guntur' },
+  'nallapadu': { lat: 16.2800, lng: 80.3800, name: 'Nallapadu, Guntur' },
+  'perecherla': { lat: 16.3260, lng: 80.3200, name: 'Perecherla' },
+  'pedakakani': { lat: 16.3450, lng: 80.4950, name: 'Pedakakani' },
+  'namburu': { lat: 16.3800, lng: 80.5200, name: 'Namburu' },
   'kaza': { lat: 16.4020, lng: 80.5520, name: 'Kaza' },
   'navuluru': { lat: 16.4400, lng: 80.5500, name: 'Navuluru, Mangalagiri' },
-  'namburu': { lat: 16.3800, lng: 80.5200, name: 'Namburu' },
+  'tadikonda': { lat: 16.4250, lng: 80.4500, name: 'Tadikonda' },
+  'thullur': { lat: 16.5400, lng: 80.4700, name: 'Thullur' },
+  'chebrolu': { lat: 16.1950, lng: 80.5280, name: 'Chebrolu' },
+  'sattenapalle': { lat: 16.3980, lng: 80.1470, name: 'Sattenapalle' },
+  'narasaraopet': { lat: 16.2340, lng: 80.0500, name: 'Narasaraopet' },
+  'bapatla': { lat: 15.9050, lng: 80.4680, name: 'Bapatla' },
+  'chirala': { lat: 15.8200, lng: 80.3500, name: 'Chirala' },
   'benz circle': { lat: 16.4998, lng: 80.6543, name: 'Benz Circle, Vijayawada' },
   'kanuru': { lat: 16.4900, lng: 80.6900, name: 'Kanuru, Vijayawada' },
   'poranki': { lat: 16.4800, lng: 80.7100, name: 'Poranki, Vijayawada' },
   'gannavaram': { lat: 16.5380, lng: 80.8030, name: 'Gannavaram' },
+  'ibrahimpatnam': { lat: 16.5870, lng: 80.5230, name: 'Ibrahimpatnam, Vijayawada' },
+  'gunadala': { lat: 16.5200, lng: 80.6650, name: 'Gunadala, Vijayawada' },
+  'bhavanipuram': { lat: 16.5250, lng: 80.5950, name: 'Bhavanipuram, Vijayawada' },
+  'patamata': { lat: 16.4950, lng: 80.6620, name: 'Patamata, Vijayawada' },
   'visakhapatnam': { lat: 17.6868, lng: 83.2185, name: 'Visakhapatnam' },
   'vizag': { lat: 17.6868, lng: 83.2185, name: 'Visakhapatnam' },
   'tirupati': { lat: 13.6288, lng: 79.4192, name: 'Tirupati' },
