@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2, Sparkles, Plus, X } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
-import { fetchGooglePlacesPredictions } from '../services/locationProvider.js';
+import { fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider.js';
 
 function normalizeCategoryValue(val, purpVal) {
   if (!val || val === 'All' || val === 'ALL') {
@@ -104,11 +104,41 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     }, 250);
   };
 
-  const handleSelectSuggestion = (item) => {
+  const handleSelectSuggestion = async (item) => {
     const text = item.mainText || item.description;
     setQuery(text);
     setSuggestionsOpen(false);
-    triggerSearch(text, purpose, category);
+
+    let extraData = {};
+    if (item.placeId) {
+      try {
+        setIsSuggesting(true);
+        const details = await fetchGooglePlaceDetails(item.placeId, text);
+        if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
+          extraData = {
+            searchLat: details.lat,
+            searchLng: details.lng,
+            referenceLat: details.lat,
+            referenceLng: details.lng,
+            referencePlace: details.name || text,
+            placeName: details.name || text,
+            formattedAddress: details.displayName || text,
+            city: details.hierarchy?.city || '',
+            district: details.hierarchy?.district || '',
+            state: details.hierarchy?.state || '',
+            locality: details.hierarchy?.locality || details.hierarchy?.subLocality || '',
+            userLat: null,
+            userLng: null
+          };
+        }
+      } catch (err) {
+        console.warn('Place details fetch failed:', err);
+      } finally {
+        setIsSuggesting(false);
+      }
+    }
+
+    triggerSearch(text, purpose, category, extraData);
   };
 
   const triggerSearch = (textQuery, currentPurpose, currentCategory, extraData = {}) => {
@@ -147,9 +177,65 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     });
   };
 
-  const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = async (e) => {
     e?.preventDefault();
-    triggerSearch(query, purpose, category);
+    setSuggestionsOpen(false);
+
+    let extraData = {};
+    const trimmed = query ? query.trim() : '';
+
+    if (trimmed && trimmed.length >= 2 && trimmed.toLowerCase() !== 'near me') {
+      try {
+        setIsSuggesting(true);
+        const predictions = await fetchGooglePlacesPredictions(trimmed);
+        if (Array.isArray(predictions) && predictions.length > 0 && predictions[0].placeId) {
+          const details = await fetchGooglePlaceDetails(predictions[0].placeId, trimmed);
+          if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
+            extraData = {
+              searchLat: details.lat,
+              searchLng: details.lng,
+              referenceLat: details.lat,
+              referenceLng: details.lng,
+              referencePlace: details.name || trimmed,
+              placeName: details.name || trimmed,
+              formattedAddress: details.displayName || trimmed,
+              city: details.hierarchy?.city || '',
+              district: details.hierarchy?.district || '',
+              state: details.hierarchy?.state || '',
+              locality: details.hierarchy?.locality || details.hierarchy?.subLocality || '',
+              userLat: null,
+              userLng: null
+            };
+          }
+        } else {
+          const geoResults = await searchLocationQuery(trimmed);
+          if (Array.isArray(geoResults) && geoResults.length > 0 && geoResults[0].lat && geoResults[0].lng) {
+            const g = geoResults[0];
+            extraData = {
+              searchLat: g.lat,
+              searchLng: g.lng,
+              referenceLat: g.lat,
+              referenceLng: g.lng,
+              referencePlace: g.displayName || trimmed,
+              placeName: g.displayName || trimmed,
+              formattedAddress: g.displayName || trimmed,
+              city: g.city || '',
+              district: g.district || '',
+              state: g.state || '',
+              locality: g.locality || '',
+              userLat: null,
+              userLng: null
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Search geocode error:', err);
+      } finally {
+        setIsSuggesting(false);
+      }
+    }
+
+    triggerSearch(query, purpose, category, extraData);
   };
 
   // Blazing-Fast Geolocation Detection Handler

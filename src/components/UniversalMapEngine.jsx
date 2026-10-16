@@ -8,7 +8,7 @@ import {
   Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink, Video
 } from 'lucide-react';
 import { deduplicateProperties, mockApi } from '../services/mockApi';
-import { extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider';
+import { extractCoordinates, extractBoundaryPolygon, fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider';
 import {
   getCategoryBadgeLabel,
   getFirstUploadedImage,
@@ -102,6 +102,7 @@ export default function UniversalMapEngine({
   const markersLayerRef = useRef(null);
   const polygonLayerRef = useRef(null);
   const userLocationMarkerRef = useRef(null);
+  const searchLocationMarkerRef = useRef(null);
 
   // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas, filtered by active search filters
   const displayProperties = useMemo(() => {
@@ -394,6 +395,11 @@ export default function UniversalMapEngine({
       });
 
       userLocationMarkerRef.current = marker;
+    } else if (!filters?.userLat && userLocationMarkerRef.current && mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.removeLayer(userLocationMarkerRef.current);
+      } catch (e) {}
+      userLocationMarkerRef.current = null;
     }
   }, [filters?.userLat, filters?.userLng]);
 
@@ -422,25 +428,120 @@ export default function UniversalMapEngine({
     };
   }, [filters?.userLat]);
 
-  // Center and smooth-zoom map onto Reference Place if selected
+  // Center, pan and place Search Target Pin when user searches any location
   useEffect(() => {
-    if (filters?.referenceLat && filters?.referenceLng && mapInstanceRef.current) {
-      const refLat = Number(filters.referenceLat);
-      const refLng = Number(filters.referenceLng);
-      if (!isNaN(refLat) && !isNaN(refLng)) {
-        let zoomLevel = 13;
-        if (filters?.radiusKm) {
-          const r = Number(filters.radiusKm);
-          if (r <= 2) zoomLevel = 15;
-          else if (r <= 5) zoomLevel = 14;
-          else if (r <= 10) zoomLevel = 13;
-          else if (r <= 25) zoomLevel = 11;
-          else zoomLevel = 10;
-        }
-        mapInstanceRef.current.setView([refLat, refLng], zoomLevel, { animate: true });
+    const rawLat = filters?.searchLat ?? filters?.referenceLat;
+    const rawLng = filters?.searchLng ?? filters?.referenceLng;
+    const targetLat = rawLat != null ? Number(rawLat) : null;
+    const targetLng = rawLng != null ? Number(rawLng) : null;
+
+    if (targetLat != null && targetLng != null && !isNaN(targetLat) && !isNaN(targetLng) && targetLat !== 0 && targetLng !== 0 && mapInstanceRef.current) {
+      // Clean up stale GPS location marker when a search location is selected
+      if (userLocationMarkerRef.current && !filters?.userLat) {
+        try { mapInstanceRef.current.removeLayer(userLocationMarkerRef.current); } catch (e) {}
+        userLocationMarkerRef.current = null;
       }
+
+      // Determine optimal zoom level:
+      // Establishments, venues, buildings and addresses get deep footprint zoom (18); radius adapts smoothly
+      let zoomLevel = 18;
+      if (filters?.radiusKm) {
+        const r = Number(filters.radiusKm);
+        if (r <= 2) zoomLevel = 16;
+        else if (r <= 5) zoomLevel = 15;
+        else if (r <= 10) zoomLevel = 14;
+        else if (r <= 25) zoomLevel = 12;
+        else zoomLevel = 10;
+      }
+
+      // Smoothly pan & zoom to the exact searched location
+      mapInstanceRef.current.setView([targetLat, targetLng], zoomLevel, { animate: true });
+
+      // Remove existing search location marker if present
+      if (searchLocationMarkerRef.current) {
+        try { mapInstanceRef.current.removeLayer(searchLocationMarkerRef.current); } catch (e) {}
+      }
+
+      const placeLabel = filters?.placeName || filters?.referencePlace || filters?.query || 'Searched Location';
+      const addressLabel = filters?.formattedAddress || filters?.address || '';
+
+      // High-visibility animated Search Location Pin
+      const searchPinIcon = L.divIcon({
+        className: 'search-location-target-pin',
+        html: `
+          <div style="position: relative; width: 44px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer;">
+            <div style="position: absolute; bottom: 0; width: 34px; height: 34px; background: rgba(244, 197, 66, 0.45); border-radius: 50%; animation: pulse 1.6s infinite;"></div>
+            <svg width="36" height="44" viewBox="0 0 36 44" fill="none" style="filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)); z-index: 2;">
+              <path d="M18 0C8.05887 0 0 8.05887 0 18C0 29.5 18 44 18 44C18 44 36 29.5 36 18C36 8.05887 27.9411 0 18 0Z" fill="#F4C542"/>
+              <path d="M18 2C9.16344 2 2 9.16344 2 18C2 28.2 18 41.5 18 41.5C18 41.5 34 28.2 34 18C34 9.16344 26.8366 2 18 2Z" fill="#0B2545"/>
+              <circle cx="18" cy="18" r="8" fill="#F4C542"/>
+              <circle cx="18" cy="18" r="4" fill="#0B2545"/>
+            </svg>
+          </div>
+        `,
+        iconSize: [44, 52],
+        iconAnchor: [22, 48],
+        popupAnchor: [0, -48]
+      });
+
+      const marker = L.marker([targetLat, targetLng], { icon: searchPinIcon }).addTo(mapInstanceRef.current);
+
+      const popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; text-align: center; padding: 6px 8px; min-width: 180px; max-width: 260px;">' +
+        '<div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #F4C542; background: #0B2545; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; letter-spacing: 0.5px;">' +
+        'SEARCHED LOCATION' +
+        '</div>' +
+        '<div style="font-size: 13px; font-weight: 800; color: #0b2545; line-height: 1.3;">' +
+        placeLabel +
+        '</div>' +
+        (addressLabel && addressLabel !== placeLabel ? '<div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 4px; line-height: 1.3;">' + addressLabel + '</div>' : '') +
+        '<div style="font-size: 10px; font-weight: 700; color: #d97706; margin-top: 6px;">' +
+        'Zoom Level ' + zoomLevel +
+        '</div>' +
+        '</div>';
+
+      marker.bindPopup(popupHtml, { offset: [0, -10] }).openPopup();
+
+      searchLocationMarkerRef.current = marker;
+    } else if (!filters?.searchLat && !filters?.referenceLat && searchLocationMarkerRef.current) {
+      if (mapInstanceRef.current) {
+        try { mapInstanceRef.current.removeLayer(searchLocationMarkerRef.current); } catch (e) {}
+      }
+      searchLocationMarkerRef.current = null;
     }
-  }, [filters?.referenceLat, filters?.referenceLng, filters?.radiusKm]);
+  }, [filters?.searchLat, filters?.searchLng, filters?.referenceLat, filters?.referenceLng, filters?.radiusKm]);
+
+  // Fallback: If search query text is present but coordinates have not been resolved yet, resolve and pan map!
+  useEffect(() => {
+    const rawQuery = filters?.query || filters?.address;
+    if (!rawQuery || typeof rawQuery !== 'string' || rawQuery.trim().length < 2 || rawQuery.toLowerCase() === 'near me') return;
+    if (filters?.searchLat || filters?.referenceLat || filters?.userLat) return;
+    if (!mapInstanceRef.current) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const predictions = await fetchGooglePlacesPredictions(rawQuery.trim());
+        if (!isMounted) return;
+        if (Array.isArray(predictions) && predictions.length > 0 && predictions[0].placeId) {
+          const details = await fetchGooglePlaceDetails(predictions[0].placeId, rawQuery.trim());
+          if (!isMounted || !details || isNaN(details.lat) || isNaN(details.lng)) return;
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.setView([details.lat, details.lng], 18, { animate: true });
+          }
+        } else {
+          const geo = await searchLocationQuery(rawQuery.trim());
+          if (!isMounted || !Array.isArray(geo) || geo.length === 0 || !geo[0].lat || !geo[0].lng) return;
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.setView([geo[0].lat, geo[0].lng], 17, { animate: true });
+          }
+        }
+      } catch (err) {
+        console.warn('Map query geocode fallback error:', err);
+      }
+    })();
+
+    return () => { isMounted = false; };
+  }, [filters?.query, filters?.address, filters?.searchLat, filters?.referenceLat, filters?.userLat]);
 
   // Update Base Tile Layer when mapType, showLabels, or activeDetail changes
   useEffect(() => {
@@ -721,10 +822,14 @@ export default function UniversalMapEngine({
       }
     }
 
-    if (!focusedProperty && !filters?.userLat && bounds.length > 0) {
+    const hasSearchCoords = (filters?.searchLat != null && filters?.searchLng != null) ||
+                            (filters?.referenceLat != null && filters?.referenceLng != null) ||
+                            Boolean(filters?.query && filters?.query.trim().length >= 2 && filters?.query.trim().toLowerCase() !== 'near me');
+
+    if (!focusedProperty && !filters?.userLat && !hasSearchCoords && bounds.length > 0) {
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
-  }, [displayProperties, filters?.userLat]);
+  }, [displayProperties, filters?.userLat, filters?.searchLat, filters?.searchLng, filters?.referenceLat, filters?.referenceLng, filters?.query]);
 
   // Memoized photo list for pop-up preview card (strictly genuine photos, zero dummy fallback padding)
   const previewPhotos = useMemo(() => {

@@ -98,6 +98,14 @@ export function searchStateToUrlParams(searchState = {}) {
     params.set('sort', searchState.sortBy);
   }
 
+  if (searchState.searchLat != null && searchState.searchLng != null) {
+    params.set('lat', String(searchState.searchLat));
+    params.set('lng', String(searchState.searchLng));
+  } else if (searchState.referenceLat != null && searchState.referenceLng != null) {
+    params.set('lat', String(searchState.referenceLat));
+    params.set('lng', String(searchState.referenceLng));
+  }
+
   const queryStr = params.toString();
   return queryStr ? `/properties?${queryStr}` : '/properties';
 }
@@ -194,6 +202,10 @@ export function urlParamsToSearchState(searchString = '') {
     amenities: amenitiesParam ? amenitiesParam.split(',').filter(Boolean) : [],
     radiusKm: (radiusParam && !isNaN(Number(radiusParam))) ? Number(radiusParam) : (parsedNL.radiusKm || null),
     referencePlace: nearParam || parsedNL.referencePlace || '',
+    referenceLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : null,
+    referenceLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : null,
+    searchLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : null,
+    searchLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : null,
     sortBy: sortParam || 'newest'
   };
 }
@@ -228,6 +240,9 @@ export function createDefaultFilterState(overrides = {}) {
     referencePlace: '',
     referenceLat: null,
     referenceLng: null,
+    searchLat: null,
+    searchLng: null,
+    searchPlaceName: '',
     sortBy: 'newest',
     cleared: false
   };

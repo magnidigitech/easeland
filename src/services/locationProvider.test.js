@@ -95,4 +95,20 @@ describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
     const shortRes = await fetchGooglePlacesPredictions('a');
     assert.deepStrictEqual(shortRes, []);
   });
+
+  it('serializes and parses search coordinates accurately into URL parameters', async () => {
+    const { searchStateToUrlParams, urlParamsToSearchState } = await import('../firebase/searchUrl.js');
+    const state = {
+      query: 'PC Overseas Education Pvt. Ltd.',
+      searchLat: 16.310243,
+      searchLng: 80.4338427
+    };
+    const url = searchStateToUrlParams(state);
+    assert.ok(url.includes('lat=16.310243'), 'URL should contain lat param');
+    assert.ok(url.includes('lng=80.4338427'), 'URL should contain lng param');
+
+    const parsed = urlParamsToSearchState(url.replace('/properties', ''));
+    assert.strictEqual(parsed.searchLat, 16.310243);
+    assert.strictEqual(parsed.searchLng, 80.4338427);
+  });
 });

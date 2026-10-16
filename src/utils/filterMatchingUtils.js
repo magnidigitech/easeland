@@ -374,11 +374,17 @@ export function matchesSearchFilters(p, searchState = {}) {
     if (!directMatch && !tokenMatch) return false;
   }
 
-  // 4e. Nearby Radius Search (Radius & Reference Place)
-  if (effectiveState.radiusKm && Number(effectiveState.radiusKm) > 0) {
-    const radiusNum = Number(effectiveState.radiusKm);
-    let refLat = effectiveState.referenceLat != null ? Number(effectiveState.referenceLat) : null;
-    let refLng = effectiveState.referenceLng != null ? Number(effectiveState.referenceLng) : null;
+  // 4e. Nearby Radius Search (Radius & Reference Place / Search Coordinates)
+  const isSpatialSearch = (effectiveState.searchLat != null && effectiveState.searchLng != null) ||
+                          (effectiveState.referenceLat != null && effectiveState.referenceLng != null);
+
+  const radiusNum = (effectiveState.radiusKm && Number(effectiveState.radiusKm) > 0)
+    ? Number(effectiveState.radiusKm)
+    : (isSpatialSearch ? 35 : null);
+
+  if (radiusNum && radiusNum > 0) {
+    let refLat = effectiveState.searchLat != null ? Number(effectiveState.searchLat) : (effectiveState.referenceLat != null ? Number(effectiveState.referenceLat) : null);
+    let refLng = effectiveState.searchLng != null ? Number(effectiveState.searchLng) : (effectiveState.referenceLng != null ? Number(effectiveState.referenceLng) : null);
 
     if ((refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) && effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
       const resolved = resolvePlaceCoordinates(effectiveState.referencePlace.trim());
@@ -413,7 +419,8 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 5. Search Query keyword token check (with smart stopword omission)
-  if (effectiveState.query && effectiveState.query.trim()) {
+  // Skip requiring place / venue words on property descriptions when exact search coordinates are active
+  if (effectiveState.query && effectiveState.query.trim() && !isSpatialSearch) {
     const q = effectiveState.query.trim().toLowerCase();
     if (q !== 'near me') {
       let tokensToCheck = [];

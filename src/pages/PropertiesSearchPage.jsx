@@ -271,10 +271,21 @@ export default function PropertiesSearchPage({
 
   // Handle Quick Search Submission from Header
   const handleQuickSearch = (newSearchState) => {
-    setSearchState(prev => ({
-      ...prev,
-      ...newSearchState
-    }));
+    setSearchState(prev => {
+      const updated = {
+        ...prev,
+        ...newSearchState
+      };
+      // If a specific search location, query, or search coordinates are provided, clear stale GPS user pin
+      if (newSearchState.searchLat || newSearchState.referenceLat || (newSearchState.query && newSearchState.query.trim().toLowerCase() !== 'near me')) {
+        if (!newSearchState.userLat) {
+          updated.userLat = null;
+          updated.userLng = null;
+          updated.locationAdjusted = false;
+        }
+      }
+      return updated;
+    });
   };
 
   // Active Filter Counter
