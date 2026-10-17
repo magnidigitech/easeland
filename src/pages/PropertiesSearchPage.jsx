@@ -17,8 +17,8 @@ import {
   MapPin, Map as MapIcon, List, RotateCcw, AlertCircle, Sparkles, Building, Loader2
 } from 'lucide-react';
 
-import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
-export { matchesSearchFilters };
+import { matchesSearchFilters, isPropertyPubliclyVisible } from '../utils/filterMatchingUtils.js';
+export { matchesSearchFilters, isPropertyPubliclyVisible };
 
 export default function PropertiesSearchPage({
   initialFilters = null,
@@ -129,17 +129,7 @@ export default function PropertiesSearchPage({
       // Dynamically compute MIN and MAX price bounds from all candidate properties matching non-price filters
       const nonPriceFilters = { ...stateToUse, minPrice: '', maxPrice: '' };
       const nonPriceCandidates = allCandidateProps.filter(p => {
-        if (!p) return false;
-        const st = String(p.status || p.listingStatus || '').toUpperCase();
-        const lst = String(p.listingStatus || '').toUpperCase();
-        const vst = String(p.verificationStatus || '').toUpperCase();
-        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || st === 'PLATFORM VERIFIED' || st === 'VERIFIED' ||
-                       lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || lst === 'PLATFORM VERIFIED' || lst === 'VERIFIED' ||
-                       vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED' ||
-                       p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
-                       (!p.status && !p.listingStatus && p.title);
-        const isBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || st === 'CHANGES_REQUIRED';
-        return isLive && !isBlocked && matchesSearchFilters(p, nonPriceFilters);
+        return isPropertyPubliclyVisible(p) && matchesSearchFilters(p, nonPriceFilters);
       });
 
       const validPrices = nonPriceCandidates
@@ -156,25 +146,15 @@ export default function PropertiesSearchPage({
       }
 
       const liveProperties = allCandidateProps.filter(p => {
-        if (!p) return false;
-        const st = String(p.status || p.listingStatus || '').toUpperCase();
-        const lst = String(p.listingStatus || '').toUpperCase();
-        const vst = String(p.verificationStatus || '').toUpperCase();
-        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || st === 'PLATFORM VERIFIED' || st === 'VERIFIED' ||
-                       lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || lst === 'PLATFORM VERIFIED' || lst === 'VERIFIED' ||
-                       vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED' ||
-                       p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
-                       (!p.status && !p.listingStatus && p.title);
-        const isBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || st === 'CHANGES_REQUIRED';
-        
-        return isLive && !isBlocked && matchesSearchFilters(p, stateToUse);
+        return isPropertyPubliclyVisible(p) && matchesSearchFilters(p, stateToUse);
       });
 
       const combined = deduplicateProperties(liveProperties);
 
       // Sort properties based on sortBy selection
       const sortBy = stateToUse.sortBy || 'newest';
-      const hasDistanceSearch = stateToUse.radiusKm != null || stateToUse.referenceLat != null || stateToUse.searchLat != null || stateToUse.referencePlace;
+      const hasValidRadius = stateToUse.radiusKm != null && stateToUse.radiusKm !== '' && stateToUse.radiusKm !== 'any' && !isNaN(Number(stateToUse.radiusKm)) && Number(stateToUse.radiusKm) > 0;
+      const hasDistanceSearch = hasValidRadius || Boolean(stateToUse.referencePlace);
       combined.sort((a, b) => {
         const priceA = Number(a.price) || 0;
         const priceB = Number(b.price) || 0;
@@ -348,7 +328,8 @@ export default function PropertiesSearchPage({
     if (searchState.bedrooms && searchState.bedrooms !== 'ANY' && searchState.bedrooms !== 'ALL') count++;
     if (searchState.facing && searchState.facing !== 'ALL' && searchState.facing !== 'ANY') count++;
     if (searchState.furnishing && searchState.furnishing !== 'ALL' && searchState.furnishing !== 'ANY') count++;
-    if (searchState.radiusKm || searchState.referencePlace) count++;
+    const hasValidRadius = searchState.radiusKm != null && searchState.radiusKm !== '' && searchState.radiusKm !== 'any' && !isNaN(Number(searchState.radiusKm)) && Number(searchState.radiusKm) > 0;
+    if (hasValidRadius || searchState.referencePlace) count++;
     if (searchState.amenities && searchState.amenities.length > 0) count += searchState.amenities.length;
     return count;
   }, [searchState]);

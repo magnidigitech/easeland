@@ -70,7 +70,7 @@ describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
   it('calculates spherical haversine distance correctly between two coordinates in km', () => {
     // Distance between Guntur and Vijayawada (~32-35 km)
     const dist = calculateDistanceKm(16.3067, 80.4365, 16.5062, 80.6480);
-    assert.ok(dist >= 30 && dist <= 40, `Expected distance ~32km, got ${dist}`);
+    assert.ok(dist >= 30 && dist <= 40, 'Expected distance ~32km, got ' + dist);
   });
 
   it('extracts centroid coordinates accurately when property has boundary polygon', () => {
@@ -207,3 +207,277 @@ describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
     assert.strictEqual(matchesSearchFilters(propArundelpet, queryFilterWithSpatial), true);
   });
 });
+
+describe('EaseLand Distance Filter Consistency & Haversine Proximity Suite', () => {
+  const gunturCenterLat = 16.3067;
+  const gunturCenterLng = 80.4365;
+
+  const propVidyanagar = {
+    id: 'prop-vidyanagar',
+    title: 'Furnished 3BHK in Vidyanagar',
+    status: 'LIVE',
+    listingStatus: 'LIVE',
+    approvalStatus: 'APPROVED',
+    adminApprovalStatus: 'APPROVED',
+    isApproved: true,
+    isLive: true,
+    isBlocked: false,
+    price: 20000000,
+    purpose: 'SALE',
+    propertyType: 'Apartment',
+    furnishing: 'Furnished',
+    facing: 'East',
+    location: {
+      city: 'Guntur',
+      locality: 'Vidyanagar',
+      lat: 16.3195,
+      lng: 80.4300
+    }
+  };
+
+  const propNear1km = {
+    id: 'prop-near-1km',
+    title: 'Plot within 1km boundary',
+    status: 'LIVE',
+    listingStatus: 'LIVE',
+    approvalStatus: 'APPROVED',
+    adminApprovalStatus: 'APPROVED',
+    isApproved: true,
+    isLive: true,
+    isBlocked: false,
+    price: 5000000,
+    purpose: 'SALE',
+    propertyType: 'Plot',
+    furnishing: 'Unfurnished',
+    facing: 'North',
+    location: {
+      city: 'Guntur',
+      locality: 'Brodipet North',
+      lat: 16.3155,
+      lng: 80.4365
+    }
+  };
+
+  const propPerecherla = {
+    id: 'prop-perecherla',
+    title: 'Fertile Land in Perecherla',
+    status: 'LIVE',
+    listingStatus: 'LIVE',
+    approvalStatus: 'APPROVED',
+    adminApprovalStatus: 'APPROVED',
+    isApproved: true,
+    isLive: true,
+    isBlocked: false,
+    price: 15000000,
+    purpose: 'SALE',
+    propertyType: 'Agricultural Land',
+    furnishing: 'Unfurnished',
+    facing: 'East',
+    location: {
+      city: 'Guntur',
+      locality: 'Perecherla',
+      lat: 16.2917,
+      lng: 80.3450
+    }
+  };
+
+  const propVijayawada = {
+    id: 'prop-vijayawada',
+    title: 'Villa in Benz Circle Vijayawada',
+    status: 'LIVE',
+    listingStatus: 'LIVE',
+    approvalStatus: 'APPROVED',
+    adminApprovalStatus: 'APPROVED',
+    isApproved: true,
+    isLive: true,
+    isBlocked: false,
+    price: 35000000,
+    purpose: 'SALE',
+    propertyType: 'Villa',
+    furnishing: 'Furnished',
+    facing: 'North-East',
+    location: {
+      city: 'Vijayawada',
+      locality: 'Benz Circle',
+      lat: 16.4988,
+      lng: 80.6558
+    }
+  };
+
+  it('1. Any Distance does not impose a radius restriction when radiusKm is null or any', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const filterNull = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: null
+    };
+    const filterAny = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 'any'
+    };
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, filterNull), true);
+    assert.strictEqual(matchesSearchFilters(propPerecherla, filterNull), true);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, filterAny), true);
+    assert.strictEqual(matchesSearchFilters(propPerecherla, filterAny), true);
+  });
+
+  it('2. Within 1 km returns eligible properties inside 1 km radius', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const filter1km = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 1
+    };
+    assert.strictEqual(matchesSearchFilters(propNear1km, filter1km), true);
+    assert.ok(propNear1km.distKm != null && propNear1km.distKm <= 1.0);
+  });
+
+  it('3. Properties outside 1 km are excluded at 1 km but included at larger radius (e.g. 5 km)', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const filter1km = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 1
+    };
+    const filter5km = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 5
+    };
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, filter1km), false);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, filter5km), true);
+  });
+
+  it('4. Each larger distance option applies the correct kilometre value (5, 10, 25, 50 km)', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const baseFilter = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng
+    };
+    assert.strictEqual(matchesSearchFilters(propPerecherla, { ...baseFilter, radiusKm: 5 }), false);
+    assert.strictEqual(matchesSearchFilters(propPerecherla, { ...baseFilter, radiusKm: 10 }), true);
+    assert.strictEqual(matchesSearchFilters(propPerecherla, { ...baseFilter, radiusKm: 25 }), true);
+    assert.strictEqual(matchesSearchFilters(propPerecherla, { ...baseFilter, radiusKm: 50 }), true);
+
+    assert.strictEqual(matchesSearchFilters(propVijayawada, { ...baseFilter, radiusKm: 25 }), false);
+    assert.strictEqual(matchesSearchFilters(propVijayawada, { ...baseFilter, radiusKm: 50 }), true);
+  });
+
+  it('5. Boundary-distance comparison uses inclusive boundary for properties on the radius', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const exactBoundaryProp = {
+      id: 'prop-exact-boundary',
+      location: { lat: 16.3157, lng: 80.4365, city: 'Guntur' }
+    };
+    const filterBoundary = {
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 1.0
+    };
+    const isMatched = matchesSearchFilters(exactBoundaryProp, filterBoundary);
+    assert.strictEqual(isMatched, true);
+  });
+
+  it('6. Missing or invalid origin coordinates do not match spatial radius queries without valid coordinates', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const filterInvalidOrigin = {
+      referenceLat: null,
+      referenceLng: null,
+      radiusKm: 1
+    };
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, filterInvalidOrigin), false);
+  });
+
+  it('7. Invalid property coordinates are handled safely without throwing errors', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const propNoCoords = {
+      id: 'prop-no-coords',
+      title: 'Ungeocoded Property in Guntur',
+      location: { city: 'Guntur' }
+    };
+    const propCorruptedCoords = {
+      id: 'prop-nan-coords',
+      title: 'Corrupted Coords Property',
+      location: { lat: NaN, lng: 'invalid' }
+    };
+    const filter10km = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 10
+    };
+    assert.doesNotThrow(() => {
+      matchesSearchFilters(propNoCoords, filter10km);
+      matchesSearchFilters(propCorruptedCoords, filter10km);
+    });
+  });
+
+  it('8. Changing distance options updates results correctly across consecutive checks', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const base = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng
+    };
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, { ...base, radiusKm: 1 }), false);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, { ...base, radiusKm: 5 }), true);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, { ...base, radiusKm: null }), true);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, { ...base, radiusKm: 1 }), false);
+  });
+
+  it('9. Other filters (furnishing, facing, purpose) continue to work together with distance filter', async () => {
+    const { matchesSearchFilters } = await import('../utils/filterMatchingUtils.js');
+    const filterWithMultiple = {
+      referencePlace: 'Guntur',
+      referenceLat: gunturCenterLat,
+      referenceLng: gunturCenterLng,
+      radiusKm: 5,
+      purpose: 'SALE',
+      furnishing: 'Furnished',
+      facing: 'East'
+    };
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, filterWithMultiple), true);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, { ...filterWithMultiple, furnishing: 'Unfurnished' }), false);
+    assert.strictEqual(matchesSearchFilters(propVidyanagar, { ...filterWithMultiple, purpose: 'RENT' }), false);
+  });
+
+  it('10. Non-LIVE and unapproved properties are rejected from public visibility regardless of proximity', async () => {
+    const { isPropertyPubliclyVisible } = await import('../utils/filterMatchingUtils.js');
+    const unapprovedNearProp = {
+      ...propNear1km,
+      id: 'unapproved-near',
+      adminApprovalStatus: 'PENDING',
+      approvalStatus: 'PENDING',
+      isApproved: false,
+      isPlatformVerified: false,
+      status: 'PENDING',
+      listingStatus: 'PENDING'
+    };
+    const draftNearProp = {
+      ...propNear1km,
+      id: 'draft-near',
+      listingStatus: 'DRAFT',
+      status: 'DRAFT',
+      isLive: false,
+      isPublished: false
+    };
+    const blockedNearProp = {
+      ...propNear1km,
+      id: 'blocked-near',
+      isBlocked: true
+    };
+
+    assert.strictEqual(isPropertyPubliclyVisible(propNear1km), true);
+    assert.strictEqual(isPropertyPubliclyVisible(unapprovedNearProp), false);
+    assert.strictEqual(isPropertyPubliclyVisible(draftNearProp), false);
+    assert.strictEqual(isPropertyPubliclyVisible(blockedNearProp), false);
+  });
+});
+

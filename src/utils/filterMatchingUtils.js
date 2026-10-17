@@ -4,6 +4,47 @@ import { convertAreaToSqFt } from '../firebase/propertyService.js';
 import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
 
 /**
+ * Dynamic check for property public visibility (Admin approved, LIVE, not blocked/draft)
+ */
+export function isPropertyPubliclyVisible(p) {
+  if (!p) return false;
+  const st = String(p.status || p.listingStatus || '').toUpperCase();
+  const lst = String(p.listingStatus || '').toUpperCase();
+  const vst = String(p.verificationStatus || '').toUpperCase();
+
+  const isApproved = p.adminApprovalStatus === 'APPROVED' ||
+                     p.approvalStatus === 'APPROVED' ||
+                     p.isApproved === true ||
+                     vst === 'PLATFORM VERIFIED' ||
+                     vst === 'VERIFIED' ||
+                     vst === 'APPROVED' ||
+                     p.isPlatformVerified === true;
+
+  const isLive = st === 'LIVE' ||
+                 st === 'APPROVED_LIVE' ||
+                 st === 'APPROVED' ||
+                 st === 'PLATFORM VERIFIED' ||
+                 st === 'VERIFIED' ||
+                 lst === 'LIVE' ||
+                 lst === 'APPROVED_LIVE' ||
+                 lst === 'APPROVED' ||
+                 lst === 'PLATFORM VERIFIED' ||
+                 lst === 'VERIFIED' ||
+                 p.isPublished === true ||
+                 p.published === true ||
+                 (!p.status && !p.listingStatus && Boolean(p.title));
+
+  const isBlocked = st === 'REJECTED' ||
+                    st === 'DRAFT' ||
+                    lst === 'REJECTED' ||
+                    lst === 'DRAFT' ||
+                    st === 'CHANGES_REQUIRED' ||
+                    p.isBlocked === true;
+
+  return (isLive || isApproved) && !isBlocked;
+}
+
+/**
  * Helper: Extract comprehensive location searchable blob
  */
 export const extractLocationBlob = (item) => {
@@ -389,7 +430,7 @@ export function matchesSearchFilters(p, searchState = {}) {
     : ((effectiveState.searchLng != null && !isNaN(effectiveState.searchLng)) ? Number(effectiveState.searchLng) : null);
 
   if (refLat == null || isNaN(refLat) || refLng == null || isNaN(refLng)) {
-    const textTarget = effectiveState.referencePlace || effectiveState.locality || effectiveState.city;
+    const textTarget = effectiveState.referencePlace || effectiveState.locality;
     if (textTarget && typeof textTarget === 'string' && textTarget.trim()) {
       const resolved = resolvePlaceCoordinates(textTarget.trim());
       if (resolved) {
@@ -406,7 +447,12 @@ export function matchesSearchFilters(p, searchState = {}) {
 
   const hasRefCoords = refLat != null && !isNaN(refLat) && refLng != null && !isNaN(refLng) && (refLat !== 0 || refLng !== 0);
   const isSpatialSearch = Boolean(hasRefCoords);
-  const hasExplicitRadius = effectiveState.radiusKm != null && effectiveState.radiusKm !== '' && Number(effectiveState.radiusKm) > 0;
+  const hasExplicitRadius = effectiveState.radiusKm != null &&
+    effectiveState.radiusKm !== '' &&
+    effectiveState.radiusKm !== 'any' &&
+    effectiveState.radiusKm !== 'all' &&
+    !isNaN(Number(effectiveState.radiusKm)) &&
+    Number(effectiveState.radiusKm) > 0;
   const radiusNum = hasExplicitRadius ? Number(effectiveState.radiusKm) : null;
 
   // Extract property coordinates (boundary polygon centroid, centroid object, location, or place text)
@@ -423,8 +469,8 @@ export function matchesSearchFilters(p, searchState = {}) {
   // 4c. Radius Distance Parameter Enforcement
   if (hasExplicitRadius) {
     if (hasRefCoords && hasPropCoords && calculatedDistKm != null) {
-      // Strictly enforce radius distance: property must be within the specified radius in km
-      if (calculatedDistKm > radiusNum) {
+      // Strictly enforce radius distance: property must be within the specified radius in km (inclusive)
+      if (calculatedDistKm > radiusNum && Math.round(calculatedDistKm * 10) / 10 > radiusNum) {
         return false;
       }
     } else if (effectiveState.referencePlace && effectiveState.referencePlace.trim()) {
@@ -433,6 +479,26 @@ export function matchesSearchFilters(p, searchState = {}) {
       const blob = extractLocationBlob(p);
       const matches = placeTokens.some(tok => blob.includes(tok));
       if (!matches) return false;
+    } else {
+      // Explicit radius requested but no search origin or reference place available to evaluate radius
+      return false;
+    }
+
+    // Preserve active administrative location filters (City & Locality) together with radius
+    if (effectiveState.city && effectiveState.city.trim()) {
+      const cityTokens = effectiveState.city.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const blob = extractLocationBlob(p);
+      const matches = cityTokens.some(tok => blob.includes(tok));
+      if (!matches) return false;
+    }
+
+    if (effectiveState.locality && effectiveState.locality.trim()) {
+      const locClean = effectiveState.locality.trim().toLowerCase();
+      const locTokens = locClean.split(/[\s,]+/).filter(tok => tok.length > 1);
+      const blob = extractLocationBlob(p);
+      const directMatch = blob.includes(locClean);
+      const tokenMatch = locTokens.length > 0 && locTokens.every(tok => blob.includes(tok));
+      if (!directMatch && !tokenMatch) return false;
     }
   } else {
     // When "Any Distance" is chosen, perform standard City, Locality, and Reference Place text matching

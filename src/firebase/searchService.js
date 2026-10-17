@@ -259,7 +259,8 @@ export async function searchPublicProperties({
     // =========================================================================
     // BRANCH A: PROXIMITY RADIUS SEARCH (Bounded Result Window)
     // =========================================================================
-    if (radiusKm && referenceLat != null && referenceLng != null) {
+    const hasValidRadius = radiusKm != null && radiusKm !== '' && radiusKm !== 'any' && radiusKm !== 'all' && !isNaN(Number(radiusKm)) && Number(radiusKm) > 0;
+    if (hasValidRadius && referenceLat != null && referenceLng != null) {
       const radiusNum = Number(radiusKm);
       const latNum = Number(referenceLat);
       const lngNum = Number(referenceLng);

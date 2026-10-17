@@ -469,8 +469,9 @@ export default function UniversalMapEngine({
 
       // Determine optimal zoom level:
       // Establishments, venues, buildings and addresses get deep footprint zoom (18); radius adapts smoothly
+      const hasExplicitRadius = filters?.radiusKm != null && filters?.radiusKm !== '' && filters?.radiusKm !== 'any' && !isNaN(Number(filters.radiusKm)) && Number(filters.radiusKm) > 0;
       let zoomLevel = 18;
-      if (filters?.radiusKm) {
+      if (hasExplicitRadius) {
         const r = Number(filters.radiusKm);
         if (r <= 2) zoomLevel = 16;
         else if (r <= 5) zoomLevel = 15;
@@ -480,7 +481,7 @@ export default function UniversalMapEngine({
       }
 
       // Smoothly pan & zoom to the exact searched location if no explicit radius circle is active
-      if (!filters?.radiusKm || Number(filters.radiusKm) <= 0) {
+      if (!hasExplicitRadius) {
         mapInstanceRef.current.setView([targetLat, targetLng], zoomLevel, { animate: true });
       }
 
@@ -582,7 +583,7 @@ export default function UniversalMapEngine({
     const centerLng = rawLng != null ? Number(rawLng) : null;
 
     const hasCenter = centerLat != null && centerLng != null && !isNaN(centerLat) && !isNaN(centerLng) && (centerLat !== 0 || centerLng !== 0);
-    const hasRadius = filters?.radiusKm != null && filters?.radiusKm !== '' && Number(filters.radiusKm) > 0;
+    const hasRadius = filters?.radiusKm != null && filters?.radiusKm !== '' && filters?.radiusKm !== 'any' && !isNaN(Number(filters.radiusKm)) && Number(filters.radiusKm) > 0;
 
     if (hasCenter && hasRadius) {
       const radiusKm = Number(filters.radiusKm);

@@ -24,6 +24,15 @@ export const AREA_UNIT_OPTIONS = [
   { label: 'Ankanams', value: 'ankanams' }
 ];
 
+export const DISTANCE_RADIUS_OPTIONS = [
+  { value: 'any', label: 'Any Distance', km: null },
+  { value: '1', label: 'Within 1 km', km: 1 },
+  { value: '5', label: 'Within 5 km', km: 5 },
+  { value: '10', label: 'Within 10 km', km: 10 },
+  { value: '25', label: 'Within 25 km', km: 25 },
+  { value: '50', label: 'Within 50 km', km: 50 }
+];
+
 export function formatPriceInWords(val) {
   if (val === null || val === undefined || val === '') return '';
   const num = Number(val);
@@ -254,7 +263,7 @@ export default function DynamicFilterPanel({
       searchLng: lng,
       userLat: null,
       userLng: null,
-      radiusKm: prev.radiusKm != null ? prev.radiusKm : 1
+      radiusKm: prev.radiusKm != null ? prev.radiusKm : null
     }));
   };
 
@@ -265,12 +274,12 @@ export default function DynamicFilterPanel({
     setFilters(prev => ({
       ...prev,
       referencePlace: '',
-      radiusKm: 1,
+      radiusKm: null,
+      referenceLat: null,
+      referenceLng: null,
       ...((prev.city || prev.locality) ? {} : {
         searchLat: null,
-        searchLng: null,
-        referenceLat: null,
-        referenceLng: null
+        searchLng: null
       })
     }));
   };
@@ -354,9 +363,8 @@ export default function DynamicFilterPanel({
       state: resolvedState || prev.state,
       searchLat: lat,
       searchLng: lng,
-      referenceLat: lat,
-      referenceLng: lng,
-      referencePlace: resolvedCity,
+      referenceLat: prev.referencePlace ? prev.referenceLat : null,
+      referenceLng: prev.referencePlace ? prev.referenceLng : null,
       placeName: resolvedCity,
       formattedAddress: formattedAddress,
       userLat: null,
@@ -474,9 +482,8 @@ export default function DynamicFilterPanel({
       state: resolvedState || prev.state,
       searchLat: lat,
       searchLng: lng,
-      referenceLat: lat,
-      referenceLng: lng,
-      referencePlace: resolvedLocality,
+      referenceLat: prev.referencePlace ? prev.referenceLat : null,
+      referenceLng: prev.referencePlace ? prev.referenceLng : null,
       placeName: resolvedLocality,
       formattedAddress: formattedAddress,
       userLat: null,
@@ -670,7 +677,9 @@ export default function DynamicFilterPanel({
     activeChips.push({ label: `Furnishing: ${displayLabel}`, key: 'furnishing', val: '' });
   }
   if (filters.referencePlace) activeChips.push({ label: `Near: ${filters.referencePlace}`, customAction: handleClearNearby });
-  if (filters.referencePlace && filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
+  if (filters.radiusKm && Number(filters.radiusKm) > 0 && (filters.referencePlace || filters.referenceLat != null || filters.searchLat != null)) {
+    activeChips.push({ label: 'Radius: Within ' + filters.radiusKm + ' km', key: 'radiusKm', val: null });
+  }
   if (filters.amenities && filters.amenities.length > 0) {
     filters.amenities.forEach(a => {
       activeChips.push({
@@ -879,9 +888,9 @@ export default function DynamicFilterPanel({
             </div>
 
             <select
-              value={filters.radiusKm === null ? 'any' : (filters.radiusKm != null ? String(filters.radiusKm) : '1')}
+              value={filters.radiusKm != null && Number(filters.radiusKm) > 0 ? String(filters.radiusKm) : 'any'}
               onChange={(e) => {
-                const val = (e.target.value === 'any' || e.target.value === '') ? null : Number(e.target.value);
+                const val = (e.target.value === 'any' || e.target.value === '' || isNaN(Number(e.target.value))) ? null : Number(e.target.value);
                 handleChange('radiusKm', val);
                 if (val && !filters.referenceLat && !filters.searchLat) {
                   const placeCandidate = nearbyQuery || localityQuery || cityQuery || filters.referencePlace || filters.locality || filters.city;
@@ -917,12 +926,11 @@ export default function DynamicFilterPanel({
               }}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
             >
-              <option value="1">Within 1 km</option>
-              <option value="5">Within 5 km</option>
-              <option value="10">Within 10 km</option>
-              <option value="25">Within 25 km</option>
-              <option value="50">Within 50 km</option>
-              <option value="any">Any Distance</option>
+              {DISTANCE_RADIUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
