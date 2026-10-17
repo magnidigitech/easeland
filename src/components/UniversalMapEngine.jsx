@@ -274,7 +274,7 @@ export default function UniversalMapEngine({
               titleText +
             '</div>' +
             '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">' +
-              bodyText + ' (Zoom Level ' + activeZoom + ')' +
+              bodyText +
             '</div>' +
             '<div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 5px;">Click pin anytime to zoom to MAX (Level 22)</div>' +
           '</div>'
@@ -384,10 +384,9 @@ export default function UniversalMapEngine({
 
       const marker = L.marker([userLat, userLng], { icon: pulseIcon, draggable: true }).addTo(mapInstanceRef.current);
       
-      const currentMapZoom = mapInstanceRef.current ? mapInstanceRef.current.getZoom() : locZoom;
       const popupText = filters?.locationAdjusted 
-        ? `Exact Location Confirmed (Zoom Level ${currentMapZoom})`
-        : `📍 You Are Here (Zoom Level ${currentMapZoom})`;
+        ? 'Exact Location Confirmed'
+        : '📍 You Are Here';
 
       const userPopupHtml = '<div style="font-family: \'Plus Jakarta Sans\', sans-serif; background: #ffffff; padding: 12px 14px; min-width: 200px; max-width: 270px; border-radius: 14px; text-align: center;">' +
         '<div style="font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; padding: 2.5px 8px; border-radius: 9999px; display: inline-block; letter-spacing: 0.5px; margin-bottom: 6px;">' +
@@ -396,7 +395,6 @@ export default function UniversalMapEngine({
         '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">' +
           popupText +
         '</div>' +
-        '<div style="font-size: 10px; font-weight: 600; color: #64748b; margin-top: 5px;">Click pin anytime to zoom to MAX (Level 22)</div>' +
         '</div>';
 
       marker.bindPopup(userPopupHtml, { offset: [0, -10] }).openPopup();
@@ -533,14 +531,11 @@ export default function UniversalMapEngine({
       const marker = L.marker([targetLat, targetLng], { icon: searchPinIcon }).addTo(mapInstanceRef.current);
 
       // Clean Modern White Card UI
-      const popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', -apple-system, BlinkMacSystemFont, sans-serif; background: #ffffff; padding: 12px 14px; min-width: 210px; max-width: 290px; border-radius: 16px;">' +
-        '<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">' +
+      const popupHtml = '<div style="font-family: \'Plus Jakarta Sans\', -apple-system, BlinkMacSystemFont, sans-serif; background: #ffffff; padding: 12px 14px; min-width: 200px; max-width: 290px; border-radius: 16px;">' +
+        '<div style="display: flex; align-items: center; margin-bottom: 8px;">' +
           '<span style="display: inline-flex; align-items: center; gap: 4.5px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px;">' +
             '<span style="width: 5px; height: 5px; border-radius: 50%; background: #d97706; display: inline-block;"></span>' +
             'SEARCHED LOCATION' +
-          '</span>' +
-          '<span style="font-size: 9.5px; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 2px 7px; border-radius: 5px; border: 1px solid #e2e8f0;">' +
-            'Zoom ' + zoomLevel +
           '</span>' +
         '</div>' +
         '<div style="font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.35; margin-bottom: 5px; letter-spacing: -0.15px;">' +
@@ -550,9 +545,6 @@ export default function UniversalMapEngine({
           '<div style="font-size: 11px; font-weight: 500; color: #475569; line-height: 1.45; margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9;">' + 
             addressLabel + 
           '</div>' : '') +
-        '<div style="display: flex; align-items: center; gap: 4px; margin-top: 8px; padding-top: 6px; border-top: 1px solid #f8fafc; font-size: 10.5px; font-weight: 700; color: #0284c7;">' +
-          '<span>📍 Exact Map Location Fixed</span>' +
-        '</div>' +
       '</div>';
 
       marker.bindPopup(popupHtml, { offset: [0, -10] }).openPopup();
