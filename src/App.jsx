@@ -27,59 +27,10 @@ import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
 import { trackPageView } from './utils/metaPixel.js';
+import { parseRouteFromUrl } from './utils/routeUtils.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User } from 'lucide-react';
 
-const getInitialPageState = () => {
-  if (typeof window === 'undefined') return { page: 'home', propId: null };
-
-  // Detect whether this is an existing active tab session or a reopened tab/window
-  let isExistingTabSession = false;
-  try {
-    isExistingTabSession = sessionStorage.getItem('easeland_tab_session') === 'active';
-  } catch (e) {}
-
-  // Clean up any legacy localStorage page persistence so stale pages never linger across closes
-  try {
-    localStorage.removeItem('easeland_active_page');
-  } catch (e) {}
-
-  // When tab/site was closed and reopened: ALWAYS open the Home Page!
-  if (!isExistingTabSession) {
-    try {
-      sessionStorage.setItem('easeland_tab_session', 'active');
-      if (window.location.pathname !== '/' || window.location.search !== '') {
-        window.history.replaceState(null, '', '/');
-      }
-    } catch (e) {}
-    return { page: 'home', propId: null };
-  }
-
-  // Active tab session (e.g. user refreshed the current open tab):
-  const rawPath = window.location.pathname || '/';
-  const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
-  const search = window.location.search || '';
-  const urlParams = new URLSearchParams(search);
-  const modeParam = urlParams.get('mode');
-
-  if (cleanPath === '/admin' || modeParam === 'admin') return { page: 'admin', propId: null };
-
-  const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
-  if (propertyMatch && propertyMatch[1]) {
-    return { page: 'property-detail', propId: propertyMatch[1] };
-  }
-
-  if (cleanPath.startsWith('/properties')) return { page: 'map', propId: null };
-  if (cleanPath === '/crm' || modeParam === 'crm' || urlParams.get('view') === 'crm') return { page: 'crm', propId: null };
-  if (cleanPath === '/buy') return { page: 'buy', propId: null };
-  if (cleanPath === '/rent') return { page: 'rent', propId: null };
-  if (cleanPath === '/sell') return { page: 'sell', propId: null };
-  if (cleanPath === '/post-property') return { page: 'post-property', propId: null };
-  if (cleanPath === '/dashboard') return { page: 'dashboard', propId: null };
-  if (cleanPath === '/wishlist') return { page: 'wishlist', propId: null };
-  if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') return { page: 'privacy-policy', propId: null };
-
-  return { page: 'home', propId: null };
-};
+export const getInitialPageState = parseRouteFromUrl;
 
 export default function App() {
   const { user: authUser, profile: authProfile, loading: authLoading, logoutUser, pending2FASession, complete2FASession, cancel2FASession, isProfileIncomplete } = useAuth();
@@ -192,23 +143,28 @@ export default function App() {
   const [dashboardTabKey, setDashboardTabKey] = useState(Date.now());
 
   // Search & Filter State
-  const [filters, setFilters] = useState({
-    query: '',
-    purpose: '',
-    propertyType: '',
-    state: '',
-    district: '',
-    city: '',
-    locality: '',
-    minPrice: '',
-    maxPrice: '',
-    minArea: '',
-    maxArea: '',
-    bedrooms: '',
-    facing: '',
-    furnishing: '',
-    amenities: [],
-    sortBy: 'newest'
+  const [filters, setFilters] = useState(() => {
+    if (initialPageState.filters) {
+      return createDefaultFilterState(initialPageState.filters);
+    }
+    return {
+      query: '',
+      purpose: '',
+      propertyType: '',
+      state: '',
+      district: '',
+      city: '',
+      locality: '',
+      minPrice: '',
+      maxPrice: '',
+      minArea: '',
+      maxArea: '',
+      bedrooms: '',
+      facing: '',
+      furnishing: '',
+      amenities: [],
+      sortBy: 'newest'
+    };
   });
 
   const [properties, setProperties] = useState([]);
@@ -351,94 +307,19 @@ export default function App() {
   };
 
   const syncStateFromUrl = () => {
-    // If this is a newly reopened tab/window, enforce Home Page
-    let isExistingTabSession = false;
-    try {
-      isExistingTabSession = sessionStorage.getItem('easeland_tab_session') === 'active';
-    } catch (e) {}
-
-    if (!isExistingTabSession) {
-      try {
-        sessionStorage.setItem('easeland_tab_session', 'active');
-        if (window.location.pathname !== '/' || window.location.search !== '') {
-          window.history.replaceState(null, '', '/');
-        }
-      } catch (e) {}
-      setActivePage('home');
-      return;
+    const route = getInitialPageState();
+    setActivePage(route.page);
+    if (route.propId) {
+      setActivePropertyId(route.propId);
     }
-
-    const rawPath = window.location.pathname || '/';
-    const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
-    const search = window.location.search || '';
-    const urlParams = new URLSearchParams(search);
-    const modeParam = urlParams.get('mode');
-
-    if (cleanPath === '/admin' || modeParam === 'admin') {
-      setActivePage('admin');
-      return;
-    }
-
-    if (cleanPath === '/' || cleanPath === '') {
-      setActivePage('home');
-      return;
-    }
-
-    const propertyMatch = cleanPath.match(/\/property\/([a-zA-Z0-9_-]+)/);
-    if (propertyMatch && propertyMatch[1]) {
-      setActivePropertyId(propertyMatch[1]);
-      setActivePage('property-detail');
-      return;
-    }
-
-    if (cleanPath.startsWith('/properties')) {
-      const parsedFilters = urlParamsToSearchState(search);
+    if (route.page === 'map') {
+      const parsedFilters = urlParamsToSearchState(window.location.search || '');
       setFilters(createDefaultFilterState(parsedFilters));
-      setActivePage('map');
-      return;
     }
-
-    if (cleanPath === '/buy') {
-      setActivePage('buy');
-      return;
+    if (route.page === 'dashboard' && route.tab) {
+      setDashboardTab(route.tab);
+      setDashboardTabKey(Date.now());
     }
-
-    if (cleanPath === '/rent') {
-      setActivePage('rent');
-      return;
-    }
-
-    if (cleanPath === '/sell') {
-      setActivePage('sell');
-      return;
-    }
-
-    if (cleanPath === '/post-property') {
-      setActivePage('post-property');
-      return;
-    }
-
-    if (cleanPath === '/dashboard') {
-      const tabParam = urlParams.get('tab');
-      if (tabParam) {
-        setDashboardTab(tabParam);
-        setDashboardTabKey(Date.now());
-      }
-      setActivePage('dashboard');
-      return;
-    }
-
-    if (cleanPath === '/wishlist') {
-      setActivePage('wishlist');
-      return;
-    }
-
-    if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') {
-      setActivePage('privacy-policy');
-      return;
-    }
-
-    setActivePage('home');
   };
 
   useEffect(() => {

@@ -118,7 +118,7 @@ export function urlParamsToSearchState(searchString = '') {
 
   const q = params.get('q') || '';
   const purposeParam = params.get('purpose');
-  const typeParam = params.get('type');
+  const typeParam = params.get('type') || params.get('propertyType');
   const stateParam = params.get('state') || '';
   const districtParam = params.get('district') || '';
   const cityParam = params.get('city') || '';
@@ -128,13 +128,13 @@ export function urlParamsToSearchState(searchString = '') {
   const maxPriceParam = params.get('maxPrice');
   const minAreaParam = params.get('minArea');
   const maxAreaParam = params.get('maxArea');
-  const bhkParam = params.get('bhk');
-  const bathsParam = params.get('baths');
+  const bhkParam = params.get('bhk') || params.get('bedrooms');
+  const bathsParam = params.get('baths') || params.get('bathrooms');
   const facingParam = params.get('facing');
   const furnishingParam = params.get('furnishing');
   const amenitiesParam = params.get('amenities');
-  const radiusParam = params.get('radius');
-  const nearParam = params.get('near');
+  const radiusParam = params.get('radius') || params.get('radiusKm');
+  const nearParam = params.get('near') || params.get('referencePlace');
   const areaUnitParam = params.get('areaUnit') || 'sq ft';
   const sortParam = params.get('sort');
 
