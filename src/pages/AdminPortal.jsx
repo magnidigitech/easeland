@@ -527,7 +527,7 @@ export default function AdminPortal({ onNavigate }) {
 
       const queueMap = new Map();
 
-      [...firebaseProps, ...postgresProps, ...localProps].forEach(p => {
+      [...localProps, ...firebaseProps, ...postgresProps].forEach(p => {
         if (!p || typeof p !== 'object') return;
         const pId = String(p.id || p.propertyId || p.referenceId || '');
         if (pId) {
@@ -545,17 +545,40 @@ export default function AdminPortal({ onNavigate }) {
             ...(Array.isArray(p.confidentialDocuments) ? p.confidentialDocuments : [])
           ];
 
-          let finalStatus = p.status || prev.status;
-          let finalListingStatus = p.listingStatus || prev.listingStatus;
+          // Re-audit edits preservation across all sources
+          const hasPendingEdits = Boolean(
+            p.hasPendingEdits === true ||
+            prev.hasPendingEdits === true ||
+            Boolean(p.pendingReauditData) ||
+            Boolean(prev.pendingReauditData)
+          );
+          const pendingReauditData = p.pendingReauditData || prev.pendingReauditData || null;
+          const reAuditStatus = (
+            p.reAuditStatus ||
+            prev.reAuditStatus ||
+            (hasPendingEdits ? 'PENDING_VERIFICATION' : null)
+          );
 
           const prevSt = String(prev.status || prev.listingStatus || '').toUpperCase();
           const pSt = String(p.status || p.listingStatus || '').toUpperCase();
           const prevTime = new Date(prev.updatedAt || 0).getTime();
           const pTime = new Date(p.updatedAt || 0).getTime();
 
-          if (prevTime > pTime && (prevSt === 'CHANGES_REQUIRED' || prevSt === 'CHANGES_REQUESTED' || prevSt === 'REJECTED' || prevSt === 'LIVE')) {
-            finalStatus = prev.status || prevSt;
-            finalListingStatus = prev.listingStatus || prevSt;
+          let finalStatus = p.status || prev.status || pSt || prevSt;
+          let finalListingStatus = p.listingStatus || prev.listingStatus || pSt || prevSt;
+
+          // If a property was explicitly resubmitted for verification (PENDING_VERIFICATION or UNDER_REVIEW),
+          // it must supersede any older CHANGES_REQUIRED, REJECTED, or DRAFT status!
+          if (pSt === 'PENDING_VERIFICATION' || pSt === 'UNDER_REVIEW') {
+            finalStatus = pSt;
+            finalListingStatus = pSt;
+          } else if (prevSt === 'PENDING_VERIFICATION' || prevSt === 'UNDER_REVIEW') {
+            if (pSt === 'CHANGES_REQUIRED' || pSt === 'REJECTED' || pSt === 'DRAFT') {
+              if (prevTime >= pTime) {
+                finalStatus = prevSt;
+                finalListingStatus = prevSt;
+              }
+            }
           }
 
           queueMap.set(pId, {
@@ -565,6 +588,9 @@ export default function AdminPortal({ onNavigate }) {
             propertyId: pId,
             status: finalStatus,
             listingStatus: finalListingStatus,
+            hasPendingEdits,
+            pendingReauditData,
+            reAuditStatus,
             media: mergedMedia.length > 0 ? mergedMedia : (p.media || prev.media || []),
             photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (prev.photos || []),
             documents: mergedDocs.length > 0 ? mergedDocs : (p.documents || prev.documents || []),
@@ -637,7 +663,8 @@ export default function AdminPortal({ onNavigate }) {
         // Check if property has pending edits submitted for re-audit
         const hasPendingReaudit = Boolean(
           (p.hasPendingEdits === true || Boolean(p.pendingReauditData)) &&
-          (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW')
+          (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW' || !p.reAuditStatus || p.reAuditStatus === 'PENDING') &&
+          p.reAuditStatus !== 'EDITS_REJECTED'
         );
 
         if (hasPendingReaudit) return true;
@@ -979,8 +1006,12 @@ export default function AdminPortal({ onNavigate }) {
     window.addEventListener('easeland-visitor-lead-updated', handleVisitorRefresh);
     window.addEventListener('easeland-visitor-lead-deleted', handleVisitorRefresh);
     window.addEventListener('storage', handleRefresh);
+    const pollTimer = setInterval(() => {
+      loadData();
+    }, 8000);
 
     return () => {
+      clearInterval(pollTimer);
       window.removeEventListener('easeland-users-updated', handleRefresh);
       window.removeEventListener('easeland-property-created', handleRefresh);
       window.removeEventListener('easeland-property-submitted', handleRefresh);
@@ -1566,7 +1597,13 @@ export default function AdminPortal({ onNavigate }) {
         id: propId,
         listingStatus: 'CHANGES_REQUIRED',
         status: 'CHANGES_REQUIRED',
+        listing_status: 'CHANGES_REQUIRED',
         isPublished: false,
+        is_published: false,
+        isPlatformVerified: false,
+        hasPendingEdits: false,
+        pendingReauditData: null,
+        reAuditStatus: null,
         ownerFacingNotes: note,
         verificationNotes: note,
         adminNotes: note,

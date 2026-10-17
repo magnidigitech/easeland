@@ -98,17 +98,35 @@ function saveLocalProperty(p, existingOverride = null) {
   const pId = p.propertyId || p.id;
   const existing = existingOverride || localPropsMap.get(pId) || {};
 
-  const isExistingLive = Boolean(
+  const existingStatusUpper = String(existing.status || existing.listing_status || existing.listingStatus || '').toUpperCase();
+  const existingListingStatusUpper = String(existing.listing_status || existing.listingStatus || '').toUpperCase();
+  const incomingStatusUpper = String(p.status || p.listing_status || p.listingStatus || '').toUpperCase();
+
+  const isExplicitPendingResubmit = (
+    incomingStatusUpper === 'PENDING_VERIFICATION' ||
+    incomingStatusUpper === 'UNDER_REVIEW'
+  ) && !p.isAlreadyLive && !p.hasPendingEdits && !p.pendingReauditData;
+
+  const existingIsNonLive = (
+    existingStatusUpper === 'CHANGES_REQUIRED' ||
+    existingStatusUpper === 'CHANGES_REQUESTED' ||
+    existingListingStatusUpper === 'CHANGES_REQUIRED' ||
+    existingListingStatusUpper === 'CHANGES_REQUESTED' ||
+    existingStatusUpper === 'REJECTED' ||
+    existingListingStatusUpper === 'REJECTED' ||
+    existingStatusUpper === 'DRAFT' ||
+    existingListingStatusUpper === 'DRAFT'
+  );
+
+  const isExistingLive = !isExplicitPendingResubmit && !existingIsNonLive && Boolean(
     p.isAlreadyLive === true ||
-    existing.listing_status === 'LIVE' ||
-    existing.listingStatus === 'LIVE' ||
-    existing.status === 'LIVE' ||
-    existing.status === 'APPROVED' ||
-    existing.listingStatus === 'APPROVED' ||
-    existing.status === 'APPROVED_LIVE' ||
-    existing.is_published === true ||
-    existing.isPublished === true ||
-    existing.isPlatformVerified === true
+    existingStatusUpper === 'LIVE' ||
+    existingStatusUpper === 'APPROVED' ||
+    existingStatusUpper === 'APPROVED_LIVE' ||
+    existingListingStatusUpper === 'LIVE' ||
+    existingListingStatusUpper === 'APPROVED' ||
+    (existing.is_published === true && existing.isPlatformVerified === true) ||
+    (existing.isPublished === true && existing.isPlatformVerified === true)
   );
 
   const isAdminApproval = Boolean(
@@ -193,7 +211,12 @@ function saveLocalProperty(p, existingOverride = null) {
       updatedAt: new Date().toISOString()
     };
   } else {
-    // New listing creation or Admin approved verification
+    // New listing creation, re-submission after changes requested, or Admin approved verification
+    const isPendingResubmit = (
+      incomingStatusUpper === 'PENDING_VERIFICATION' ||
+      incomingStatusUpper === 'UNDER_REVIEW'
+    );
+
     updated = {
       ...existing,
       ...p,
@@ -210,6 +233,19 @@ function saveLocalProperty(p, existingOverride = null) {
       embeddedVideoUrl: p.embeddedVideoUrl || existing.embeddedVideoUrl || null,
       updatedAt: new Date().toISOString()
     };
+
+    if (isPendingResubmit && !isAdminApproval) {
+      updated.status = 'PENDING_VERIFICATION';
+      updated.listingStatus = 'PENDING_VERIFICATION';
+      updated.listing_status = 'PENDING_VERIFICATION';
+      updated.verificationStatus = 'Pending Verification';
+      updated.isPublished = false;
+      updated.is_published = false;
+      updated.isPlatformVerified = false;
+      updated.hasPendingEdits = false;
+      updated.pendingReauditData = null;
+      updated.reAuditStatus = null;
+    }
 
     if (isAdminApproval) {
       updated.hasPendingEdits = false;

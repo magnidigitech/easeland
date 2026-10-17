@@ -391,4 +391,67 @@ describe('EaseLand Live Property Re-Verification & Modifications Protection Suit
     assert.strictEqual(globalThis.localStorage.getItem('easeland_wizard_location_' + pId), null);
     assert.strictEqual(globalThis.sessionStorage.getItem('easeland_editing_property'), null);
   });
+
+  it('8. Re-submission after CHANGES_REQUIRED properly reflects in Verification Queue as PENDING_VERIFICATION', () => {
+    // 1. Property was previously CHANGES_REQUIRED
+    const changesRequiredProp = {
+      id: 'prop-changes-req-resubmit',
+      propertyId: 'prop-changes-req-resubmit',
+      title: 'Amaravati Highway Plot',
+      status: 'CHANGES_REQUIRED',
+      listingStatus: 'CHANGES_REQUIRED',
+      isPublished: false,
+      isPlatformVerified: false
+    };
+
+    // Store in localStorage as old stale state on admin client
+    globalThis.localStorage.setItem('easeland_properties', JSON.stringify([changesRequiredProp]));
+
+    // 2. Owner edits and resubmits for verification
+    const resubmittedData = {
+      ...changesRequiredProp,
+      title: 'Amaravati Highway Plot - Updated Boundary',
+      status: 'PENDING_VERIFICATION',
+      listingStatus: 'PENDING_VERIFICATION',
+      listing_status: 'PENDING_VERIFICATION',
+      isPublished: false,
+      isPlatformVerified: false
+    };
+
+    // When postgres has the resubmitted property, queue building must reflect PENDING_VERIFICATION
+    mockApi.addProperty(resubmittedData, false);
+    const queue = mockApi.getVerificationQueue();
+    const queueIds = queue.map(q => String(q.id || q.propertyId));
+
+    assert.strictEqual(queueIds.includes('prop-changes-req-resubmit'), true, 'Resubmitted property must appear in verification queue');
+    const queueItem = queue.find(q => String(q.id || q.propertyId) === 'prop-changes-req-resubmit');
+    assert.strictEqual(queueItem.status, 'PENDING_VERIFICATION');
+  });
+
+  it('9. Re-submission of LIVE property with pending modifications reflects in Verification Queue for re-audit', () => {
+    const livePropWithPendingEdits = {
+      id: 'prop-live-reaudit-check',
+      propertyId: 'prop-live-reaudit-check',
+      title: 'Gachibowli High-Rise Commercial Space',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      pendingReauditData: {
+        price: 95000000,
+        description: 'Updated floor plan specs'
+      }
+    };
+
+    mockApi.addProperty(livePropWithPendingEdits, false);
+    const queue = mockApi.getVerificationQueue();
+    const queueIds = queue.map(q => String(q.id || q.propertyId));
+
+    assert.strictEqual(queueIds.includes('prop-live-reaudit-check'), true, 'Live property with pending modifications must reflect in verification queue');
+    const queueItem = queue.find(q => String(q.id || q.propertyId) === 'prop-live-reaudit-check');
+    assert.strictEqual(queueItem.hasPendingEdits, true);
+    assert.strictEqual(queueItem.reAuditStatus, 'PENDING_VERIFICATION');
+  });
 });

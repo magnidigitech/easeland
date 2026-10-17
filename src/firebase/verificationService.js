@@ -62,6 +62,35 @@ export async function getVerificationQueue({
     const snap = await getDocs(q);
     let properties = snap.docs.map(doc => doc.data());
 
+    // Also include PostgreSQL properties with pending verification or pending re-audit
+    if (typeof window !== 'undefined') {
+      try {
+        const pgRes = await fetch('/api/properties');
+        if (pgRes.ok) {
+          const pgData = await pgRes.json();
+          if (pgData.success && Array.isArray(pgData.properties)) {
+            const pgQueue = pgData.properties.filter(p => {
+              if (!p) return false;
+              const st = String(p.status || p.listingStatus || '').toUpperCase();
+              const lst = String(p.listingStatus || '').toUpperCase();
+              const isPending = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW';
+              const hasPendingReaudit = Boolean(
+                (p.hasPendingEdits === true || Boolean(p.pendingReauditData)) &&
+                (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW' || !p.reAuditStatus)
+              );
+              return isPending || hasPendingReaudit;
+            });
+            const pMap = new Map();
+            [...properties, ...pgQueue].forEach(p => {
+              const id = String(p.propertyId || p.id || '');
+              if (id) pMap.set(id, { ...pMap.get(id), ...p });
+            });
+            properties = Array.from(pMap.values());
+          }
+        }
+      } catch (e) {}
+    }
+
     // Sort in memory by createdAt ascending
     properties.sort((a, b) => {
       const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (new Date(a.createdAt || 0).getTime() || 0);
@@ -465,6 +494,13 @@ export async function requestVerificationChanges(propertyId, adminUid, adminName
       id: propertyId,
       listingStatus: ListingStatus.CHANGES_REQUIRED,
       status: ListingStatus.CHANGES_REQUIRED,
+      listing_status: ListingStatus.CHANGES_REQUIRED,
+      isPublished: false,
+      is_published: false,
+      isPlatformVerified: false,
+      hasPendingEdits: false,
+      pendingReauditData: null,
+      reAuditStatus: null,
       verificationNotes: notes,
       ownerFacingNotes: notes,
       adminNotes: notes,

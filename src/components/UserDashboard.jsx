@@ -347,17 +347,21 @@ export default function UserDashboard({
       }
       existing = existing || {};
 
-      const isLive = Boolean(
+      const pSt = String(p.status || p.listingStatus || '').toUpperCase();
+      const pLst = String(p.listingStatus || '').toUpperCase();
+      const isPending = (pSt === 'PENDING_VERIFICATION' || pLst === 'PENDING_VERIFICATION' || pSt === 'UNDER_REVIEW' || pLst === 'UNDER_REVIEW');
+
+      const isLive = !isPending && Boolean(
         p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
-        p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED' ||
-        p.isPublished || p.isPlatformVerified ||
-        existing.status === 'LIVE' || existing.listingStatus === 'LIVE' || existing.status === 'APPROVED_LIVE' || existing.isPlatformVerified || existing.isPublished
+        p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
       );
-      const statusResolved = isLive
+      const statusResolved = isPending
+        ? 'PENDING_VERIFICATION'
+        : isLive
         ? 'LIVE'
-        : (p.listingStatus === 'REJECTED' || p.status === 'REJECTED' || existing.status === 'REJECTED')
+        : (p.listingStatus === 'REJECTED' || p.status === 'REJECTED')
         ? 'REJECTED'
-        : (p.listingStatus === 'CHANGES_REQUIRED' || p.status === 'CHANGES_REQUIRED' || existing.status === 'CHANGES_REQUIRED')
+        : (p.listingStatus === 'CHANGES_REQUIRED' || p.status === 'CHANGES_REQUIRED')
         ? 'CHANGES_REQUIRED'
         : (p.listingStatus || existing.listingStatus || p.status || existing.status || 'DRAFT');
 
@@ -371,8 +375,8 @@ export default function UserDashboard({
         listingStatus: statusResolved,
         status: statusResolved,
         verificationStatus: isLive ? 'Platform Verified' : (p.verificationStatus || existing.verificationStatus || 'Pending Verification'),
-        isPlatformVerified: Boolean(isLive || p.isPlatformVerified || existing.isPlatformVerified),
-        isPublished: Boolean(isLive || p.isPublished || existing.isPublished),
+        isPlatformVerified: Boolean(isLive),
+        isPublished: Boolean(isLive),
         verificationNotes: noteCandidate,
         ownerFacingNotes: noteCandidate,
         adminNotes: noteCandidate,
@@ -402,20 +406,23 @@ export default function UserDashboard({
 
     const thumbImage = getFirstUploadedImage(p);
 
-    const isLiveProp = Boolean(
+    const propSt = String(p.status || p.listingStatus || '').toUpperCase();
+    const propLst = String(p.listingStatus || '').toUpperCase();
+    const isPendingAudit = propSt === 'PENDING_VERIFICATION' || propLst === 'PENDING_VERIFICATION' || propSt === 'UNDER_REVIEW' || propLst === 'UNDER_REVIEW';
+
+    const isLiveProp = !isPendingAudit && Boolean(
       p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
-      p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED' ||
-      p.isPublished || p.isPlatformVerified
+      p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
     );
 
-    const statusVal = isLiveProp
+    const statusVal = isPendingAudit
+      ? 'PENDING_VERIFICATION'
+      : isLiveProp
       ? 'LIVE'
       : (p.status === 'REJECTED' || p.listingStatus === 'REJECTED')
       ? 'REJECTED'
       : (p.status === 'CHANGES_REQUIRED' || p.listingStatus === 'CHANGES_REQUIRED')
       ? 'CHANGES_REQUIRED'
-      : (p.status === 'PENDING_VERIFICATION' || p.listingStatus === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.listingStatus === 'UNDER_REVIEW')
-      ? 'PENDING_VERIFICATION'
       : (p.status || p.listingStatus || 'DRAFT');
 
     let adminNoteVal = p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || p.rawProperty?.verificationNotes || p.rawProperty?.ownerFacingNotes || p.rawProperty?.adminNotes || p.rawProperty?.adminFeedback;

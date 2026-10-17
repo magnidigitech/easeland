@@ -784,16 +784,27 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
       }
     }
 
-    const isAlreadyLive = Boolean(
+    const propStatusUpper = String(propData.status || propData.listingStatus || '').toUpperCase();
+    const propListingStatusUpper = String(propData.listingStatus || '').toUpperCase();
+    const isExplicitNonLive = (
+      propStatusUpper === 'CHANGES_REQUIRED' ||
+      propStatusUpper === 'CHANGES_REQUESTED' ||
+      propListingStatusUpper === 'CHANGES_REQUIRED' ||
+      propListingStatusUpper === 'CHANGES_REQUESTED' ||
+      propStatusUpper === 'REJECTED' ||
+      propListingStatusUpper === 'REJECTED' ||
+      propStatusUpper === 'DRAFT' ||
+      propListingStatusUpper === 'DRAFT'
+    );
+
+    const isAlreadyLive = !isExplicitNonLive && Boolean(
       formData?.isAlreadyLive ||
-      propData.listingStatus === ListingStatus.LIVE ||
-      propData.status === ListingStatus.LIVE ||
-      propData.listingStatus === 'LIVE' ||
-      propData.status === 'LIVE' ||
-      propData.status === 'APPROVED' ||
-      propData.listingStatus === 'APPROVED' ||
-      propData.isPublished ||
-      propData.isPlatformVerified
+      propStatusUpper === 'LIVE' ||
+      propStatusUpper === 'APPROVED' ||
+      propStatusUpper === 'APPROVED_LIVE' ||
+      propListingStatusUpper === 'LIVE' ||
+      propListingStatusUpper === 'APPROVED' ||
+      (propData.isPlatformVerified === true && propData.isPublished === true)
     );
 
     let publicPayload = {};
@@ -843,8 +854,14 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         ...derived,
         listingStatus: ListingStatus.PENDING_VERIFICATION,
         status: ListingStatus.PENDING_VERIFICATION,
+        listing_status: ListingStatus.PENDING_VERIFICATION,
         verificationStatus: 'Pending Verification',
         isPublished: false,
+        is_published: false,
+        isPlatformVerified: false,
+        hasPendingEdits: false,
+        pendingReauditData: null,
+        reAuditStatus: null,
         submittedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
