@@ -633,19 +633,58 @@ export async function updateOwnerProperty(propertyId, ownerId, updates) {
       ...permittedUpdates
     } = updates;
 
-    // Check for material edits requiring reverification (location changes, land type/purpose/area changes)
-    let materialEdit = false;
-    if (permittedUpdates.location && JSON.stringify(permittedUpdates.location) !== JSON.stringify(currentData.location)) {
-      materialEdit = true;
-    }
-    if (permittedUpdates.propertyType && permittedUpdates.propertyType !== currentData.propertyType) {
-      materialEdit = true;
-    }
-    if (permittedUpdates.purpose && permittedUpdates.purpose !== currentData.purpose) {
-      materialEdit = true;
-    }
-    if (permittedUpdates.area && Number(permittedUpdates.area) !== Number(currentData.area)) {
-      materialEdit = true;
+    // Check if property is already LIVE / VERIFIED
+    const isAlreadyLive = Boolean(
+      currentData.listingStatus === ListingStatus.LIVE ||
+      currentData.status === ListingStatus.LIVE ||
+      currentData.listingStatus === 'LIVE' ||
+      currentData.status === 'LIVE' ||
+      currentData.isPlatformVerified ||
+      currentData.isPublished
+    );
+
+    if (isAlreadyLive) {
+      // Owner is attempting to change details on a live & verified listing.
+      // Under NO circumstances overwrite root live fields or unpublish the property!
+      // Stage the updates in pendingReauditData and flag for Admin Re-Verification.
+      const existingPending = currentData.pendingReauditData || currentData.pendingEdits || {};
+      const mergedPending = { ...existingPending, ...permittedUpdates };
+      const derived = computeDerivedPropertyFields({ ...currentData, ...mergedPending });
+
+      const payload = {
+        ...currentData, // Retains all existing approved data visible to public!
+        hasPendingEdits: true,
+        reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+        reAuditRequestedAt: new Date().toISOString(),
+        pendingReauditData: {
+          ...mergedPending,
+          ...derived,
+          updatedAt: new Date().toISOString()
+        },
+        listingStatus: ListingStatus.LIVE,
+        status: ListingStatus.LIVE,
+        isPublished: true,
+        isPlatformVerified: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      await syncPropertyToPostgres(payload);
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        mockApi.addProperty(payload, false);
+      } catch (e) {}
+
+      try {
+        await updateDoc(propRef, {
+          hasPendingEdits: true,
+          reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+          reAuditRequestedAt: serverTimestamp(),
+          pendingReauditData: payload.pendingReauditData,
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) {}
+
+      return { success: true, materialEdit: true, reAuditPending: true };
     }
 
     const merged = { ...currentData, ...permittedUpdates };
@@ -657,14 +696,8 @@ export async function updateOwnerProperty(propertyId, ownerId, updates) {
       updatedAt: serverTimestamp()
     };
 
-    // If a LIVE property undergoes a material edit, reset listingStatus to PENDING_VERIFICATION and unpublish
-    if (currentData.listingStatus === ListingStatus.LIVE && materialEdit) {
-      payload.listingStatus = ListingStatus.PENDING_VERIFICATION;
-      payload.isPublished = false;
-    }
-
     await updateDoc(propRef, payload);
-    return { success: true, materialEdit };
+    return { success: true, materialEdit: false };
   } catch (error) {
     return { success: false, error: formatFirestoreError(error) };
   }
@@ -688,18 +721,29 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
       console.warn('Property fetch warning prior to submission:', e);
     }
 
-    const isAlreadyLive = propData.listingStatus === ListingStatus.LIVE || propData.status === ListingStatus.LIVE || propData.isPublished || propData.isPlatformVerified;
+    const isAlreadyLive = Boolean(
+      propData.listingStatus === ListingStatus.LIVE ||
+      propData.status === ListingStatus.LIVE ||
+      propData.listingStatus === 'LIVE' ||
+      propData.status === 'LIVE' ||
+      propData.isPublished ||
+      propData.isPlatformVerified
+    );
 
     let publicPayload = {};
 
     if (isAlreadyLive && formData) {
       // Re-Audit Workflow: Keep existing live data published on site while staging new edits for Admin verification
+      const derived = computeDerivedPropertyFields({ ...propData, ...formData });
       publicPayload = {
         ...propData,
         hasPendingEdits: true,
         reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+        reAuditRequestedAt: new Date().toISOString(),
         pendingReauditData: {
           ...formData,
+          ...derived,
+          submittedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         },
         listingStatus: ListingStatus.LIVE,
@@ -750,7 +794,7 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         ...publicPayload,
         id: propertyId,
         propertyId,
-        referenceId: publicPayload.referenceId || `EL-PROP-${propertyId}`,
+        referenceId: publicPayload.referenceId || 'EL-PROP-' + propertyId,
         ownerId,
         ownerPrivateEmail: publicPayload.ownerPrivateEmail || '',
         createdAt: publicPayload.createdAt || new Date().toISOString()
@@ -772,6 +816,18 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           const parsed = JSON.parse(rawUserProps);
           const updated = parsed.map(p => {
             if (p && String(p.id || p.propertyId) === pIdStr) {
+              if (isAlreadyLive) {
+                return {
+                  ...p,
+                  hasPendingEdits: true,
+                  reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+                  pendingReauditData: publicPayload.pendingReauditData,
+                  listingStatus: ListingStatus.LIVE,
+                  status: ListingStatus.LIVE,
+                  isPublished: true,
+                  isPlatformVerified: true
+                };
+              }
               return {
                 ...p,
                 listingStatus: ListingStatus.PENDING_VERIFICATION,
@@ -790,6 +846,18 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           const parsedAll = JSON.parse(rawAllProps);
           const updatedAll = parsedAll.map(p => {
             if (p && String(p.id || p.propertyId) === pIdStr) {
+              if (isAlreadyLive) {
+                return {
+                  ...p,
+                  hasPendingEdits: true,
+                  reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+                  pendingReauditData: publicPayload.pendingReauditData,
+                  listingStatus: ListingStatus.LIVE,
+                  status: ListingStatus.LIVE,
+                  isPublished: true,
+                  isPlatformVerified: true
+                };
+              }
               return {
                 ...p,
                 listingStatus: ListingStatus.PENDING_VERIFICATION,
@@ -1085,6 +1153,73 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
       referenceId: _r,
       ...permittedUpdates
     } = stepData;
+
+    // Check if the property is already LIVE / VERIFIED
+    let isAlreadyLive = Boolean(
+      currentData.listingStatus === ListingStatus.LIVE ||
+      currentData.status === ListingStatus.LIVE ||
+      currentData.listingStatus === 'LIVE' ||
+      currentData.status === 'LIVE' ||
+      currentData.isPlatformVerified ||
+      currentData.isPublished
+    );
+
+    if (!isAlreadyLive && typeof window !== 'undefined') {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj && (pObj.status === 'LIVE' || pObj.listingStatus === 'LIVE' || pObj.isPlatformVerified || pObj.isPublished)) {
+          isAlreadyLive = true;
+          currentData = { ...pObj, ...currentData };
+        }
+      } catch (e) {}
+    }
+
+    if (isAlreadyLive) {
+      // The property is already LIVE on the marketplace.
+      // Under NO circumstances overwrite root live fields or unpublish the property!
+      // Stage the updates in pendingReauditData and flag for Admin Re-Verification.
+      const existingPending = currentData.pendingReauditData || currentData.pendingEdits || {};
+      const mergedPending = { ...existingPending, ...permittedUpdates };
+      const derived = computeDerivedPropertyFields({ ...currentData, ...mergedPending });
+
+      const publicPayload = {
+        ...currentData, // Retains live approved fields for public users!
+        hasPendingEdits: true,
+        reAuditStatus: currentData.reAuditStatus === ListingStatus.PENDING_VERIFICATION ? ListingStatus.PENDING_VERIFICATION : 'DRAFT',
+        pendingReauditData: {
+          ...mergedPending,
+          ...derived,
+          lastStep,
+          updatedAt: new Date().toISOString()
+        },
+        listingStatus: ListingStatus.LIVE,
+        status: ListingStatus.LIVE,
+        isPublished: true,
+        isPlatformVerified: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      await syncPropertyToPostgres(publicPayload);
+
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        mockApi.addProperty(publicPayload, false);
+      } catch (e) {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: publicPayload }));
+      }
+
+      try {
+        await setDoc(propRef, {
+          ...publicPayload,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (e) {}
+
+      return { success: true, isAlreadyLive: true };
+    }
 
     const merged = { ...currentData, ...permittedUpdates };
     const pType = String(merged.propertyType || 'OPEN_PLOT').toUpperCase();

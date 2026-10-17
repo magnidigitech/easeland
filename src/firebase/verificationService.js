@@ -203,16 +203,32 @@ export async function approvePropertyVerification(propertyId, adminUid, adminNam
       if (snap.exists()) propData = snap.data();
     } catch (e) {}
 
-    const pendingEdits = propData.pendingReauditData || {};
+    if (!propData || Object.keys(propData).length === 0) {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) propData = pObj;
+      } catch (e) {}
+    }
+
+    const pendingEdits = propData.pendingReauditData || propData.pendingEdits || {};
+    const merged = { ...propData, ...pendingEdits };
+    let derived = {};
+    try {
+      const { computeDerivedPropertyFields } = await import('./propertyService.js');
+      derived = computeDerivedPropertyFields(merged);
+    } catch (e) {}
 
     const updatedPayload = {
       ...propData,
       ...pendingEdits,
+      ...derived,
       propertyId,
       id: propertyId,
       hasPendingEdits: false,
       reAuditStatus: null,
       pendingReauditData: null,
+      pendingEdits: null,
       listingStatus: ListingStatus.LIVE,
       status: ListingStatus.LIVE,
       isPlatformVerified: true,
@@ -251,6 +267,12 @@ export async function approvePropertyVerification(propertyId, adminUid, adminNam
     try {
       const propRef = doc(db, 'properties', propertyId);
       await updateDoc(propRef, {
+        ...pendingEdits,
+        ...derived,
+        hasPendingEdits: false,
+        reAuditStatus: null,
+        pendingReauditData: null,
+        pendingEdits: null,
         listingStatus: ListingStatus.LIVE,
         isPlatformVerified: true,
         isPublished: true,
@@ -273,10 +295,90 @@ export async function approvePropertyVerification(propertyId, adminUid, adminNam
         timestamp: serverTimestamp()
       });
 
-      await logAdminActivity('PROPERTY_APPROVED', `Property ${propertyId} (${propData.title || ''}) approved for LIVE marketplace by ${adminName}`, adminUid, adminName);
+      await logAdminActivity('PROPERTY_APPROVED', 'Property ' + propertyId + ' (' + (propData.title || '') + ') approved for LIVE marketplace by ' + adminName, adminUid, adminName);
     } catch (fsErr) {
       console.warn('Firestore approval save fallback:', fsErr.message);
     }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: formatFirestoreError(error) };
+  }
+}
+
+/**
+ * Admin Action: Reject Proposed Edits on a LIVE property (Previous Approved Listing remains LIVE)
+ */
+export async function rejectPropertyEdits(propertyId, adminUid, adminName = 'EaseLand Auditor', notes = '') {
+  try {
+    if (!propertyId || !adminUid) return { success: false, error: 'Property ID and Admin UID are required.' };
+    
+    let propData = {};
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      const snap = await getDoc(propRef);
+      if (snap.exists()) propData = snap.data();
+    } catch (e) {}
+
+    if (!propData || Object.keys(propData).length === 0) {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) propData = pObj;
+      } catch (e) {}
+    }
+
+    const updatedPayload = {
+      ...propData,
+      propertyId,
+      id: propertyId,
+      hasPendingEdits: false,
+      reAuditStatus: 'EDITS_REJECTED',
+      pendingReauditData: null,
+      pendingEdits: null,
+      listingStatus: ListingStatus.LIVE,
+      status: ListingStatus.LIVE,
+      isPlatformVerified: true,
+      isPublished: true,
+      adminFeedback: notes || 'Proposed changes rejected by Admin. Previously approved details remain live.',
+      verificationNotes: notes || 'Proposed changes rejected by Admin. Previously approved details remain live.',
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      const { syncPropertyToPostgres } = await import('./propertyService.js');
+      await syncPropertyToPostgres(updatedPayload);
+    } catch (e) {}
+
+    try {
+      const { mockApi } = await import('../services/mockApi.js');
+      mockApi.addProperty(updatedPayload, false);
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      try {
+        const rawSub = localStorage.getItem('easeland_submitted_properties');
+        if (rawSub) {
+          const parsedSub = JSON.parse(rawSub);
+          if (Array.isArray(parsedSub)) {
+            localStorage.setItem('easeland_submitted_properties', JSON.stringify(parsedSub.filter(id => String(id) !== String(propertyId))));
+          }
+        }
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: updatedPayload }));
+    }
+
+    try {
+      const propRef = doc(db, 'properties', propertyId);
+      await updateDoc(propRef, {
+        hasPendingEdits: false,
+        reAuditStatus: 'EDITS_REJECTED',
+        pendingReauditData: null,
+        pendingEdits: null,
+        adminFeedback: notes || 'Proposed changes rejected by Admin.',
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {}
 
     return { success: true };
   } catch (error) {

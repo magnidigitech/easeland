@@ -37,6 +37,36 @@ export default function PropertyReviewStep({
   const [errorMsg, setErrorMsg] = useState(null);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
+  const [isExistingLive, setIsExistingLive] = useState(() => {
+    if (formData?.isAlreadyLive || formData?.listingStatus === 'LIVE' || formData?.status === 'LIVE' || formData?.isPlatformVerified || formData?.isPublished) {
+      return true;
+    }
+    if (typeof window !== 'undefined' && propertyId) {
+      try {
+        const stored = localStorage.getItem('easeland_properties');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const match = Array.isArray(list) && list.find(p => (p.propertyId || p.id) === propertyId);
+          if (match && (match.listingStatus === 'LIVE' || match.status === 'LIVE' || match.isPublished || match.isPlatformVerified)) {
+            return true;
+          }
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (propertyId) {
+      import('../services/mockApi.js').then(({ mockApi }) => {
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj && (pObj.listingStatus === 'LIVE' || pObj.status === 'LIVE' || pObj.isPublished || pObj.isPlatformVerified)) {
+          setIsExistingLive(true);
+        }
+      }).catch(() => {});
+    }
+  }, [propertyId]);
+
   const [reviewMedia, setReviewMedia] = useState(() => {
     if (Array.isArray(formData.media) && formData.media.length > 0) return formData.media;
     if (Array.isArray(formData.photos) && formData.photos.length > 0) return formData.photos;
@@ -193,22 +223,36 @@ export default function PropertyReviewStep({
             Ref: {referenceId || 'EL-PROP-DRAFT'}
           </span>
           <h2 className="text-2xl font-extrabold text-brand-charcoal">
-            Property Submitted for Verification!
+            {isExistingLive ? 'Modifications Submitted for Re-Verification!' : 'Property Submitted for Verification!'}
           </h2>
           <p className="text-xs text-gray-600 font-medium leading-relaxed">
-            Your property listing has been successfully submitted to the EaseLand Verification Queue. EaseLand Admins will review your location, specifications, media, and legal documents.
+            {isExistingLive
+              ? 'Your proposed listing modifications have been safely submitted to the EaseLand Verification Queue for Admin Re-Audit.'
+              : 'Your property listing has been successfully submitted to the EaseLand Verification Queue. EaseLand Admins will review your location, specifications, media, and legal documents.'}
           </p>
         </div>
 
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs space-y-1 text-amber-900">
-          <span className="font-extrabold flex items-center gap-1.5 text-amber-950">
-            <Clock className="w-4 h-4 text-amber-600" />
-            <span>Marketplace Visibility Notice:</span>
-          </span>
-          <span>
-            Your property is currently in <strong>PENDING_VERIFICATION</strong> status. It will remain private and unlisted until EaseLand Admins approve the listing. You can monitor verification progress from your owner dashboard.
-          </span>
-        </div>
+        {isExistingLive ? (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-left text-xs space-y-1 text-emerald-950">
+            <span className="font-extrabold flex items-center gap-1.5 text-emerald-900">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Marketplace Visibility Protected:</span>
+            </span>
+            <span>
+              Your previously approved listing remains <strong>LIVE and visible to buyers</strong> on EaseLand without interruption. Only after an Admin approves your proposed modifications will the updated details appear on the live listing.
+            </span>
+          </div>
+        ) : (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs space-y-1 text-amber-900">
+            <span className="font-extrabold flex items-center gap-1.5 text-amber-950">
+              <Clock className="w-4 h-4 text-amber-600" />
+              <span>Marketplace Visibility Notice:</span>
+            </span>
+            <span>
+              Your property is currently in <strong>PENDING_VERIFICATION</strong> status. It will remain private and unlisted until EaseLand Admins approve the listing. You can monitor verification progress from your owner dashboard.
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -610,7 +654,7 @@ export default function PropertyReviewStep({
           }`}
         >
           <Send className="w-4 h-4" />
-          <span>{submitting ? 'Submitting for Verification...' : 'Submit for Verification'}</span>
+          <span>{submitting ? 'Submitting for Verification...' : (isExistingLive ? 'Submit Modifications for Re-Audit' : 'Submit for Verification')}</span>
         </button>
       </div>
 
@@ -624,12 +668,20 @@ export default function PropertyReviewStep({
               </div>
               <div>
                 <h3 className="text-lg font-extrabold text-brand-charcoal">Confirm Submission</h3>
-                <p className="text-xs text-gray-500 font-medium">Submit listing for EaseLand Verification</p>
+                <p className="text-xs text-gray-500 font-medium">{isExistingLive ? 'Submit modifications for EaseLand Re-Verification' : 'Submit listing for EaseLand Verification'}</p>
               </div>
             </div>
 
             <p className="text-xs text-gray-700 leading-relaxed">
-              Are you sure you want to submit <strong>"{formData.title}"</strong> for EaseLand Verification? Your listing will enter the verification queue and will remain hidden from the marketplace until approved.
+              {isExistingLive ? (
+                <>
+                  Are you sure you want to submit your updated modifications for <strong>"{formData.title}"</strong>? Your currently approved listing remains <strong>LIVE and visible to buyers</strong> while these new changes are being audited by Admins.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to submit <strong>"{formData.title}"</strong> for EaseLand Verification? Your listing will enter the verification queue and will remain hidden from the marketplace until approved.
+                </>
+              )}
             </p>
 
             <div className="pt-2 flex justify-end gap-3">

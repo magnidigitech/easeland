@@ -105,7 +105,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   // Helper: Apply loaded property data into wizard state
   const applyPropertyToForm = (propCandidate, overrideStep = null) => {
     if (!propCandidate) return;
-    const p = propCandidate.rawProperty || propCandidate;
+    const baseP = propCandidate.rawProperty || propCandidate;
+    const pendingData = baseP.pendingReauditData || baseP.pendingEdits || propCandidate.pendingReauditData || propCandidate.pendingEdits || {};
+    const p = {
+      ...baseP,
+      ...pendingData,
+      specs: { ...(baseP.specs || {}), ...(pendingData.specs || {}) }
+    };
     const pId = p.propertyId || p.id || propCandidate.propertyId || propCandidate.id;
     if (pId) setPropertyId(pId);
     const ref = p.referenceId || propCandidate.referenceId;
@@ -124,7 +130,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     let cachedLoc = locCandidate;
     if (typeof window !== 'undefined' && pId) {
       try {
-        const storedLoc = localStorage.getItem(`easeland_wizard_location_${pId}`) || localStorage.getItem(`easeland_wizard_location_${user?.uid}`);
+        const storedLoc = localStorage.getItem('easeland_wizard_location_' + pId) || localStorage.getItem('easeland_wizard_location_' + (user?.uid || ''));
         if (storedLoc) cachedLoc = JSON.parse(storedLoc);
       } catch (e) {}
     }
@@ -175,7 +181,16 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     const mediaList = Array.isArray(p.media) ? p.media : (Array.isArray(propCandidate.media) ? propCandidate.media : (Array.isArray(p.photos) ? p.photos : []));
     const photosList = Array.isArray(p.photos) ? p.photos : mediaList.filter(m => m.type === 'PHOTO');
 
+    const isLive = Boolean(
+      baseP.listingStatus === 'LIVE' ||
+      baseP.status === 'LIVE' ||
+      baseP.isPublished ||
+      baseP.isPlatformVerified ||
+      propCandidate.isAlreadyLive
+    );
+
     setFormData({
+      isAlreadyLive: isLive,
       title: p.title || propCandidate.title || '',
       category: p.category || propCandidate.category || 'Open Plot Ventures',
       propertyType: resolvedPropType,
@@ -187,8 +202,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT,
       description: p.description || propCandidate.description || '',
       specs: {
-        ...(p.specs || {}),
+        ...(baseP.specs || {}),
         ...(propCandidate.specs || {}),
+        ...(pendingData.specs || {}),
         ...(defaultFurn ? { furnishing: defaultFurn } : {}),
         areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT
       },

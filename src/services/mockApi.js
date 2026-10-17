@@ -1185,10 +1185,18 @@ export const mockApi = {
       const isChangesRequired = st === 'CHANGES_REQUIRED' || st === 'CHANGES_REQUESTED' || st === 'REVISION_REQUESTED' || lst === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUESTED' || lst === 'REVISION_REQUESTED';
       const isDraft = st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true;
 
+      // Check if property has pending edits submitted for re-audit
+      const hasPendingReaudit = Boolean(
+        (p.hasPendingEdits === true || Boolean(p.pendingReauditData)) &&
+        (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW')
+      );
+
+      if (hasPendingReaudit) return true;
+
       // Never show in verification queue if approved, rejected, changes requested, or draft
       if (isLive || isClosed || isChangesRequired || isDraft) return false;
 
-      const isPending = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED' || (p.hasPendingEdits && (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW'));
+      const isPending = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED';
 
       return isPending || (submittedIds.includes(pId) && !isDraft && !isChangesRequired && !isClosed && !isLive);
     });
@@ -1247,6 +1255,12 @@ export const mockApi = {
     const prop = all.find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr));
 
     if (prop) {
+      const pendingEdits = prop.pendingReauditData || prop.pendingEdits || {};
+      Object.assign(prop, pendingEdits);
+      prop.hasPendingEdits = false;
+      prop.reAuditStatus = null;
+      prop.pendingReauditData = null;
+      prop.pendingEdits = null;
       prop.status = 'LIVE';
       prop.listingStatus = 'LIVE';
       prop.isPlatformVerified = true;
@@ -1283,6 +1297,11 @@ export const mockApi = {
                   if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
                     return {
                       ...p,
+                      ...pendingEdits,
+                      hasPendingEdits: false,
+                      reAuditStatus: null,
+                      pendingReauditData: null,
+                      pendingEdits: null,
                       status: 'LIVE',
                       listingStatus: 'LIVE',
                       isPlatformVerified: true,
@@ -1301,6 +1320,71 @@ export const mockApi = {
 
         window.dispatchEvent(new CustomEvent('easeland-property-approved', { detail: prop }));
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: prop }));
+      }
+    }
+    return prop;
+  },
+
+  rejectPropertyEditsAdmin: (propertyId, reason = 'Proposed changes rejected by Admin') => {
+    const targetIdStr = String(propertyId);
+    let localProps = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localProps.push(...parsed);
+          }
+        });
+      }
+    } catch (e) {}
+
+    const all = [...properties, ...localProps];
+    let prop = all.find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr));
+    if (prop) {
+      prop.hasPendingEdits = false;
+      prop.reAuditStatus = 'EDITS_REJECTED';
+      prop.pendingReauditData = null;
+      prop.pendingEdits = null;
+      prop.adminFeedback = reason;
+      prop.verificationNotes = reason;
+
+      const idx = properties.findIndex(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr));
+      if (idx !== -1) {
+        properties[idx] = { ...properties[idx], ...prop };
+      } else {
+        properties.unshift(prop);
+      }
+      setStoredData('easeland_properties', properties);
+
+      if (typeof window !== 'undefined') {
+        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
+        keys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const updated = parsed.map(item => {
+                if (item && (String(item.id) === targetIdStr || String(item.propertyId) === targetIdStr || String(item.referenceId) === targetIdStr)) {
+                  return {
+                    ...item,
+                    hasPendingEdits: false,
+                    reAuditStatus: 'EDITS_REJECTED',
+                    pendingReauditData: null,
+                    pendingEdits: null,
+                    adminFeedback: reason,
+                    verificationNotes: reason
+                  };
+                }
+                return item;
+              });
+              localStorage.setItem(k, JSON.stringify(updated));
+            }
+          }
+        });
+        window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: prop }));
       }
     }
     return prop;

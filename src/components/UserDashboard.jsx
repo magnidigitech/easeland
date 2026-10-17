@@ -1176,75 +1176,89 @@ export default function UserDashboard({
 
                           {/* STATUS BADGE */}
                           <div>
-                            {(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (
+                            {prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW') ? (
+                              <span className="bg-amber-100 text-amber-900 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-300 shadow-sm animate-pulse">
+                                <Clock className="w-4 h-4 text-amber-600" />
+                                Live (Re-Verification Pending)
+                              </span>
+                            ) : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) ? (
                               <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                                 Live & Verified
                               </span>
-                            )}
-                            {!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING') && (
+                            ) : !(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING') ? (
                               <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-blue-200">
                                 <Clock className="w-4 h-4 text-blue-600" />
                                 Under Audit
                               </span>
-                            )}
-                            {prop.status === 'CHANGES_REQUIRED' && (
-                              <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-200">
-                                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                                Action Required
-                              </span>
-                            )}
-                            {prop.status === 'UNAVAILABLE' && (
-                              <span className="bg-orange-100 text-orange-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-orange-200">
-                                <Clock className="w-4 h-4 text-orange-600" />
-                                Paused
-                              </span>
-                            )}
-                            {prop.status === 'SOLD' && (
-                              <span className="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-purple-200">
-                                <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                                Sold
-                              </span>
-                            )}
-                            {prop.status === 'RENTED' && (
-                              <span className="bg-indigo-100 text-indigo-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-indigo-200">
-                                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
-                                Rented
-                              </span>
-                            )}
-                            {prop.status === 'DRAFT' && (
-                              <span className="bg-gray-100 text-gray-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-gray-200">
-                                <Edit className="w-4 h-4 text-gray-500" />
-                                Draft
-                              </span>
-                            )}
-                            {prop.status === 'REJECTED' && (
-                              <span className="bg-red-100 text-red-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-red-200">
-                                <XCircle className="w-4 h-4 text-red-600" />
-                                Rejected
-                              </span>
-                            )}
-                            {prop.status === 'ARCHIVED' && (
-                              <span className="bg-slate-100 text-slate-700 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-slate-200">
-                                <FileText className="w-4 h-4 text-slate-500" />
-                                Archived
-                              </span>
+                            ) : null}
+                            {!(prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
+                              <>
+                                {prop.status === 'CHANGES_REQUIRED' && (
+                                  <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-200">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                    Action Required
+                                  </span>
+                                )}
+                                {prop.status === 'UNAVAILABLE' && (
+                                  <span className="bg-orange-100 text-orange-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-orange-200">
+                                    <Clock className="w-4 h-4 text-orange-600" />
+                                    Paused
+                                  </span>
+                                )}
+                                {prop.status === 'SOLD' && (
+                                  <span className="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-purple-200">
+                                    <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                                    Sold
+                                  </span>
+                                )}
+                                {prop.status === 'RENTED' && (
+                                  <span className="bg-indigo-100 text-indigo-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-indigo-200">
+                                    <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                                    Rented
+                                  </span>
+                                )}
+                                {prop.status === 'DRAFT' && (
+                                  <span className="bg-gray-100 text-gray-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-gray-200">
+                                    <Edit className="w-4 h-4 text-gray-500" />
+                                    Draft
+                                  </span>
+                                )}
+                                {prop.status === 'REJECTED' && (
+                                  <span className="bg-red-100 text-red-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-red-200">
+                                    <XCircle className="w-4 h-4 text-red-600" />
+                                    Rejected
+                                  </span>
+                                )}
+                                {prop.status === 'ARCHIVED' && (
+                                  <span className="bg-slate-100 text-slate-700 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-slate-200">
+                                    <FileText className="w-4 h-4 text-slate-500" />
+                                    Archived
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
 
                         {/* ADMIN FEEDBACK BANNER */}
-                        <div className={`p-4 rounded-xl border text-xs font-medium ${prop.status === 'CHANGES_REQUIRED'
-                            ? 'bg-amber-50 text-amber-900 border-amber-200'
-                            : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                              : 'bg-blue-50 text-blue-900 border-blue-200'
-                          }`}>
+                        <div className={
+                          'p-4 rounded-xl border text-xs font-medium ' +
+                          (prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
+                            ? 'bg-amber-50 text-amber-950 border-amber-300 shadow-sm'
+                            : prop.status === 'CHANGES_REQUIRED'
+                              ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
+                                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                : 'bg-blue-50 text-blue-900 border-blue-200')
+                        }>
                           <span className="font-extrabold uppercase tracking-wider block mb-1">
                             Verification Status & Feedback:
                           </span>
                           <span>
-                            {prop.adminNote || (
+                            {prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
+                              ? 'Your recently modified details have been submitted for Admin Re-Audit. Your previously approved details remain active & LIVE to buyers on the marketplace without interruption. Once verified, the changes will automatically appear on the live listing.'
+                              : prop.adminNote || (
                               (!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW'))
                                 ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
                                 : ((prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)

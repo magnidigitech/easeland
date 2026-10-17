@@ -62,6 +62,7 @@ import {
   getVerificationWorkspaceData,
   startPropertyReview,
   approvePropertyVerification,
+  rejectPropertyEdits,
   requestVerificationChanges,
   rejectPropertyVerification
 } from '../firebase/verificationService.js';
@@ -633,11 +634,19 @@ export default function AdminPortal({ onNavigate }) {
         const isChangesRequired = st === 'CHANGES_REQUIRED' || st === 'CHANGES_REQUESTED' || st === 'REVISION_REQUESTED' || lst === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUESTED' || lst === 'REVISION_REQUESTED';
         const isDraft = st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true;
 
+        // Check if property has pending edits submitted for re-audit
+        const hasPendingReaudit = Boolean(
+          (p.hasPendingEdits === true || Boolean(p.pendingReauditData)) &&
+          (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW')
+        );
+
+        if (hasPendingReaudit) return true;
+
         // CRITICAL RULE: If ANY of the 3 actions took place (Live/Approved, Rejected, or Changes Requested), or if it's draft, NEVER show in Verification Queue!
         if (isLive || isClosed || isChangesRequired || isDraft) return false;
 
         // ONLY visible if actively in pending verification audit state (first submission or resubmission after changes)
-        const isPendingAudit = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED' || (p.hasPendingEdits === true && (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW'));
+        const isPendingAudit = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED';
 
         return isPendingAudit || (submittedIds.includes(pId) && !isDraft && !isChangesRequired && !isClosed && !isLive);
       });
@@ -1117,19 +1126,25 @@ export default function AdminPortal({ onNavigate }) {
       }
 
       // 3. PostgreSQL database sync (/api/properties)
+      const pendingEdits = selectedProperty?.pendingReauditData || selectedProperty?.pendingEdits || {};
+      const payload = {
+        ...(selectedProperty || {}),
+        ...pendingEdits,
+        propertyId: propId,
+        id: propId,
+        hasPendingEdits: false,
+        reAuditStatus: null,
+        pendingReauditData: null,
+        pendingEdits: null,
+        listingStatus: 'LIVE',
+        status: 'LIVE',
+        isPlatformVerified: true,
+        isPublished: true,
+        verifiedDate: new Date().toISOString(),
+        verificationNotes: note,
+        verificationStatus: 'Platform Verified'
+      };
       try {
-        const payload = {
-          ...(selectedProperty || {}),
-          propertyId: propId,
-          id: propId,
-          listingStatus: 'LIVE',
-          status: 'LIVE',
-          isPlatformVerified: true,
-          isPublished: true,
-          verifiedDate: new Date().toISOString(),
-          verificationNotes: note,
-          verificationStatus: 'Platform Verified'
-        };
         await fetch('/api/properties', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1164,6 +1179,11 @@ export default function AdminPortal({ onNavigate }) {
                   if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
                     return {
                       ...p,
+                      ...pendingEdits,
+                      hasPendingEdits: false,
+                      reAuditStatus: null,
+                      pendingReauditData: null,
+                      pendingEdits: null,
                       listingStatus: 'LIVE',
                       status: 'LIVE',
                       isPlatformVerified: true,
@@ -1201,6 +1221,11 @@ export default function AdminPortal({ onNavigate }) {
         if (id1 === targetId || id2 === targetId || id3 === targetId) {
           return {
             ...p,
+            ...pendingEdits,
+            hasPendingEdits: false,
+            reAuditStatus: null,
+            pendingReauditData: null,
+            pendingEdits: null,
             listingStatus: 'LIVE',
             status: 'LIVE',
             isPlatformVerified: true,
@@ -1217,9 +1242,152 @@ export default function AdminPortal({ onNavigate }) {
         window.dispatchEvent(new CustomEvent('easeland-property-approved', { detail: { propertyId: propId, status: 'LIVE' } }));
         window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: { propertyId: propId, status: 'LIVE' } }));
       }
-      logAdminActivity(`verified and published property ${propId} live.`);
+      logAdminActivity('verified and published property ' + propId + ' live with approved details.');
 
       setPublishSuccessMessage('Property approved and successfully published LIVE!');
+      setFeedbackNote('');
+      setIsWorkspaceOpen(false);
+      setSelectedProperty(null);
+      setActiveTab('verification');
+      await loadData();
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } finally {
+      setAdminActionProcessing(false);
+    }
+  };
+
+  const handleRejectEdits = async (propId) => {
+    if (adminActionProcessing || !propId) return;
+    setAdminActionProcessing(true);
+    try {
+      const adminUid = user?.uid || 'admin_auditor';
+      const adminName = user?.displayName || 'EaseLand Auditor';
+      const note = feedbackNote || 'Proposed modifications rejected by Admin auditor. The previously approved listing details remain live.';
+
+      try {
+        await rejectPropertyEdits(propId, adminUid, adminName, note);
+      } catch (e1) { }
+
+      if (typeof mockApi.rejectPropertyEditsAdmin === 'function') {
+        mockApi.rejectPropertyEditsAdmin(propId, note);
+      }
+
+      const payload = {
+        ...(selectedProperty || {}),
+        propertyId: propId,
+        id: propId,
+        hasPendingEdits: false,
+        reAuditStatus: 'EDITS_REJECTED',
+        pendingReauditData: null,
+        pendingEdits: null,
+        listingStatus: 'LIVE',
+        status: 'LIVE',
+        isPlatformVerified: true,
+        isPublished: true,
+        verificationNotes: note,
+        adminFeedback: note,
+        ownerFacingNotes: note
+      };
+
+      try {
+        await fetch('/api/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (pgErr) { }
+
+      try {
+        if (typeof window !== 'undefined') {
+          const targetIdStr = String(propId);
+          const rawSub = localStorage.getItem('easeland_submitted_properties');
+          if (rawSub) {
+            const parsedSub = JSON.parse(rawSub);
+            if (Array.isArray(parsedSub)) {
+              localStorage.setItem('easeland_submitted_properties', JSON.stringify(
+                parsedSub.filter(id => {
+                  const s = String(id || '');
+                  return s !== targetIdStr && s !== String(selectedProperty?.id) && s !== String(selectedProperty?.propertyId) && s !== String(selectedProperty?.referenceId);
+                })
+              ));
+            }
+          }
+
+          const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
+          keys.forEach(k => {
+            const rawLocal = localStorage.getItem(k);
+            if (rawLocal) {
+              const parsed = JSON.parse(rawLocal);
+              if (Array.isArray(parsed)) {
+                const updated = parsed.map(p => {
+                  if (p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) {
+                    return {
+                      ...p,
+                      hasPendingEdits: false,
+                      reAuditStatus: 'EDITS_REJECTED',
+                      pendingReauditData: null,
+                      pendingEdits: null,
+                      listingStatus: 'LIVE',
+                      status: 'LIVE',
+                      isPlatformVerified: true,
+                      isPublished: true,
+                      verificationNotes: note,
+                      adminFeedback: note,
+                      ownerFacingNotes: note
+                    };
+                  }
+                  return p;
+                });
+                localStorage.setItem(k, JSON.stringify(updated));
+              }
+            }
+          });
+        }
+      } catch (lErr) { }
+
+      // Evict immediately from Verification Queue UI state
+      setVerificationQueue(prev => prev.filter(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        return id1 !== targetId && id2 !== targetId && id3 !== targetId;
+      }));
+
+      // Update in All Properties state
+      setAllProperties(prev => prev.map(p => {
+        if (!p) return p;
+        const id1 = String(p.id || '');
+        const id2 = String(p.propertyId || '');
+        const id3 = String(p.referenceId || '');
+        const targetId = String(propId);
+        if (id1 === targetId || id2 === targetId || id3 === targetId) {
+          return {
+            ...p,
+            hasPendingEdits: false,
+            reAuditStatus: 'EDITS_REJECTED',
+            pendingReauditData: null,
+            pendingEdits: null,
+            listingStatus: 'LIVE',
+            status: 'LIVE',
+            isPlatformVerified: true,
+            isPublished: true,
+            verificationNotes: note,
+            adminFeedback: note,
+            ownerFacingNotes: note
+          };
+        }
+        return p;
+      }));
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: payload }));
+        window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: payload }));
+      }
+      logAdminActivity('rejected proposed modifications for property ' + propId + ' (' + note + '). Approved listing remains live.');
+
+      setPublishSuccessMessage('Proposed edits rejected. Previous approved listing remains LIVE.');
       setFeedbackNote('');
       setIsWorkspaceOpen(false);
       setSelectedProperty(null);
@@ -3374,7 +3542,14 @@ export default function AdminPortal({ onNavigate }) {
                       <div key={prop.id} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-4 items-center text-xs hover:bg-gray-50 transition-colors">
                         {/* TITLE & LOCATION */}
                         <div className="col-span-4">
-                          <span className="font-bold text-brand-charcoal block line-clamp-1">{prop.title}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <span className="font-bold text-brand-charcoal line-clamp-1">{prop.title}</span>
+                            {Boolean((prop.hasPendingEdits || prop.pendingReauditData) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
+                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300">
+                                Re-Verification Pending
+                              </span>
+                            )}
+                          </div>
                           <span className="text-gray-500 text-[11px]">
                             {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || (typeof prop.location === 'string' ? prop.location : 'India')}
                           </span>
@@ -3548,10 +3723,16 @@ export default function AdminPortal({ onNavigate }) {
                         {/* HEADER BAR */}
                         <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-black text-amber-900 bg-amber-200 px-3 py-1 rounded-md tracking-wider">
-                                AUDIT IN PROGRESS
-                              </span>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              {Boolean((activeAuditProp.hasPendingEdits || activeAuditProp.pendingReauditData) && (activeAuditProp.reAuditStatus === 'PENDING_VERIFICATION' || activeAuditProp.reAuditStatus === 'UNDER_REVIEW')) ? (
+                                <span className="text-xs font-black text-purple-900 bg-purple-200 px-3 py-1 rounded-md tracking-wider border border-purple-300">
+                                  RE-VERIFICATION (LIVE LISTING MODIFIED)
+                                </span>
+                              ) : (
+                                <span className="text-xs font-black text-amber-900 bg-amber-200 px-3 py-1 rounded-md tracking-wider">
+                                  AUDIT IN PROGRESS
+                                </span>
+                              )}
                               <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-md">
                                 ID: {propIdStr}
                               </span>
@@ -3583,6 +3764,73 @@ export default function AdminPortal({ onNavigate }) {
                             </button>
                           </div>
                         </div>
+
+                        {/* PROPOSED MODIFICATIONS DIFF CARD (RE-AUDIT WORKFLOW) */}
+                        {Boolean((activeAuditProp.hasPendingEdits || activeAuditProp.pendingReauditData) && activeAuditProp.pendingReauditData) && (
+                          <div className="p-5 bg-purple-50/80 border-2 border-purple-300 rounded-2xl space-y-4 shadow-sm animate-in fade-in">
+                            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-purple-200 pb-3">
+                              <div className="flex items-center gap-2 text-purple-950 font-black text-sm">
+                                <AlertTriangle className="w-5 h-5 text-purple-600 shrink-0" />
+                                <span>PROPOSED MODIFICATIONS AWAITING VERIFICATION</span>
+                              </div>
+                              <span className="text-[11px] font-extrabold text-purple-800 bg-purple-200 px-3 py-1 rounded-full border border-purple-300">
+                                Existing Listing Remains LIVE with Previously Approved Details
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-purple-900 font-semibold leading-relaxed">
+                              The property owner submitted the following changes. The live public marketplace continues displaying the approved data shown below. Review the proposed changes before approving them to replace the live details.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
+                              {/* TITLE DIFF */}
+                              {activeAuditProp.pendingReauditData.title && activeAuditProp.pendingReauditData.title !== activeAuditProp.title && (
+                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Title Modification:</span>
+                                  <div className="text-slate-600 line-through text-[11px]">Live: {activeAuditProp.title}</div>
+                                  <div className="text-emerald-700 font-extrabold text-xs">Proposed: {activeAuditProp.pendingReauditData.title}</div>
+                                </div>
+                              )}
+
+                              {/* PRICE DIFF */}
+                              {(activeAuditProp.pendingReauditData.price !== undefined && Number(activeAuditProp.pendingReauditData.price) !== Number(activeAuditProp.price)) && (
+                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Price Modification:</span>
+                                  <div className="text-slate-600 line-through text-[11px]">
+                                    Live: {activeAuditProp.priceDisplay || ('Rs. ' + Number(activeAuditProp.price).toLocaleString('en-IN'))}
+                                  </div>
+                                  <div className="text-emerald-700 font-extrabold text-xs">
+                                    Proposed: {activeAuditProp.pendingReauditData.priceDisplay || ('Rs. ' + Number(activeAuditProp.pendingReauditData.price).toLocaleString('en-IN'))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* AREA DIFF */}
+                              {(activeAuditProp.pendingReauditData.area !== undefined && Number(activeAuditProp.pendingReauditData.area) !== Number(activeAuditProp.area)) && (
+                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Area Modification:</span>
+                                  <div className="text-slate-600 line-through text-[11px]">
+                                    Live: {activeAuditProp.areaDisplay || (activeAuditProp.area + ' ' + (activeAuditProp.areaUnit || 'sq ft'))}
+                                  </div>
+                                  <div className="text-emerald-700 font-extrabold text-xs">
+                                    Proposed: {activeAuditProp.pendingReauditData.areaDisplay || (activeAuditProp.pendingReauditData.area + ' ' + (activeAuditProp.pendingReauditData.areaUnit || activeAuditProp.areaUnit || 'sq ft'))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* DESCRIPTION DIFF */}
+                              {activeAuditProp.pendingReauditData.description && activeAuditProp.pendingReauditData.description !== activeAuditProp.description && (
+                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1 md:col-span-2">
+                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Description Modification:</span>
+                                  <div className="text-slate-600 text-[11px] max-h-16 overflow-y-auto">Live: {activeAuditProp.description}</div>
+                                  <div className="text-emerald-700 font-extrabold text-xs max-h-24 overflow-y-auto border-t border-purple-100 pt-1">
+                                    Proposed: {activeAuditProp.pendingReauditData.description}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* 2-COLUMN DATA CARDS */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4140,10 +4388,21 @@ export default function AdminPortal({ onNavigate }) {
                           <button
                             onClick={() => handleReject(activeAuditProp.id || activeAuditProp.propertyId)}
                             disabled={adminActionProcessing}
-                            className="px-5 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300"
+                            className="px-4 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300"
+                            title="Completely unpublish and reject this property listing"
                           >
-                            Reject Listing
+                            Reject Entire Listing
                           </button>
+                          {Boolean(activeAuditProp.hasPendingEdits || activeAuditProp.pendingReauditData) && (
+                            <button
+                              onClick={() => handleRejectEdits(activeAuditProp.id || activeAuditProp.propertyId)}
+                              disabled={adminActionProcessing}
+                              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs transition-colors cursor-pointer shadow-sm"
+                              title="Discard owner's proposed changes while keeping the previously approved listing live"
+                            >
+                              Reject Proposed Edits (Keep Approved Live)
+                            </button>
+                          )}
                           <button
                             onClick={() => handleRequestChanges(activeAuditProp.id || activeAuditProp.propertyId)}
                             disabled={adminActionProcessing}
