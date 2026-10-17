@@ -86,7 +86,7 @@ export function searchStateToUrlParams(searchState = {}) {
     params.set('amenities', searchState.amenities.join(','));
   }
 
-  if (searchState.radiusKm) {
+  if (searchState.radiusKm && (searchState.referencePlace || searchState.referenceLat != null || searchState.searchLat != null)) {
     params.set('radius', String(searchState.radiusKm));
   }
 
@@ -200,7 +200,11 @@ export function urlParamsToSearchState(searchString = '') {
     facing: facingParam || 'ALL',
     furnishing: furnishingParam || 'ALL',
     amenities: amenitiesParam ? amenitiesParam.split(',').filter(Boolean) : [],
-    radiusKm: (radiusParam && !isNaN(Number(radiusParam))) ? Number(radiusParam) : (parsedNL.radiusKm || null),
+    radiusKm: (radiusParam && !isNaN(Number(radiusParam)))
+      ? Number(radiusParam)
+      : ((radiusParam === 'any' || radiusParam === 'all')
+        ? null
+        : (parsedNL.radiusKm || 1)),
     referencePlace: nearParam || parsedNL.referencePlace || '',
     referenceLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : null,
     referenceLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : null,
@@ -236,7 +240,7 @@ export function createDefaultFilterState(overrides = {}) {
     facing: 'ALL',
     furnishing: 'ALL',
     amenities: [],
-    radiusKm: null,
+    radiusKm: 1,
     referencePlace: '',
     referenceLat: null,
     referenceLng: null,

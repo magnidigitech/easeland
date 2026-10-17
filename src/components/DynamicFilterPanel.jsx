@@ -254,7 +254,7 @@ export default function DynamicFilterPanel({
       searchLng: lng,
       userLat: null,
       userLng: null,
-      radiusKm: prev.radiusKm || 5
+      radiusKm: prev.radiusKm != null ? prev.radiusKm : 1
     }));
   };
 
@@ -265,7 +265,7 @@ export default function DynamicFilterPanel({
     setFilters(prev => ({
       ...prev,
       referencePlace: '',
-      radiusKm: null,
+      radiusKm: 1,
       ...((prev.city || prev.locality) ? {} : {
         searchLat: null,
         searchLng: null,
@@ -670,7 +670,7 @@ export default function DynamicFilterPanel({
     activeChips.push({ label: `Furnishing: ${displayLabel}`, key: 'furnishing', val: '' });
   }
   if (filters.referencePlace) activeChips.push({ label: `Near: ${filters.referencePlace}`, customAction: handleClearNearby });
-  if (filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
+  if (filters.referencePlace && filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
   if (filters.amenities && filters.amenities.length > 0) {
     filters.amenities.forEach(a => {
       activeChips.push({
@@ -879,9 +879,9 @@ export default function DynamicFilterPanel({
             </div>
 
             <select
-              value={filters.radiusKm || ''}
+              value={filters.radiusKm === null ? 'any' : (filters.radiusKm != null ? String(filters.radiusKm) : '1')}
               onChange={(e) => {
-                const val = e.target.value ? Number(e.target.value) : null;
+                const val = (e.target.value === 'any' || e.target.value === '') ? null : Number(e.target.value);
                 handleChange('radiusKm', val);
                 if (val && !filters.referenceLat && !filters.searchLat) {
                   const placeCandidate = nearbyQuery || localityQuery || cityQuery || filters.referencePlace || filters.locality || filters.city;
@@ -917,12 +917,12 @@ export default function DynamicFilterPanel({
               }}
               className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white"
             >
-              <option value="">Any Distance</option>
               <option value="1">Within 1 km</option>
               <option value="5">Within 5 km</option>
               <option value="10">Within 10 km</option>
               <option value="25">Within 25 km</option>
               <option value="50">Within 50 km</option>
+              <option value="any">Any Distance</option>
             </select>
           </div>
         </div>
