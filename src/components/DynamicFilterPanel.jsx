@@ -1340,7 +1340,7 @@ export default function DynamicFilterPanel({
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                placeholder={dynamicBounds.min > 0 ? dynamicBounds.min.toLocaleString('en-IN') : '0'}
+                placeholder="Enter Min Price"
                 value={filters.minPrice || ''}
                 onKeyDown={(e) => {
                   if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
@@ -1365,7 +1365,7 @@ export default function DynamicFilterPanel({
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                placeholder={dynamicBounds.max ? dynamicBounds.max.toLocaleString('en-IN') : 'Any'}
+                placeholder="Enter Max Price"
                 value={filters.maxPrice || ''}
                 onKeyDown={(e) => {
                   if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
