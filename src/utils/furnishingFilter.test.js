@@ -118,3 +118,34 @@ test('matchesSearchFilters correctly filters by facing direction with hyphens an
   assert.strictEqual(matchesSearchFilters(westProp, { facing: 'WEST' }), true);
   assert.strictEqual(matchesSearchFilters(westProp, { facing: 'NORTH_EAST' }), false);
 });
+
+test('matchesSearchFilters matches properties by their actual furnishing and does not hardcode un-specified ones', () => {
+  const apartmentWithoutFurnishing = {
+    id: 'p20',
+    title: 'Already Posted Flat Without Furnishing Filled',
+    propertyType: 'APARTMENT',
+    specs: {}
+  };
+
+  const apartmentWithUnfurnished = {
+    id: 'p21',
+    title: 'Flat Posted With Unfurnished Default',
+    propertyType: 'APARTMENT',
+    specs: {
+      furnishing: 'Unfurnished'
+    }
+  };
+
+  const unfurnFilter = { furnishing: 'UNFURNISHED' };
+  const semiFilter = { furnishing: 'SEMI_FURNISHED' };
+  const allFilter = { furnishing: 'ALL' };
+
+  // Flat posted with Unfurnished matches UNFURNISHED filter
+  assert.strictEqual(matchesSearchFilters(apartmentWithUnfurnished, unfurnFilter), true);
+  assert.strictEqual(matchesSearchFilters(apartmentWithUnfurnished, semiFilter), false);
+
+  // Already posted flat where user left furnishing empty is left as-is without hardcoding
+  assert.strictEqual(matchesSearchFilters(apartmentWithoutFurnishing, unfurnFilter), false);
+  assert.strictEqual(matchesSearchFilters(apartmentWithoutFurnishing, semiFilter), false);
+  assert.strictEqual(matchesSearchFilters(apartmentWithoutFurnishing, allFilter), true);
+});

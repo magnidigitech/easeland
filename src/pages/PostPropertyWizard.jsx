@@ -168,6 +168,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     }
 
     const resolvedPropType = p.propertyType || p.type || p.category || propCandidate.propertyType || propCandidate.type || PropertyType.OPEN_PLOT;
+    const isLandOrPlot = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(String(resolvedPropType || '').toUpperCase());
+    const existingFurn = p.specs?.furnishing || propCandidate.specs?.furnishing || p.furnishing || propCandidate.furnishing;
+    const defaultFurn = (!isLandOrPlot && !existingFurn) ? 'Unfurnished' : existingFurn;
     const resolvedPurpose = p.purpose || propCandidate.purpose || Purpose.SALE;
     const mediaList = Array.isArray(p.media) ? p.media : (Array.isArray(propCandidate.media) ? propCandidate.media : (Array.isArray(p.photos) ? p.photos : []));
     const photosList = Array.isArray(p.photos) ? p.photos : mediaList.filter(m => m.type === 'PHOTO');
@@ -186,6 +189,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
       specs: {
         ...(p.specs || {}),
         ...(propCandidate.specs || {}),
+        ...(defaultFurn ? { furnishing: defaultFurn } : {}),
         areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT
       },
       amenities: Array.isArray(p.amenities) ? p.amenities : (Array.isArray(propCandidate.amenities) ? propCandidate.amenities : []),
@@ -520,11 +524,19 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
         areaDisplay: getAreaDisplay(),
         description: customUpdates?.description !== undefined ? customUpdates.description : formData.description,
-        specs: {
-          ...(formData.specs || {}),
-          ...(customUpdates?.specs || {}),
-          areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT
-        },
+        specs: (() => {
+          const effectivePropType = customUpdates?.propertyType !== undefined ? customUpdates.propertyType : formData.propertyType;
+          const isLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(String(effectivePropType || '').toUpperCase());
+          const merged = {
+            ...(formData.specs || {}),
+            ...(customUpdates?.specs || {}),
+            areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT
+          };
+          if (!isLand && !merged.furnishing) {
+            merged.furnishing = 'Unfurnished';
+          }
+          return merged;
+        })(),
         amenities: customUpdates?.amenities !== undefined ? customUpdates.amenities : (formData.amenities || []),
         location: customUpdates?.location !== undefined ? customUpdates.location : (formData.location || null),
         boundary: effectiveBoundary || null,
@@ -877,7 +889,20 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
                   <button
                     key={item.category}
                     type="button"
-                    onClick={() => setFormData({ ...formData, propertyType: item.value, category: item.category })}
+                    onClick={() => {
+                      const isLand = ['OPEN_PLOT', 'LAND'].includes(item.value);
+                      const currentFurn = formData.specs?.furnishing;
+                      const nextFurn = (!isLand && !currentFurn) ? 'Unfurnished' : currentFurn;
+                      setFormData({
+                        ...formData,
+                        propertyType: item.value,
+                        category: item.category,
+                        specs: {
+                          ...(formData.specs || {}),
+                          ...(nextFurn ? { furnishing: nextFurn } : {})
+                        }
+                      });
+                    }}
                     className={`p-3 rounded-xl border text-xs font-bold transition-all ${
                       (formData.category === item.category || (!formData.category && formData.propertyType === item.value))
                         ? 'bg-brand-navy border-brand-navy text-brand-yellow shadow-md scale-105'

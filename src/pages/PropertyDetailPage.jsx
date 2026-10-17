@@ -831,10 +831,10 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                   </div>
                 )}
 
-                {specFlags.showFurnishing && property.specs?.furnishing && (
+                {specFlags.showFurnishing && (property.specs?.furnishing || property.furnishing) && (
                   <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
                     <span className="text-gray-400 font-bold block uppercase tracking-wider text-[10px]">Furnishing</span>
-                    <span className="text-sm font-extrabold text-brand-charcoal mt-0.5 block">{property.specs.furnishing}</span>
+                    <span className="text-sm font-extrabold text-brand-charcoal mt-0.5 block">{property.specs?.furnishing || property.furnishing}</span>
                   </div>
                 )}
 

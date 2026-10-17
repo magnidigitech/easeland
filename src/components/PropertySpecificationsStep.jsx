@@ -27,6 +27,12 @@ export default function PropertySpecificationsStep({
     });
   };
 
+  React.useEffect(() => {
+    if (fieldsConfig.showFurnishing && !specsData.furnishing) {
+      handleFieldChange('furnishing', FurnishingStatus.UNFURNISHED);
+    }
+  }, [fieldsConfig.showFurnishing]);
+
   const handleAmenityToggle = (amenityId) => {
     if (selectedAmenities.includes(amenityId)) {
       onChangeAmenities(selectedAmenities.filter(id => id !== amenityId));
@@ -161,11 +167,10 @@ export default function PropertySpecificationsStep({
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Furnishing Status</label>
               <select
-                value={specsData.furnishing || ''}
+                value={specsData.furnishing || FurnishingStatus.UNFURNISHED}
                 onChange={(e) => handleFieldChange('furnishing', e.target.value)}
                 className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
               >
-                <option value="">-- Select Furnishing (Optional) --</option>
                 {Object.values(FurnishingStatus).map(f => (
                   <option key={f} value={f}>{f}</option>
                 ))}

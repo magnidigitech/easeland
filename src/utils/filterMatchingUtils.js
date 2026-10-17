@@ -558,6 +558,7 @@ export function matchesSearchFilters(p, searchState = {}) {
                                 p.furnishingStatus ||
                                 '';
       const propFurnishing = normalizeFurnishing(rawPropFurnishing);
+
       if (!propFurnishing || propFurnishing !== targetFurnishing) {
         return false;
       }

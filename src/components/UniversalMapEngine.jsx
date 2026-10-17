@@ -969,7 +969,7 @@ export default function UniversalMapEngine({
     const facing = s.facing || p.facing;
     if (facing) chips.push({ label: 'Facing', value: `${facing} Facing`, icon: 'compass' });
 
-    const furnishing = s.furnishing || p.furnishing;
+    const furnishing = s.furnishing || p.specs?.furnishing || p.furnishing;
     if (furnishing) chips.push({ label: 'Furnishing', value: furnishing, icon: 'sofa' });
 
     const road = s.approachRoadWidth || p.approachRoadWidth || p.roadWidth;

@@ -858,6 +858,11 @@ export const mockApi = {
       email: newPropertyPayload.ownerPrivateEmail || ''
     };
 
+    const pType = String(newPropertyPayload.propertyType || 'OPEN_PLOT').toUpperCase();
+    const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(pType) || pType.includes('PLOT');
+    const existingFurn = newPropertyPayload.specs?.furnishing || newPropertyPayload.furnishing;
+    const defaultFurn = (!isPlotOrLand && !existingFurn) ? 'Unfurnished' : existingFurn;
+
     const targetProp = {
       ...newPropertyPayload,
       id: newId,
@@ -871,6 +876,11 @@ export const mockApi = {
       location: newPropertyPayload.location || {},
       propertyType: newPropertyPayload.propertyType || 'OPEN_PLOT',
       purpose: newPropertyPayload.purpose || 'SALE',
+      specs: {
+        ...(newPropertyPayload.specs || {}),
+        ...(defaultFurn ? { furnishing: newPropertyPayload.specs?.furnishing || defaultFurn } : {})
+      },
+      furnishing: defaultFurn || newPropertyPayload.furnishing,
       status: isDraft ? 'DRAFT' : 'PENDING_VERIFICATION',
       listingStatus: isDraft ? 'DRAFT' : 'PENDING_VERIFICATION',
       verificationStatus: isDraft ? 'Draft' : 'Pending Admin Verification',

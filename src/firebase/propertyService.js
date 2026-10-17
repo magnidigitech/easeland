@@ -215,6 +215,15 @@ export async function createPropertyDraft(ownerId, propertyData) {
 
     const derived = computeDerivedPropertyFields(propertyData);
 
+    const pType = String(propertyData.propertyType || 'OPEN_PLOT').toUpperCase();
+    const isLandOrPlot = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(pType) || pType.includes('PLOT');
+    const existingFurn = propertyData.specs?.furnishing || propertyData.furnishing;
+    const resolvedFurnishing = existingFurn || (!isLandOrPlot ? 'Unfurnished' : undefined);
+    const resolvedSpecs = {
+      ...(propertyData.specs || {}),
+      ...(resolvedFurnishing ? { furnishing: propertyData.specs?.furnishing || resolvedFurnishing } : {})
+    };
+
     const publicPayload = {
       propertyId,
       id: propertyId,
@@ -235,7 +244,8 @@ export async function createPropertyDraft(ownerId, propertyData) {
       area: Number(propertyData.area) || 0,
       areaUnit: propertyData.areaUnit || propertyData.specs?.areaUnit || 'sq ft',
       areaDisplay: propertyData.areaDisplay || `${Number(propertyData.area) || 0} sq ft`,
-      specs: propertyData.specs || {},
+      specs: resolvedSpecs,
+      furnishing: resolvedFurnishing || propertyData.furnishing || undefined,
       amenities: Array.isArray(propertyData.amenities) ? propertyData.amenities : [],
 
       // Derived indexed search fields
@@ -706,6 +716,15 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         listingStatus: ListingStatus.PENDING_VERIFICATION,
         isPublished: false
       };
+      const pType = String(mergedData.propertyType || 'OPEN_PLOT').toUpperCase();
+      const isLandOrPlot = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(pType) || pType.includes('PLOT');
+      if (!isLandOrPlot) {
+        mergedData.specs = {
+          ...(mergedData.specs || {}),
+          furnishing: mergedData.specs?.furnishing || 'Unfurnished'
+        };
+        mergedData.furnishing = mergedData.furnishing || 'Unfurnished';
+      }
 
       const derived = computeDerivedPropertyFields(mergedData);
 
@@ -1068,6 +1087,19 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
     } = stepData;
 
     const merged = { ...currentData, ...permittedUpdates };
+    const pType = String(merged.propertyType || 'OPEN_PLOT').toUpperCase();
+    const isLandOrPlot = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(pType) || pType.includes('PLOT');
+    if (!isLandOrPlot) {
+      if (merged.specs && !merged.specs.furnishing) {
+        merged.specs.furnishing = 'Unfurnished';
+      }
+      if (!merged.furnishing) {
+        merged.furnishing = 'Unfurnished';
+      }
+      if (permittedUpdates.specs && !permittedUpdates.specs.furnishing) {
+        permittedUpdates.specs.furnishing = 'Unfurnished';
+      }
+    }
     const derived = computeDerivedPropertyFields(merged);
 
     const publicPayload = {
