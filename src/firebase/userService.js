@@ -7,7 +7,8 @@ import {
   updateDoc,
   deleteDoc,
   deleteField,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from './config.js';
 import { logAdminActivity } from './verificationService.js';
@@ -107,7 +108,7 @@ export async function getCurrentUserProfile(uid) {
     }
     return { success: false, error: 'Profile not found' };
   } catch (error) {
-    console.error(`Error fetching profile for ${uid}:`, error);
+    console.error('Error fetching profile for ' + uid + ':', error);
     return { success: false, error: error.message };
   }
 }
@@ -141,7 +142,7 @@ export async function updateOwnProfile(uid, updates) {
     await Promise.race([savePromise, timeoutPromise]);
     return { success: true };
   } catch (error) {
-    console.warn(`Firestore profile update note for ${uid}:`, error.message || error);
+    console.warn('Firestore profile update note for ' + uid + ':', error.message || error);
     return { success: true };
   }
 }
@@ -160,7 +161,7 @@ export async function updateCommunicationPreferences(uid, preferences) {
     }, { merge: true });
     return { success: true };
   } catch (error) {
-    console.error(`Error updating preferences for ${uid}:`, error);
+    console.error('Error updating preferences for ' + uid + ':', error);
     return { success: false, error: error.message };
   }
 }
@@ -233,7 +234,7 @@ export async function getAllUsersAdmin() {
         const key = (userObj.email || userObj.uid).toLowerCase();
         fetchedMap.set(key, userObj);
       } catch (errDoc) {
-        console.error(`Error processing user document ${docSnap.id}:`, errDoc);
+        console.error('Error processing user document ' + docSnap.id + ':', errDoc);
       }
     });
 
@@ -246,8 +247,92 @@ export async function getAllUsersAdmin() {
 }
 
 /**
+ * Continuous real-time listener for registered users collection in Cloud Firestore.
+ * Invokes onUsersUpdate callback instantly whenever any user is created, updated, or modified.
+ */
+export function subscribeToUsersAdmin(onUsersUpdate) {
+  try {
+    const usersRef = collection(db, 'users');
+    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+      let deletedUsers = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const rawDel = localStorage.getItem('easeland_deleted_users');
+          if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+        }
+      } catch (e) { }
+
+      const fetchedMap = new Map();
+      snapshot.forEach((docSnap) => {
+        try {
+          const data = docSnap.data();
+          const docId = String(docSnap.id || '').toLowerCase().trim();
+          const userEmail = String(data.email || '').toLowerCase().trim();
+          const uStatus = String(data.accountStatus || data.status || '').toUpperCase();
+
+          if (uStatus === 'REMOVED' || uStatus === 'DELETED' || uStatus === 'ACCOUNT_DELETED') return;
+          if (deletedUsers.includes(docId) || deletedUsers.includes(userEmail)) return;
+
+          const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || data.telePhone || '';
+
+          let createdAtFormatted = null;
+          if (data.createdAt) {
+            try {
+              if (typeof data.createdAt.toDate === 'function') {
+                createdAtFormatted = data.createdAt.toDate().toISOString();
+              } else if (typeof data.createdAt.seconds === 'number') {
+                createdAtFormatted = new Date(data.createdAt.seconds * 1000).toISOString();
+              } else if (typeof data.createdAt === 'string' || typeof data.createdAt === 'number') {
+                createdAtFormatted = new Date(data.createdAt).toISOString();
+              }
+            } catch (e) {
+              createdAtFormatted = new Date().toISOString();
+            }
+          }
+
+          const userObj = {
+            id: docSnap.id,
+            uid: docSnap.id,
+            name: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
+            displayName: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
+            email: data.email || '',
+            emailVerified: data.emailVerified ?? (data.email?.endsWith('@gmail.com') ? true : false),
+            authProvider: data.authProvider || data.providerId || (data.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
+            phone: extractedPhone,
+            phoneNumber: extractedPhone,
+            role: data.adminRole ? 'ADMIN' : (data.role || 'USER'),
+            status: data.accountStatus || data.status || 'ACTIVE',
+            accountStatus: data.accountStatus || data.status || 'ACTIVE',
+            postedListingsCount: data.postedListingsCount || 0,
+            createdAt: createdAtFormatted,
+            suspension: data.suspension || null
+          };
+
+          const key = (userObj.email || userObj.uid).toLowerCase();
+          fetchedMap.set(key, userObj);
+        } catch (errDoc) {
+          console.error('Error processing user snapshot doc:', errDoc);
+        }
+      });
+
+      const users = Array.from(fetchedMap.values());
+      if (typeof onUsersUpdate === 'function') {
+        onUsersUpdate(users);
+      }
+    }, (err) => {
+      console.warn('Firestore users subscription notice:', err.message);
+    });
+
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Failed to attach Firestore users onSnapshot:', err);
+    return () => {};
+  }
+}
+
+/**
  * Temporarily suspend a user account.
- * Updates accountStatus to SUSPENDED in users/{userId} and records suspension metadata.
+ * Updates accountStatus and status to SUSPENDED in users/{userId} and records suspension metadata.
  */
 export async function suspendUserAccount(userId, adminUid, durationDays = 7, reason = 'Policy Violation') {
   try {
@@ -267,22 +352,33 @@ export async function suspendUserAccount(userId, adminUid, durationDays = 7, rea
       suspendedBy: adminUid
     };
 
-    await updateDoc(userRef, {
+    // Use setDoc with merge: true so it works even if document did not previously exist
+    await setDoc(userRef, {
       accountStatus: 'SUSPENDED',
+      status: 'SUSPENDED',
       suspension: suspensionPayload,
       updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // Sync to PostgreSQL backend
+    syncUserToPostgres({
+      uid: userId,
+      id: userId,
+      accountStatus: 'SUSPENDED',
+      status: 'SUSPENDED',
+      suspension: suspensionPayload
     });
 
     // Audit log
     await logAdminActivity(
       'USER_SUSPENDED',
-      `User ${userId} account suspended for ${durationDays} days. Reason: ${reason}`,
+      'User ' + userId + ' account suspended for ' + durationDays + ' days. Reason: ' + reason,
       adminUid
     );
 
     return { success: true };
   } catch (error) {
-    console.error(`Error suspending user ${userId}:`, error);
+    console.error('Error suspending user ' + userId + ':', error);
     return { success: false, error: error.message };
   }
 }
@@ -297,22 +393,32 @@ export async function unsuspendUserAccount(userId, adminUid) {
     }
 
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       accountStatus: 'ACTIVE',
+      status: 'ACTIVE',
       suspension: null,
       updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // Sync to PostgreSQL backend
+    syncUserToPostgres({
+      uid: userId,
+      id: userId,
+      accountStatus: 'ACTIVE',
+      status: 'ACTIVE',
+      suspension: null
     });
 
     // Audit log
     await logAdminActivity(
       'USER_UNSUSPENDED',
-      `User ${userId} account suspension lifted.`,
+      'User ' + userId + ' account suspension lifted.',
       adminUid
     );
 
     return { success: true };
   } catch (error) {
-    console.error(`Error lifting suspension for user ${userId}:`, error);
+    console.error('Error lifting suspension for user ' + userId + ':', error);
     return { success: false, error: error.message };
   }
 }
@@ -330,13 +436,18 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
     try {
       await deleteDoc(userRef);
     } catch (dErr) {
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         accountStatus: 'REMOVED',
         status: 'REMOVED',
         removalReason: reason,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
     }
+
+    // Call DELETE on server backend
+    try {
+      await fetch('/api/users/' + encodeURIComponent(userId), { method: 'DELETE' });
+    } catch (eDel) { }
 
     try {
       if (typeof window !== 'undefined') {
@@ -359,13 +470,13 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
 
     await logAdminActivity(
       'USER_REMOVED',
-      `User ${userId} account permanently removed by admin. Reason: ${reason}`,
+      'User ' + userId + ' account permanently removed by admin. Reason: ' + reason,
       adminUid || 'admin_uid_001'
     );
 
     return { success: true };
   } catch (error) {
-    console.error(`Error removing user account ${userId}:`, error);
+    console.error('Error removing user account ' + userId + ':', error);
     return { success: false, error: error.message };
   }
 }

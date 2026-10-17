@@ -23,6 +23,8 @@ import {
   mark2FAVerifiedForSession,
   clear2FAVerifiedForSession
 } from '../firebase/securityService.js';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase/config.js';
 
 const AuthContext = createContext({
   user: null,
@@ -248,10 +250,59 @@ export function AuthProvider({ children }) {
         }
         setLoading(false);
 
+        // Continuous live Firestore listener for real-time user governance & profile changes
+        let unsubUserDoc = null;
+        if (currentUser.uid) {
+          try {
+            const userDocRef = doc(db, 'users', currentUser.uid);
+            unsubUserDoc = onSnapshot(userDocRef, (docSnap) => {
+              if (docSnap.exists()) {
+                const fsData = docSnap.data();
+                const uAccStatus = String(fsData.accountStatus || fsData.status || 'ACTIVE').toUpperCase();
+
+                if (uAccStatus === 'REMOVED' || uAccStatus === 'DELETED') {
+                  apiLogoutUser();
+                  setUser(null);
+                  setProfile(null);
+                  return;
+                }
+
+                setUser(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    accountStatus: uAccStatus,
+                    status: uAccStatus,
+                    suspension: fsData.suspension || null
+                  };
+                });
+
+                setProfile(prev => {
+                  if (!prev) return { ...fsData, accountStatus: uAccStatus, status: uAccStatus, suspension: fsData.suspension || null };
+                  return {
+                    ...prev,
+                    ...fsData,
+                    accountStatus: uAccStatus,
+                    status: uAccStatus,
+                    suspension: fsData.suspension || null
+                  };
+                });
+              }
+            }, (err) => {
+              console.warn('Live user profile snapshot notice:', err.message);
+            });
+          } catch (subErr) {
+            console.warn('User doc onSnapshot attach note:', subErr);
+          }
+        }
+
         // Background asynchronous Firestore profile sync (non-blocking)
         getCurrentUserProfile(currentUser.uid).then(res => {
           if (res.success && res.profile) {
             setProfile(prev => prev ? { ...prev, ...res.profile } : res.profile);
+            if (res.profile.accountStatus) {
+              setUser(prev => prev ? { ...prev, accountStatus: res.profile.accountStatus, status: res.profile.accountStatus, suspension: res.profile.suspension || null } : prev);
+            }
           }
         }).catch(e => console.warn('Background profile sync note:', e));
       } else {
@@ -270,9 +321,58 @@ export function AuthProvider({ children }) {
     };
     window.addEventListener('easeland-admin-updated', handleAdminUpdated);
 
+    const handleUserStatusChanged = (e) => {
+      const detail = e.detail;
+      if (!detail) return;
+      const targetUid = String(detail.userId || '').toLowerCase().trim();
+      const targetEmail = String(detail.email || '').toLowerCase().trim();
+      const newStatus = String(detail.status || 'ACTIVE').toUpperCase();
+
+      setUser(prev => {
+        if (!prev) return prev;
+        const myUid = String(prev.uid || prev.id || '').toLowerCase().trim();
+        const myEmail = String(prev.email || '').toLowerCase().trim();
+        const matches = (targetUid && (myUid === targetUid)) || (targetEmail && (myEmail === targetEmail));
+        if (matches) {
+          if (newStatus === 'REMOVED' || newStatus === 'DELETED') {
+            apiLogoutUser();
+            return null;
+          }
+          return {
+            ...prev,
+            accountStatus: newStatus,
+            status: newStatus,
+            suspension: detail.suspension || (newStatus === 'SUSPENDED' ? { reason: 'Account suspended by admin' } : null)
+          };
+        }
+        return prev;
+      });
+
+      setProfile(prev => {
+        if (!prev) return prev;
+        const myUid = String(prev.uid || prev.id || '').toLowerCase().trim();
+        const myEmail = String(prev.email || '').toLowerCase().trim();
+        const matches = (targetUid && (myUid === targetUid)) || (targetEmail && (myEmail === targetEmail));
+        if (matches) {
+          if (newStatus === 'REMOVED' || newStatus === 'DELETED') {
+            return null;
+          }
+          return {
+            ...prev,
+            accountStatus: newStatus,
+            status: newStatus,
+            suspension: detail.suspension || (newStatus === 'SUSPENDED' ? { reason: 'Account suspended by admin' } : null)
+          };
+        }
+        return prev;
+      });
+    };
+    window.addEventListener('easeland-user-status-changed', handleUserStatusChanged);
+
     return () => {
       unsubscribe();
       window.removeEventListener('easeland-admin-updated', handleAdminUpdated);
+      window.removeEventListener('easeland-user-status-changed', handleUserStatusChanged);
     };
   }, []);
 

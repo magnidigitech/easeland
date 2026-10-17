@@ -70,7 +70,8 @@ import {
   getAllUsersAdmin,
   suspendUserAccount,
   unsuspendUserAccount,
-  removeUserAccount
+  removeUserAccount,
+  subscribeToUsersAdmin
 } from '../firebase/userService.js';
 import {
   getAllEnquiriesAdmin,
@@ -488,6 +489,93 @@ export default function AdminPortal({ onNavigate }) {
       return f;
     });
     setFollowUps(updated);
+  };
+
+  const enrichAndSyncLiveUsers = (incomingUsers, propertiesList = allProperties) => {
+    let deletedUsers = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+      }
+    } catch (e) { }
+
+    setRegisteredUsersList(prev => {
+      const userMap = new Map();
+      [...(prev || []), ...(incomingUsers || [])].forEach(u => {
+        if (!u) return;
+        const emailKey = (u.email || '').toLowerCase().trim();
+        const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
+        if (!emailKey && !uidKey) return;
+
+        const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
+        const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
+        const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
+        const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
+
+        const mergedUser = {
+          ...existing,
+          ...u,
+          uid: u.uid || u.id || existing.uid || existing.id,
+          id: u.id || u.uid || existing.id || existing.uid,
+          email: u.email || existing.email || '',
+          name: cleanName,
+          displayName: cleanName,
+          status: u.status || u.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
+          accountStatus: u.accountStatus || u.status || existing.accountStatus || existing.status || 'ACTIVE',
+          role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER'),
+          suspension: u.suspension || existing.suspension || null
+        };
+
+        if (emailKey) userMap.set(emailKey, mergedUser);
+        if (uidKey) userMap.set(uidKey, mergedUser);
+      });
+
+      const cleanUsers = Array.from(new Set(userMap.values())).filter(u => {
+        if (!u) return false;
+        const uId = String(u.id || u.uid || '').toLowerCase().trim();
+        const uEmail = String(u.email || '').toLowerCase().trim();
+        const st = String(u.status || u.accountStatus || '').toUpperCase();
+        if (st === 'REMOVED' || st === 'DELETED' || st === 'ACCOUNT_DELETED') return false;
+        if (deletedUsers.includes(uId) || deletedUsers.includes(uEmail)) return false;
+        return true;
+      });
+
+      return cleanUsers.map(u => {
+        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+        const uEmail = (u.email || '').toLowerCase().trim();
+
+        const userListings = (propertiesList || []).filter(p => {
+          if (!p) return false;
+          const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
+          const pEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
+          return (uUid && pOwnerId && uUid === pOwnerId) || (uEmail && pEmail && uEmail === pEmail);
+        });
+
+        const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in' || uUid === 'admin-101';
+        let derivedRole = u.role;
+        if (!isUserAdmin) {
+          derivedRole = userListings.length > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : 'USER';
+        }
+
+        let finalName = u.name || u.displayName || 'EaseLand User';
+        if (isUserAdmin || finalName.includes('Scarlett') || uEmail === 'admin@easeland.in') {
+          finalName = 'EaseLand Admin';
+        }
+
+        return {
+          ...u,
+          name: finalName,
+          displayName: finalName,
+          status: u.status || u.accountStatus || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
+          accountStatus: u.accountStatus || u.status || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
+          role: isUserAdmin ? 'ADMIN' : derivedRole,
+          postedListingsCount: userListings.length,
+          authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
+          emailVerified: u.emailVerified ?? (u.email ? true : false)
+        };
+      });
+    });
   };
 
   const loadData = async () => {
@@ -926,51 +1014,7 @@ export default function AdminPortal({ onNavigate }) {
       }
     } catch (e) { }
 
-    const cleanUsers = users.filter(u => {
-      if (!u) return false;
-      const uId = String(u.id || u.uid || '').toLowerCase().trim();
-      const uEmail = String(u.email || '').toLowerCase().trim();
-      const st = String(u.status || u.accountStatus || '').toUpperCase();
-      if (st === 'REMOVED' || st === 'DELETED' || st === 'ACCOUNT_DELETED') return false;
-      if (deletedUsers.includes(uId) || deletedUsers.includes(uEmail)) return false;
-      return true;
-    });
-
-    const enrichedUsers = cleanUsers.map(u => {
-      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-      const uEmail = (u.email || '').toLowerCase().trim();
-
-      const userListings = allMergedProps.filter(p => {
-        if (!p) return false;
-        const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
-        const pEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
-        return (uUid && pOwnerId && uUid === pOwnerId) || (uEmail && pEmail && uEmail === pEmail);
-      });
-
-      const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in' || uUid === 'admin-101';
-      let derivedRole = u.role;
-      if (!isUserAdmin) {
-        derivedRole = userListings.length > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : 'USER';
-      }
-
-      let finalName = u.name || u.displayName || 'EaseLand User';
-      if (isUserAdmin || finalName.includes('Scarlett') || uEmail === 'admin@easeland.in') {
-        finalName = 'EaseLand Admin';
-      }
-
-      return {
-        ...u,
-        name: finalName,
-        displayName: finalName,
-        status: u.status || u.accountStatus || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
-        role: isUserAdmin ? 'ADMIN' : derivedRole,
-        postedListingsCount: userListings.length,
-        authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
-        emailVerified: u.emailVerified ?? (u.email ? true : false)
-      };
-    });
-
-    setRegisteredUsersList(enrichedUsers);
+    enrichAndSyncLiveUsers(users, allMergedProps);
     setSiteConfig(cfg);
 
     if (queue.length > 0) {
@@ -996,6 +1040,13 @@ export default function AdminPortal({ onNavigate }) {
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
     const handleVisitorRefresh = () => loadVisitorLeads();
 
+    // Continuous live Firestore subscription for instant bidirectional synchronization
+    const unsubFirestoreUsers = subscribeToUsersAdmin((liveUsers) => {
+      if (Array.isArray(liveUsers) && liveUsers.length > 0) {
+        enrichAndSyncLiveUsers(liveUsers);
+      }
+    });
+
     window.addEventListener('easeland-users-updated', handleRefresh);
     window.addEventListener('easeland-property-created', handleRefresh);
     window.addEventListener('easeland-property-submitted', handleRefresh);
@@ -1010,10 +1061,11 @@ export default function AdminPortal({ onNavigate }) {
     window.addEventListener('storage', handleRefresh);
     const pollTimer = setInterval(() => {
       loadData();
-    }, 8000);
+    }, 6000);
 
     return () => {
       clearInterval(pollTimer);
+      unsubFirestoreUsers();
       window.removeEventListener('easeland-users-updated', handleRefresh);
       window.removeEventListener('easeland-property-created', handleRefresh);
       window.removeEventListener('easeland-property-submitted', handleRefresh);
@@ -2107,26 +2159,45 @@ export default function AdminPortal({ onNavigate }) {
   // User Suspension & Removal Handlers
   const handleSuspendUserModalOpen = (u) => {
     setSelectedUserForSuspension(u);
+    setSuspensionDays(7);
+    setSuspensionHours(0);
+    setSuspensionReason('Fraudulent Land Title Document Upload');
+    setCustomReasonText('');
     setIsSuspendModalOpen(true);
   };
+  const handleOpenSuspendModal = handleSuspendUserModalOpen;
 
   const handleConfirmSuspendUser = async () => {
     if (!selectedUserForSuspension) return;
+    const targetUser = selectedUserForSuspension;
+    const targetId = String(targetUser.id || targetUser.uid || '').toLowerCase().trim();
+    const targetEmail = String(targetUser.email || '').toLowerCase().trim();
     const totalHours = (suspensionDays * 24) + parseInt(suspensionHours || 0);
-    const reasonText = suspensionReason === 'Other' ? customReasonText : suspensionReason;
+    const reasonText = (suspensionReason === 'Custom Reason' || suspensionReason === 'Other')
+      ? (customReasonText || 'Policy Violation')
+      : suspensionReason;
 
-    try {
-      await suspendUserAccount(selectedUserForSuspension.id || selectedUserForSuspension.uid, user?.uid || 'admin_uid_001', suspensionDays, reasonText);
-    } catch (e) { }
-    mockApi.suspendUserAdmin(selectedUserForSuspension.id, totalHours, reasonText);
-    logAdminActivity(`suspended user ${selectedUserForSuspension?.name || selectedUserForSuspension?.email || 'User'} for ${suspensionDays} days (${reasonText}).`);
+    const suspensionPayload = {
+      days: suspensionDays,
+      hours: suspensionHours,
+      totalHours: totalHours,
+      reason: reasonText,
+      suspendedAt: new Date().toISOString(),
+      suspendedUntil: new Date(Date.now() + (totalHours * 60 * 60 * 1000)).toISOString(),
+      suspendedBy: user?.uid || 'admin_uid_001'
+    };
 
+    // 1. Immediate optimistic UI update
     setRegisteredUsersList(prev => prev.map(u => {
-      if (u.id === selectedUserForSuspension.id || u.email === selectedUserForSuspension.email) {
+      const uId = String(u.id || u.uid || '').toLowerCase().trim();
+      const uEm = String(u.email || '').toLowerCase().trim();
+      const isMatch = (targetId && uId === targetId) || (targetEmail && uEm === targetEmail);
+      if (isMatch) {
         return {
           ...u,
           accountStatus: 'SUSPENDED',
           status: 'SUSPENDED',
+          suspension: suspensionPayload,
           suspensionReason: reasonText
         };
       }
@@ -2135,24 +2206,134 @@ export default function AdminPortal({ onNavigate }) {
 
     setIsSuspendModalOpen(false);
     setSelectedUserForSuspension(null);
+    setPublishSuccessMessage('User account suspended successfully for ' + suspensionDays + ' days.');
+    setTimeout(() => setPublishSuccessMessage(''), 4000);
+
+    // 2. Persist to Firestore
+    try {
+      await suspendUserAccount(targetUser.id || targetUser.uid, user?.uid || 'admin_uid_001', suspensionDays, reasonText);
+    } catch (e) {
+      console.warn('Firestore suspend note:', e);
+    }
+
+    // 3. Persist to mockApi and logs
+    mockApi.suspendUserAdmin(targetUser.id || targetUser.uid, totalHours, reasonText);
+    logAdminActivity('suspended user ' + (targetUser.name || targetUser.email || 'User') + ' for ' + suspensionDays + ' days (' + reasonText + ').');
+
+    // 4. Persist to PostgreSQL backend
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: targetUser.uid || targetUser.id,
+          id: targetUser.id || targetUser.uid,
+          email: targetUser.email,
+          displayName: targetUser.name || targetUser.displayName || 'EaseLand User',
+          accountStatus: 'SUSPENDED',
+          status: 'SUSPENDED',
+          suspension: suspensionPayload
+        })
+      });
+    } catch (apiErr) { }
+
+    // 5. Update local storage and broadcast cross-tab events
+    try {
+      if (typeof window !== 'undefined') {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map(u => {
+              const uId = String(u.id || u.uid || '').toLowerCase().trim();
+              const uEm = String(u.email || '').toLowerCase().trim();
+              const isMatch = (targetId && uId === targetId) || (targetEmail && uEm === targetEmail);
+              return isMatch ? { ...u, accountStatus: 'SUSPENDED', status: 'SUSPENDED', suspension: suspensionPayload } : u;
+            });
+            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+        window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: { userId: targetId, status: 'SUSPENDED' } }));
+        window.dispatchEvent(new CustomEvent('easeland-user-status-changed', { detail: { userId: targetId, email: targetEmail, status: 'SUSPENDED', suspension: suspensionPayload } }));
+      }
+    } catch (e) { }
   };
+  const handleApplySuspension = handleConfirmSuspendUser;
 
   const handleUnsuspendUser = async (u) => {
-    try {
-      await unsuspendUserAccount(u.id || u.uid, user?.uid || 'admin_uid_001');
-    } catch (e) { }
-    mockApi.unsuspendUserAdmin(u.id);
-    logAdminActivity(`unsuspended user ${u.name || u.email || 'User'}.`);
+    if (!u) return;
+    const targetUser = typeof u === 'object' ? u : (registeredUsersList.find(usr => usr.id === u || usr.uid === u) || { id: u, uid: u });
+    const targetId = String(targetUser.id || targetUser.uid || '').toLowerCase().trim();
+    const targetEmail = String(targetUser.email || '').toLowerCase().trim();
+
+    // 1. Immediate optimistic UI update
     setRegisteredUsersList(prev => prev.map(usr => {
-      if (usr.id === u.id || usr.email === usr.email) {
+      const uId = String(usr.id || usr.uid || '').toLowerCase().trim();
+      const uEm = String(usr.email || '').toLowerCase().trim();
+      const isMatch = (targetId && uId === targetId) || (targetEmail && uEm === targetEmail);
+      if (isMatch) {
         return {
           ...usr,
           accountStatus: 'ACTIVE',
-          status: 'ACTIVE'
+          status: 'ACTIVE',
+          suspension: null,
+          suspensionReason: null
         };
       }
       return usr;
     }));
+
+    setPublishSuccessMessage('User suspension lifted successfully. Account restored to ACTIVE.');
+    setTimeout(() => setPublishSuccessMessage(''), 4000);
+
+    // 2. Persist to Firestore
+    try {
+      await unsuspendUserAccount(targetUser.id || targetUser.uid, user?.uid || 'admin_uid_001');
+    } catch (e) {
+      console.warn('Firestore unsuspend note:', e);
+    }
+
+    // 3. Persist to mockApi and logs
+    mockApi.unsuspendUserAdmin(targetUser.id || targetUser.uid);
+    logAdminActivity('unsuspended user ' + (targetUser.name || targetUser.email || 'User') + '.');
+
+    // 4. Persist to PostgreSQL backend
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: targetUser.uid || targetUser.id,
+          id: targetUser.id || targetUser.uid,
+          email: targetUser.email,
+          displayName: targetUser.name || targetUser.displayName || 'EaseLand User',
+          accountStatus: 'ACTIVE',
+          status: 'ACTIVE',
+          suspension: null
+        })
+      });
+    } catch (apiErr) { }
+
+    // 5. Update local storage and broadcast cross-tab events
+    try {
+      if (typeof window !== 'undefined') {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map(usr => {
+              const uId = String(usr.id || usr.uid || '').toLowerCase().trim();
+              const uEm = String(usr.email || '').toLowerCase().trim();
+              const isMatch = (targetId && uId === targetId) || (targetEmail && uEm === targetEmail);
+              return isMatch ? { ...usr, accountStatus: 'ACTIVE', status: 'ACTIVE', suspension: null } : usr;
+            });
+            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+        window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: { userId: targetId, status: 'ACTIVE' } }));
+        window.dispatchEvent(new CustomEvent('easeland-user-status-changed', { detail: { userId: targetId, email: targetEmail, status: 'ACTIVE' } }));
+      }
+    } catch (e) { }
   };
 
   const handleRemoveUserModalOpen = (u) => {
@@ -2160,19 +2341,44 @@ export default function AdminPortal({ onNavigate }) {
     setRemovalReason('Account permanently deleted by platform admin for policy violation');
     setIsRemoveModalOpen(true);
   };
+  const handleOpenRemoveModal = handleRemoveUserModalOpen;
 
   const handleConfirmRemoveUser = async () => {
     if (!selectedUserForRemoval) return;
-    const targetId = String(selectedUserForRemoval.id || selectedUserForRemoval.uid || '').toLowerCase().trim();
-    const targetEmail = String(selectedUserForRemoval.email || '').toLowerCase().trim();
+    const targetUser = selectedUserForRemoval;
+    const targetId = String(targetUser.id || targetUser.uid || '').toLowerCase().trim();
+    const targetEmail = String(targetUser.email || '').toLowerCase().trim();
 
+    // 1. Immediate optimistic UI update
+    setRegisteredUsersList(prev => prev.filter(u => {
+      const id1 = String(u.id || u.uid || '').toLowerCase().trim();
+      const em1 = String(u.email || '').toLowerCase().trim();
+      return id1 !== targetId && em1 !== targetEmail;
+    }));
+
+    setIsRemoveModalOpen(false);
+    setSelectedUserForRemoval(null);
+    setPublishSuccessMessage('User account permanently deleted.');
+    setTimeout(() => setPublishSuccessMessage(''), 4000);
+
+    // 2. Persist to Firestore
     try {
-      await removeUserAccount(selectedUserForRemoval.id || selectedUserForRemoval.uid, user?.uid || 'admin_uid_001', removalReason);
-    } catch (e) { }
+      await removeUserAccount(targetUser.id || targetUser.uid, user?.uid || 'admin_uid_001', removalReason);
+    } catch (e) {
+      console.warn('Firestore remove note:', e);
+    }
 
-    mockApi.removeUserAdmin(selectedUserForRemoval.id, removalReason);
-    logAdminActivity(`permanently removed user account ${selectedUserForRemoval?.name || selectedUserForRemoval?.email || 'User'}.`);
+    // 3. Persist to mockApi and logs
+    mockApi.removeUserAdmin(targetUser.id || targetUser.uid, removalReason);
+    logAdminActivity('permanently removed user account ' + (targetUser.name || targetUser.email || 'User') + '.');
 
+    // 4. Delete from PostgreSQL backend
+    try {
+      const uidParam = encodeURIComponent(targetUser.uid || targetUser.id || targetEmail);
+      await fetch('/api/users/' + uidParam, { method: 'DELETE' });
+    } catch (apiErr) { }
+
+    // 5. Update local storage and broadcast cross-tab events
     try {
       if (typeof window !== 'undefined') {
         const rawDel = localStorage.getItem('easeland_deleted_users');
@@ -2194,18 +2400,10 @@ export default function AdminPortal({ onNavigate }) {
             localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
           }
         }
+        window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: { userId: targetId, status: 'REMOVED' } }));
+        window.dispatchEvent(new CustomEvent('easeland-user-status-changed', { detail: { userId: targetId, email: targetEmail, status: 'REMOVED' } }));
       }
     } catch (e) { }
-
-    setRegisteredUsersList(prev => prev.filter(u => {
-      const id1 = String(u.id || u.uid || '').toLowerCase().trim();
-      const em1 = String(u.email || '').toLowerCase().trim();
-      return id1 !== targetId && em1 !== targetEmail;
-    }));
-
-    setIsRemoveModalOpen(false);
-    setSelectedUserForRemoval(null);
-    await loadData();
   };
 
   // FAQ management helpers
@@ -4915,12 +5113,17 @@ export default function AdminPortal({ onNavigate }) {
                         setPublishSuccessMessage('User directory synced & refreshed from Firebase Auth!');
                         setTimeout(() => setPublishSuccessMessage(''), 3000);
                       }}
-                      className="flex items-center gap-1.5 bg-brand-charcoal text-brand-yellow hover:bg-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm transition-all shrink-0"
+                      className="flex items-center gap-1.5 bg-brand-charcoal text-brand-yellow hover:bg-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm transition-all shrink-0 cursor-pointer"
                       title="Sync and Refresh User Directory from Firebase Auth & Firestore"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                       <span>Sync & Refresh</span>
                     </button>
+
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-extrabold shadow-xs shrink-0 select-none">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>Live Sync Active</span>
+                    </div>
 
                     {['ALL', 'ACTIVE', 'SUSPENDED', 'REMOVED'].map((st) => (
                       <button
@@ -5030,8 +5233,8 @@ export default function AdminPortal({ onNavigate }) {
                                         </div>
                                         <span className="text-[10px] text-gray-500 font-medium block truncate">{u.email}</span>
                                         {(u.uid || u.id) && (
-                                          <span className="text-[9px] text-slate-400 font-mono block truncate" title={`Firebase Auth UID: ${u.uid || u.id}`}>
-                                            UID: {String(u.uid || u.id).length > 18 ? `${String(u.uid || u.id).substring(0, 16)}...` : String(u.uid || u.id)}
+                                          <span className="text-[9px] text-slate-400 font-mono block truncate" title={'Firebase Auth UID: ' + (u.uid || u.id)}>
+                                            UID: {String(u.uid || u.id).length > 18 ? (String(u.uid || u.id).substring(0, 16) + '...') : String(u.uid || u.id)}
                                           </span>
                                         )}
                                       </div>
@@ -5067,31 +5270,27 @@ export default function AdminPortal({ onNavigate }) {
                                   </td>
 
                                   <td className="py-3 px-3 text-center">
-                                    {u.status === 'ACTIVE' && (
-                                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                        ACTIVE
-                                      </span>
-                                    )}
-
-                                    {u.status === 'SUSPENDED' && (
+                                    {(u.status === 'SUSPENDED' || u.accountStatus === 'SUSPENDED') ? (
                                       <div>
-                                        <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                        <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
                                           <AlertTriangle className="w-3 h-3 text-amber-600" />
                                           SUSPENDED
                                         </span>
-                                        {u.suspension && (
+                                        {u.suspension?.suspendedUntil && (
                                           <span className="block text-[9px] text-amber-700 font-semibold mt-0.5">
                                             Until: {new Date(u.suspension.suspendedUntil).toLocaleDateString('en-IN')}
                                           </span>
                                         )}
                                       </div>
-                                    )}
-
-                                    {u.status === 'ADMIN' && (
-                                      <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                                    ) : (u.status === 'ADMIN' || u.role === 'ADMIN' || u.email === 'admin@easeland.in') ? (
+                                      <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
                                         <ShieldCheck className="w-3 h-3 text-purple-600" />
                                         ADMIN
+                                      </span>
+                                    ) : (
+                                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        ACTIVE
                                       </span>
                                     )}
                                   </td>
@@ -5099,27 +5298,36 @@ export default function AdminPortal({ onNavigate }) {
                                   <td className="py-3 px-3 text-right">
                                     {u.status !== 'ADMIN' && u.role !== 'ADMIN' && u.email !== 'admin@easeland.in' && (
                                       <div className="flex items-center justify-end gap-1.5">
-                                        {u.status === 'SUSPENDED' ? (
+                                        {(u.status === 'SUSPENDED' || u.accountStatus === 'SUSPENDED') ? (
                                           <button
-                                            onClick={() => handleUnsuspendUser(u.id)}
-                                            className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
+                                            type="button"
+                                            onClick={() => handleUnsuspendUser(u)}
+                                            className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                                            title="Lift suspension and restore account status to ACTIVE"
                                           >
-                                            Lift Suspension
+                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                            <span>Lift Suspension</span>
                                           </button>
-                                        ) : u.status === 'ACTIVE' ? (
+                                        ) : (
                                           <button
-                                            onClick={() => handleOpenSuspendModal(u)}
-                                            className="bg-amber-100 text-amber-900 hover:bg-amber-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
+                                            type="button"
+                                            onClick={() => handleSuspendUserModalOpen(u)}
+                                            className="bg-amber-100 text-amber-900 hover:bg-amber-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                                            title="Temporarily restrict user access and capabilities"
                                           >
-                                            Suspend Account
+                                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                            <span>Suspend Account</span>
                                           </button>
-                                        ) : null}
+                                        )}
 
                                         <button
-                                          onClick={() => handleOpenRemoveModal(u)}
-                                          className="bg-red-100 text-red-800 hover:bg-red-200 font-extrabold px-2.5 py-1 rounded-lg text-[10px] transition-colors"
+                                          type="button"
+                                          onClick={() => handleRemoveUserModalOpen(u)}
+                                          className="bg-red-100 text-red-800 hover:bg-red-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                                          title="Permanently remove user account"
                                         >
-                                          Remove Account
+                                          <Trash2 className="w-3 h-3 text-red-600" />
+                                          <span>Remove Account</span>
                                         </button>
                                       </div>
                                     )}
@@ -5701,7 +5909,7 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 1: SUSPENSION DURATION & REASON CUSTOMIZER */}
       {isSuspendModalOpen && selectedUserForSuspension && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
@@ -5709,8 +5917,9 @@ export default function AdminPortal({ onNavigate }) {
                 <h3 className="text-lg font-black text-brand-charcoal">Temporarily Suspend User Account</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsSuspendModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5740,10 +5949,9 @@ export default function AdminPortal({ onNavigate }) {
                         setSuspensionDays(preset.d);
                         setSuspensionHours(preset.h);
                       }}
-                      className={`py-2 rounded-xl text-xs font-extrabold border transition-all ${suspensionDays === preset.d && suspensionHours === preset.h
+                      className={'py-2 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ' + (suspensionDays === preset.d && suspensionHours === preset.h
                           ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow'
-                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100')}
                     >
                       {preset.label}
                     </button>
@@ -5809,14 +6017,14 @@ export default function AdminPortal({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => setIsSuspendModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleApplySuspension}
-                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md transition-all"
+                onClick={handleConfirmSuspendUser}
+                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
               >
                 Confirm Account Suspension
               </button>
@@ -5827,7 +6035,7 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 2: ACCOUNT REMOVAL CONFIRMATION */}
       {isRemoveModalOpen && selectedUserForRemoval && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-red-600">
@@ -5835,8 +6043,9 @@ export default function AdminPortal({ onNavigate }) {
                 <h3 className="text-lg font-black text-brand-charcoal">Remove User Account</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsRemoveModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5861,14 +6070,14 @@ export default function AdminPortal({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => setIsRemoveModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmRemoveUser}
-                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md transition-all"
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
               >
                 Permanently Remove Account
               </button>
