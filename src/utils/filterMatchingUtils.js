@@ -227,6 +227,30 @@ export function propertyHasAmenity(p, reqAmenity) {
 }
 
 /**
+ * Normalizes furnishing status values across enum keys, hyphens, spaces, and casing
+ * e.g., 'Semi-Furnished', 'SEMI_FURNISHED', 'Semi Furnished', 'semi' -> 'SEMI_FURNISHED'
+ *       'Fully Furnished', 'FULLY_FURNISHED', 'Furnished' -> 'FULLY_FURNISHED'
+ *       'Unfurnished', 'UNFURNISHED' -> 'UNFURNISHED'
+ */
+export function normalizeFurnishing(val) {
+  if (!val || typeof val !== 'string') return '';
+  const clean = val.toUpperCase().replace(/[^A-Z]/g, '');
+  if (clean.includes('SEMI')) return 'SEMI_FURNISHED';
+  if (clean.includes('UNFURNISH')) return 'UNFURNISHED';
+  if (clean.includes('FULLY') || clean === 'FURNISHED' || clean === 'FURNISHING') return 'FULLY_FURNISHED';
+  return clean;
+}
+
+/**
+ * Normalizes facing directions across hyphens, spaces, and casing
+ * e.g., 'North-East', 'NORTH_EAST', 'North East' -> 'NORTHEAST'
+ */
+export function normalizeFacing(val) {
+  if (!val || typeof val !== 'string') return '';
+  return val.toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+/**
  * Pure search filter evaluator across property record
  */
 export function matchesSearchFilters(p, searchState = {}) {
@@ -514,16 +538,30 @@ export function matchesSearchFilters(p, searchState = {}) {
 
   // 9. Facing Direction
   if (effectiveState.facing && effectiveState.facing !== 'ANY' && effectiveState.facing !== 'ALL') {
-    const targetFacing = String(effectiveState.facing).toUpperCase();
-    const pFacing = String(p.facing || p.specifications?.facing || '').toUpperCase();
-    if (pFacing && !pFacing.includes(targetFacing)) return false;
+    const targetFacing = normalizeFacing(effectiveState.facing);
+    if (targetFacing) {
+      const rawFacing = p.facing || p.specs?.facing || p.specifications?.facing || '';
+      const propFacing = normalizeFacing(rawFacing);
+      if (!propFacing || propFacing !== targetFacing) return false;
+    }
   }
 
   // 10. Furnishing Status
   if (effectiveState.furnishing && effectiveState.furnishing !== 'ANY' && effectiveState.furnishing !== 'ALL') {
-    const targetFurnishing = String(effectiveState.furnishing).toUpperCase();
-    const pFurnishing = String(p.furnishing || p.furnishingStatus || p.specifications?.furnishing || '').toUpperCase();
-    if (pFurnishing && !pFurnishing.includes(targetFurnishing)) return false;
+    const targetFurnishing = normalizeFurnishing(effectiveState.furnishing);
+    if (targetFurnishing) {
+      const rawPropFurnishing = p.specs?.furnishing ||
+                                p.specs?.furnishingStatus ||
+                                p.specifications?.furnishing ||
+                                p.specifications?.furnishingStatus ||
+                                p.furnishing ||
+                                p.furnishingStatus ||
+                                '';
+      const propFurnishing = normalizeFurnishing(rawPropFurnishing);
+      if (!propFurnishing || propFurnishing !== targetFurnishing) {
+        return false;
+      }
+    }
   }
 
   // 11. Amenities

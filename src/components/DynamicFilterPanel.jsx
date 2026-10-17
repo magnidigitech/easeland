@@ -635,8 +635,16 @@ export default function DynamicFilterPanel({
   if (filters.minArea || filters.minAreaSqFt) activeChips.push({ label: `Min Area: ${filters.minArea || filters.minAreaSqFt} ${currentAreaUnit}`, key: 'minArea', val: '' });
   if (filters.maxArea || filters.maxAreaSqFt) activeChips.push({ label: `Max Area: ${filters.maxArea || filters.maxAreaSqFt} ${currentAreaUnit}`, key: 'maxArea', val: '' });
   if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY' && filters.bedrooms !== 'ALL') activeChips.push({ label: `BHK: ${filters.bedrooms}+`, key: 'bedrooms', val: '' });
-  if (filters.facing && filters.facing !== 'ALL' && filters.facing !== 'ANY') activeChips.push({ label: `Facing: ${filters.facing}`, key: 'facing', val: '' });
-  if (filters.furnishing && filters.furnishing !== 'ALL' && filters.furnishing !== 'ANY') activeChips.push({ label: `Furnishing: ${filters.furnishing}`, key: 'furnishing', val: '' });
+  if (filters.facing && filters.facing !== 'ALL' && filters.facing !== 'ANY') {
+    const matchedFacing = FACING_OPTIONS.find(o => o.value === filters.facing);
+    const facingLabel = matchedFacing ? matchedFacing.label : String(filters.facing).replace(/_/g, ' ');
+    activeChips.push({ label: `Facing: ${facingLabel}`, key: 'facing', val: '' });
+  }
+  if (filters.furnishing && filters.furnishing !== 'ALL' && filters.furnishing !== 'ANY') {
+    const matchedOption = FURNISHING_OPTIONS.find(o => o.value === filters.furnishing);
+    const displayLabel = matchedOption ? matchedOption.label : String(filters.furnishing).replace(/_/g, ' ');
+    activeChips.push({ label: `Furnishing: ${displayLabel}`, key: 'furnishing', val: '' });
+  }
   if (filters.referencePlace) activeChips.push({ label: `Near: ${filters.referencePlace}`, customAction: handleClearNearby });
   if (filters.radiusKm) activeChips.push({ label: `Radius: Within ${filters.radiusKm} km`, key: 'radiusKm', val: null });
   if (filters.amenities && filters.amenities.length > 0) {
@@ -1406,7 +1414,7 @@ export default function DynamicFilterPanel({
             Facing Direction
           </label>
           <select
-            value={filters.facing || ''}
+            value={(filters.facing === 'ALL' || filters.facing === 'ANY') ? '' : (filters.facing || '')}
             onChange={(e) => handleChange('facing', e.target.value)}
             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
           >
@@ -1423,7 +1431,7 @@ export default function DynamicFilterPanel({
               Furnishing Status
             </label>
             <select
-              value={filters.furnishing || ''}
+              value={(filters.furnishing === 'ALL' || filters.furnishing === 'ANY') ? '' : (filters.furnishing || '')}
               onChange={(e) => handleChange('furnishing', e.target.value)}
               className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold"
             >

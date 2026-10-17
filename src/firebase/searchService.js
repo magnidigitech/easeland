@@ -18,7 +18,7 @@ import { db } from './config.js';
 import { ListingStatus, MediaStatus, Purpose, PropertyType } from './schema.js';
 import { formatFirestoreError } from './userService.js';
 import { encodeGeohash, convertAreaToSqFt } from './propertyService.js';
-import { propertyHasAmenity } from '../utils/filterMatchingUtils.js';
+import { propertyHasAmenity, normalizeFurnishing, normalizeFacing } from '../utils/filterMatchingUtils.js';
 import { isPhotoMedia } from '../utils/categoryUtils.js';
 
 export { convertAreaToSqFt, encodeGeohash };
@@ -240,6 +240,8 @@ export async function searchPublicProperties({
       maxAreaSqFt,
       bedrooms,
       bathrooms,
+      facing,
+      furnishing,
       amenities = [],
       radiusKm,
       referenceLat,
@@ -347,6 +349,24 @@ export async function searchPublicProperties({
           return true;
         });
       }
+      if (facing && facing !== 'ALL' && facing !== 'ANY') {
+        const targetFacing = normalizeFacing(facing);
+        if (targetFacing) {
+          filteredCandidates = filteredCandidates.filter(c => {
+            const raw = c.data.facing || c.data.specs?.facing || c.data.specifications?.facing || '';
+            return normalizeFacing(raw) === targetFacing;
+          });
+        }
+      }
+      if (furnishing && furnishing !== 'ALL' && furnishing !== 'ANY') {
+        const targetFurn = normalizeFurnishing(furnishing);
+        if (targetFurn) {
+          filteredCandidates = filteredCandidates.filter(c => {
+            const raw = c.data.specs?.furnishing || c.data.specs?.furnishingStatus || c.data.specifications?.furnishing || c.data.specifications?.furnishingStatus || c.data.furnishing || c.data.furnishingStatus || '';
+            return normalizeFurnishing(raw) === targetFurn;
+          });
+        }
+      }
 
       const paginatedSlice = filteredCandidates.slice(0, pageSize);
       const newLastDoc = paginatedSlice.length > 0 ? paginatedSlice[paginatedSlice.length - 1].docSnap : null;
@@ -355,7 +375,9 @@ export async function searchPublicProperties({
         const d = c.data;
         const mediaList = Array.isArray(d.publicApprovedMedia) ? d.publicApprovedMedia : d.media || [];
         return {
-          propertyId: d.propertyId || c.docSnap.id,
+          ...d,
+          id: d.id || d.propertyId || c.docSnap.id,
+          propertyId: d.propertyId || d.id || c.docSnap.id,
           referenceId: d.referenceId || '',
           title: d.title || '',
           propertyType: d.propertyType || '',
@@ -366,6 +388,8 @@ export async function searchPublicProperties({
           areaDisplay: d.areaDisplay || '',
           areaSqFt: Number(d.areaSqFt) || 0,
           location: d.location || null,
+          specs: d.specs || d.specifications || null,
+          specifications: d.specifications || d.specs || null,
           isPlatformVerified: Boolean(d.isPlatformVerified),
           approvedThumbnail: getApprovedPrimaryThumbnail(mediaList),
           createdAt: d.createdAt,
@@ -528,6 +552,26 @@ export async function searchPublicProperties({
       filteredProperties = filteredProperties.filter(p => {
         return amenities.every(am => propertyHasAmenity(p, am));
       });
+    }
+
+    if (facing && facing !== 'ALL' && facing !== 'ANY') {
+      const targetFacing = normalizeFacing(facing);
+      if (targetFacing) {
+        filteredProperties = filteredProperties.filter(p => {
+          const raw = p.facing || p.specs?.facing || p.specifications?.facing || '';
+          return normalizeFacing(raw) === targetFacing;
+        });
+      }
+    }
+
+    if (furnishing && furnishing !== 'ALL' && furnishing !== 'ANY') {
+      const targetFurn = normalizeFurnishing(furnishing);
+      if (targetFurn) {
+        filteredProperties = filteredProperties.filter(p => {
+          const raw = p.specs?.furnishing || p.specs?.furnishingStatus || p.specifications?.furnishing || p.specifications?.furnishingStatus || p.furnishing || p.furnishingStatus || '';
+          return normalizeFurnishing(raw) === targetFurn;
+        });
+      }
     }
 
     return {

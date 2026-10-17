@@ -2,6 +2,7 @@ import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UP
 import { extractCoordinates } from './locationProvider.js';
 import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
 import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
+import { normalizeFurnishing, normalizeFacing } from '../utils/filterMatchingUtils.js';
 
 export const safeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -748,6 +749,26 @@ export const mockApi = {
     }
     if (effectiveFilters.cornerPlot) result = result.filter(p => p.cornerPlot === true);
     if (effectiveFilters.gatedCommunity) result = result.filter(p => p.gatedCommunity === true);
+
+    if (effectiveFilters.furnishing && effectiveFilters.furnishing !== 'ALL' && effectiveFilters.furnishing !== 'ANY') {
+      const targetFurn = normalizeFurnishing(effectiveFilters.furnishing);
+      if (targetFurn) {
+        result = result.filter(p => {
+          const raw = p.specs?.furnishing || p.specs?.furnishingStatus || p.specifications?.furnishing || p.specifications?.furnishingStatus || p.furnishing || p.furnishingStatus || '';
+          return normalizeFurnishing(raw) === targetFurn;
+        });
+      }
+    }
+
+    if (effectiveFilters.facing && effectiveFilters.facing !== 'ALL' && effectiveFilters.facing !== 'ANY') {
+      const targetFacing = normalizeFacing(effectiveFilters.facing);
+      if (targetFacing) {
+        result = result.filter(p => {
+          const raw = p.facing || p.specs?.facing || p.specifications?.facing || '';
+          return normalizeFacing(raw) === targetFacing;
+        });
+      }
+    }
 
     // Location Filters (State, District, City, Locality)
     if (filters.state && filters.state.trim()) {
