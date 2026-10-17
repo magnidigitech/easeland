@@ -91,6 +91,8 @@ import {
   deleteVisitorLead,
   convertVisitorToCrmLead
 } from '../firebase/visitorService.js';
+import VerificationLocationBoundaryCard from '../components/VerificationLocationBoundaryCard.jsx';
+import { computeReauditDiff, formatInr } from '../utils/reauditDiffUtils.js';
 
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
@@ -3754,6 +3756,10 @@ export default function AdminPortal({ onNavigate }) {
                     const lpVal = activeAuditProp.location?.lpNo || activeAuditProp.lpNo || 'N/A';
                     const lpStr = typeof lpVal === 'string' || typeof lpVal === 'number' ? String(lpVal) : 'N/A';
 
+                    // Exhaustive field diff between Live Approved data and Proposed Modifications
+                    const reauditDiff = computeReauditDiff(activeAuditProp);
+                    const { isReaudit, hasChanges, changedFieldCount, changedKeys, diffs } = reauditDiff;
+
                     return (
                       <div className="bg-white rounded-2xl p-6 border border-slate-300 shadow-lg space-y-6 text-slate-900">
 
@@ -3761,9 +3767,15 @@ export default function AdminPortal({ onNavigate }) {
                         <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
                           <div>
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              {Boolean((activeAuditProp.hasPendingEdits || activeAuditProp.pendingReauditData) && (activeAuditProp.reAuditStatus === 'PENDING_VERIFICATION' || activeAuditProp.reAuditStatus === 'UNDER_REVIEW')) ? (
-                                <span className="text-xs font-black text-purple-900 bg-purple-200 px-3 py-1 rounded-md tracking-wider border border-purple-300">
-                                  RE-VERIFICATION (LIVE LISTING MODIFIED)
+                              {isReaudit ? (
+                                <span className="text-xs font-black text-purple-900 bg-purple-200 px-3 py-1 rounded-md tracking-wider border border-purple-300 flex items-center gap-1.5 shadow-sm">
+                                  <Sparkles className="w-3.5 h-3.5 text-purple-700" />
+                                  <span>RE-VERIFICATION (LIVE LISTING MODIFIED)</span>
+                                  {changedFieldCount > 0 && (
+                                    <span className="bg-purple-900 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1">
+                                      {changedFieldCount + ' Field' + (changedFieldCount > 1 ? 's' : '') + ' Changed'}
+                                    </span>
+                                  )}
                                 </span>
                               ) : (
                                 <span className="text-xs font-black text-amber-900 bg-amber-200 px-3 py-1 rounded-md tracking-wider">
@@ -3773,8 +3785,34 @@ export default function AdminPortal({ onNavigate }) {
                               <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-md">
                                 ID: {propIdStr}
                               </span>
+                              {isReaudit && diffs.location?.changed && (
+                                <span className="text-[10px] font-black uppercase bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded">
+                                  Location Modified
+                                </span>
+                              )}
+                              {isReaudit && diffs.boundary?.changed && (
+                                <span className="text-[10px] font-black uppercase bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded">
+                                  Boundary Modified
+                                </span>
+                              )}
                             </div>
-                            <h3 className="text-2xl font-black text-slate-900 mt-1">{propTitle}</h3>
+
+                            {diffs.title?.changed ? (
+                              <div className="mt-1 space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="text-2xl font-black text-purple-950">{diffs.title.proposed}</h3>
+                                  <span className="text-[10px] font-black uppercase bg-purple-200 text-purple-900 px-2 py-0.5 rounded border border-purple-300">
+                                    PROPOSED TITLE
+                                  </span>
+                                </div>
+                                <div className="text-xs text-slate-500 line-through font-semibold">
+                                  Live Approved Title: {diffs.title.live}
+                                </div>
+                              </div>
+                            ) : (
+                              <h3 className="text-2xl font-black text-slate-900 mt-1">{propTitle}</h3>
+                            )}
+
                             <p className="text-xs font-extrabold text-slate-700 mt-0.5 flex items-center gap-1">
                               <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                               <span>
@@ -3782,11 +3820,28 @@ export default function AdminPortal({ onNavigate }) {
                               </span>
                             </p>
                           </div>
+
                           <div className="text-right flex flex-col items-end gap-2">
                             <div>
-                              <span className="text-2xl font-black text-emerald-700 block">
-                                {priceStr}
-                              </span>
+                              {diffs.price?.changed ? (
+                                <div>
+                                  <div className="flex items-center gap-1.5 justify-end">
+                                    <span className="text-[10px] font-black uppercase text-purple-900 bg-purple-200 px-1.5 py-0.5 rounded border border-purple-300">
+                                      PROPOSED
+                                    </span>
+                                    <span className="text-2xl font-black text-emerald-700 block">
+                                      {diffs.price.proposedDisplay}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-500 line-through block text-right">
+                                    Live: {diffs.price.liveDisplay}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-2xl font-black text-emerald-700 block">
+                                  {priceStr}
+                                </span>
+                              )}
                               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block">
                                 Submitted: {activeAuditProp.submittedDate || 'Recent'}
                               </span>
@@ -3803,12 +3858,17 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
 
                         {/* PROPOSED MODIFICATIONS DIFF CARD (RE-AUDIT WORKFLOW) */}
-                        {Boolean((activeAuditProp.hasPendingEdits || activeAuditProp.pendingReauditData) && activeAuditProp.pendingReauditData) && (
-                          <div className="p-5 bg-purple-50/80 border-2 border-purple-300 rounded-2xl space-y-4 shadow-sm animate-in fade-in">
+                        {isReaudit && (
+                          <div className="p-5 bg-purple-50/90 border-2 border-purple-300 rounded-2xl space-y-4 shadow-sm animate-in fade-in">
                             <div className="flex items-center justify-between flex-wrap gap-2 border-b border-purple-200 pb-3">
                               <div className="flex items-center gap-2 text-purple-950 font-black text-sm">
                                 <AlertTriangle className="w-5 h-5 text-purple-600 shrink-0" />
                                 <span>PROPOSED MODIFICATIONS AWAITING VERIFICATION</span>
+                                {changedFieldCount > 0 && (
+                                  <span className="text-xs bg-purple-900 text-white px-2.5 py-0.5 rounded-full font-black">
+                                    {changedFieldCount + ' item' + (changedFieldCount > 1 ? 's' : '') + ' changed'}
+                                  </span>
+                                )}
                               </div>
                               <span className="text-[11px] font-extrabold text-purple-800 bg-purple-200 px-3 py-1 rounded-full border border-purple-300">
                                 Existing Listing Remains LIVE with Previously Approved Details
@@ -3819,53 +3879,173 @@ export default function AdminPortal({ onNavigate }) {
                               The property owner submitted the following changes. The live public marketplace continues displaying the approved data shown below. Review the proposed changes before approving them to replace the live details.
                             </p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
-                              {/* TITLE DIFF */}
-                              {activeAuditProp.pendingReauditData.title && activeAuditProp.pendingReauditData.title !== activeAuditProp.title && (
-                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
-                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Title Modification:</span>
-                                  <div className="text-slate-600 line-through text-[11px]">Live: {activeAuditProp.title}</div>
-                                  <div className="text-emerald-700 font-extrabold text-xs">Proposed: {activeAuditProp.pendingReauditData.title}</div>
-                                </div>
-                              )}
+                            {changedFieldCount === 0 ? (
+                              <div className="p-3.5 bg-white border border-purple-200 rounded-xl text-xs font-semibold text-purple-900">
+                                Owner re-submitted listing verification without modifying core parameter fields.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs font-semibold">
+                                {/* TITLE DIFF */}
+                                {diffs.title && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Title Modification:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {diffs.title.live}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: {diffs.title.proposed}</div>
+                                  </div>
+                                )}
 
-                              {/* PRICE DIFF */}
-                              {(activeAuditProp.pendingReauditData.price !== undefined && Number(activeAuditProp.pendingReauditData.price) !== Number(activeAuditProp.price)) && (
-                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
-                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Price Modification:</span>
-                                  <div className="text-slate-600 line-through text-[11px]">
-                                    Live: {activeAuditProp.priceDisplay || ('Rs. ' + Number(activeAuditProp.price).toLocaleString('en-IN'))}
+                                {/* PRICE DIFF */}
+                                {diffs.price && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Price Modification:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {diffs.price.liveDisplay}</div>
+                                    <div className="text-emerald-700 font-extrabold text-xs">Proposed: {diffs.price.proposedDisplay}</div>
                                   </div>
-                                  <div className="text-emerald-700 font-extrabold text-xs">
-                                    Proposed: {activeAuditProp.pendingReauditData.priceDisplay || ('Rs. ' + Number(activeAuditProp.pendingReauditData.price).toLocaleString('en-IN'))}
-                                  </div>
-                                </div>
-                              )}
+                                )}
 
-                              {/* AREA DIFF */}
-                              {(activeAuditProp.pendingReauditData.area !== undefined && Number(activeAuditProp.pendingReauditData.area) !== Number(activeAuditProp.area)) && (
-                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
-                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Area Modification:</span>
-                                  <div className="text-slate-600 line-through text-[11px]">
-                                    Live: {activeAuditProp.areaDisplay || (activeAuditProp.area + ' ' + (activeAuditProp.areaUnit || 'sq ft'))}
+                                {/* AREA DIFF */}
+                                {diffs.area && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Total Area Modification:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {diffs.area.liveDisplay}</div>
+                                    <div className="text-emerald-700 font-extrabold text-xs">Proposed: {diffs.area.proposedDisplay}</div>
                                   </div>
-                                  <div className="text-emerald-700 font-extrabold text-xs">
-                                    Proposed: {activeAuditProp.pendingReauditData.areaDisplay || (activeAuditProp.pendingReauditData.area + ' ' + (activeAuditProp.pendingReauditData.areaUnit || activeAuditProp.areaUnit || 'sq ft'))}
-                                  </div>
-                                </div>
-                              )}
+                                )}
 
-                              {/* DESCRIPTION DIFF */}
-                              {activeAuditProp.pendingReauditData.description && activeAuditProp.pendingReauditData.description !== activeAuditProp.description && (
-                                <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1 md:col-span-2">
-                                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Description Modification:</span>
-                                  <div className="text-slate-600 text-[11px] max-h-16 overflow-y-auto">Live: {activeAuditProp.description}</div>
-                                  <div className="text-emerald-700 font-extrabold text-xs max-h-24 overflow-y-auto border-t border-purple-100 pt-1">
-                                    Proposed: {activeAuditProp.pendingReauditData.description}
+                                {/* CATEGORY & TYPE DIFF */}
+                                {(diffs.category || diffs.propertyType) && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Category & Type:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {catStr + ' • ' + propTypeStr}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: {(diffs.category?.proposed || catStr) + ' • ' + (diffs.propertyType?.proposed || propTypeStr)}</div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
+                                )}
+
+                                {/* INTENT DIFF */}
+                                {diffs.intent && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Listing Intent:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {diffs.intent.live}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: {diffs.intent.proposed}</div>
+                                  </div>
+                                )}
+
+                                {/* FACING & DIMENSIONS DIFF */}
+                                {(diffs.facing || diffs.dimensions) && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Facing & Dimensions:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {facingStr + ' • ' + dimStr}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: {(diffs.facing?.proposed || facingStr) + ' • ' + (diffs.dimensions?.proposed || dimStr)}</div>
+                                  </div>
+                                )}
+
+                                {/* SURVEY & LP DIFF */}
+                                {(diffs.surveyNo || diffs.lpNo) && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Survey / LP Identifiers:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: Sy. No: {surveyStr} • LP: {lpStr}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: Sy. No: {diffs.surveyNo?.proposed || surveyStr} • LP: {diffs.lpNo?.proposed || lpStr}</div>
+                                  </div>
+                                )}
+
+                                {/* FURNISHING DIFF */}
+                                {diffs.furnishing && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Furnishing:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {diffs.furnishing.live}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: {diffs.furnishing.proposed}</div>
+                                  </div>
+                                )}
+
+                                {/* LOCATION & ADDRESS DIFF */}
+                                {diffs.location && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1 md:col-span-2">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Location Coordinates & Address:</span>
+                                    <div className="text-slate-500 line-through text-[11px]">Live: {diffs.location.liveAddress}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs">Proposed: {diffs.location.proposedAddress}</div>
+                                    {diffs.location.coordsDiff && (
+                                      <div className="text-[10px] font-bold text-purple-800 pt-0.5">
+                                        New Coordinates: {diffs.location.proposedCoords?.lat?.toFixed(5) + ', ' + diffs.location.proposedCoords?.lng?.toFixed(5)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* BOUNDARY GEOMETRY DIFF */}
+                                {diffs.boundary && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1 md:col-span-2">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Plot Boundary Geometry:</span>
+                                    <div className="text-slate-500 text-[11px]">
+                                      Live: {diffs.boundary.liveVertexCount + ' corners • ' + diffs.boundary.liveAreaSqFt.toLocaleString('en-IN') + ' sq ft'}
+                                    </div>
+                                    <div className="text-purple-950 font-extrabold text-xs">
+                                      Proposed: {diffs.boundary.proposedVertexCount + ' corners • ' + diffs.boundary.proposedAreaSqFt.toLocaleString('en-IN') + ' sq ft'}
+                                      {' (' + (diffs.boundary.areaDeltaSqFt >= 0 ? '+' : '') + diffs.boundary.areaDeltaSqFt.toLocaleString('en-IN') + ' sq ft)'}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* DESCRIPTION DIFF */}
+                                {diffs.description && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1 md:col-span-2 lg:col-span-3">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Description Modification:</span>
+                                    <div className="text-slate-500 text-[11px] max-h-16 overflow-y-auto">Live: {diffs.description.live}</div>
+                                    <div className="text-purple-950 font-extrabold text-xs max-h-24 overflow-y-auto border-t border-purple-100 pt-1">
+                                      Proposed: {diffs.description.proposed}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* AMENITIES DIFF */}
+                                {diffs.amenities && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1.5 md:col-span-2 lg:col-span-3">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Amenities Modification:</span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {diffs.amenities.added.map((a, i) => (
+                                        <span key={'add-' + i} className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black px-2 py-0.5 rounded">
+                                          + Added: {a}
+                                        </span>
+                                      ))}
+                                      {diffs.amenities.removed.map((a, i) => (
+                                        <span key={'rem-' + i} className="bg-rose-100 text-rose-900 border border-rose-300 text-[11px] font-bold line-through px-2 py-0.5 rounded">
+                                          - Removed: {a}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* PHOTOS DIFF */}
+                                {diffs.photos && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Submitted Photos:</span>
+                                    <div className="text-purple-950 font-extrabold text-xs">
+                                      {diffs.photos.newCount + ' New Photo' + (diffs.photos.newCount > 1 ? 's' : '') + ' Uploaded by Owner'}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* VIDEOS DIFF */}
+                                {diffs.videos && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Submitted Video:</span>
+                                    <div className="text-purple-950 font-extrabold text-xs">
+                                      Owner updated property video link / upload
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* DOCUMENTS DIFF */}
+                                {diffs.documents && (
+                                  <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
+                                    <span className="text-[10px] uppercase font-bold text-purple-800 block">Verification Documents:</span>
+                                    <div className="text-purple-950 font-extrabold text-xs">
+                                      {diffs.documents.newCount + ' New Document' + (diffs.documents.newCount > 1 ? 's' : '') + ' Attached'}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -3911,25 +4091,86 @@ export default function AdminPortal({ onNavigate }) {
                               <span>Property Specifications & Financials</span>
                             </h4>
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs space-y-2.5 text-slate-900 font-bold">
-                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                <span className="text-slate-600 font-bold">Category & Type:</span>
-                                <span className="text-slate-900 font-extrabold">{catStr} • {propTypeStr}</span>
+                              {/* Category & Type */}
+                              <div className={'flex justify-between border-b border-slate-200 pb-1.5 ' + (changedKeys.has('category') || changedKeys.has('propertyType') ? 'bg-purple-100/70 p-1.5 rounded-lg border border-purple-300' : '')}>
+                                <span className="text-slate-600 font-bold flex items-center gap-1">
+                                  <span>Category & Type:</span>
+                                  {(changedKeys.has('category') || changedKeys.has('propertyType')) && (
+                                    <span className="bg-purple-200 text-purple-900 text-[9px] font-black px-1.5 py-0.2 rounded border border-purple-300">MODIFIED</span>
+                                  )}
+                                </span>
+                                <div className="text-right">
+                                  {(changedKeys.has('category') || changedKeys.has('propertyType')) && (
+                                    <span className="text-slate-500 line-through text-[11px] block">{catStr + ' • ' + propTypeStr}</span>
+                                  )}
+                                  <span className="text-slate-900 font-extrabold">
+                                    {(diffs.category?.proposed || catStr) + ' • ' + (diffs.propertyType?.proposed || propTypeStr)}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                <span className="text-slate-600 font-bold">Listing Intent:</span>
-                                <span className="text-slate-900 font-extrabold">{txTypeStr}</span>
+
+                              {/* Listing Intent */}
+                              <div className={'flex justify-between border-b border-slate-200 pb-1.5 ' + (changedKeys.has('intent') ? 'bg-purple-100/70 p-1.5 rounded-lg border border-purple-300' : '')}>
+                                <span className="text-slate-600 font-bold flex items-center gap-1">
+                                  <span>Listing Intent:</span>
+                                  {changedKeys.has('intent') && (
+                                    <span className="bg-purple-200 text-purple-900 text-[9px] font-black px-1.5 py-0.2 rounded border border-purple-300">MODIFIED</span>
+                                  )}
+                                </span>
+                                <div className="text-right">
+                                  {changedKeys.has('intent') && (
+                                    <span className="text-slate-500 line-through text-[11px] block">{txTypeStr}</span>
+                                  )}
+                                  <span className="text-slate-900 font-extrabold">{diffs.intent?.proposed || txTypeStr}</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                <span className="text-slate-600 font-bold">Total Area:</span>
-                                <span className="text-slate-900 font-extrabold">{areaStr}</span>
+
+                              {/* Total Area */}
+                              <div className={'flex justify-between border-b border-slate-200 pb-1.5 ' + (changedKeys.has('area') ? 'bg-purple-100/70 p-1.5 rounded-lg border border-purple-300' : '')}>
+                                <span className="text-slate-600 font-bold flex items-center gap-1">
+                                  <span>Total Area:</span>
+                                  {changedKeys.has('area') && (
+                                    <span className="bg-purple-200 text-purple-900 text-[9px] font-black px-1.5 py-0.2 rounded border border-purple-300">MODIFIED</span>
+                                  )}
+                                </span>
+                                <div className="text-right">
+                                  {changedKeys.has('area') && (
+                                    <span className="text-slate-500 line-through text-[11px] block">{diffs.area.liveDisplay}</span>
+                                  )}
+                                  <span className="text-slate-900 font-extrabold">{diffs.area?.proposedDisplay || areaStr}</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                <span className="text-slate-600 font-bold">Facing & Dimensions:</span>
-                                <span className="text-slate-900 font-extrabold">{facingStr} • {dimStr}</span>
+
+                              {/* Facing & Dimensions */}
+                              <div className={'flex justify-between border-b border-slate-200 pb-1.5 ' + (changedKeys.has('facing') || changedKeys.has('dimensions') ? 'bg-purple-100/70 p-1.5 rounded-lg border border-purple-300' : '')}>
+                                <span className="text-slate-600 font-bold flex items-center gap-1">
+                                  <span>Facing & Dimensions:</span>
+                                  {(changedKeys.has('facing') || changedKeys.has('dimensions')) && (
+                                    <span className="bg-purple-200 text-purple-900 text-[9px] font-black px-1.5 py-0.2 rounded border border-purple-300">MODIFIED</span>
+                                  )}
+                                </span>
+                                <div className="text-right">
+                                  {(changedKeys.has('facing') || changedKeys.has('dimensions')) && (
+                                    <span className="text-slate-500 line-through text-[11px] block">{facingStr + ' • ' + dimStr}</span>
+                                  )}
+                                  <span className="text-slate-900 font-extrabold">{(diffs.facing?.proposed || facingStr) + ' • ' + (diffs.dimensions?.proposed || dimStr)}</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-600 font-bold">Survey / LP Identifiers:</span>
-                                <span className="text-slate-900 font-extrabold">Sy. No: {surveyStr} • LP: {lpStr}</span>
+
+                              {/* Survey / LP */}
+                              <div className={'flex justify-between ' + (changedKeys.has('surveyNo') || changedKeys.has('lpNo') ? 'bg-purple-100/70 p-1.5 rounded-lg border border-purple-300' : '')}>
+                                <span className="text-slate-600 font-bold flex items-center gap-1">
+                                  <span>Survey / LP Identifiers:</span>
+                                  {(changedKeys.has('surveyNo') || changedKeys.has('lpNo')) && (
+                                    <span className="bg-purple-200 text-purple-900 text-[9px] font-black px-1.5 py-0.2 rounded border border-purple-300">MODIFIED</span>
+                                  )}
+                                </span>
+                                <div className="text-right">
+                                  {(changedKeys.has('surveyNo') || changedKeys.has('lpNo')) && (
+                                    <span className="text-slate-500 line-through text-[11px] block">{'Sy. No: ' + surveyStr + ' • LP: ' + lpStr}</span>
+                                  )}
+                                  <span className="text-slate-900 font-extrabold">{'Sy. No: ' + (diffs.surveyNo?.proposed || surveyStr) + ' • LP: ' + (diffs.lpNo?.proposed || lpStr)}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -3945,31 +4186,79 @@ export default function AdminPortal({ onNavigate }) {
                               ? activeAuditProp.amenities.split(',').map(s => s.trim()).filter(Boolean)
                               : []);
 
-                          if (!descVal && amenitiesList.length === 0) return null;
+                          if (!descVal && amenitiesList.length === 0 && !diffs.description && !diffs.amenities) return null;
 
                           return (
                             <div className="space-y-3 pt-4 border-t border-slate-200">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                                <FileText className="w-4 h-4 text-purple-600" />
-                                <span>Property Description & Key Amenities</span>
-                              </h4>
-                              {descVal && (
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                  <FileText className="w-4 h-4 text-purple-600" />
+                                  <span>Property Description & Key Amenities</span>
+                                </h4>
+                                {(diffs.description || diffs.amenities) && (
+                                  <span className="bg-purple-200 text-purple-900 text-[10px] font-black uppercase px-2 py-0.5 rounded border border-purple-300">
+                                    MODIFIED CONTENT
+                                  </span>
+                                )}
+                              </div>
+
+                              {diffs.description ? (
+                                <div className="space-y-2">
+                                  <div className="p-4 bg-purple-50 border-2 border-purple-300 rounded-xl text-xs font-semibold text-purple-950 leading-relaxed shadow-sm">
+                                    <span className="text-[10px] font-black uppercase text-purple-800 block mb-1">Proposed New Description:</span>
+                                    {diffs.description.proposed}
+                                  </div>
+                                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 leading-relaxed">
+                                    <span className="text-[10px] font-bold uppercase text-slate-500 block mb-0.5">Live Approved Description:</span>
+                                    {diffs.description.live}
+                                  </div>
+                                </div>
+                              ) : descVal ? (
                                 <div className="p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 leading-relaxed">
                                   {descVal}
                                 </div>
-                              )}
-                              {amenitiesList.length > 0 && (
-                                <div className="flex flex-wrap gap-2 pt-1">
-                                  {amenitiesList.map((amenity, idx) => (
-                                    <span key={idx} className="bg-slate-200 text-slate-900 font-extrabold text-[11px] px-3 py-1 rounded-lg border border-slate-300">
-                                      ✓ {String(amenity)}
+                              ) : null}
+
+                              {/* Amenities list with Added / Removed highlighting */}
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {amenitiesList.map((amenity, idx) => {
+                                  const isNew = diffs.amenities?.added?.some(a => a.toLowerCase() === String(amenity).toLowerCase());
+                                  return (
+                                    <span
+                                      key={'amenity-' + idx}
+                                      className={'font-extrabold text-[11px] px-3 py-1 rounded-lg border flex items-center gap-1 ' +
+                                        (isNew
+                                          ? 'bg-emerald-100 text-emerald-950 border-emerald-400 shadow-sm animate-pulse'
+                                          : 'bg-slate-200 text-slate-900 border-slate-300')}
+                                    >
+                                      {isNew ? <Sparkles className="w-3 h-3 text-emerald-700" /> : '✓ '}
+                                      <span>{String(amenity)}</span>
+                                      {isNew && <span className="bg-emerald-700 text-white text-[9px] px-1 rounded ml-0.5 font-black">NEW</span>}
                                     </span>
-                                  ))}
-                                </div>
-                              )}
+                                  );
+                                })}
+
+                                {diffs.amenities?.removed?.map((remAmenity, remIdx) => (
+                                  <span
+                                    key={'removed-' + remIdx}
+                                    className="bg-rose-50 text-rose-800 font-bold text-[11px] px-3 py-1 rounded-lg border border-rose-300 line-through opacity-80 flex items-center gap-1"
+                                  >
+                                    <span>✕ {String(remAmenity)}</span>
+                                    <span className="bg-rose-200 text-rose-900 text-[9px] px-1 rounded no-underline font-black">REMOVED</span>
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           );
                         })()}
+
+                        {/* LOCATION & PLOT BOUNDARY VERIFICATION SECTION */}
+                        <VerificationLocationBoundaryCard
+                          property={activeAuditProp}
+                          pendingReauditData={activeAuditProp.pendingReauditData}
+                          locationDiff={diffs.location}
+                          boundaryDiff={diffs.boundary}
+                        />
 
                         {/* SUBMITTED MEDIA, VIDEO PRESENTATION & UPLOADED DOCUMENTS */}
                         {(() => {
@@ -4187,6 +4476,11 @@ export default function AdminPortal({ onNavigate }) {
                                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
                                     <ImageIcon className="w-4 h-4 text-blue-600" />
                                     <span>Submitted Property Photos ({photos.length})</span>
+                                    {diffs.photos?.newCount > 0 && (
+                                      <span className="bg-purple-200 text-purple-900 border border-purple-300 text-[10px] font-black px-2 py-0.5 rounded ml-1 shadow-sm">
+                                        {diffs.photos.newCount + ' Proposed New'}
+                                      </span>
+                                    )}
                                   </h4>
                                   <span className="text-[11px] font-semibold text-slate-500">
                                     Auditor can remove ineligible or blurred photos directly
@@ -4201,11 +4495,12 @@ export default function AdminPortal({ onNavigate }) {
                                     {photos.map((imgUrl, idx) => (
                                       <div
                                         key={idx}
-                                        className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-sm hover:shadow-md transition-all"
+                                        className={'group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition-all ' +
+                                          (diffs.photos?.newPhotos?.includes(imgUrl) ? 'border-2 border-purple-400 ring-2 ring-purple-200' : 'border-slate-300')}
                                       >
                                         <img
                                           src={imgUrl}
-                                          alt={`User property photo ${idx + 1}`}
+                                          alt={'User property photo ' + (idx + 1)}
                                           className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
                                           onClick={() => setEnlargedMediaUrl(imgUrl)}
                                           onError={(e) => {
@@ -4216,9 +4511,16 @@ export default function AdminPortal({ onNavigate }) {
                                         />
 
                                         {/* Status / Policy Badge */}
-                                        <span className="absolute top-1.5 left-1.5 z-10 bg-emerald-700/90 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none">
-                                          Eligible
-                                        </span>
+                                        {diffs.photos?.newPhotos?.includes(imgUrl) ? (
+                                          <span className="absolute top-1.5 left-1.5 z-10 bg-purple-700 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none flex items-center gap-0.5">
+                                            <Sparkles className="w-2.5 h-2.5" />
+                                            <span>Proposed Edit</span>
+                                          </span>
+                                        ) : (
+                                          <span className="absolute top-1.5 left-1.5 z-10 bg-emerald-700/90 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none">
+                                            Eligible
+                                          </span>
+                                        )}
 
                                         {/* Admin Remove Button */}
                                         <button
@@ -4254,6 +4556,11 @@ export default function AdminPortal({ onNavigate }) {
                                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
                                     <Video className="w-4 h-4 text-amber-600" />
                                     <span>Submitted Property Videos & Walkthroughs ({videos.length})</span>
+                                    {diffs.videos?.changed && (
+                                      <span className="bg-purple-200 text-purple-900 border border-purple-300 text-[10px] font-black px-2 py-0.5 rounded ml-1 shadow-sm">
+                                        Proposed Video Edit
+                                      </span>
+                                    )}
                                   </h4>
                                   <span className="text-[11px] font-semibold text-slate-500">
                                     Auditor can remove copyright-violating or invalid videos
@@ -4294,7 +4601,7 @@ export default function AdminPortal({ onNavigate }) {
                                               src={embedSrc}
                                               className="w-full aspect-video rounded-xl border-0"
                                               allowFullScreen
-                                              title={`Property Video ${vIdx + 1}`}
+                                              title={'Property Video ' + (vIdx + 1)}
                                             />
                                           ) : (
                                             <video
@@ -4308,9 +4615,16 @@ export default function AdminPortal({ onNavigate }) {
                                               <span className="font-bold flex items-center gap-1.5 text-amber-400">
                                                 🎬 {isYoutube ? 'YouTube Video' : isDrive ? 'Google Drive Video' : 'Direct Upload Video'}
                                               </span>
-                                              <span className="bg-emerald-900/60 text-emerald-300 border border-emerald-600/40 text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
-                                                Eligible Media
-                                              </span>
+                                              {diffs.videos?.changed ? (
+                                                <span className="bg-purple-900 text-purple-200 border border-purple-500 text-[9px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                                                  <Sparkles className="w-2.5 h-2.5" />
+                                                  <span>Proposed New Video</span>
+                                                </span>
+                                              ) : (
+                                                <span className="bg-emerald-900/60 text-emerald-300 border border-emerald-600/40 text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
+                                                  Eligible Media
+                                                </span>
+                                              )}
                                             </div>
                                             <div className="flex items-center gap-3">
                                               <a
@@ -4345,6 +4659,11 @@ export default function AdminPortal({ onNavigate }) {
                                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
                                     <FileText className="w-4 h-4 text-indigo-600" />
                                     <span>Uploaded Verification Documents ({documents.length})</span>
+                                    {diffs.documents?.newCount > 0 && (
+                                      <span className="bg-purple-200 text-purple-900 border border-purple-300 text-[10px] font-black px-2 py-0.5 rounded ml-1 shadow-sm">
+                                        {diffs.documents.newCount + ' Proposed New'}
+                                      </span>
+                                    )}
                                   </h4>
                                   <span className="text-[11px] font-semibold text-slate-500">
                                     Auditor can remove fake or unreadable documents
@@ -4357,19 +4676,32 @@ export default function AdminPortal({ onNavigate }) {
                                     </div>
                                   ) : (
                                     documents.map((docItem, idx) => {
-                                      const docNameStr = typeof docItem.name === 'string' ? docItem.name : String(docItem.name || `Document ${idx + 1}`);
+                                      const docNameStr = typeof docItem.name === 'string' ? docItem.name : String(docItem.name || ('Document ' + (idx + 1)));
                                       const docTypeStr = typeof docItem.type === 'string' ? docItem.type : String(docItem.type || 'Verification Document');
                                       const docUrlStr = typeof docItem.url === 'string' ? docItem.url : String(docItem.url || '#');
+                                      const isProposedDoc = diffs.documents?.newDocs?.some(k => k === docUrlStr || k === docNameStr || k === docItem.docId);
 
                                       return (
-                                        <div key={idx} className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs text-slate-900 min-w-0 overflow-hidden shadow-sm">
+                                        <div
+                                          key={idx}
+                                          className={'p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-slate-900 min-w-0 overflow-hidden shadow-sm ' +
+                                            (isProposedDoc ? 'bg-purple-50 border-2 border-purple-300 ring-2 ring-purple-100' : 'bg-blue-50 border border-blue-200')}
+                                        >
                                           <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
-                                            <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                                            <FileText className={'w-5 h-5 shrink-0 ' + (isProposedDoc ? 'text-purple-600' : 'text-blue-600')} />
                                             <div className="min-w-0 overflow-hidden">
-                                              <span className="font-extrabold text-blue-950 block truncate" title={docNameStr}>
-                                                {docNameStr}
-                                              </span>
-                                              <span className="text-[10px] text-blue-700 font-bold block truncate">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-extrabold text-slate-900 block truncate" title={docNameStr}>
+                                                  {docNameStr}
+                                                </span>
+                                                {isProposedDoc && (
+                                                  <span className="text-[9px] font-black uppercase bg-purple-200 text-purple-900 border border-purple-300 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5">
+                                                    <Sparkles className="w-2.5 h-2.5" />
+                                                    <span>Proposed New</span>
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className={'text-[10px] font-bold block truncate ' + (isProposedDoc ? 'text-purple-700' : 'text-blue-700')}>
                                                 {docTypeStr}
                                               </span>
                                             </div>
