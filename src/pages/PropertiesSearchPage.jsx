@@ -61,6 +61,8 @@ export default function PropertiesSearchPage({
   const [disclosureMsg, setDisclosureMsg] = useState(null);
   const [candidateLimitReached, setCandidateLimitReached] = useState(false);
   const [sortCheck, setSortCheck] = useState({ compatible: true });
+  const [candidateProperties, setCandidateProperties] = useState([]);
+  const [priceBounds, setPriceBounds] = useState(null);
 
   // 3. Wishlist State
   const [wishlistSet, setWishlistSet] = useState(new Set());
@@ -122,6 +124,37 @@ export default function PropertiesSearchPage({
 
       // 3. Merge PostgreSQL + Firestore + LocalStorage properties and apply matchesSearchFilters
       const allCandidateProps = [...pgProperties, ...fsProperties, ...localData];
+      setCandidateProperties(allCandidateProps);
+
+      // Dynamically compute MIN and MAX price bounds from all candidate properties matching non-price filters
+      const nonPriceFilters = { ...stateToUse, minPrice: '', maxPrice: '' };
+      const nonPriceCandidates = allCandidateProps.filter(p => {
+        if (!p) return false;
+        const st = String(p.status || p.listingStatus || '').toUpperCase();
+        const lst = String(p.listingStatus || '').toUpperCase();
+        const vst = String(p.verificationStatus || '').toUpperCase();
+        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || st === 'PLATFORM VERIFIED' || st === 'VERIFIED' ||
+                       lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || lst === 'PLATFORM VERIFIED' || lst === 'VERIFIED' ||
+                       vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED' ||
+                       p.isPlatformVerified === true || p.isPublished === true || p.published === true ||
+                       (!p.status && !p.listingStatus && p.title);
+        const isBlocked = st === 'REJECTED' || st === 'DRAFT' || lst === 'REJECTED' || lst === 'DRAFT' || st === 'CHANGES_REQUIRED';
+        return isLive && !isBlocked && matchesSearchFilters(p, nonPriceFilters);
+      });
+
+      const validPrices = nonPriceCandidates
+        .map(p => Number(p.price) || Number(p.pricing?.totalPrice) || 0)
+        .filter(p => p > 0);
+
+      if (validPrices.length > 0) {
+        setPriceBounds({
+          min: Math.min(...validPrices),
+          max: Math.max(...validPrices)
+        });
+      } else {
+        setPriceBounds(null);
+      }
+
       const liveProperties = allCandidateProps.filter(p => {
         if (!p) return false;
         const st = String(p.status || p.listingStatus || '').toUpperCase();
@@ -447,6 +480,9 @@ export default function PropertiesSearchPage({
           onApplyFilters={() => executeSearch(searchState, null)}
           totalCount={properties.length}
           sortCompatibility={sortCheck}
+          priceBounds={priceBounds}
+          candidateProperties={candidateProperties}
+          properties={properties}
         />
       </div>
 

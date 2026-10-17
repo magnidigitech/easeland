@@ -7,6 +7,13 @@ import {
   fetchGooglePlacesPredictions,
   fetchGooglePlaceDetails
 } from '../services/locationProvider.js';
+import { mockApi } from '../services/mockApi.js';
+import {
+  calculateDynamicPriceBounds,
+  formatPriceCompact,
+  getScaleMarkers,
+  filterBudgetPresets
+} from '../utils/dynamicPriceRange.js';
 
 export const AREA_UNIT_OPTIONS = [
   { label: 'Sq Ft', value: 'sq ft' },
@@ -80,9 +87,26 @@ export default function DynamicFilterPanel({
   setFilters,
   onApplyFilters,
   totalCount,
-  sortCompatibility = null
+  sortCompatibility = null,
+  priceBounds = null,
+  candidateProperties = null,
+  properties = null
 }) {
   if (!isOpen) return null;
+
+  const isRent = filters?.purpose === Purpose.RENT;
+
+  // Dynamically calculate MIN and MAX price range bounds from property listings
+  const dynamicBounds = useMemo(() => {
+    return calculateDynamicPriceBounds({
+      properties: (candidateProperties && candidateProperties.length > 0)
+        ? candidateProperties
+        : (properties && properties.length > 0 ? properties : (mockApi.getPublicProperties({ ...(filters || {}), minPrice: '', maxPrice: '' }) || [])),
+      purpose: filters?.purpose,
+      customMin: priceBounds?.min,
+      customMax: priceBounds?.max
+    });
+  }, [priceBounds, candidateProperties, properties, filters?.purpose]);
 
   const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType);
 
@@ -1135,12 +1159,17 @@ export default function DynamicFilterPanel({
           )}
         </div>
 
-        {/* Price Range with Interactive Price Dragger */}
+        {/* Price Range with Dynamic Min and Max Price Dragger */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-              Price Range (Rupees)
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                Price Range (Rupees)
+              </label>
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100/80 text-amber-900 border border-amber-300/60">
+                Dynamic Range
+              </span>
+            </div>
             {(filters.minPrice || filters.maxPrice) && (
               <button
                 type="button"
@@ -1157,24 +1186,45 @@ export default function DynamicFilterPanel({
 
           {/* Interactive Dual Price Dragger Bar */}
           {(() => {
-            const isRent = filters.purpose === Purpose.RENT;
-            const priceSliderMax = isRent ? 200000 : 100000000;
-            const priceSliderStep = isRent ? 5000 : 500000;
-            const sliderMinVal = Math.max(0, Math.min(Number(filters.minPrice) || 0, priceSliderMax));
-            const sliderMaxVal = filters.maxPrice ? Math.max(0, Math.min(Number(filters.maxPrice), priceSliderMax)) : priceSliderMax;
-            const minPercent = Math.min(100, Math.max(0, (sliderMinVal / priceSliderMax) * 100));
-            const maxPercent = Math.min(100, Math.max(0, (sliderMaxVal / priceSliderMax) * 100));
+            const sliderMinVal = (filters.minPrice != null && filters.minPrice !== '')
+              ? Math.max(dynamicBounds.min, Math.min(Number(filters.minPrice), dynamicBounds.max))
+              : dynamicBounds.min;
+
+            const sliderMaxVal = (filters.maxPrice != null && filters.maxPrice !== '')
+              ? Math.max(sliderMinVal, Math.min(Number(filters.maxPrice), dynamicBounds.max))
+              : dynamicBounds.max;
+
+            const rangeSpan = Math.max(1, dynamicBounds.max - dynamicBounds.min);
+            const minPercent = Math.min(100, Math.max(0, ((sliderMinVal - dynamicBounds.min) / rangeSpan) * 100));
+            const maxPercent = Math.min(100, Math.max(0, ((sliderMaxVal - dynamicBounds.min) / rangeSpan) * 100));
+            const scaleMarkers = getScaleMarkers(dynamicBounds.min, dynamicBounds.max);
 
             return (
               <div className="bg-gray-50/90 p-3.5 rounded-xl border border-gray-200 mb-3 space-y-3">
                 <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-800">
-                  <span className="truncate max-w-[45%]">
-                    {filters.minPrice ? (formatPriceInWords(filters.minPrice) || `Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`) : 'Rs. 0'}
-                  </span>
-                  <span className="text-gray-400 font-bold shrink-0">to</span>
-                  <span className="truncate max-w-[45%] text-right">
-                    {filters.maxPrice ? (formatPriceInWords(filters.maxPrice) || `Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`) : (isRent ? 'Rs. 2L+' : 'Rs. 10 Cr+')}
-                  </span>
+                  <div className="flex items-center gap-1.5 truncate max-w-[46%]">
+                    <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shadow-2xs">
+                      MIN
+                    </span>
+                    <span className="truncate">
+                      {filters.minPrice
+                        ? (formatPriceInWords(filters.minPrice) || `Rs. ${Number(filters.minPrice).toLocaleString('en-IN')}`)
+                        : (formatPriceInWords(dynamicBounds.min) || `Rs. ${dynamicBounds.min.toLocaleString('en-IN')}`)}
+                    </span>
+                  </div>
+
+                  <span className="text-gray-400 font-bold shrink-0 text-xs">to</span>
+
+                  <div className="flex items-center gap-1.5 truncate max-w-[46%] justify-end">
+                    <span className="truncate text-right">
+                      {filters.maxPrice
+                        ? (formatPriceInWords(filters.maxPrice) || `Rs. ${Number(filters.maxPrice).toLocaleString('en-IN')}`)
+                        : (formatPriceInWords(dynamicBounds.max) || `Rs. ${dynamicBounds.max.toLocaleString('en-IN')}`)}
+                    </span>
+                    <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shadow-2xs">
+                      MAX
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dragger Bar Track */}
@@ -1193,60 +1243,62 @@ export default function DynamicFilterPanel({
                   {/* Min Price Dragger Thumb */}
                   <input
                     type="range"
-                    min={0}
-                    max={priceSliderMax}
-                    step={priceSliderStep}
+                    min={dynamicBounds.min}
+                    max={dynamicBounds.max}
+                    step={dynamicBounds.step}
                     value={sliderMinVal}
                     onChange={(e) => {
-                      const val = Math.max(0, Math.min(Number(e.target.value), sliderMaxVal));
-                      handleChange('minPrice', val > 0 ? String(val) : '');
+                      const val = Math.max(dynamicBounds.min, Math.min(Number(e.target.value), sliderMaxVal));
+                      handleChange('minPrice', val > dynamicBounds.min ? String(val) : '');
                     }}
-                    className={`price-slider-input absolute inset-x-0 w-full h-2 cursor-pointer ${sliderMinVal > priceSliderMax * 0.7 ? 'z-20' : 'z-10'}`}
+                    className={`price-slider-input absolute inset-x-0 w-full h-2 cursor-pointer ${sliderMinVal > dynamicBounds.min + rangeSpan * 0.7 ? 'z-20' : 'z-10'}`}
                     aria-label="Minimum Price Dragger"
                   />
 
                   {/* Max Price Dragger Thumb */}
                   <input
                     type="range"
-                    min={0}
-                    max={priceSliderMax}
-                    step={priceSliderStep}
+                    min={dynamicBounds.min}
+                    max={dynamicBounds.max}
+                    step={dynamicBounds.step}
                     value={sliderMaxVal}
                     onChange={(e) => {
-                      const val = Math.max(sliderMinVal, Number(e.target.value));
-                      handleChange('maxPrice', val < priceSliderMax ? String(val) : '');
+                      const val = Math.max(sliderMinVal, Math.min(Number(e.target.value), dynamicBounds.max));
+                      handleChange('maxPrice', val < dynamicBounds.max ? String(val) : '');
                     }}
                     className="price-slider-input absolute inset-x-0 w-full h-2 cursor-pointer z-15"
                     aria-label="Maximum Price Dragger"
                   />
                 </div>
 
-                {/* Slider Scale End Labels */}
+                {/* Dynamic Slider Scale End Labels */}
                 <div className="flex items-center justify-between text-[10px] text-gray-500 font-bold px-0.5">
-                  <span>Rs. 0</span>
-                  <span>{isRent ? 'Rs. 50k' : 'Rs. 50 Lakhs'}</span>
-                  <span>{isRent ? 'Rs. 1 Lakh' : 'Rs. 1 Crore'}</span>
-                  <span>{isRent ? 'Rs. 2L+' : 'Rs. 10 Cr+'}</span>
+                  {scaleMarkers.map((marker, idx) => (
+                    <span key={idx}>{marker.label}</span>
+                  ))}
                 </div>
 
                 {/* Quick Budget Preset Chips */}
                 <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-200/60">
-                  {(isRent
-                    ? [
-                        { label: 'Under 15k', min: '', max: '15000' },
-                        { label: '15k - 30k', min: '15000', max: '30000' },
-                        { label: '30k - 50k', min: '30000', max: '50000' },
-                        { label: '50k - 1L', min: '50000', max: '100000' },
-                        { label: '1L+', min: '100000', max: '' }
-                      ]
-                    : [
-                        { label: '< 25L', min: '', max: '2500000' },
-                        { label: '25L - 50L', min: '2500000', max: '5000000' },
-                        { label: '50L - 1 Cr', min: '5000000', max: '10000000' },
-                        { label: '1 - 2 Cr', min: '10000000', max: '20000000' },
-                        { label: '2 - 5 Cr', min: '20000000', max: '50000000' },
-                        { label: '5 Cr+', min: '50000000', max: '' }
-                      ]
+                  {filterBudgetPresets(
+                    isRent
+                      ? [
+                          { label: 'Under 15k', min: '', max: '15000' },
+                          { label: '15k - 30k', min: '15000', max: '30000' },
+                          { label: '30k - 50k', min: '30000', max: '50000' },
+                          { label: '50k - 1L', min: '50000', max: '100000' },
+                          { label: '1L+', min: '100000', max: '' }
+                        ]
+                      : [
+                          { label: '< 25L', min: '', max: '2500000' },
+                          { label: '25L - 50L', min: '2500000', max: '5000000' },
+                          { label: '50L - 1 Cr', min: '5000000', max: '10000000' },
+                          { label: '1 - 2 Cr', min: '10000000', max: '20000000' },
+                          { label: '2 - 5 Cr', min: '20000000', max: '50000000' },
+                          { label: '5 Cr+', min: '50000000', max: '' }
+                        ],
+                    dynamicBounds.min,
+                    dynamicBounds.max
                   ).map((preset) => {
                     const isSelected = String(filters.minPrice || '') === String(preset.min) && String(filters.maxPrice || '') === String(preset.max);
                     return (
@@ -1280,7 +1332,7 @@ export default function DynamicFilterPanel({
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                placeholder="0"
+                placeholder={dynamicBounds.min > 0 ? dynamicBounds.min.toLocaleString('en-IN') : '0'}
                 value={filters.minPrice || ''}
                 onKeyDown={(e) => {
                   if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
@@ -1305,7 +1357,7 @@ export default function DynamicFilterPanel({
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                placeholder="Any"
+                placeholder={dynamicBounds.max ? dynamicBounds.max.toLocaleString('en-IN') : 'Any'}
                 value={filters.maxPrice || ''}
                 onKeyDown={(e) => {
                   if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
