@@ -893,12 +893,91 @@ export const mockApi = {
       createdAt: newPropertyPayload.createdAt || new Date().toISOString()
     };
 
+    const newRefId = newPropertyPayload.referenceId;
     const existingIndex = freshProps.findIndex(
-      p => p.id === newId || p.propertyId === newId ||
+      p => p && (
+        (newId && (String(p.id) === String(newId) || String(p.propertyId) === String(newId))) ||
+        (newRefId && String(p.referenceId) === String(newRefId)) ||
         (p.title && newPropertyPayload.title && p.title.toLowerCase().trim() === newPropertyPayload.title.toLowerCase().trim())
+      )
     );
 
     if (existingIndex !== -1) {
+      const existing = freshProps[existingIndex];
+      const isExistingLive = Boolean(
+        newPropertyPayload.isAlreadyLive === true ||
+        (existing && (
+          existing.status === 'LIVE' || existing.listingStatus === 'LIVE' ||
+          existing.status === 'APPROVED' || existing.listingStatus === 'APPROVED' ||
+          existing.status === 'APPROVED_LIVE' ||
+          existing.verificationStatus === 'Platform Verified' ||
+          existing.isPlatformVerified || existing.isPublished
+        ))
+      );
+
+      const isAdminApproval = Boolean(
+        newPropertyPayload.adminVerified === true ||
+        newPropertyPayload.isAdminApproval === true ||
+        (newPropertyPayload.isPlatformVerified === true && newPropertyPayload.hasPendingEdits === false && !newPropertyPayload.pendingReauditData && !newPropertyPayload.reAuditStatus)
+      );
+
+      if (isExistingLive && !isAdminApproval) {
+        // The property is verified & LIVE. Incoming payload is an owner modification or draft step.
+        // Under NO circumstances overwrite root live approved details visible to public!
+        // Stage updates into pendingReauditData while keeping approved root fields intact.
+        const incomingProposed = newPropertyPayload.pendingReauditData || newPropertyPayload.pendingEdits || newPropertyPayload;
+        const existingPending = existing.pendingReauditData || existing.pendingEdits || {};
+        const cleanProposed = {};
+        const protectedKeys = [
+          'id', 'propertyId', 'referenceId', 'ownerId', 'listingStatus', 'status',
+          'isPublished', 'isPlatformVerified', 'verificationStatus', 'createdAt', 'views', 'enquiriesCount'
+        ];
+        for (const [k, v] of Object.entries(incomingProposed)) {
+          if (!protectedKeys.includes(k) && v !== undefined && v !== null && v !== '') {
+            cleanProposed[k] = v;
+          }
+        }
+        const mergedPending = {
+          ...existingPending,
+          ...cleanProposed,
+          updatedAt: new Date().toISOString()
+        };
+
+        const preservedLiveProp = {
+          ...existing, // 100% retain approved live root fields!
+          hasPendingEdits: true,
+          reAuditStatus: 'PENDING_VERIFICATION',
+          reAuditRequestedAt: existing.reAuditRequestedAt || new Date().toISOString(),
+          pendingReauditData: mergedPending,
+          status: 'LIVE',
+          listingStatus: 'LIVE',
+          isPublished: true,
+          isPlatformVerified: true,
+          verificationStatus: existing.verificationStatus || 'Platform Verified'
+        };
+
+        freshProps[existingIndex] = preservedLiveProp;
+        properties = freshProps.filter(p => !isFakeProperty(p));
+        setStoredData('easeland_properties', properties);
+        if (typeof window !== 'undefined') {
+          const userPropsRaw = localStorage.getItem('easeland_user_properties');
+          if (userPropsRaw) {
+            try {
+              const parsed = JSON.parse(userPropsRaw);
+              if (Array.isArray(parsed)) {
+                const uIdx = parsed.findIndex(p => p && (String(p.id) === String(newId) || String(p.propertyId) === String(newId)));
+                if (uIdx !== -1) {
+                  parsed[uIdx] = preservedLiveProp;
+                  localStorage.setItem('easeland_user_properties', JSON.stringify(parsed));
+                }
+              }
+            } catch (e) {}
+          }
+          window.dispatchEvent(new CustomEvent('easeland-property-updated', { detail: preservedLiveProp }));
+        }
+        return preservedLiveProp;
+      }
+
       freshProps[existingIndex] = { ...freshProps[existingIndex], ...targetProp };
     } else {
       freshProps.unshift(targetProp);

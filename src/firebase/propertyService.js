@@ -610,11 +610,45 @@ export async function updateOwnerProperty(propertyId, ownerId, updates) {
   try {
     if (!propertyId || !ownerId) return { success: false, error: 'Property ID and Owner ID are required.' };
     const propRef = doc(db, 'properties', propertyId);
-    const snap = await getDoc(propRef);
-    if (!snap.exists()) return { success: false, error: 'Property not found.' };
+    let currentData = null;
 
-    const currentData = snap.data();
-    if (currentData.ownerId !== ownerId) return { success: false, error: 'Unauthorized: You do not own this property.' };
+    // 1. Try PostgreSQL API first (Primary DB)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/properties/' + encodeURIComponent(propertyId));
+        if (res.ok) {
+          const pgRes = await res.json();
+          if (pgRes.success && pgRes.property) {
+            currentData = pgRes.property;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try Firestore
+    if (!currentData) {
+      try {
+        const snap = await getDoc(propRef);
+        if (snap.exists()) currentData = snap.data();
+      } catch (e) {}
+    }
+
+    // 3. Try mockApi and LocalStorage
+    if (!currentData && typeof window !== 'undefined') {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) currentData = pObj;
+      } catch (e) {}
+    }
+
+    if (!currentData) return { success: false, error: 'Property not found.' };
+
+    const cOwnerId = String(currentData.ownerId || currentData.owner?.id || currentData.userId || '').toLowerCase().trim();
+    const reqOwnerId = String(ownerId || '').toLowerCase().trim();
+    if (cOwnerId && reqOwnerId && cOwnerId !== reqOwnerId && reqOwnerId !== 'admin_uid_001') {
+      return { success: false, error: 'Unauthorized: You do not own this property.' };
+    }
 
     // Strip protected system keys
     const {
@@ -639,6 +673,8 @@ export async function updateOwnerProperty(propertyId, ownerId, updates) {
       currentData.status === ListingStatus.LIVE ||
       currentData.listingStatus === 'LIVE' ||
       currentData.status === 'LIVE' ||
+      currentData.status === 'APPROVED' ||
+      currentData.listingStatus === 'APPROVED' ||
       currentData.isPlatformVerified ||
       currentData.isPublished
     );
@@ -712,20 +748,50 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
     const propRef = doc(db, 'properties', propertyId);
     let propData = {};
 
-    try {
-      const snap = await getDoc(propRef);
-      if (snap.exists()) {
-        propData = snap.data();
+    // 1. Try PostgreSQL API first (Primary DB)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/properties/' + encodeURIComponent(propertyId));
+        if (res.ok) {
+          const pgRes = await res.json();
+          if (pgRes.success && pgRes.property) {
+            propData = pgRes.property;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try Firestore
+    if (!propData || !propData.title) {
+      try {
+        const snap = await getDoc(propRef);
+        if (snap.exists()) {
+          propData = { ...propData, ...snap.data() };
+        }
+      } catch (e) {
+        console.warn('Property fetch warning prior to submission:', e);
       }
-    } catch (e) {
-      console.warn('Property fetch warning prior to submission:', e);
+    }
+
+    // 3. Try mockApi and LocalStorage
+    if (!propData || !propData.title) {
+      if (typeof window !== 'undefined') {
+        try {
+          const { mockApi } = await import('../services/mockApi.js');
+          const pObj = mockApi.getPropertyById(propertyId);
+          if (pObj) propData = { ...pObj, ...propData };
+        } catch (e) {}
+      }
     }
 
     const isAlreadyLive = Boolean(
+      formData?.isAlreadyLive ||
       propData.listingStatus === ListingStatus.LIVE ||
       propData.status === ListingStatus.LIVE ||
       propData.listingStatus === 'LIVE' ||
       propData.status === 'LIVE' ||
+      propData.status === 'APPROVED' ||
+      propData.listingStatus === 'APPROVED' ||
       propData.isPublished ||
       propData.isPlatformVerified
     );
@@ -1134,11 +1200,38 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
     const propRef = doc(db, 'properties', propertyId);
     let currentData = {};
 
-    try {
-      const snap = await getDoc(propRef);
-      if (snap.exists()) currentData = snap.data();
-    } catch (e) {
-      console.warn('Property draft step fetch note:', e);
+    // 1. Try PostgreSQL API first (Primary DB)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/properties/' + encodeURIComponent(propertyId));
+        if (res.ok) {
+          const pgRes = await res.json();
+          if (pgRes.success && pgRes.property) {
+            currentData = pgRes.property;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try Firestore
+    if (!currentData || !currentData.title) {
+      try {
+        const snap = await getDoc(propRef);
+        if (snap.exists()) currentData = { ...currentData, ...snap.data() };
+      } catch (e) {
+        console.warn('Property draft step fetch note:', e);
+      }
+    }
+
+    // 3. Try mockApi and LocalStorage
+    if (!currentData || !currentData.title) {
+      if (typeof window !== 'undefined') {
+        try {
+          const { mockApi } = await import('../services/mockApi.js');
+          const pObj = mockApi.getPropertyById(propertyId);
+          if (pObj) currentData = { ...pObj, ...currentData };
+        } catch (e) {}
+      }
     }
 
     // Strip protected system keys
@@ -1156,24 +1249,16 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
 
     // Check if the property is already LIVE / VERIFIED
     let isAlreadyLive = Boolean(
+      stepData.isAlreadyLive ||
       currentData.listingStatus === ListingStatus.LIVE ||
       currentData.status === ListingStatus.LIVE ||
       currentData.listingStatus === 'LIVE' ||
       currentData.status === 'LIVE' ||
+      currentData.status === 'APPROVED' ||
+      currentData.listingStatus === 'APPROVED' ||
       currentData.isPlatformVerified ||
       currentData.isPublished
     );
-
-    if (!isAlreadyLive && typeof window !== 'undefined') {
-      try {
-        const { mockApi } = await import('../services/mockApi.js');
-        const pObj = mockApi.getPropertyById(propertyId);
-        if (pObj && (pObj.status === 'LIVE' || pObj.listingStatus === 'LIVE' || pObj.isPlatformVerified || pObj.isPublished)) {
-          isAlreadyLive = true;
-          currentData = { ...pObj, ...currentData };
-        }
-      } catch (e) {}
-    }
 
     if (isAlreadyLive) {
       // The property is already LIVE on the marketplace.

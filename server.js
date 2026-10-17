@@ -93,10 +93,29 @@ try {
   console.warn('Local properties store initialization note:', e.message);
 }
 
-function saveLocalProperty(p) {
+function saveLocalProperty(p, existingOverride = null) {
   if (!p || (!p.propertyId && !p.id)) return;
   const pId = p.propertyId || p.id;
-  const existing = localPropsMap.get(pId) || {};
+  const existing = existingOverride || localPropsMap.get(pId) || {};
+
+  const isExistingLive = Boolean(
+    p.isAlreadyLive === true ||
+    existing.listing_status === 'LIVE' ||
+    existing.listingStatus === 'LIVE' ||
+    existing.status === 'LIVE' ||
+    existing.status === 'APPROVED' ||
+    existing.listingStatus === 'APPROVED' ||
+    existing.status === 'APPROVED_LIVE' ||
+    existing.is_published === true ||
+    existing.isPublished === true ||
+    existing.isPlatformVerified === true
+  );
+
+  const isAdminApproval = Boolean(
+    p.adminVerified === true ||
+    p.isAdminApproval === true ||
+    (p.isPlatformVerified === true && p.hasPendingEdits === false && !p.pendingReauditData && !p.reAuditStatus && (p.verifiedBy || p.verificationNotes))
+  );
 
   const finalMedia = Array.isArray(p.media)
     ? p.media
@@ -130,22 +149,82 @@ function saveLocalProperty(p) {
     return true;
   });
 
-  const updated = {
-    ...existing,
-    ...p,
-    propertyId: pId,
-    id: pId,
-    location: p.location || existing.location || null,
-    boundary: p.boundary || p.ownerSubmittedBoundary || existing.boundary || existing.ownerSubmittedBoundary || null,
-    ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || existing.ownerSubmittedBoundary || existing.boundary || null,
-    media: cleanMedia,
-    photos: finalPhotos,
-    documents: cleanDocs,
-    videoUrl: p.videoUrl || existing.videoUrl || null,
-    videoLink: p.videoLink || existing.videoLink || null,
-    embeddedVideoUrl: p.embeddedVideoUrl || existing.embeddedVideoUrl || null,
-    updatedAt: new Date().toISOString()
-  };
+  let updated;
+
+  if (isExistingLive && !isAdminApproval) {
+    // The property is verified & LIVE. Incoming payload is an owner modification or draft step.
+    // Under NO circumstances overwrite root live approved details visible to public!
+    // Stage updates into pendingReauditData while keeping approved root fields intact.
+    const incomingProposed = p.pendingReauditData || p.pendingEdits || p;
+    const existingPending = existing.pendingReauditData || existing.pendingEdits || {};
+    const cleanProposed = {};
+    const protectedKeys = [
+      'id', 'propertyId', 'property_id', 'referenceId', 'reference_id',
+      'ownerId', 'owner_id', 'listingStatus', 'listing_status', 'status',
+      'isPublished', 'is_published', 'isPlatformVerified', 'verificationStatus',
+      'createdAt', 'created_at', 'views', 'enquiriesCount', 'isAlreadyLive'
+    ];
+    for (const [k, v] of Object.entries(incomingProposed)) {
+      if (!protectedKeys.includes(k) && v !== undefined && v !== null && v !== '') {
+        cleanProposed[k] = v;
+      }
+    }
+
+    const mergedPending = {
+      ...existingPending,
+      ...cleanProposed,
+      updatedAt: new Date().toISOString()
+    };
+
+    updated = {
+      ...existing, // 100% retain live approved title, price, area, description, specs, location, etc.
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      reAuditRequestedAt: existing.reAuditRequestedAt || new Date().toISOString(),
+      pendingReauditData: mergedPending,
+      listing_status: 'LIVE',
+      listingStatus: 'LIVE',
+      status: 'LIVE',
+      is_published: true,
+      isPublished: true,
+      isPlatformVerified: true,
+      verificationStatus: existing.verificationStatus || 'Platform Verified',
+      documents: cleanDocs,
+      updatedAt: new Date().toISOString()
+    };
+  } else {
+    // New listing creation or Admin approved verification
+    updated = {
+      ...existing,
+      ...p,
+      propertyId: pId,
+      id: pId,
+      location: p.location || existing.location || null,
+      boundary: p.boundary || p.ownerSubmittedBoundary || existing.boundary || existing.ownerSubmittedBoundary || null,
+      ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || existing.ownerSubmittedBoundary || existing.boundary || null,
+      media: cleanMedia,
+      photos: finalPhotos,
+      documents: cleanDocs,
+      videoUrl: p.videoUrl || existing.videoUrl || null,
+      videoLink: p.videoLink || existing.videoLink || null,
+      embeddedVideoUrl: p.embeddedVideoUrl || existing.embeddedVideoUrl || null,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (isAdminApproval) {
+      updated.hasPendingEdits = false;
+      updated.reAuditStatus = null;
+      updated.pendingReauditData = null;
+      updated.pendingEdits = null;
+      updated.status = 'LIVE';
+      updated.listingStatus = 'LIVE';
+      updated.listing_status = 'LIVE';
+      updated.isPublished = true;
+      updated.is_published = true;
+      updated.isPlatformVerified = true;
+      updated.verificationStatus = 'Platform Verified';
+    }
+  }
 
   localPropsMap.set(pId, updated);
 
@@ -297,6 +376,20 @@ async function initPgDb() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    try {
+      const allPg = await client.query('SELECT raw_data FROM properties;');
+      allPg.rows.forEach(r => {
+        if (r.raw_data && (r.raw_data.propertyId || r.raw_data.id)) {
+          const id = r.raw_data.propertyId || r.raw_data.id;
+          const current = localPropsMap.get(id) || {};
+          localPropsMap.set(id, { ...r.raw_data, ...current });
+        }
+      });
+      console.log('Hydrated properties store from PostgreSQL into localPropsMap.');
+    } catch (hydrateErr) {
+      console.warn('PostgreSQL property hydration note:', hydrateErr.message);
+    }
 
     client.release();
     console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors, users) initialized successfully.');
@@ -614,9 +707,26 @@ app.post('/api/properties', async (req, res) => {
     if (!p || (!p.propertyId && !p.id)) {
       return res.status(400).json({ success: false, error: 'Property payload with propertyId is required.' });
     }
+    const pId = p.propertyId || p.id;
+
+    // Check PostgreSQL database if existing record is not yet in local memory
+    let existing = localPropsMap.get(pId);
+    if (!existing || (!existing.status && !existing.listingStatus)) {
+      try {
+        const ph = String.fromCharCode(36) + '1';
+        const pgCheck = await pgPool.query(
+          "SELECT raw_data FROM properties WHERE property_id = " + ph + " OR reference_id = " + ph + " OR raw_data->>'id' = " + ph + " OR raw_data->>'propertyId' = " + ph + ";",
+          [pId]
+        );
+        if (pgCheck.rows.length > 0 && pgCheck.rows[0].raw_data) {
+          existing = pgCheck.rows[0].raw_data;
+          localPropsMap.set(pId, existing);
+        }
+      } catch (e) {}
+    }
 
     // 1. ALWAYS Save to Local Persistent Disk & In-Memory Store FIRST (100% Reliable & Immediate)
-    const savedLocal = saveLocalProperty(p);
+    const savedLocal = saveLocalProperty(p, existing);
 
     // 2. Try background sync to PostgreSQL (Non-blocking fallback)
     try {
@@ -645,21 +755,21 @@ app.post('/api/properties', async (req, res) => {
       `;
 
       const values = [
-        p.propertyId || p.id,
-        p.referenceId || null,
-        p.ownerId || null,
-        p.title || 'Untitled Property',
-        p.propertyType || null,
-        p.purpose || null,
-        Number(p.price) || 0,
-        Number(p.area) || 0,
-        JSON.stringify(p.location || {}),
-        JSON.stringify(p.specs || {}),
-        JSON.stringify(p.amenities || []),
-        JSON.stringify(p.media || []),
-        p.listingStatus || 'DRAFT',
-        Boolean(p.isPublished),
-        JSON.stringify(savedLocal || p)
+        savedLocal.propertyId || savedLocal.id,
+        savedLocal.referenceId || null,
+        savedLocal.ownerId || null,
+        savedLocal.title || 'Untitled Property',
+        savedLocal.propertyType || null,
+        savedLocal.purpose || null,
+        Number(savedLocal.price) || 0,
+        Number(savedLocal.area) || 0,
+        JSON.stringify(savedLocal.location || {}),
+        JSON.stringify(savedLocal.specs || {}),
+        JSON.stringify(savedLocal.amenities || []),
+        JSON.stringify(savedLocal.media || []),
+        savedLocal.listingStatus || 'DRAFT',
+        Boolean(savedLocal.isPublished),
+        JSON.stringify(savedLocal)
       ];
 
       await pgPool.query(queryText, values);

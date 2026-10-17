@@ -58,6 +58,19 @@ export default function PropertyReviewStep({
 
   useEffect(() => {
     if (propertyId) {
+      if (typeof window !== 'undefined') {
+        fetch('/api/properties/' + encodeURIComponent(propertyId))
+          .then(r => r.json())
+          .then(d => {
+            if (d.success && d.property) {
+              const p = d.property;
+              if (p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.listing_status === 'LIVE' || p.isPublished || p.is_published || p.isPlatformVerified) {
+                setIsExistingLive(true);
+              }
+            }
+          })
+          .catch(() => {});
+      }
       import('../services/mockApi.js').then(({ mockApi }) => {
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj && (pObj.listingStatus === 'LIVE' || pObj.status === 'LIVE' || pObj.isPublished || pObj.isPlatformVerified)) {
