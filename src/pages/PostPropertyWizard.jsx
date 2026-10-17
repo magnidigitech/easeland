@@ -127,11 +127,30 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         address: locCandidate
       };
     }
+
     let cachedLoc = locCandidate;
-    if (typeof window !== 'undefined' && pId) {
+    const hasValidCandidateLoc = Boolean(
+      locCandidate && (
+        locCandidate.confirmed ||
+        locCandidate.geoPoint ||
+        (locCandidate.lat && !isNaN(Number(locCandidate.lat)) && Number(locCandidate.lat) !== 0 && Number(locCandidate.lat) !== 20.5937) ||
+        (locCandidate.latitude && !isNaN(Number(locCandidate.latitude)) && Number(locCandidate.latitude) !== 0 && Number(locCandidate.latitude) !== 20.5937) ||
+        locCandidate.locality ||
+        locCandidate.city ||
+        locCandidate.address
+      )
+    );
+
+    // ONLY if the property has no existing location at all, check if a draft location exists for THIS specific propertyId
+    if (!hasValidCandidateLoc && typeof window !== 'undefined' && pId) {
       try {
-        const storedLoc = localStorage.getItem('easeland_wizard_location_' + pId) || localStorage.getItem('easeland_wizard_location_' + (user?.uid || ''));
-        if (storedLoc) cachedLoc = JSON.parse(storedLoc);
+        const storedLoc = localStorage.getItem('easeland_wizard_location_' + pId);
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && (parsed.lat || parsed.latitude || parsed.geoPoint || parsed.city || parsed.address)) {
+            cachedLoc = parsed;
+          }
+        }
       } catch (e) {}
     }
 
@@ -231,12 +250,40 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   // Load existing owner drafts or target resume property on mount
   useEffect(() => {
     if (user?.uid) {
+      // Purge any stale user-level or guest wizard location keys that clobber individual property locations
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('easeland_wizard_location_' + (user?.uid || ''));
+          localStorage.removeItem('easeland_wizard_location_guest');
+        } catch (e) {}
+      }
+
       let cachedProp = null;
       if (typeof window !== 'undefined') {
         try {
           const rawCached = sessionStorage.getItem('easeland_editing_property');
           if (rawCached) {
-            cachedProp = JSON.parse(rawCached);
+            const parsed = JSON.parse(rawCached);
+            // Verify cachedProp is not marked deleted
+            const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
+            const deletedList = JSON.parse(rawDeleted);
+            const cachedIdStr = String(parsed?.id || parsed?.propertyId || parsed?.referenceId || '');
+
+            if (cachedIdStr && deletedList.includes(cachedIdStr)) {
+              sessionStorage.removeItem('easeland_editing_property');
+            } else if (resumePropertyId) {
+              const targetStr = String(resumePropertyId).toLowerCase().trim();
+              const cId = String(parsed?.id || '').toLowerCase().trim();
+              const cPropId = String(parsed?.propertyId || '').toLowerCase().trim();
+              const cRefId = String(parsed?.referenceId || '').toLowerCase().trim();
+              if (cId === targetStr || cPropId === targetStr || cRefId === targetStr) {
+                cachedProp = parsed;
+              } else {
+                sessionStorage.removeItem('easeland_editing_property');
+              }
+            } else {
+              sessionStorage.removeItem('easeland_editing_property');
+            }
           }
         } catch (e) {}
       }
@@ -245,7 +292,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         const loadTargetProperty = async () => {
           let foundProp = null;
 
-          // 1. Instant cache check from sessionStorage (Primary for Edit Listing)
+          // 1. Instant cache check from sessionStorage ONLY if matching resumePropertyId
           if (cachedProp) {
             foundProp = cachedProp;
             applyPropertyToForm(cachedProp);
@@ -1231,12 +1278,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
             onLocationConfirmed={(confirmedLocation) => {
               setFormData(prev => {
                 const next = { ...prev, location: confirmedLocation };
-                if (typeof window !== 'undefined') {
+                if (typeof window !== 'undefined' && propertyId) {
                   try {
-                    localStorage.setItem(`easeland_wizard_location_${user?.uid || 'guest'}`, JSON.stringify(confirmedLocation));
-                    if (propertyId) {
-                      localStorage.setItem(`easeland_wizard_location_${propertyId}`, JSON.stringify(confirmedLocation));
-                    }
+                    localStorage.setItem('easeland_wizard_location_' + propertyId, JSON.stringify(confirmedLocation));
                   } catch (e) {}
                 }
                 return next;

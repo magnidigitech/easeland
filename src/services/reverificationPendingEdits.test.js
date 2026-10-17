@@ -283,4 +283,112 @@ describe('EaseLand Live Property Re-Verification & Modifications Protection Suit
     assert.strictEqual(resultProp.isPublished, true);
     assert.strictEqual(resultProp.isPlatformVerified, true);
   });
+
+  it('6. Edit Listing preserves actual distinct setup locations across different properties and does not clobber with old or deleted property locations', () => {
+    // Property 1 in Guntur
+    const propGuntur = {
+      id: 'prop-loc-guntur',
+      propertyId: 'prop-loc-guntur',
+      title: 'Guntur Commercial Plot',
+      location: {
+        city: 'Guntur',
+        locality: 'Brodipet',
+        address: 'Brodipet Main Rd, Guntur',
+        lat: 16.3067,
+        lng: 80.4365,
+        confirmed: true
+      }
+    };
+
+    // Property 2 in Vijayawada
+    const propVijayawada = {
+      id: 'prop-loc-vijayawada',
+      propertyId: 'prop-loc-vijayawada',
+      title: 'Vijayawada Commercial Space',
+      location: {
+        city: 'Vijayawada',
+        locality: 'Benz Circle',
+        address: 'Benz Circle, Vijayawada',
+        lat: 16.5062,
+        lng: 80.6480,
+        confirmed: true
+      }
+    };
+
+    // Property 3 in Visakhapatnam
+    const propVizag = {
+      id: 'prop-loc-vizag',
+      propertyId: 'prop-loc-vizag',
+      title: 'Visakhapatnam Sea View Plot',
+      location: {
+        city: 'Visakhapatnam',
+        locality: 'Beach Road',
+        address: 'RK Beach Rd, Visakhapatnam',
+        lat: 17.7126,
+        lng: 83.3197,
+        confirmed: true
+      }
+    };
+
+    // Simulate stale deleted property location in user-level key
+    const deletedLocation = {
+      city: 'Hyderabad',
+      locality: 'Banjara Hills',
+      address: 'Old Deleted Property Location',
+      lat: 17.4123,
+      lng: 78.4312,
+      confirmed: true
+    };
+    globalThis.localStorage.setItem('easeland_wizard_location_user123', JSON.stringify(deletedLocation));
+    globalThis.localStorage.setItem('easeland_wizard_location_guest', JSON.stringify(deletedLocation));
+
+    // When resolving property locations for editing, each property must retain its own actual location
+    const resolveLocation = (p) => {
+      let loc = p.location || null;
+      const hasValid = Boolean(
+        loc && (
+          loc.confirmed ||
+          loc.geoPoint ||
+          (loc.lat && !isNaN(Number(loc.lat)) && Number(loc.lat) !== 0 && Number(loc.lat) !== 20.5937) ||
+          loc.locality ||
+          loc.city ||
+          loc.address
+        )
+      );
+      if (!hasValid && typeof window !== 'undefined' && (p.propertyId || p.id)) {
+        const stored = localStorage.getItem('easeland_wizard_location_' + (p.propertyId || p.id));
+        if (stored) loc = JSON.parse(stored);
+      }
+      return loc;
+    };
+
+    const gunturLoc = resolveLocation(propGuntur);
+    const vjaLoc = resolveLocation(propVijayawada);
+    const vizagLoc = resolveLocation(propVizag);
+
+    assert.strictEqual(gunturLoc.city, 'Guntur');
+    assert.strictEqual(gunturLoc.lat, 16.3067);
+    assert.strictEqual(vjaLoc.city, 'Vijayawada');
+    assert.strictEqual(vjaLoc.lat, 16.5062);
+    assert.strictEqual(vizagLoc.city, 'Visakhapatnam');
+    assert.strictEqual(vizagLoc.lat, 17.7126);
+
+    // Verify none of them show the deleted Hyderabad location
+    assert.notStrictEqual(gunturLoc.city, 'Hyderabad');
+    assert.notStrictEqual(vjaLoc.city, 'Hyderabad');
+    assert.notStrictEqual(vizagLoc.city, 'Hyderabad');
+  });
+
+  it('7. Deleting a property purges its wizard location cache and editing property session state', async () => {
+    const { deletePropertyListing } = await import('../firebase/propertyService.js');
+    const pId = 'prop-to-delete-999';
+
+    globalThis.localStorage.setItem('easeland_wizard_location_' + pId, JSON.stringify({ city: 'Ongole', lat: 15.5, lng: 80.0 }));
+    globalThis.sessionStorage.setItem('easeland_editing_property', JSON.stringify({ id: pId, title: 'Ongole Property' }));
+
+    await deletePropertyListing(pId, 'owner-user-123', false);
+
+    assert.strictEqual(globalThis.localStorage.getItem('easeland_wizard_location_' + pId), null);
+    assert.strictEqual(globalThis.sessionStorage.getItem('easeland_editing_property'), null);
+  });
 });

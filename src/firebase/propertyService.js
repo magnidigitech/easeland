@@ -1643,8 +1643,24 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
           localStorage.setItem('easeland_properties', JSON.stringify(updated));
         }
 
-        localStorage.removeItem(`easeland_media_${pIdStr}`);
-        localStorage.removeItem(`easeland_docs_${pIdStr}`);
+        localStorage.removeItem('easeland_media_' + pIdStr);
+        localStorage.removeItem('easeland_docs_' + pIdStr);
+        localStorage.removeItem('easeland_wizard_location_' + pIdStr);
+        localStorage.removeItem('easeland_wizard_location_guest');
+        if (ownerId) {
+          localStorage.removeItem('easeland_wizard_location_' + ownerId);
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          const rawEditing = sessionStorage.getItem('easeland_editing_property');
+          if (rawEditing) {
+            try {
+              const parsedEditing = JSON.parse(rawEditing);
+              if (String(parsedEditing?.id || parsedEditing?.propertyId || parsedEditing?.referenceId) === pIdStr) {
+                sessionStorage.removeItem('easeland_editing_property');
+              }
+            } catch (e) {}
+          }
+        }
       } catch (e) {}
     }
 

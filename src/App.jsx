@@ -568,6 +568,10 @@ export default function App() {
           sessionStorage.setItem('easeland_editing_property', JSON.stringify(propParam));
         } catch (e) {}
       }
+    } else {
+      try {
+        sessionStorage.removeItem('easeland_editing_property');
+      } catch (e) {}
     }
     setEditingPropertyId(targetPropId || null);
 

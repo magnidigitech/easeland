@@ -141,44 +141,21 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
   );
   const hasValidLocationPin = !isNaN(pinLat) && !isNaN(pinLng) && (pinLat !== 0 || pinLng !== 0) && (pinLat !== 20.5937 || pinLng !== 78.9629);
 
-  // Fallback: check localStorage wizard location if prop is pending or editing draft
-  const resolvedPinLat = hasValidLocationPin ? pinLat : (() => {
-    if (typeof window !== 'undefined') {
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('easeland_wizard_location_')) {
-            const val = JSON.parse(localStorage.getItem(key) || '{}');
-            const lLat = Number(val?.geoPoint?.latitude ?? val?.lat ?? val?.latitude);
-            const lLng = Number(val?.geoPoint?.longitude ?? val?.lng ?? val?.longitude);
-            if (!isNaN(lLat) && !isNaN(lLng) && (lLat !== 0 || lLng !== 0) && (lLat !== 20.5937 || lLng !== 78.9629)) {
-              return lLat;
-            }
-          }
-        }
-      } catch (e) {}
+  // Derive center coordinates from property location pin or boundary vertices centroid
+  const verticesCentroid = (() => {
+    if (Array.isArray(boundaryData?.vertices) && boundaryData.vertices.length > 0) {
+      const validPoints = boundaryData.vertices.filter(v => v && !isNaN(v.lat) && !isNaN(v.lng));
+      if (validPoints.length > 0) {
+        const sumLat = validPoints.reduce((acc, v) => acc + Number(v.lat), 0);
+        const sumLng = validPoints.reduce((acc, v) => acc + Number(v.lng), 0);
+        return { lat: sumLat / validPoints.length, lng: sumLng / validPoints.length };
+      }
     }
     return null;
   })();
 
-  const resolvedPinLng = hasValidLocationPin ? pinLng : (() => {
-    if (typeof window !== 'undefined') {
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('easeland_wizard_location_')) {
-            const val = JSON.parse(localStorage.getItem(key) || '{}');
-            const lLat = Number(val?.geoPoint?.latitude ?? val?.lat ?? val?.latitude);
-            const lLng = Number(val?.geoPoint?.longitude ?? val?.lng ?? val?.longitude);
-            if (!isNaN(lLat) && !isNaN(lLng) && (lLat !== 0 || lLng !== 0) && (lLat !== 20.5937 || lLng !== 78.9629)) {
-              return lLng;
-            }
-          }
-        }
-      } catch (e) {}
-    }
-    return null;
-  })();
+  const resolvedPinLat = hasValidLocationPin ? pinLat : (verticesCentroid?.lat ?? null);
+  const resolvedPinLng = hasValidLocationPin ? pinLng : (verticesCentroid?.lng ?? null);
 
   // Initial Center Coordinates derived from location pin
   const centerLat = resolvedPinLat ?? 16.3124;

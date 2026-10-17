@@ -186,13 +186,40 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     }
   }, [lat, lng]);
 
-  // Sync lat/lng if locationData prop updates externally
+  // Sync all location fields if locationData prop updates externally
   useEffect(() => {
-    const propLat = Number(locationData?.geoPoint?.latitude || locationData?.lat || locationData?.latitude);
-    const propLng = Number(locationData?.geoPoint?.longitude || locationData?.lng || locationData?.longitude);
-    if (propLat && propLng && !isNaN(propLat) && !isNaN(propLng)) {
+    if (!locationData) return;
+    const propLat = Number(locationData?.geoPoint?.latitude ?? locationData?.lat ?? locationData?.latitude);
+    const propLng = Number(locationData?.geoPoint?.longitude ?? locationData?.lng ?? locationData?.longitude);
+    if (!isNaN(propLat) && !isNaN(propLng) && (propLat !== 0 || propLng !== 0) && (propLat !== 20.5937 || propLng !== 78.9629)) {
       setLat(propLat);
       setLng(propLng);
+    }
+    setHierarchy({
+      country: locationData.country || 'India',
+      state: locationData.state || '',
+      district: locationData.district || '',
+      city: locationData.city || '',
+      mandal: locationData.mandal || '',
+      locality: locationData.locality || '',
+      subLocality: locationData.subLocality || '',
+      village: locationData.village || '',
+      road: locationData.road || '',
+      colony: locationData.colony || '',
+      landmark: locationData.landmark || '',
+      postalCode: locationData.postalCode || '',
+      address: locationData.address || ''
+    });
+    if (locationData.address) {
+      setSearchQuery(locationData.address);
+    }
+    const hasPin = !isNaN(propLat) && !isNaN(propLng) && (propLat !== 0 || propLng !== 0) && (propLat !== 20.5937 || propLng !== 78.9629);
+    if (locationData.confirmed || hasPin) {
+      setIsConfirmed(true);
+      setSelectedPlaceInfo({
+        name: locationData.locality || locationData.city || locationData.address || 'Selected Location',
+        address: locationData.address || ((locationData.locality ? locationData.locality + ', ' : '') + (locationData.city || ''))
+      });
     }
   }, [locationData]);
 
