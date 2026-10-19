@@ -25,7 +25,7 @@ export const AREA_UNIT_OPTIONS = [
 ];
 
 export const DISTANCE_RADIUS_OPTIONS = [
-  { value: 'any', label: 'Any Distance', km: null },
+  { value: 'any', label: 'Select Distance', km: null },
   { value: '1', label: 'Within 1 km', km: 1 },
   { value: '5', label: 'Within 5 km', km: 5 },
   { value: '10', label: 'Within 10 km', km: 10 },
@@ -69,7 +69,7 @@ const FACING_OPTIONS = [
 ];
 
 const FURNISHING_OPTIONS = [
-  { label: 'Any Furnishing', value: '' },
+  { label: 'Select Furnishing', value: '' },
   { label: 'Unfurnished', value: 'UNFURNISHED' },
   { label: 'Semi Furnished', value: 'SEMI_FURNISHED' },
   { label: 'Fully Furnished', value: 'FULLY_FURNISHED' }
