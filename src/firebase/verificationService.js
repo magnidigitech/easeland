@@ -60,7 +60,7 @@ export async function getVerificationQueue({
     }
 
     const snap = await getDocs(q);
-    let properties = snap.docs.map(doc => doc.data());
+    let properties = snap.docs.map(doc => ({ id: doc.id, propertyId: doc.id, ...doc.data() }));
 
     // Also include PostgreSQL properties with pending verification or pending re-audit
     if (typeof window !== 'undefined') {
