@@ -43,6 +43,48 @@ describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
     );
   });
 
+  it('correctly resolves independent municipal towns dynamically without overriding them with taluk/district', () => {
+    // Google Maps structure for independent towns like Ponnur or Tenali
+    const mockTownResult = {
+      formatted_address: 'Ponnur, Andhra Pradesh, India',
+      address_components: [
+        { long_name: 'Ponnur', types: ['locality', 'political'] },
+        { long_name: 'Guntur', types: ['administrative_area_level_3', 'political'] },
+        { long_name: 'Andhra Pradesh', types: ['administrative_area_level_1', 'political'] },
+        { long_name: 'India', types: ['country', 'political'] }
+      ]
+    };
+
+    const hierarchy = extractGoogleLocationHierarchy(mockTownResult);
+
+    assert.strictEqual(hierarchy.city, 'Ponnur');
+    assert.strictEqual(hierarchy.district, 'Guntur');
+    assert.strictEqual(hierarchy.mandal, 'Guntur');
+    assert.strictEqual(hierarchy.state, 'Andhra Pradesh');
+    assert.strictEqual(hierarchy.country, 'India');
+  });
+
+  it('dynamically falls back to administrative sub-district or district for rural villages lacking locality tag', () => {
+    const mockVillageResult = {
+      formatted_address: 'Pedagarlapadu, Dachepalle, Palnadu, Andhra Pradesh, India',
+      address_components: [
+        { long_name: 'Pedagarlapadu', types: ['administrative_area_level_4', 'political'] },
+        { long_name: 'Dachepalle', types: ['administrative_area_level_3', 'political'] },
+        { long_name: 'Palnadu', types: ['administrative_area_level_2', 'political'] },
+        { long_name: 'Andhra Pradesh', types: ['administrative_area_level_1', 'political'] },
+        { long_name: 'India', types: ['country', 'political'] }
+      ]
+    };
+
+    const hierarchy = extractGoogleLocationHierarchy(mockVillageResult);
+
+    assert.strictEqual(hierarchy.locality, 'Pedagarlapadu');
+    assert.strictEqual(hierarchy.city, 'Dachepalle');
+    assert.strictEqual(hierarchy.mandal, 'Dachepalle');
+    assert.strictEqual(hierarchy.district, 'Palnadu');
+    assert.strictEqual(hierarchy.state, 'Andhra Pradesh');
+  });
+
   it('gracefully handles empty or missing geocode objects with un-fabricated defaults', () => {
     const empty = extractGoogleLocationHierarchy(null);
     assert.strictEqual(empty.country, 'India');

@@ -95,14 +95,31 @@ export function extractGoogleLocationHierarchy(geocodedResult) {
   const admin2 = getComp('administrative_area_level_2');
   const admin1 = getComp('administrative_area_level_1');
 
-  // Hierarchy resolution:
-  // Case A: Neighborhood in a City (e.g. Brodipet in Guntur)
-  // Case B: Village or Town in a Taluk/District (e.g. Perecherla in Guntur)
-  const locality = rawSubLocality || rawLocality || '';
-  const city = rawSubLocality
-    ? (rawLocality || admin3 || admin2)
-    : (admin3 || admin2 || rawLocality);
-  const district = admin2 || admin3 || (rawSubLocality ? rawLocality : '');
+  // Completely dynamic hierarchy resolution (Standard Google Maps Platform specification):
+  // 1. Locality (neighborhood / sub-area / village):
+  //    - If sublocality exists (e.g. Brodipet), locality is that sublocality.
+  //    - If no sublocality, but admin4 / village exists, locality is that village.
+  //    - If querying a city/town directly without a sub-area, locality remains empty so it doesn't double-filter.
+  const subArea = rawSubLocality || getComp('administrative_area_level_4') || getComp('village') || '';
+  const locality = subArea;
+
+  // 2. City / Town:
+  //    - Google Maps canonically designates incorporated cities and towns as 'locality'.
+  //    - If rawLocality exists (e.g. Ponnur, Guntur, Tenali, Mumbai, Bengaluru), that is the city/town.
+  //    - If rawLocality is absent (e.g. rural coordinates), fallback to sub-district (admin3) or district (admin2).
+  const city = rawLocality || admin3 || admin2 || '';
+
+  // 3. District:
+  //    - administrative_area_level_2 is the official District.
+  //    - If admin2 is omitted, admin3 fallback provides district coverage.
+  const district = admin2 || admin3 || '';
+
+  // 4. Mandal / Taluk:
+  //    - administrative_area_level_3 is the official Mandal / Taluk / Tehsil.
+  const mandal = admin3 || admin2 || city || '';
+
+  // 5. State:
+  //    - administrative_area_level_1 is the State / Province.
   const state = admin1;
 
   return {
@@ -110,7 +127,7 @@ export function extractGoogleLocationHierarchy(geocodedResult) {
     state: state,
     district: district,
     city: city,
-    mandal: admin3 || admin2 || city,
+    mandal: mandal,
     locality: locality,
     subLocality: getComp('sublocality_level_2') || rawSubLocality,
     village: getComp('administrative_area_level_4') || getComp('village'),
