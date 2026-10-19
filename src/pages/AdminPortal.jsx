@@ -684,6 +684,20 @@ export default function AdminPortal({ onNavigate }) {
           if (rawDeleted) deletedIds = JSON.parse(rawDeleted).map(String);
           const rawSub = localStorage.getItem('easeland_submitted_properties');
           if (rawSub) submittedIds = JSON.parse(rawSub).map(String);
+
+          const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties');
+          if (rawAdminDel) {
+            try {
+              const parsedAdminDel = JSON.parse(rawAdminDel);
+              if (Array.isArray(parsedAdminDel) && parsedAdminDel.length > 0) {
+                fetch('/api/properties/sync-deleted', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ deletedProperties: parsedAdminDel })
+                }).catch(() => {});
+              }
+            } catch (eSync) {}
+          }
         }
       } catch (e) { }
 
@@ -1197,6 +1211,11 @@ export default function AdminPortal({ onNavigate }) {
           deletedAt: new Date().toISOString()
         });
         localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(parsedAdminDel));
+        fetch('/api/properties/sync-deleted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deletedProperties: parsedAdminDel })
+        }).catch(() => {});
       }
 
       const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];

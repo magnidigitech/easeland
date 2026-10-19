@@ -222,6 +222,44 @@ try {
 function getAdminDeletedLedger() {
   const seen = new Set();
   const list = [];
+
+  // Dynamically index any DELETED_BY_ADMIN properties present in localPropsMap
+  for (const p of localPropsMap.values()) {
+    if (!p) continue;
+    const st = String(p.status || p.listingStatus || p.listing_status || '').toUpperCase();
+    const lst = String(p.listing_status || p.listingStatus || '').toUpperCase();
+    if (st === 'DELETED_BY_ADMIN' || lst === 'DELETED_BY_ADMIN' || p.deletedByAdmin === true) {
+      const pId = String(p.propertyId || p.id || '').trim();
+      const refId = String(p.referenceId || (pId ? 'EL-PROP-' + pId.replace(/^(el-prop-|prop-)/i, '') : '')).trim();
+      const title = String(p.title || '').trim();
+      const entry = {
+        ...p,
+        id: pId || refId,
+        propertyId: pId || refId,
+        referenceId: refId || pId,
+        title,
+        status: 'DELETED_BY_ADMIN',
+        listingStatus: 'DELETED_BY_ADMIN',
+        listing_status: 'DELETED_BY_ADMIN',
+        deletedByAdmin: true,
+        isDeleted: true,
+        isPublished: false,
+        is_published: false,
+        adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+        deletedAt: p.deletedAt || p.updatedAt || new Date().toISOString()
+      };
+      if (pId) localAdminDeletedMap.set(pId.toLowerCase(), entry);
+      if (refId) localAdminDeletedMap.set(refId.toLowerCase(), entry);
+      if (title) localAdminDeletedMap.set(title.toLowerCase().trim(), entry);
+      const cleanNum = (pId || refId).replace(/^(el-prop-|prop-)/i, '').toLowerCase().trim();
+      if (cleanNum) {
+        localAdminDeletedMap.set(cleanNum, entry);
+        localAdminDeletedMap.set('el-prop-' + cleanNum, entry);
+        localAdminDeletedMap.set('prop-' + cleanNum, entry);
+      }
+    }
+  }
+
   for (const item of localAdminDeletedMap.values()) {
     if (!item) continue;
     const key = String(item.referenceId || item.propertyId || item.id || item.title || '').toLowerCase().trim();
@@ -237,6 +275,8 @@ function recordAdminDeletedItem(item) {
   const pId = String(item.propertyId || item.id || '').trim();
   const refId = String(item.referenceId || (pId ? 'EL-PROP-' + pId.replace(/^(el-prop-|prop-)/i, '') : '')).trim();
   const title = String(item.title || '').trim();
+  const cleanNum = (pId || refId).replace(/^(el-prop-|prop-)/i, '').toLowerCase().trim();
+
   const entry = {
     ...item,
     id: pId || refId,
@@ -257,6 +297,11 @@ function recordAdminDeletedItem(item) {
   if (pId) localAdminDeletedMap.set(pId.toLowerCase(), entry);
   if (refId) localAdminDeletedMap.set(refId.toLowerCase(), entry);
   if (title) localAdminDeletedMap.set(title.toLowerCase().trim(), entry);
+  if (cleanNum) {
+    localAdminDeletedMap.set(cleanNum, entry);
+    localAdminDeletedMap.set('el-prop-' + cleanNum, entry);
+    localAdminDeletedMap.set('prop-' + cleanNum, entry);
+  }
 
   try {
     fs.writeFileSync(adminDeletedStoreFile, JSON.stringify(getAdminDeletedLedger(), null, 2), 'utf8');
@@ -622,12 +667,28 @@ async function initPgDb() {
     `);
 
     try {
-      const allPg = await client.query('SELECT raw_data FROM properties;');
+      const allPg = await client.query('SELECT property_id, reference_id, title, owner_id, listing_status, raw_data FROM properties;');
       allPg.rows.forEach(r => {
-        if (r.raw_data && (r.raw_data.propertyId || r.raw_data.id)) {
-          const id = r.raw_data.propertyId || r.raw_data.id;
-          const current = localPropsMap.get(id) || {};
-          localPropsMap.set(id, { ...r.raw_data, ...current });
+        const raw = r.raw_data || {};
+        const pId = r.property_id || raw.propertyId || raw.id;
+        if (pId) {
+          const current = localPropsMap.get(pId) || {};
+          localPropsMap.set(pId, { ...raw, ...current, propertyId: pId, id: pId });
+        }
+        const st = String(r.listing_status || raw.listing_status || raw.status || '').toUpperCase();
+        if (st === 'DELETED_BY_ADMIN' || raw.deletedByAdmin === true) {
+          recordAdminDeletedItem({
+            ...raw,
+            propertyId: pId,
+            id: pId,
+            referenceId: r.reference_id || raw.referenceId,
+            title: r.title || raw.title,
+            ownerId: r.owner_id || raw.ownerId,
+            status: 'DELETED_BY_ADMIN',
+            listingStatus: 'DELETED_BY_ADMIN',
+            listing_status: 'DELETED_BY_ADMIN',
+            deletedByAdmin: true
+          });
         }
       });
       console.log('Hydrated properties store from PostgreSQL into localPropsMap.');
@@ -1214,6 +1275,55 @@ app.get('/api/properties', async (req, res) => {
 // API Endpoint: Dedicated Authoritative Admin Deleted Properties Ledger
 app.get('/api/properties/admin-deleted', (req, res) => {
   return res.json({ success: true, ledger: getAdminDeletedLedger() });
+});
+
+// API Endpoint: Batch synchronize admin deleted properties (from Admin Studio or clients)
+app.post('/api/properties/sync-deleted', async (req, res) => {
+  try {
+    const incoming = Array.isArray(req.body?.deletedProperties) ? req.body.deletedProperties : (Array.isArray(req.body) ? req.body : []);
+    const recordedList = [];
+
+    for (const item of incoming) {
+      if (!item) continue;
+      const formatted = typeof item === 'string'
+        ? { propertyId: item, id: item, title: '' }
+        : item;
+      const recorded = recordAdminDeletedItem(formatted);
+      if (recorded) recordedList.push(recorded);
+
+      // Also persist to PostgreSQL admin_deleted_properties table
+      try {
+        const pId = recorded.propertyId || recorded.id;
+        const refId = recorded.referenceId;
+        const title = recorded.title || '';
+        const ownerId = recorded.ownerId || null;
+        const feedback = recorded.adminFeedback || 'Notification: Deleted by Admin';
+
+        const qph1 = String.fromCharCode(36) + '1';
+        const qph2 = String.fromCharCode(36) + '2';
+        const qph3 = String.fromCharCode(36) + '3';
+        const qph4 = String.fromCharCode(36) + '4';
+        const qph5 = String.fromCharCode(36) + '5';
+        const qph6 = String.fromCharCode(36) + '6';
+
+        await pgPool.query(
+          "INSERT INTO admin_deleted_properties (property_id, reference_id, title, owner_id, admin_feedback, raw_data) " +
+          "VALUES (" + qph1 + ", " + qph2 + ", " + qph3 + ", " + qph4 + ", " + qph5 + ", " + qph6 + ") " +
+          "ON CONFLICT (property_id) DO UPDATE SET " +
+          "  reference_id = EXCLUDED.reference_id, " +
+          "  title = EXCLUDED.title, " +
+          "  admin_feedback = EXCLUDED.admin_feedback, " +
+          "  raw_data = EXCLUDED.raw_data, " +
+          "  deleted_at = NOW();",
+          [pId, refId, title, ownerId, feedback, JSON.stringify(recorded)]
+        );
+      } catch (dbErr) {}
+    }
+
+    return res.json({ success: true, count: recordedList.length, ledger: getAdminDeletedLedger() });
+  } catch (err) {
+    return res.json({ success: true, ledger: getAdminDeletedLedger() });
+  }
 });
 
 

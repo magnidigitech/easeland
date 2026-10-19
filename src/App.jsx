@@ -1173,8 +1173,8 @@ export default function App() {
               <p className="text-gray-400 leading-relaxed font-medium">
                 {(() => {
                   const tag = siteConfig?.footer?.tagline;
-                  if (!tag || tag.includes('Zero brokerage') || tag.includes('zero brokerage')) {
-                    return 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, verified land titles, and precise plot boundaries.';
+                  if (!tag || tag.includes('Zero brokerage') || tag.includes('zero brokerage') || tag.includes('precise plot boundaries')) {
+                    return 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, crystal-clear land titles, and zero boundary disputes.';
                   }
                   return tag;
                 })()}

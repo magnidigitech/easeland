@@ -225,7 +225,7 @@ export const DEFAULT_SITE_CONFIG = {
     heroTagline: 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform',
     heroTitlePrefix: 'Find, Explore & Verify Properties ',
     heroTitleHighlight: 'Directly from Owners',
-    heroSubtitle: '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.',
+    heroSubtitle: '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.',
     showSearchCard: true,
     showPopularSearches: true,
     heroBackgroundImage: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80'
@@ -242,7 +242,7 @@ export const DEFAULT_SITE_CONFIG = {
     stickyNavbar: true
   },
   footer: {
-    tagline: 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, verified land titles, and precise plot boundaries.',
+    tagline: 'EaseLand is India\'s premier property discovery and verification marketplace. 100% physically inspected listings, crystal-clear land titles, and zero boundary disputes.',
     officeAddress: 'Door No. 4-12-89, 4th Line Main, Brodipet, Guntur Central Mandal, Guntur, AP - 522002, India',
     supportPhone: '+91 98765 43210',
     supportEmail: 'support@easeland.in',
@@ -278,7 +278,7 @@ export const DEFAULT_SITE_CONFIG = {
   ],
   faqs: [
     { id: 'faq-1', question: 'How does EaseLand verify property titles and land boundaries?', answer: 'EaseLand deploys field inspection specialists who perform physical site visits, capture GeoJSON plot boundary coordinates, and audit land records (Pahani, Adangal, Encumbrance Certificates) before publishing listings live.' },
-    { id: 'faq-2', question: 'How does EaseLand ensure a safe and smooth property transaction?', answer: 'EaseLand conducts rigorous on-ground verification, reviews title documents, maps precise plot boundaries, and connects genuine buyers with verified owners for a seamless transaction experience.' },
+    { id: 'faq-2', question: 'How does EaseLand ensure a safe and smooth property transaction?', answer: 'EaseLand conducts rigorous on-ground verification, reviews title documents, guarantees zero boundary disputes, and connects genuine buyers with verified owners for a seamless transaction experience.' },
     { id: 'faq-3', question: 'How long does property verification take after posting?', answer: 'Property verification is completed within 24 hours of document submission. Our legal auditors inspect documents and publish the verified listing.' },
     { id: 'faq-4', question: 'Are confidential land title documents accessible to public users?', answer: 'No. Property title deeds and Pahani extracts are stored in an encrypted vault accessible only to EaseLand legal auditors and verified property owners.' }
   ],
@@ -320,7 +320,7 @@ export const DEFAULT_SITE_CONFIG = {
   },
   seo: {
     metaTitle: 'EaseLand — Pan-India Verified Property & Land Marketplace',
-    metaDescription: 'Discover and verify open plots, villas, apartments, and agricultural lands. 100% verified title deeds, precise plot boundaries, and Leaflet Google satellite map polygons.',
+    metaDescription: 'Discover and verify open plots, villas, apartments, and agricultural lands. 100% verified title deeds, zero boundary disputes, and Leaflet Google satellite map polygons.',
     keywords: 'land plots, buy land, guntur real estate, hyderabad plots, verified property, transparent deals, plot boundary, real estate india',
     ogImageUrl: '/easeland_logo.png',
     canonicalUrl: 'https://easeland.in'
@@ -354,7 +354,8 @@ export const sanitizeSiteConfig = (cfg) => {
     heroSub.includes('Zero brokerage') ||
     heroSub.includes('zero broker') ||
     heroSub.includes('zero-brokerage') ||
-    heroSub.includes('zero-commission')
+    heroSub.includes('zero-commission') ||
+    heroSub.includes('Accurate plot boundaries')
   ) {
     if (!sanitized.homepage) sanitized.homepage = {};
     sanitized.homepage.heroSubtitle = DEFAULT_SITE_CONFIG.homepage.heroSubtitle;
@@ -364,7 +365,7 @@ export const sanitizeSiteConfig = (cfg) => {
   const footerTag = sanitized.footer?.tagline;
   if (
     footerTag &&
-    (footerTag.includes('Zero brokerage') || footerTag.includes('zero brokerage'))
+    (footerTag.includes('Zero brokerage') || footerTag.includes('zero brokerage') || footerTag.includes('precise plot boundaries'))
   ) {
     if (!sanitized.footer) sanitized.footer = {};
     sanitized.footer.tagline = DEFAULT_SITE_CONFIG.footer.tagline;
@@ -475,7 +476,8 @@ if (typeof window !== 'undefined') {
       rawConfig.includes('Zero commission') ||
       rawConfig.includes('Zero brokerage') ||
       rawConfig.includes('zero brokerage') ||
-      rawConfig.includes('zero broker')
+      rawConfig.includes('zero broker') ||
+      rawConfig.includes('Accurate plot boundaries')
     )) {
       localStorage.removeItem('easeland_site_config');
     }

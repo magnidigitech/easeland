@@ -13,7 +13,7 @@ describe('EaseLand Site Config Sanitization & Zero-Claims Scrubbing Suite', () =
     const cleaned = sanitizeSiteConfig(staleConfig);
     assert.strictEqual(
       cleaned.homepage.heroSubtitle,
-      '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'
+      '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.'
     );
   });
 

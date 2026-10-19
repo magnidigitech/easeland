@@ -459,9 +459,10 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               sub.includes('Zero commission') ||
               sub.includes('Zero brokerage') ||
               sub.includes('zero broker') ||
-              sub.includes('zero brokerage')
+              sub.includes('zero brokerage') ||
+              sub.includes('Accurate plot boundaries')
             ) {
-              return '100% verified listings. Accurate plot boundaries. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.';
+              return '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.';
             }
             return sub;
           })()}
