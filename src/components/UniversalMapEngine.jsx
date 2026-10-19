@@ -17,8 +17,7 @@ import {
   getPropertyPhotosList,
   getPropertyVideosList
 } from '../utils/categoryUtils';
-import { CANONICAL_AMENITIES } from '../firebase/specificationsConfig';
-import { matchesSearchFilters } from '../utils/filterMatchingUtils.js';
+import { matchesSearchFilters, isPropertyDeleted, isPropertyPubliclyVisible } from '../utils/filterMatchingUtils.js';
 
 // Helper: Create custom EaseLand circular cluster badge with property count
 function createEaseLandClusterIcon(cluster) {
@@ -108,7 +107,7 @@ export default function UniversalMapEngine({
   // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas, filtered by active search filters
   const displayProperties = useMemo(() => {
     const raw = deduplicateProperties(properties);
-    const filtered = raw.filter(p => matchesSearchFilters(p, filters));
+    const filtered = raw.filter(p => !isPropertyDeleted(p) && isPropertyPubliclyVisible(p) && matchesSearchFilters(p, filters));
     const hasDistanceSearch = filters?.radiusKm != null || filters?.referenceLat != null || filters?.nearbyPlace;
     if (hasDistanceSearch) {
       filtered.sort((a, b) => {

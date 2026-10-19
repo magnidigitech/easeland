@@ -125,6 +125,148 @@ try {
   console.warn('Local properties store initialization note:', e.message);
 }
 
+// Local Persistent Disk & Memory Store for Authoritative Admin Deleted Properties Ledger
+const adminDeletedStoreFile = path.join(uploadsDir, 'admin_deleted_store.json');
+const localAdminDeletedMap = new Map();
+
+// Seed initial ledger with known Admin Deleted properties
+const SEED_ADMIN_DELETED_PROPERTIES = [
+  {
+    propertyId: '63727',
+    id: '63727',
+    referenceId: 'EL-PROP-63727',
+    title: 'MAGNI DIGI TECH',
+    status: 'DELETED_BY_ADMIN',
+    listingStatus: 'DELETED_BY_ADMIN',
+    listing_status: 'DELETED_BY_ADMIN',
+    deletedByAdmin: true,
+    isDeleted: true,
+    isPublished: false,
+    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+    deletedAt: '2026-10-18T10:00:00.000Z'
+  },
+  {
+    propertyId: '84040',
+    id: '84040',
+    referenceId: 'EL-PROP-84040',
+    title: 'Furnished 3BHK in Vidyanagar',
+    status: 'DELETED_BY_ADMIN',
+    listingStatus: 'DELETED_BY_ADMIN',
+    listing_status: 'DELETED_BY_ADMIN',
+    deletedByAdmin: true,
+    isDeleted: true,
+    isPublished: false,
+    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+    deletedAt: '2026-10-18T10:00:00.000Z'
+  },
+  {
+    propertyId: '64847',
+    id: '64847',
+    referenceId: 'EL-PROP-64847',
+    title: 'Fertile Land in Perecherla',
+    status: 'DELETED_BY_ADMIN',
+    listingStatus: 'DELETED_BY_ADMIN',
+    listing_status: 'DELETED_BY_ADMIN',
+    deletedByAdmin: true,
+    isDeleted: true,
+    isPublished: false,
+    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+    deletedAt: '2026-10-18T10:00:00.000Z'
+  },
+  {
+    propertyId: 'prop_1792224332032',
+    id: 'prop_1792224332032',
+    referenceId: 'EL-PROP-prop_1792224332032',
+    title: 'LEM',
+    status: 'DELETED_BY_ADMIN',
+    listingStatus: 'DELETED_BY_ADMIN',
+    listing_status: 'DELETED_BY_ADMIN',
+    deletedByAdmin: true,
+    isDeleted: true,
+    isPublished: false,
+    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+    deletedAt: '2026-10-18T10:00:00.000Z'
+  }
+];
+
+SEED_ADMIN_DELETED_PROPERTIES.forEach(p => {
+  const k1 = String(p.propertyId || p.id).toLowerCase();
+  const k2 = String(p.referenceId).toLowerCase();
+  const k3 = String(p.title).toLowerCase().trim();
+  localAdminDeletedMap.set(k1, p);
+  localAdminDeletedMap.set(k2, p);
+  localAdminDeletedMap.set(k3, p);
+});
+
+try {
+  if (fs.existsSync(adminDeletedStoreFile)) {
+    const rawDisk = fs.readFileSync(adminDeletedStoreFile, 'utf8');
+    const parsedDisk = JSON.parse(rawDisk);
+    if (Array.isArray(parsedDisk)) {
+      parsedDisk.forEach(p => {
+        if (p) {
+          const k1 = String(p.propertyId || p.id || '').toLowerCase().trim();
+          const k2 = String(p.referenceId || '').toLowerCase().trim();
+          const k3 = String(p.title || '').toLowerCase().trim();
+          if (k1) localAdminDeletedMap.set(k1, p);
+          if (k2) localAdminDeletedMap.set(k2, p);
+          if (k3) localAdminDeletedMap.set(k3, p);
+        }
+      });
+    }
+  }
+} catch (e) {
+  console.warn('Local admin deleted store initialization note:', e.message);
+}
+
+function getAdminDeletedLedger() {
+  const seen = new Set();
+  const list = [];
+  for (const item of localAdminDeletedMap.values()) {
+    if (!item) continue;
+    const key = String(item.referenceId || item.propertyId || item.id || item.title || '').toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    list.push(item);
+  }
+  return list;
+}
+
+function recordAdminDeletedItem(item) {
+  if (!item) return null;
+  const pId = String(item.propertyId || item.id || '').trim();
+  const refId = String(item.referenceId || (pId ? 'EL-PROP-' + pId.replace(/^(el-prop-|prop-)/i, '') : '')).trim();
+  const title = String(item.title || '').trim();
+  const entry = {
+    ...item,
+    id: pId || refId,
+    propertyId: pId || refId,
+    referenceId: refId || pId,
+    title,
+    status: 'DELETED_BY_ADMIN',
+    listingStatus: 'DELETED_BY_ADMIN',
+    listing_status: 'DELETED_BY_ADMIN',
+    deletedByAdmin: true,
+    isDeleted: true,
+    isPublished: false,
+    is_published: false,
+    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+    deletedAt: item.deletedAt || new Date().toISOString()
+  };
+
+  if (pId) localAdminDeletedMap.set(pId.toLowerCase(), entry);
+  if (refId) localAdminDeletedMap.set(refId.toLowerCase(), entry);
+  if (title) localAdminDeletedMap.set(title.toLowerCase().trim(), entry);
+
+  try {
+    fs.writeFileSync(adminDeletedStoreFile, JSON.stringify(getAdminDeletedLedger(), null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Failed to write admin deleted store file:', err.message);
+  }
+  return entry;
+}
+
+
 function saveLocalProperty(p, existingOverride = null) {
   if (!p || (!p.propertyId && !p.id)) return;
   const pId = String(p.propertyId || p.id).trim();
@@ -466,6 +608,19 @@ async function initPgDb() {
       );
     `);
 
+    // 7. Admin Deleted Properties Ledger Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_deleted_properties (
+        property_id VARCHAR(100) PRIMARY KEY,
+        reference_id VARCHAR(100),
+        title TEXT,
+        owner_id VARCHAR(100),
+        admin_feedback TEXT DEFAULT 'Notification: Deleted by Admin',
+        deleted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        raw_data JSONB
+      );
+    `);
+
     try {
       const allPg = await client.query('SELECT raw_data FROM properties;');
       allPg.rows.forEach(r => {
@@ -480,8 +635,28 @@ async function initPgDb() {
       console.warn('PostgreSQL property hydration note:', hydrateErr.message);
     }
 
+    try {
+      const allDel = await client.query('SELECT property_id, reference_id, title, owner_id, admin_feedback, deleted_at, raw_data FROM admin_deleted_properties;');
+      allDel.rows.forEach(r => {
+        const item = {
+          ...(r.raw_data || {}),
+          propertyId: r.property_id,
+          id: r.property_id,
+          referenceId: r.reference_id,
+          title: r.title,
+          ownerId: r.owner_id,
+          adminFeedback: r.admin_feedback,
+          deletedAt: r.deleted_at
+        };
+        recordAdminDeletedItem(item);
+      });
+      console.log('Hydrated admin deleted properties ledger from PostgreSQL.');
+    } catch (hydrateDelErr) {
+      console.warn('PostgreSQL admin deleted hydration note:', hydrateDelErr.message);
+    }
+
     client.release();
-    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors, users) initialized successfully.');
+    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors, users, admin_deleted_properties) initialized successfully.');
   } catch (err) {
     console.warn('PostgreSQL connection/init note (Local disk store active):', err.message);
   }
@@ -998,20 +1173,49 @@ app.get('/api/properties', async (req, res) => {
     }
 
     if (isPublicOnly) {
+      const ledger = getAdminDeletedLedger();
+      const ledgerAliases = new Set();
+      ledger.forEach(item => {
+        if (item.id) ledgerAliases.add(String(item.id).toLowerCase().trim());
+        if (item.propertyId) ledgerAliases.add(String(item.propertyId).toLowerCase().trim());
+        if (item.referenceId) ledgerAliases.add(String(item.referenceId).toLowerCase().trim());
+        if (item.title) ledgerAliases.add(String(item.title).toLowerCase().trim());
+        const n = String(item.id || item.propertyId || item.referenceId || '').toLowerCase().replace(/^(el-prop-|prop-)/i, '').trim();
+        if (n) ledgerAliases.add(n);
+      });
+
       properties = properties.filter(p => {
+        if (!p) return false;
         const st = String(p.status || p.listingStatus || '').toUpperCase();
         const lst = String(p.listingStatus || '').toUpperCase();
         const isDel = p.deletedByAdmin === true || p.isDeleted === true || st === 'DELETED_BY_ADMIN' || lst === 'DELETED_BY_ADMIN' || st === 'DELETED' || lst === 'DELETED';
         const isPub = p.isPublished === true || p.is_published === true;
-        return !isDel && isPub;
+        if (isDel || !isPub) return false;
+
+        const pid1 = String(p.id || '').toLowerCase().trim();
+        const pid2 = String(p.propertyId || '').toLowerCase().trim();
+        const pid3 = String(p.referenceId || '').toLowerCase().trim();
+        const ptitle = String(p.title || '').toLowerCase().trim();
+        const pnum = pid1.replace(/^(el-prop-|prop-)/i, '').trim();
+
+        if (ledgerAliases.has(pid1) || ledgerAliases.has(pid2) || ledgerAliases.has(pid3) || ledgerAliases.has(ptitle) || (pnum && ledgerAliases.has(pnum))) {
+          return false;
+        }
+        return true;
       });
     }
 
-    return res.json({ success: true, properties });
+    return res.json({ success: true, properties, adminDeletedLedger: getAdminDeletedLedger() });
   } catch (err) {
-    return res.json({ success: true, properties: getLocalProperties() });
+    return res.json({ success: true, properties: getLocalProperties(), adminDeletedLedger: getAdminDeletedLedger() });
   }
 });
+
+// API Endpoint: Dedicated Authoritative Admin Deleted Properties Ledger
+app.get('/api/properties/admin-deleted', (req, res) => {
+  return res.json({ success: true, ledger: getAdminDeletedLedger() });
+});
+
 
 // API Endpoint: Get single property record by ID (PostgreSQL Primary + Local Disk Store Fallback)
 app.get('/api/properties/:id', async (req, res) => {
@@ -1129,6 +1333,44 @@ app.delete('/api/properties/:id', async (req, res) => {
       const ph5 = String.fromCharCode(36) + '5';
 
       if (isAdmin) {
+        const ledgerItem = recordAdminDeletedItem({
+          propertyId: targetId,
+          referenceId: refWithPrefix || extraRef || targetId,
+          title: reqTitle || req.body?.property?.title || '',
+          ownerId: req.body?.property?.ownerId || req.body?.ownerId || null,
+          adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
+          raw_data: req.body?.property || {}
+        });
+
+        try {
+          const qph1 = String.fromCharCode(36) + '1';
+          const qph2 = String.fromCharCode(36) + '2';
+          const qph3 = String.fromCharCode(36) + '3';
+          const qph4 = String.fromCharCode(36) + '4';
+          const qph5 = String.fromCharCode(36) + '5';
+          const qph6 = String.fromCharCode(36) + '6';
+          await pgPool.query(
+            "INSERT INTO admin_deleted_properties (property_id, reference_id, title, owner_id, admin_feedback, raw_data) " +
+            "VALUES (" + qph1 + ", " + qph2 + ", " + qph3 + ", " + qph4 + ", " + qph5 + ", " + qph6 + ") " +
+            "ON CONFLICT (property_id) DO UPDATE SET " +
+            "  reference_id = EXCLUDED.reference_id, " +
+            "  title = EXCLUDED.title, " +
+            "  admin_feedback = EXCLUDED.admin_feedback, " +
+            "  raw_data = EXCLUDED.raw_data, " +
+            "  deleted_at = NOW();",
+            [
+              ledgerItem.propertyId,
+              ledgerItem.referenceId,
+              ledgerItem.title,
+              ledgerItem.ownerId,
+              ledgerItem.adminFeedback,
+              JSON.stringify(ledgerItem)
+            ]
+          );
+        } catch (lErr) {
+          console.warn('PostgreSQL admin deleted ledger insert note:', lErr.message);
+        }
+
         await pgPool.query(
           "UPDATE properties " +
           "SET listing_status = 'DELETED_BY_ADMIN', " +

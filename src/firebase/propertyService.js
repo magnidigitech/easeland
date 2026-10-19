@@ -509,13 +509,21 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
   try {
     if (!ownerId) return { success: false, error: 'Owner ID is required.' };
     let propertiesList = [];
-
+    let serverAdminDeletedLedger = [];
 
     // 1. Primary PostgreSQL database fetch (/api/properties)
     try {
       const res = await fetch('/api/properties');
       if (res.ok) {
         const data = await res.json();
+        if (data.adminDeletedLedger && Array.isArray(data.adminDeletedLedger)) {
+          serverAdminDeletedLedger = data.adminDeletedLedger;
+          try {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(data.adminDeletedLedger));
+            }
+          } catch (e) {}
+        }
         if (data.success && Array.isArray(data.properties)) {
           const pgProps = data.properties.filter(p => {
             if (!p) return false;
@@ -544,13 +552,22 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
     }
 
     let deletedIds = [];
-    let adminDeletedList = [];
+    let adminDeletedList = [...serverAdminDeletedLedger];
     try {
       if (typeof window !== 'undefined') {
         const rawDel = localStorage.getItem('easeland_deleted_properties');
         if (rawDel) deletedIds = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
         const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties');
-        if (rawAdminDel) adminDeletedList = JSON.parse(rawAdminDel);
+        if (rawAdminDel) {
+          const parsed = JSON.parse(rawAdminDel);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(item => {
+              if (item && !adminDeletedList.some(x => String(x.id || x.propertyId || x.referenceId) === String(item.id || item.propertyId || item.referenceId))) {
+                adminDeletedList.push(item);
+              }
+            });
+          }
+        }
       }
     } catch (e) {}
 
@@ -625,7 +642,14 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
         }
         existing = existing || {};
 
-        if (isAdminDeleted) {
+        // UNIDIRECTIONAL IMMUTABILITY: If either existing OR incoming is marked DELETED_BY_ADMIN, it stays deleted!
+        const existingIsAdminDeleted = Boolean(
+          existing.deletedByAdmin === true ||
+          existing.status === 'DELETED_BY_ADMIN' ||
+          existing.listingStatus === 'DELETED_BY_ADMIN'
+        );
+
+        if (isAdminDeleted || existingIsAdminDeleted) {
           propMap.set(existingKey || pId, {
             ...existing,
             ...p,
@@ -638,10 +662,26 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
             isDeleted: true,
             isPlatformVerified: false,
             isPublished: false,
-            adminFeedback: 'Notification: Deleted by Admin',
+            adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
             verificationNotes: 'Deleted by Admin',
             adminNotes: 'Deleted by Admin'
           });
+
+          // Self-healing Firestore update using owner session
+          const targetDocId = p.id || p.propertyId;
+          if (targetDocId && (p.listingStatus === 'LIVE' || p.listingStatus === 'PENDING_VERIFICATION' || p.status === 'LIVE' || p.status === 'PENDING_VERIFICATION')) {
+            try {
+              const propDocRef = doc(db, 'properties', String(targetDocId));
+              updateDoc(propDocRef, {
+                status: 'DELETED_BY_ADMIN',
+                listingStatus: 'DELETED_BY_ADMIN',
+                deletedByAdmin: true,
+                isDeleted: true,
+                isPublished: false,
+                adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.'
+              }).catch(() => {});
+            } catch (err) {}
+          }
           return;
         }
 
@@ -1644,7 +1684,40 @@ export async function getPublicPropertyById(propertyId) {
     const statusVal = String(data.listingStatus || data.status || '').toUpperCase();
     const verVal = String(data.verificationStatus || '').toUpperCase();
 
-    const isArchivedOrDeleted = statusVal === 'ARCHIVED' || statusVal === 'DELETED' || statusVal === 'REJECTED';
+    let adminDelList = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawA = localStorage.getItem('easeland_admin_deleted_properties');
+        if (rawA) adminDelList = JSON.parse(rawA);
+      }
+    } catch (e) {}
+
+    const pId1 = String(data.id || '').toLowerCase().trim();
+    const pId2 = String(data.propertyId || '').toLowerCase().trim();
+    const pId3 = String(data.referenceId || '').toLowerCase().trim();
+    const num1 = pId1.replace(/^(el-prop-|prop-)/i, '');
+    const num2 = pId2.replace(/^(el-prop-|prop-)/i, '');
+    const normTitle = String(data.title || '').toLowerCase().trim();
+
+    const isInAdminDelLedger = adminDelList.some(item => {
+      if (!item) return false;
+      const iId1 = String(item.id || '').toLowerCase().trim();
+      const iId2 = String(item.propertyId || '').toLowerCase().trim();
+      const iId3 = String(item.referenceId || '').toLowerCase().trim();
+      const iNum1 = iId1.replace(/^(el-prop-|prop-)/i, '');
+      const iNum2 = iId2.replace(/^(el-prop-|prop-)/i, '');
+      const iTitle = String(item.title || '').toLowerCase().trim();
+      return (
+        (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
+        (iId2 && (iId2 === pId1 || iId2 === pId2 || iId2 === pId3)) ||
+        (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
+        (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2))) ||
+        (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2))) ||
+        (iTitle && normTitle && iTitle === normTitle)
+      );
+    });
+
+    const isArchivedOrDeleted = statusVal === 'ARCHIVED' || statusVal === 'DELETED' || statusVal === 'DELETED_BY_ADMIN' || statusVal === 'REJECTED' || data.isDeleted === true || data.deletedByAdmin === true || isInAdminDelLedger;
 
     const isLive = statusVal === 'LIVE' ||
                    statusVal === 'APPROVED_LIVE' ||
@@ -1659,7 +1732,7 @@ export async function getPublicPropertyById(propertyId) {
                    (!isArchivedOrDeleted && data.isPublished !== false);
 
     if (isArchivedOrDeleted || !isLive) {
-      return { success: false, error: 'This property listing is no longer active on the public marketplace.' };
+      return { success: false, error: 'This property listing was removed by Admin and is no longer available on EaseLand.' };
     }
 
     // Expose APPROVED public media items from publicApprovedMedia, media, photos, images, or single URLs

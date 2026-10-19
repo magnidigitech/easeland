@@ -263,6 +263,13 @@ export default function UserDashboard({
       const res = await fetch('/api/properties');
       if (res.ok) {
         const data = await res.json();
+        if (data.adminDeletedLedger && Array.isArray(data.adminDeletedLedger)) {
+          try {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(data.adminDeletedLedger));
+            }
+          } catch (e) {}
+        }
         if (data.success && Array.isArray(data.properties)) {
           const uId = String(userIdToPass || '').toLowerCase().trim();
           const uEmail = (userEmailToPass || '').toLowerCase().trim();
@@ -405,7 +412,13 @@ export default function UserDashboard({
       }
       existing = existing || {};
 
-      if (isAdminDeleted) {
+      const existingIsAdminDeleted = Boolean(
+        existing.deletedByAdmin === true ||
+        existing.status === 'DELETED_BY_ADMIN' ||
+        existing.listingStatus === 'DELETED_BY_ADMIN'
+      );
+
+      if (isAdminDeleted || existingIsAdminDeleted) {
         combinedPropsMap.set(existingKey || pId, {
           ...existing,
           ...p,
@@ -418,7 +431,7 @@ export default function UserDashboard({
           isDeleted: true,
           isPlatformVerified: false,
           isPublished: false,
-          adminFeedback: 'Notification: Deleted by Admin',
+          adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
           adminNotes: 'Deleted by Admin',
           verificationNotes: 'Deleted by Admin'
         });
@@ -542,6 +555,29 @@ export default function UserDashboard({
       rawProperty: p
     };
   });
+
+  const activeUserProperties = userProperties.filter(p => p.status !== 'DELETED_BY_ADMIN' && p.status !== 'DELETED');
+  const deletedUserProperties = userProperties.filter(p => p.status === 'DELETED_BY_ADMIN');
+
+  const handleDismissDeletedProperty = (targetProp) => {
+    if (!targetProp) return;
+    try {
+      const raw = localStorage.getItem('easeland_user_dismissed_properties') || '[]';
+      const parsed = JSON.parse(raw);
+      const id1 = String(targetProp.id || '').toLowerCase().trim();
+      const id2 = String(targetProp.propertyId || '').toLowerCase().trim();
+      const id3 = String(targetProp.referenceId || '').toLowerCase().trim();
+      const num1 = id1.replace(/^(el-prop-|prop-)/i, '');
+      const num2 = id2.replace(/^(el-prop-|prop-)/i, '');
+      const title = String(targetProp.title || '').toLowerCase().trim();
+
+      [id1, id2, id3, num1, num2, title].filter(Boolean).forEach(k => {
+        if (!parsed.includes(k)) parsed.push(k);
+      });
+      localStorage.setItem('easeland_user_dismissed_properties', JSON.stringify(parsed));
+      refreshUserProperties();
+    } catch (e) {}
+  };
 
   const [actionLoading, setActionLoading] = useState({});
 
@@ -981,7 +1017,7 @@ export default function UserDashboard({
               >
                 <div className="flex items-center gap-3">
                   <Building2 className={`w-4 h-4 ${activeTab === 'properties' ? 'text-slate-950' : 'text-amber-500'}`} />
-                  <span>My Properties ({userProperties.length})</span>
+                  <span>My Properties ({activeUserProperties.length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
               </button>
@@ -997,7 +1033,7 @@ export default function UserDashboard({
                   <ShieldCheck className={`w-4 h-4 ${activeTab === 'verification' ? 'text-slate-950' : 'text-amber-500'}`} />
                   <span>Verification Status</span>
                 </div>
-                {userProperties.some(p => p.status === 'PENDING_VERIFICATION') && (
+                {activeUserProperties.some(p => p.status === 'PENDING_VERIFICATION') && (
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                 )}
               </button>
@@ -1044,8 +1080,8 @@ export default function UserDashboard({
                 <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
                   <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
                     <div>
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">My Listings</span>
-                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{userProperties.length}</span>
+                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Active Listings</span>
+                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{activeUserProperties.length}</span>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black">
                       <Building2 className="w-6 h-6 text-brand-charcoal" />
@@ -1056,7 +1092,7 @@ export default function UserDashboard({
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Verified Live</span>
                       <span className="text-2xl font-black text-emerald-600 mt-1 block">
-                        {userProperties.filter(p => (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished) && p.status !== 'DELETED_BY_ADMIN').length}
+                        {activeUserProperties.filter(p => (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished)).length}
                       </span>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
@@ -1074,6 +1110,31 @@ export default function UserDashboard({
                     </div>
                   </div>
                 </div>
+
+                {/* ADMIN REMOVED LISTINGS NOTICES BANNER */}
+                {deletedUserProperties.length > 0 && (
+                  <div className="bg-red-50/80 rounded-2xl p-5 border-2 border-red-200 flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                      <XCircle className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-extrabold text-red-950 text-sm">
+                          {deletedUserProperties.length} Listing{deletedUserProperties.length > 1 ? 's' : ''} Removed by Admin Auditor
+                        </h3>
+                        <button
+                          onClick={() => setActiveTab('properties')}
+                          className="text-xs font-extrabold text-red-700 underline hover:text-red-950 cursor-pointer"
+                        >
+                          View Listings
+                        </button>
+                      </div>
+                      <p className="text-xs text-red-800 font-medium">
+                        EaseLand Admin Auditor has unlisted {deletedUserProperties.length} of your listings. They are struck off with shadow black styling in your property list for your reference.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* ACTION REQUIRED VERIFICATION ALERT */}
                 {userProperties.some(p => p.status === 'CHANGES_REQUIRED') && (
@@ -1126,7 +1187,7 @@ export default function UserDashboard({
                           }}
                           className={`py-4 px-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all rounded-xl border ${
                             isDeletedByAdmin
-                              ? 'bg-red-50/20 border-red-200'
+                              ? 'bg-slate-900/[0.04] dark:bg-slate-950/70 border-slate-300 dark:border-slate-800 shadow-md shadow-slate-950/10'
                               : 'cursor-pointer hover:bg-slate-50/80 border-transparent hover:border-gray-200/80 group'
                           }`}
                         >
@@ -1139,34 +1200,48 @@ export default function UserDashboard({
                                   e.target.onerror = null;
                                   e.target.src = getCategoryFallbackImage(prop);
                                 }}
-                                className={`w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-60' : 'group-hover:scale-105 transition-transform'}`}
+                                className={`w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-40 shadow-inner' : 'group-hover:scale-105 transition-transform'}`}
                               />
                               {isDeletedByAdmin && (
-                                <div className="absolute inset-0 bg-red-950/40 rounded-xl flex items-center justify-center">
-                                  <XCircle className="w-6 h-6 text-red-300" />
+                                <div className="absolute inset-0 bg-slate-950/75 rounded-xl flex items-center justify-center">
+                                  <XCircle className="w-5 h-5 text-red-400" />
                                 </div>
                               )}
                             </div>
                             <div>
-                              <h3 className={`font-extrabold text-sm flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
+                              <h3 className={`font-extrabold text-sm flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
                                 <span>{prop.title}</span>
                                 {!isDeletedByAdmin && <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700" />}
                               </h3>
-                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-gray-500'}`}>
                                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                                 <span>{prop.location}</span>
                                 <span>•</span>
-                                <span className={`font-bold ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-emerald-700'}`}>{prop.price}</span>
+                                <span className={`font-bold ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500' : 'text-emerald-700'}`}>{prop.price}</span>
                               </p>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-3">
                             {isDeletedByAdmin ? (
-                              <span className="bg-red-100 text-red-800 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-red-300">
-                                <XCircle className="w-3 h-3 text-red-600" />
-                                Deleted by Admin
-                              </span>
+                              <>
+                                <span className="bg-slate-900 text-white dark:bg-red-950/80 dark:text-red-300 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-slate-800 dark:border-red-900/60 shadow-sm">
+                                  <XCircle className="w-3 h-3 text-red-400" />
+                                  <span>Deleted by Admin</span>
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDismissDeletedProperty(prop);
+                                    handleOwnerPropertyAction('DELETE', prop);
+                                  }}
+                                  className="px-2.5 py-1 bg-slate-900 hover:bg-black text-white text-[10px] font-bold rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-sm border border-slate-700"
+                                  title="Dismiss from Dashboard"
+                                >
+                                  <Trash2 className="w-3 h-3 text-red-400" />
+                                  <span>Dismiss</span>
+                                </button>
+                              </>
                             ) : (prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) ? (
                               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -1184,7 +1259,7 @@ export default function UserDashboard({
                               </span>
                             ) : null}
 
-                            {!isDeletedByAdmin ? (
+                            {!isDeletedByAdmin && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1195,10 +1270,6 @@ export default function UserDashboard({
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>View Listing</span>
                               </button>
-                            ) : (
-                              <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2.5 py-1 rounded-lg border border-red-200">
-                                Removed
-                              </span>
                             )}
                           </div>
                         </div>
@@ -1291,9 +1362,14 @@ export default function UserDashboard({
                     }).map((prop) => {
                       const isDeletedByAdmin = prop.status === 'DELETED_BY_ADMIN';
                       return (
-                      <div key={prop.id} className={`rounded-2xl p-6 border shadow-sm space-y-4 transition-all ${
-                        isDeletedByAdmin ? 'bg-red-50/20 border-red-200' : 'bg-white border-gray-200'
+                      <div key={prop.id} className={`rounded-2xl p-6 border shadow-sm space-y-4 transition-all relative overflow-hidden ${
+                        isDeletedByAdmin
+                          ? 'bg-slate-900/[0.04] dark:bg-slate-950/80 border-slate-300 dark:border-slate-800 shadow-2xl shadow-slate-950/15 backdrop-blur-sm'
+                          : 'bg-white border-gray-200'
                       }`}>
+                        {isDeletedByAdmin && (
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-slate-800 to-red-600" />
+                        )}
 
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                           <div
@@ -1312,30 +1388,31 @@ export default function UserDashboard({
                                   e.target.onerror = null;
                                   e.target.src = getCategoryFallbackImage(prop);
                                 }}
-                                className={`w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-60' : 'group-hover:scale-105 transition-transform'}`}
+                                className={`w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-40 shadow-inner' : 'group-hover:scale-105 transition-transform'}`}
                               />
                               {isDeletedByAdmin && (
-                                <div className="absolute inset-0 bg-red-950/40 rounded-2xl flex items-center justify-center">
-                                  <XCircle className="w-8 h-8 text-red-300" />
+                                <div className="absolute inset-0 bg-slate-950/75 rounded-2xl flex flex-col items-center justify-center p-1 text-center">
+                                  <XCircle className="w-6 h-6 text-red-400 mb-0.5" />
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-red-300">DELETED</span>
                                 </div>
                               )}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md ${isDeletedByAdmin ? 'text-gray-400 bg-gray-200 line-through' : 'text-brand-yellow bg-brand-charcoal'}`}>
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md ${isDeletedByAdmin ? 'text-slate-400 bg-slate-200 dark:bg-slate-800 line-through' : 'text-brand-yellow bg-brand-charcoal'}`}>
                                   {prop.type}
                                 </span>
                                 <span className={`text-xs font-semibold ${isDeletedByAdmin ? 'text-red-500 font-bold' : 'text-gray-500'}`}>• Ref: {prop.referenceId}</span>
                               </div>
-                              <h3 className={`font-extrabold text-base mt-1 flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
+                              <h3 className={`font-extrabold text-base mt-1 flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400 decoration-2' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
                                 <span>{prop.title}</span>
                                 {!isDeletedByAdmin && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-amber-700" />}
                               </h3>
-                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-gray-500'}`}>
                                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                                 <span>{prop.location}</span>
                                 <span>•</span>
-                                <span className={`font-extrabold text-sm ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-emerald-700'}`}>{prop.price}</span>
+                                <span className={`font-extrabold text-sm ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500' : 'text-emerald-700'}`}>{prop.price}</span>
                                 <span>({prop.area})</span>
                               </p>
                             </div>
@@ -1344,9 +1421,9 @@ export default function UserDashboard({
                           {/* STATUS BADGE */}
                           <div>
                             {isDeletedByAdmin ? (
-                              <span className="bg-red-100 text-red-800 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-red-300 shadow-xs">
-                                <XCircle className="w-4 h-4 text-red-600" />
-                                Deleted by Admin
+                              <span className="bg-slate-900 text-white dark:bg-red-950/80 dark:text-red-300 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-slate-800 dark:border-red-900/60 shadow-md">
+                                <XCircle className="w-4 h-4 text-red-400" />
+                                <span>Deleted by Admin</span>
                               </span>
                             ) : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW') ? (
                               <span className="bg-amber-100 text-amber-900 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-300 shadow-sm animate-pulse">
@@ -1417,7 +1494,7 @@ export default function UserDashboard({
                         <div className={
                           'p-4 rounded-xl border text-xs font-medium ' +
                           (isDeletedByAdmin
-                            ? 'bg-red-50 text-red-950 border-red-300'
+                            ? 'bg-slate-900/10 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-800 shadow-inner'
                             : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
                               ? 'bg-amber-50 text-amber-950 border-amber-300 shadow-sm'
                               : prop.status === 'CHANGES_REQUIRED'
@@ -1430,15 +1507,15 @@ export default function UserDashboard({
                             {isDeletedByAdmin ? (
                               <>
                                 <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                                <span className="text-red-700 font-extrabold">Notification: Deleted by Admin</span>
+                                <span className="text-red-700 dark:text-red-400 font-extrabold">Admin Action Notice: Property Listing Struck Off</span>
                               </>
                             ) : (
                               <span>Verification Status & Feedback:</span>
                             )}
                           </div>
-                          <p className={isDeletedByAdmin ? 'text-red-800 font-medium' : ''}>
+                          <p className={isDeletedByAdmin ? 'text-slate-600 dark:text-slate-400 font-medium leading-relaxed' : ''}>
                             {isDeletedByAdmin
-                              ? (prop.adminNote || 'Notification: Deleted by Admin. This property listing was removed from the marketplace by an EaseLand Admin.')
+                              ? (prop.adminNote || 'Notification: Deleted by Admin. This property listing was removed from the marketplace by an EaseLand Admin. Map pins, search index listings, and buyer inquiry channels have been permanently closed.')
                               : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
                                 ? 'Your recently modified details have been submitted for Admin Re-Audit. Your previously approved details remain active & LIVE to buyers on the marketplace without interruption. Once verified, the changes will automatically appear on the live listing.'
                                 : prop.adminNote || (
@@ -1462,17 +1539,20 @@ export default function UserDashboard({
                           <div className="flex flex-wrap items-center gap-2">
                             {isDeletedByAdmin ? (
                               <>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold border border-red-200">
-                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
-                                  <span>Unlisted & Removed from Platform</span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white dark:bg-red-950/50 dark:text-red-300 rounded-xl text-xs font-bold border border-slate-800 shadow-sm">
+                                  <XCircle className="w-3.5 h-3.5 text-red-400" />
+                                  <span>Permanently Delisted & Struck Off</span>
                                 </span>
                                 <button
-                                  onClick={() => handleOwnerPropertyAction('DELETE', prop)}
-                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm transition-colors cursor-pointer"
-                                  title="Remove from your dashboard view"
+                                  onClick={() => {
+                                    handleDismissDeletedProperty(prop);
+                                    handleOwnerPropertyAction('DELETE', prop);
+                                  }}
+                                  className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl flex items-center gap-1.5 font-bold shadow-md hover:shadow-lg transition-all cursor-pointer border border-slate-700"
+                                  title="Dismiss from your dashboard view"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 text-white" />
-                                  <span>Remove from Dashboard</span>
+                                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                  <span>Dismiss from Dashboard</span>
                                 </button>
                               </>
                             ) : (

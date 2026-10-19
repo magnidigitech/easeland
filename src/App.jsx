@@ -17,7 +17,7 @@ import PostPropertyWizard from './pages/PostPropertyWizard';
 import AdminPortal from './pages/AdminPortal';
 import EaseLandCRM from './pages/EaseLandCRM';
 import UserDashboard from './components/UserDashboard';
-import PropertiesSearchPage, { matchesSearchFilters } from './pages/PropertiesSearchPage';
+import PropertiesSearchPage, { matchesSearchFilters, isPropertyPubliclyVisible, isPropertyDeleted } from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import OfflineIndicator from './components/OfflineIndicator';
@@ -184,8 +184,9 @@ export default function App() {
     try {
       const res = await getUserWishlistProperties(uid);
       if (res && res.success && Array.isArray(res.properties)) {
-        setWishlistProperties(res.properties);
-        setWishlistCount(res.properties.length);
+        const validWishlist = res.properties.filter(p => !isPropertyDeleted(p));
+        setWishlistProperties(validWishlist);
+        setWishlistCount(validWishlist.length);
       } else {
         setWishlistProperties([]);
         setWishlistCount(0);
@@ -215,7 +216,7 @@ export default function App() {
   const loadProperties = async () => {
     let pgProperties = [];
     try {
-      const res = await fetch('/api/properties');
+      const res = await fetch('/api/properties?publicOnly=true');
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.properties)) {
@@ -237,7 +238,7 @@ export default function App() {
 
     const localData = mockApi.getPublicProperties(filters) || [];
 
-    const candidateProps = [...pgProperties, ...fsProperties, ...localData];
+    const candidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p) && isPropertyPubliclyVisible(p));
     const hasActiveFilters = filters && Object.values(filters).some(v => v !== '' && v !== null && v !== undefined && v !== 'All' && v !== 'ALL');
     const filteredCandidates = hasActiveFilters ? candidateProps.filter(p => matchesSearchFilters(p, filters)) : candidateProps;
 
