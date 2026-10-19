@@ -57,7 +57,7 @@ export function formatPriceInWords(val) {
 }
 
 const FACING_OPTIONS = [
-  { label: 'Any Direction', value: '' },
+  { label: 'Select Direction', value: '' },
   { label: 'East', value: 'EAST' },
   { label: 'West', value: 'WEST' },
   { label: 'North', value: 'NORTH' },
