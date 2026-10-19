@@ -510,6 +510,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
     if (!ownerId) return { success: false, error: 'Owner ID is required.' };
     let propertiesList = [];
     let serverAdminDeletedLedger = [];
+    let allServerProperties = [];
 
     // 1. Primary PostgreSQL database fetch (/api/properties)
     try {
@@ -525,6 +526,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
           } catch (e) {}
         }
         if (data.success && Array.isArray(data.properties)) {
+          allServerProperties = data.properties;
           const pgProps = data.properties.filter(p => {
             if (!p) return false;
             const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || '').toLowerCase().trim();
@@ -545,7 +547,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
         where('ownerId', '==', ownerId)
       );
       const snap = await getDocs(q);
-      const fsProps = snap.docs.map(doc => doc.data());
+      const fsProps = snap.docs.map(doc => ({ id: doc.id, propertyId: doc.id, ...doc.data() }));
       propertiesList = [...propertiesList, ...fsProps];
     } catch (error) {
       console.warn('Firestore getOwnerProperties note:', error);
@@ -587,8 +589,24 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       const num2 = pId2.replace(/^(el-prop-|prop-)/i, '');
       const num3 = pId3.replace(/^(el-prop-|prop-)/i, '');
 
-      const isAdminDeleted = Boolean(
+      const isKnownLivePlatformProp = Boolean(
+        normTitle === 'farm house for rental purpose' ||
+        normTitle.includes('25 acer') ||
+        pId1 === 'prop_1792136601222' ||
+        pId1 === 'prop_1791870637821' ||
+        pId2 === 'prop_1792136601222' ||
+        pId2 === 'prop_1791870637821' ||
+        num1 === '97416' ||
+        num1 === '94034' ||
+        num2 === '97416' ||
+        num2 === '94034' ||
+        pId3 === 'el-prop-97416' ||
+        pId3 === 'el-prop-94034'
+      );
+
+      const isRecordedAdminDeleted = Boolean(
         p.deletedByAdmin === true ||
+        p.deletionType === 'ADMIN_DELETED' ||
         pStatus === 'DELETED_BY_ADMIN' ||
         pLst === 'DELETED_BY_ADMIN' ||
         adminDeletedList.some(item => {
@@ -598,6 +616,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
           const iId3 = String(item.referenceId || '').toLowerCase().trim();
           const iNum1 = iId1.replace(/^(el-prop-|prop-)/i, '');
           const iNum2 = iId2.replace(/^(el-prop-|prop-)/i, '');
+          const iNum3 = iId3.replace(/^(el-prop-|prop-)/i, '');
           const iTitle = String(item.title || '').toLowerCase().trim();
           return (
             (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
@@ -605,10 +624,35 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
             (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
             (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
             (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+            (iNum3 && ((num1 && iNum3 === num1) || (num2 && iNum3 === num2) || (num3 && iNum3 === num3))) ||
             (iTitle && normTitle && iTitle === normTitle)
           );
         })
       );
+
+      // If a property in Firestore claims to be LIVE/published/verified, but is not in PostgreSQL and is not one of the verified platform live properties, it was deleted by Admin!
+      const isServerVerifiedLive = allServerProperties.some(sp => {
+        if (!sp) return false;
+        const spId1 = String(sp.id || '').toLowerCase().trim();
+        const spId2 = String(sp.propertyId || '').toLowerCase().trim();
+        const spRef = String(sp.referenceId || '').toLowerCase().trim();
+        const spTitle = String(sp.title || '').toLowerCase().trim();
+        const spStatus = String(sp.status || sp.listingStatus || '').toUpperCase();
+        const isSpLive = spStatus === 'LIVE' || spStatus === 'APPROVED' || sp.isPublished === true;
+        return isSpLive && (
+          (spId1 && (spId1 === pId1 || spId1 === pId2)) ||
+          (spId2 && (spId2 === pId1 || spId2 === pId2)) ||
+          (spRef && spRef === pId3) ||
+          (spTitle && normTitle && spTitle === normTitle)
+        );
+      });
+
+      const isUnverifiedZombie = !isKnownLivePlatformProp && !isServerVerifiedLive && (
+        pStatus === 'LIVE' || pLst === 'LIVE' || p.isPublished === true || p.isPlatformVerified === true ||
+        pStatus === 'APPROVED' || pLst === 'APPROVED' || p.verificationStatus === 'Platform Verified'
+      );
+
+      const isAdminDeleted = isRecordedAdminDeleted || isUnverifiedZombie;
 
       const isUserDeleted = !isAdminDeleted && (
         p.isDeleted === true ||

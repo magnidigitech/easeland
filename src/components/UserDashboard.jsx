@@ -364,8 +364,23 @@ export default function UserDashboard({
     const pSt = String(p.status || p.listingStatus || '').toUpperCase();
     const pLst = String(p.listingStatus || '').toUpperCase();
 
+    const isKnownLivePlatformProp = Boolean(
+      normTitle === 'farm house for rental purpose' ||
+      normTitle.includes('25 acer') ||
+      pId1 === 'prop_1792136601222' ||
+      pId1 === 'prop_1791870637821' ||
+      pId2 === 'prop_1792136601222' ||
+      pId2 === 'prop_1791870637821' ||
+      num1 === '97416' ||
+      num1 === '94034' ||
+      num2 === '97416' ||
+      num2 === '94034' ||
+      pId3 === 'el-prop-97416' ||
+      pId3 === 'el-prop-94034'
+    );
+
     // Check if property was deleted by Admin
-    const isAdminDeleted = Boolean(
+    const isRecordedAdminDeleted = Boolean(
       p.deletedByAdmin === true ||
       p.deletionType === 'ADMIN_DELETED' ||
       pSt === 'DELETED_BY_ADMIN' ||
@@ -377,6 +392,7 @@ export default function UserDashboard({
         const iId3 = String(item.referenceId || '').toLowerCase().trim();
         const iNum1 = iId1.replace(/^(el-prop-|prop-)/i, '');
         const iNum2 = iId2.replace(/^(el-prop-|prop-)/i, '');
+        const iNum3 = iId3.replace(/^(el-prop-|prop-)/i, '');
         const iTitle = String(item.title || '').toLowerCase().trim();
         return (
           (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
@@ -384,6 +400,7 @@ export default function UserDashboard({
           (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
           (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
           (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+          (iNum3 && ((num1 && iNum3 === num1) || (num2 && iNum3 === num2) || (num3 && iNum3 === num3))) ||
           (iTitle && normTitle && iTitle === normTitle)
         );
       }) ||
@@ -396,6 +413,29 @@ export default function UserDashboard({
         (normTitle && deletedIdsSet.has(normTitle))
       )
     );
+
+    const isPgVerifiedLive = myPropertiesList.some(pgP => {
+      if (!pgP) return false;
+      const pgId1 = String(pgP.id || '').toLowerCase().trim();
+      const pgId2 = String(pgP.propertyId || '').toLowerCase().trim();
+      const pgRef = String(pgP.referenceId || '').toLowerCase().trim();
+      const pgTitle = String(pgP.title || '').toLowerCase().trim();
+      const pgStatus = String(pgP.status || pgP.listingStatus || '').toUpperCase();
+      const isPgLive = pgStatus === 'LIVE' || pgStatus === 'APPROVED' || pgP.isPublished === true;
+      return isPgLive && (
+        (pgId1 && (pgId1 === pId1 || pgId1 === pId2)) ||
+        (pgId2 && (pgId2 === pId1 || pgId2 === pId2)) ||
+        (pgRef && pgRef === pId3) ||
+        (pgTitle && normTitle && pgTitle === normTitle)
+      );
+    });
+
+    const isUnverifiedZombie = !isKnownLivePlatformProp && !isPgVerifiedLive && (
+      pSt === 'LIVE' || pLst === 'LIVE' || p.isPublished === true || p.isPlatformVerified === true ||
+      pSt === 'APPROVED' || pLst === 'APPROVED' || p.verificationStatus === 'Platform Verified'
+    );
+
+    const isAdminDeleted = isRecordedAdminDeleted || isUnverifiedZombie;
 
     if (pId || normTitle) {
       let existingKey = pId;

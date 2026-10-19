@@ -91,4 +91,21 @@ test('Admin Property Deletion & Public Visibility Suite', async (t) => {
     assert.strictEqual(isPropertyDeleted(livePlot), false);
     assert.strictEqual(isPropertyPubliclyVisible(livePlot), true);
   });
+
+  await t.test('5. Multi-user dashboard properties deleted by admin are detected and filtered', () => {
+    storageMock.set('easeland_admin_deleted_properties', JSON.stringify([
+      { id: 'userB-prop-123', referenceId: 'EL-PROP-123', title: 'User B Beachfront Villa' }
+    ]));
+
+    const userBProp = {
+      id: 'EL-PROP-123',
+      propertyId: '123',
+      title: 'User B Beachfront Villa',
+      status: 'LIVE',
+      isPlatformVerified: true
+    };
+
+    assert.strictEqual(isPropertyDeleted(userBProp), true);
+    assert.strictEqual(isPropertyPubliclyVisible(userBProp), false);
+  });
 });

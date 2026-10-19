@@ -19,9 +19,9 @@ export function isPropertyDeleted(p) {
       const pId1 = String(p.id || '').toLowerCase().trim();
       const pId2 = String(p.propertyId || '').toLowerCase().trim();
       const pId3 = String(p.referenceId || '').toLowerCase().trim();
-      const num1 = pId1.replace(/^(el-prop-|prop-)/, '');
-      const num2 = pId2.replace(/^(el-prop-|prop-)/, '');
-      const num3 = pId3.replace(/^(el-prop-|prop-)/, '');
+      const num1 = pId1.replace(/^(el-prop-|prop-)/i, '');
+      const num2 = pId2.replace(/^(el-prop-|prop-)/i, '');
+      const num3 = pId3.replace(/^(el-prop-|prop-)/i, '');
       const normTitle = String(p.title || '').toLowerCase().trim();
 
       const rawDel = localStorage.getItem('easeland_deleted_properties');
@@ -29,7 +29,7 @@ export function isPropertyDeleted(p) {
         const delArr = JSON.parse(rawDel);
         const isMatch = delArr.some(d => {
           const dStr = String(d || '').toLowerCase().trim();
-          const dNum = dStr.replace(/^(el-prop-|prop-)/, '');
+          const dNum = dStr.replace(/^(el-prop-|prop-)/i, '');
           return (
             (dStr && (dStr === pId1 || dStr === pId2 || dStr === pId3)) ||
             (dNum && ((num1 && dNum === num1) || (num2 && dNum === num2) || (num3 && dNum === num3))) ||
@@ -47,8 +47,9 @@ export function isPropertyDeleted(p) {
           const iId1 = String(item.id || '').toLowerCase().trim();
           const iId2 = String(item.propertyId || '').toLowerCase().trim();
           const iId3 = String(item.referenceId || '').toLowerCase().trim();
-          const iNum1 = iId1.replace(/^(el-prop-|prop-)/, '');
-          const iNum2 = iId2.replace(/^(el-prop-|prop-)/, '');
+          const iNum1 = iId1.replace(/^(el-prop-|prop-)/i, '');
+          const iNum2 = iId2.replace(/^(el-prop-|prop-)/i, '');
+          const iNum3 = iId3.replace(/^(el-prop-|prop-)/i, '');
           const iTitle = String(item.title || '').toLowerCase().trim();
           return (
             (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
@@ -56,6 +57,7 @@ export function isPropertyDeleted(p) {
             (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
             (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
             (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+            (iNum3 && ((num1 && iNum3 === num1) || (num2 && iNum3 === num2) || (num3 && iNum3 === num3))) ||
             (iTitle && normTitle && iTitle === normTitle)
           );
         });
