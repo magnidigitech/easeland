@@ -22,15 +22,25 @@ import { mockApi } from '../services/mockApi.js';
  */
 export async function syncPropertyToPostgres(propertyData) {
   try {
-    if (!propertyData || !propertyData.propertyId) return;
-    await fetch('/api/properties', {
+    if (!propertyData || (!propertyData.propertyId && !propertyData.id)) return null;
+    const payload = {
+      ...propertyData,
+      propertyId: propertyData.propertyId || propertyData.id,
+      id: propertyData.id || propertyData.propertyId
+    };
+    const res = await fetch('/api/properties', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(propertyData)
+      body: JSON.stringify(payload)
     });
+    if (res.ok) {
+      const data = await res.json();
+      return data?.property || payload;
+    }
   } catch (err) {
     console.warn('PostgreSQL sync note:', err);
   }
+  return null;
 }
 
 /**

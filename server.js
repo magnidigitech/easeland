@@ -127,44 +127,24 @@ try {
 
 function saveLocalProperty(p, existingOverride = null) {
   if (!p || (!p.propertyId && !p.id)) return;
-  const pId = p.propertyId || p.id;
+  const pId = String(p.propertyId || p.id).trim();
   const existing = existingOverride || localPropsMap.get(pId) || {};
 
   const existingStatusUpper = String(existing.status || existing.listing_status || existing.listingStatus || '').toUpperCase();
   const existingListingStatusUpper = String(existing.listing_status || existing.listingStatus || '').toUpperCase();
   const incomingStatusUpper = String(p.status || p.listing_status || p.listingStatus || '').toUpperCase();
 
-  const isExplicitPendingResubmit = (
-    incomingStatusUpper === 'PENDING_VERIFICATION' ||
-    incomingStatusUpper === 'UNDER_REVIEW'
-  ) && !p.isAlreadyLive && !p.hasPendingEdits && !p.pendingReauditData;
-
-  const existingIsNonLive = (
-    existingStatusUpper === 'CHANGES_REQUIRED' ||
-    existingStatusUpper === 'CHANGES_REQUESTED' ||
-    existingListingStatusUpper === 'CHANGES_REQUIRED' ||
-    existingListingStatusUpper === 'CHANGES_REQUESTED' ||
-    existingStatusUpper === 'REJECTED' ||
-    existingListingStatusUpper === 'REJECTED' ||
-    existingStatusUpper === 'DRAFT' ||
-    existingListingStatusUpper === 'DRAFT'
-  );
-
-  const isExistingLive = !isExplicitPendingResubmit && !existingIsNonLive && Boolean(
-    p.isAlreadyLive === true ||
-    existingStatusUpper === 'LIVE' ||
-    existingStatusUpper === 'APPROVED' ||
-    existingStatusUpper === 'APPROVED_LIVE' ||
-    existingListingStatusUpper === 'LIVE' ||
-    existingListingStatusUpper === 'APPROVED' ||
-    (existing.is_published === true && existing.isPlatformVerified === true) ||
-    (existing.isPublished === true && existing.isPlatformVerified === true)
-  );
-
-  const isAdminApproval = Boolean(
-    p.adminVerified === true ||
+  const isAdminAction = Boolean(
+    p.isAdmin === true ||
     p.isAdminApproval === true ||
-    (p.isPlatformVerified === true && p.hasPendingEdits === false && !p.pendingReauditData && !p.reAuditStatus && (p.verifiedBy || p.verificationNotes))
+    p.adminVerified === true ||
+    p.verifiedBy
+  );
+
+  const isExplicitDeleteByAdmin = Boolean(
+    p.deletedByAdmin === true ||
+    incomingStatusUpper === 'DELETED_BY_ADMIN' ||
+    existing.deletedByAdmin === true
   );
 
   const finalMedia = Array.isArray(p.media)
@@ -201,10 +181,33 @@ function saveLocalProperty(p, existingOverride = null) {
 
   let updated;
 
-  if (isExistingLive && !isAdminApproval) {
-    // The property is verified & LIVE. Incoming payload is an owner modification or draft step.
-    // Under NO circumstances overwrite root live approved details visible to public!
-    // Stage updates into pendingReauditData while keeping approved root fields intact.
+  // 1. Admin Deletion State
+  if (isExplicitDeleteByAdmin) {
+    updated = {
+      ...existing,
+      ...p,
+      propertyId: pId,
+      id: pId,
+      status: 'DELETED_BY_ADMIN',
+      listingStatus: 'DELETED_BY_ADMIN',
+      listing_status: 'DELETED_BY_ADMIN',
+      deletedByAdmin: true,
+      isDeleted: true,
+      isPublished: false,
+      is_published: false,
+      isPlatformVerified: false,
+      verificationStatus: 'Deleted by Admin',
+      adminFeedback: 'Notification: Deleted by Admin',
+      adminNotes: 'Deleted by Admin',
+      verificationNotes: 'Deleted by Admin',
+      media: cleanMedia,
+      photos: finalPhotos,
+      documents: cleanDocs,
+      updatedAt: new Date().toISOString()
+    };
+  }
+  // 2. Owner Draft Staging ONLY if explicitly specified via isOwnerDraftEdit on a verified LIVE property
+  else if (p.isOwnerDraftEdit === true && !isAdminAction && (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE')) {
     const incomingProposed = p.pendingReauditData || p.pendingEdits || p;
     const existingPending = existing.pendingReauditData || existing.pendingEdits || {};
     const cleanProposed = {};
@@ -227,7 +230,7 @@ function saveLocalProperty(p, existingOverride = null) {
     };
 
     updated = {
-      ...existing, // 100% retain live approved title, price, area, description, specs, location, etc.
+      ...existing,
       hasPendingEdits: true,
       reAuditStatus: 'PENDING_VERIFICATION',
       reAuditRequestedAt: existing.reAuditRequestedAt || new Date().toISOString(),
@@ -242,18 +245,53 @@ function saveLocalProperty(p, existingOverride = null) {
       documents: cleanDocs,
       updatedAt: new Date().toISOString()
     };
-  } else {
-    // New listing creation, re-submission after changes requested, or Admin approved verification
-    const isPendingResubmit = (
-      incomingStatusUpper === 'PENDING_VERIFICATION' ||
-      incomingStatusUpper === 'UNDER_REVIEW'
-    );
+  }
+  // 3. Direct Status Changes and Updates across all data fields
+  else {
+    let finalStatus = 'DRAFT';
+    let finalIsPublished = false;
+    let finalIsVerified = false;
+
+    if (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED' || p.isAdminApproval === true || p.adminVerified === true) {
+      finalStatus = 'LIVE';
+      finalIsPublished = true;
+      finalIsVerified = true;
+    } else if (incomingStatusUpper === 'CHANGES_REQUIRED' || incomingStatusUpper === 'CHANGES_REQUESTED') {
+      finalStatus = 'CHANGES_REQUIRED';
+      finalIsPublished = false;
+      finalIsVerified = false;
+    } else if (incomingStatusUpper === 'REJECTED') {
+      finalStatus = 'REJECTED';
+      finalIsPublished = false;
+      finalIsVerified = false;
+    } else if (incomingStatusUpper === 'PENDING_VERIFICATION' || incomingStatusUpper === 'UNDER_REVIEW' || incomingStatusUpper === 'UNDER_AUDIT') {
+      finalStatus = 'PENDING_VERIFICATION';
+      finalIsPublished = false;
+      finalIsVerified = false;
+    } else if (incomingStatusUpper) {
+      finalStatus = incomingStatusUpper;
+      finalIsPublished = Boolean(p.isPublished || p.is_published);
+      finalIsVerified = Boolean(p.isPlatformVerified);
+    } else if (existingStatusUpper) {
+      finalStatus = existingStatusUpper;
+      finalIsPublished = Boolean(existing.is_published || existing.isPublished);
+      finalIsVerified = Boolean(existing.isPlatformVerified);
+    }
 
     updated = {
       ...existing,
       ...p,
       propertyId: pId,
       id: pId,
+      status: finalStatus,
+      listingStatus: finalStatus,
+      listing_status: finalStatus,
+      isPublished: finalIsPublished,
+      is_published: finalIsPublished,
+      isPlatformVerified: finalIsVerified,
+      hasPendingEdits: (finalStatus === 'LIVE' || finalStatus === 'REJECTED' || finalStatus === 'CHANGES_REQUIRED') ? false : (p.hasPendingEdits ?? existing.hasPendingEdits ?? false),
+      pendingReauditData: (finalStatus === 'LIVE' || finalStatus === 'REJECTED' || finalStatus === 'CHANGES_REQUIRED') ? null : (p.pendingReauditData ?? existing.pendingReauditData ?? null),
+      reAuditStatus: (finalStatus === 'LIVE' || finalStatus === 'REJECTED' || finalStatus === 'CHANGES_REQUIRED') ? null : (p.reAuditStatus ?? existing.reAuditStatus ?? null),
       location: p.location || existing.location || null,
       boundary: p.boundary || p.ownerSubmittedBoundary || existing.boundary || existing.ownerSubmittedBoundary || null,
       ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || existing.ownerSubmittedBoundary || existing.boundary || null,
@@ -266,31 +304,14 @@ function saveLocalProperty(p, existingOverride = null) {
       updatedAt: new Date().toISOString()
     };
 
-    if (isPendingResubmit && !isAdminApproval) {
-      updated.status = 'PENDING_VERIFICATION';
-      updated.listingStatus = 'PENDING_VERIFICATION';
-      updated.listing_status = 'PENDING_VERIFICATION';
-      updated.verificationStatus = 'Pending Verification';
-      updated.isPublished = false;
-      updated.is_published = false;
-      updated.isPlatformVerified = false;
-      updated.hasPendingEdits = false;
-      updated.pendingReauditData = null;
-      updated.reAuditStatus = null;
-    }
-
-    if (isAdminApproval) {
-      updated.hasPendingEdits = false;
-      updated.reAuditStatus = null;
-      updated.pendingReauditData = null;
-      updated.pendingEdits = null;
-      updated.status = 'LIVE';
-      updated.listingStatus = 'LIVE';
-      updated.listing_status = 'LIVE';
-      updated.isPublished = true;
-      updated.is_published = true;
-      updated.isPlatformVerified = true;
+    if (finalStatus === 'LIVE') {
       updated.verificationStatus = 'Platform Verified';
+    } else if (finalStatus === 'CHANGES_REQUIRED') {
+      updated.verificationStatus = 'Changes Requested';
+    } else if (finalStatus === 'REJECTED') {
+      updated.verificationStatus = 'Rejected';
+    } else if (finalStatus === 'PENDING_VERIFICATION') {
+      updated.verificationStatus = 'Pending Verification';
     }
   }
 
@@ -769,38 +790,63 @@ app.get('/api/media/:mediaId', async (req, res) => {
 });
 
 // API Endpoint: Sync/Save property record to PostgreSQL DB + Local Disk (Zero Downtime)
-app.post('/api/properties', async (req, res) => {
+const handlePropertyUpsert = async (req, res) => {
   try {
     const p = req.body;
     if (!p || (!p.propertyId && !p.id)) {
       return res.status(400).json({ success: false, error: 'Property payload with propertyId is required.' });
     }
-    const pId = String(p.propertyId || p.id);
-    const refId = String(p.referenceId || ('EL-PROP-' + pId));
-    const pTitle = String(p.title || 'Untitled Property');
+    const pId = String(p.propertyId || p.id).trim();
+    const cleanNum = pId.replace(/^(el-prop-|prop-)/i, '').trim();
+    const refId = String(p.referenceId || ('EL-PROP-' + (cleanNum || pId))).trim();
+    const pTitle = String(p.title || 'Untitled Property').trim();
 
-    // 1. Check existing in PostgreSQL FIRST (Primary Database Source)
+    // 1. Query PostgreSQL FIRST for any existing record under all alias formats
     let existing = null;
+    let canonicalPropertyId = pId;
     try {
       const ph1 = String.fromCharCode(36) + '1';
       const ph2 = String.fromCharCode(36) + '2';
-      const pgCheck = await pgPool.query(
-        "SELECT raw_data FROM properties WHERE LOWER(property_id) = LOWER(" + ph1 + ") OR LOWER(reference_id) = LOWER(" + ph1 + ") OR LOWER(reference_id) = LOWER(" + ph2 + ") OR (LOWER(title) = LOWER(" + ph2 + ") AND " + ph2 + " <> '') LIMIT 1;",
-        [pId, refId]
-      );
-      if (pgCheck.rows.length > 0 && pgCheck.rows[0].raw_data) {
-        existing = pgCheck.rows[0].raw_data;
-      }
-    } catch (e) {}
+      const ph3 = String.fromCharCode(36) + '3';
+      const ph4 = String.fromCharCode(36) + '4';
 
-    if (!existing) {
-      existing = localPropsMap.get(pId) || {};
+      const pgCheck = await pgPool.query(
+        "SELECT property_id, reference_id, listing_status, is_published, raw_data FROM properties " +
+        "WHERE LOWER(property_id) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph2 + ") " +
+        "   OR LOWER(property_id) = LOWER(" + ph2 + ") " +
+        "   OR (" + ph3 + " <> '' AND LOWER(property_id) = LOWER(" + ph3 + ")) " +
+        "   OR (" + ph4 + " <> '' AND LOWER(title) = LOWER(" + ph4 + ")) " +
+        "LIMIT 1;",
+        [pId, refId, cleanNum, pTitle !== 'Untitled Property' ? pTitle : '']
+      );
+
+      if (pgCheck.rows.length > 0) {
+        canonicalPropertyId = pgCheck.rows[0].property_id || pId;
+        existing = pgCheck.rows[0].raw_data || {};
+        if (pgCheck.rows[0].listing_status) {
+          existing.listing_status = pgCheck.rows[0].listing_status;
+          existing.listingStatus = pgCheck.rows[0].listing_status;
+          existing.status = pgCheck.rows[0].listing_status;
+        }
+        if (pgCheck.rows[0].is_published !== null && pgCheck.rows[0].is_published !== undefined) {
+          existing.is_published = pgCheck.rows[0].is_published;
+          existing.isPublished = pgCheck.rows[0].is_published;
+        }
+      }
+    } catch (pgCheckErr) {
+      console.warn('PostgreSQL property lookup note:', pgCheckErr.message);
     }
 
-    // Compute updated property object
-    const savedLocal = saveLocalProperty(p, existing);
+    if (!existing) {
+      existing = localPropsMap.get(pId) || localPropsMap.get(canonicalPropertyId) || {};
+    }
 
-    // 2. ALWAYS Save to PostgreSQL FIRST
+    // Save and compute updated representation
+    const savedLocal = saveLocalProperty({ ...p, propertyId: canonicalPropertyId, id: canonicalPropertyId }, existing);
+
+    // 2. ALWAYS Save to PostgreSQL FIRST (Authoritative Primary Storage)
     try {
       const ph1 = String.fromCharCode(36) + '1';
       const ph2 = String.fromCharCode(36) + '2';
@@ -841,9 +887,12 @@ app.post('/api/properties', async (req, res) => {
         "  raw_data = EXCLUDED.raw_data, " +
         "  updated_at = NOW();";
 
+      const finalStatus = savedLocal.listing_status || savedLocal.listingStatus || savedLocal.status || 'DRAFT';
+      const finalIsPublished = Boolean(savedLocal.is_published !== undefined ? savedLocal.is_published : savedLocal.isPublished);
+
       const values = [
-        savedLocal.propertyId || savedLocal.id,
-        savedLocal.referenceId || null,
+        canonicalPropertyId,
+        savedLocal.referenceId || refId,
         savedLocal.ownerId || null,
         savedLocal.title || 'Untitled Property',
         savedLocal.propertyType || null,
@@ -854,8 +903,8 @@ app.post('/api/properties', async (req, res) => {
         JSON.stringify(savedLocal.specs || {}),
         JSON.stringify(savedLocal.amenities || []),
         JSON.stringify(savedLocal.media || []),
-        savedLocal.listingStatus || 'DRAFT',
-        Boolean(savedLocal.isPublished),
+        finalStatus,
+        finalIsPublished,
         JSON.stringify(savedLocal)
       ];
 
@@ -869,25 +918,35 @@ app.post('/api/properties', async (req, res) => {
     console.error('Property save handler note:', err.message);
     return res.json({ success: true, message: 'Property saved locally.' });
   }
-});
+};
+
+app.post('/api/properties', handlePropertyUpsert);
 
 // Also support PUT & PATCH for RESTful updates
 app.put('/api/properties/:id', (req, res) => {
   req.body = req.body || {};
-  req.body.propertyId = req.params.id;
-  return app._router.handle(req, res);
+  req.body.propertyId = req.params.id || req.body.propertyId || req.body.id;
+  return handlePropertyUpsert(req, res);
 });
 
-// API Endpoint: Get all property records (PostgreSQL Primary + Local Disk Store Fallback)
+app.patch('/api/properties/:id', (req, res) => {
+  req.body = req.body || {};
+  req.body.propertyId = req.params.id || req.body.propertyId || req.body.id;
+  return handlePropertyUpsert(req, res);
+});
+
+// API Endpoint: Get all property records (PostgreSQL Primary Authoritative Source + Local Disk Store Fallback)
 app.get('/api/properties', async (req, res) => {
   try {
     const isPublicOnly = req.query.publicOnly === 'true' || req.query.public === 'true';
     let pgProperties = [];
+    let pgConnected = false;
 
     try {
       const result = await pgPool.query(
         'SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at FROM properties ORDER BY updated_at DESC;'
       );
+      pgConnected = true;
       pgProperties = result.rows.map(row => {
         const raw = row.raw_data || {};
         const listingStatus = row.listing_status || raw.listing_status || raw.listingStatus || 'DRAFT';
@@ -919,31 +978,24 @@ app.get('/api/properties', async (req, res) => {
           adminFeedback: isAdminDeleted ? 'Notification: Deleted by Admin' : (raw.adminFeedback || raw.verificationNotes || raw.adminNotes)
         };
       }).filter(Boolean);
+
+      // Keep localPropsMap synchronized with PostgreSQL records
+      pgProperties.forEach(p => {
+        if (p && (p.propertyId || p.id)) {
+          localPropsMap.set(p.propertyId || p.id, p);
+        }
+      });
     } catch (pgErr) {
       console.warn('PostgreSQL fetch note (Serving local disk store fallback):', pgErr.message);
     }
 
-    const localList = getLocalProperties();
-    const mergedMap = new Map();
-
-    // 1. Seed from localList first
-    localList.forEach(p => {
-      if (p && (p.propertyId || p.id)) {
-        const pId = String(p.propertyId || p.id);
-        mergedMap.set(pId, p);
-      }
-    });
-
-    // 2. Overlay with PostgreSQL (PostgreSQL is Authoritative Primary Source)
-    pgProperties.forEach(p => {
-      if (p && (p.propertyId || p.id)) {
-        const pId = String(p.propertyId || p.id);
-        const localItem = mergedMap.get(pId) || {};
-        mergedMap.set(pId, { ...localItem, ...p });
-      }
-    });
-
-    let properties = Array.from(mergedMap.values());
+    let properties = [];
+    if (pgConnected) {
+      // PostgreSQL is Authoritative Primary Source
+      properties = pgProperties;
+    } else {
+      properties = getLocalProperties();
+    }
 
     if (isPublicOnly) {
       properties = properties.filter(p => {
@@ -958,6 +1010,96 @@ app.get('/api/properties', async (req, res) => {
     return res.json({ success: true, properties });
   } catch (err) {
     return res.json({ success: true, properties: getLocalProperties() });
+  }
+});
+
+// API Endpoint: Get single property record by ID (PostgreSQL Primary + Local Disk Store Fallback)
+app.get('/api/properties/:id', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    if (!targetId) {
+      return res.status(400).json({ success: false, error: 'Property ID is required.' });
+    }
+    const tLower = targetId.toLowerCase().trim();
+    const cleanNum = tLower.replace(/^(el-prop-|prop-)/i, '').trim();
+    const refWithPrefix = cleanNum ? ('el-prop-' + cleanNum) : '';
+    const propWithPrefix = cleanNum ? ('prop-' + cleanNum) : '';
+
+    // 1. Check PostgreSQL FIRST
+    try {
+      const ph1 = String.fromCharCode(36) + '1';
+      const ph2 = String.fromCharCode(36) + '2';
+      const ph3 = String.fromCharCode(36) + '3';
+      const result = await pgPool.query(
+        "SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at " +
+        "FROM properties " +
+        "WHERE LOWER(property_id) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph1 + ") " +
+        "   OR (" + ph2 + " <> '' AND (LOWER(property_id) = LOWER(" + ph2 + ") OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph2 + "))) " +
+        "   OR (" + ph3 + " <> '' AND (LOWER(property_id) = LOWER(" + ph3 + ") OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph3 + "))) " +
+        "   OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph1 + ") " +
+        "LIMIT 1;",
+        [tLower, cleanNum, refWithPrefix || propWithPrefix]
+      );
+
+      if (result.rows.length > 0) {
+        const row = result.rows[0];
+        const raw = row.raw_data || {};
+        const listingStatus = row.listing_status || raw.listing_status || raw.listingStatus || 'DRAFT';
+        const isPublished = row.is_published !== null && row.is_published !== undefined ? Boolean(row.is_published) : Boolean(raw.is_published || raw.isPublished);
+        const isAdminDeleted = listingStatus === 'DELETED_BY_ADMIN' || raw.status === 'DELETED_BY_ADMIN' || raw.deletedByAdmin === true;
+
+        const property = {
+          ...raw,
+          propertyId: row.property_id || raw.propertyId || raw.id,
+          id: row.property_id || raw.id || raw.propertyId,
+          referenceId: row.reference_id || raw.referenceId,
+          ownerId: row.owner_id || raw.ownerId,
+          title: row.title || raw.title,
+          propertyType: row.property_type || raw.propertyType,
+          purpose: row.purpose || raw.purpose,
+          price: row.price !== null ? Number(row.price) : raw.price,
+          area: row.area !== null ? Number(row.area) : raw.area,
+          location: row.location || raw.location,
+          specs: row.specs || raw.specs,
+          amenities: row.amenities || raw.amenities,
+          media: row.media || raw.media,
+          listing_status: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
+          listingStatus: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
+          status: isAdminDeleted ? 'DELETED_BY_ADMIN' : (raw.status || listingStatus),
+          deletedByAdmin: Boolean(isAdminDeleted),
+          isDeleted: Boolean(isAdminDeleted || raw.isDeleted),
+          is_published: isAdminDeleted ? false : isPublished,
+          isPublished: isAdminDeleted ? false : isPublished,
+          adminFeedback: isAdminDeleted ? 'Notification: Deleted by Admin' : (raw.adminFeedback || raw.verificationNotes || raw.adminNotes)
+        };
+
+        // Cache into localPropsMap
+        localPropsMap.set(property.propertyId, property);
+        return res.json({ success: true, property });
+      }
+    } catch (pgErr) {
+      console.warn('PostgreSQL single property fetch note:', pgErr.message);
+    }
+
+    // 2. Check Local Store
+    const allAliases = new Set([tLower, cleanNum, refWithPrefix, propWithPrefix].filter(Boolean));
+    for (const [k, v] of localPropsMap.entries()) {
+      const kLow = String(k).toLowerCase().trim();
+      const vId = String(v.id || '').toLowerCase().trim();
+      const vPropId = String(v.propertyId || '').toLowerCase().trim();
+      const vRefId = String(v.referenceId || '').toLowerCase().trim();
+      if (allAliases.has(kLow) || allAliases.has(vId) || allAliases.has(vPropId) || allAliases.has(vRefId)) {
+        return res.json({ success: true, property: v });
+      }
+    }
+
+    return res.status(404).json({ success: false, error: 'Property not found' });
+  } catch (err) {
+    console.error('Get single property error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

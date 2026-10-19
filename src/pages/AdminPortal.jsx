@@ -618,7 +618,17 @@ export default function AdminPortal({ onNavigate }) {
 
       const queueMap = new Map();
 
-      [...localProps, ...firebaseProps, ...postgresProps].forEach(p => {
+      // 1. Seed fallback from local and firebase props
+      [...localProps, ...firebaseProps].forEach(p => {
+        if (!p || typeof p !== 'object') return;
+        const pId = String(p.id || p.propertyId || p.referenceId || '');
+        if (pId) {
+          queueMap.set(pId, { ...p, id: pId, propertyId: pId });
+        }
+      });
+
+      // 2. Authoritative PostgreSQL properties overlay: PostgreSQL ALWAYS takes precedence!
+      postgresProps.forEach(p => {
         if (!p || typeof p !== 'object') return;
         const pId = String(p.id || p.propertyId || p.referenceId || '');
         if (pId) {
@@ -626,65 +636,33 @@ export default function AdminPortal({ onNavigate }) {
           const mergedMedia = [
             ...(Array.isArray(prev.media) ? prev.media : []),
             ...(Array.isArray(p.media) ? p.media : []),
-            ...(Array.isArray(p.photos) ? p.photos : []),
-            ...(Array.isArray(p.publicApprovedMedia) ? p.publicApprovedMedia : [])
+            ...(Array.isArray(p.photos) ? p.photos : [])
           ];
           const mergedDocs = [
             ...(Array.isArray(prev.documents) ? prev.documents : []),
             ...(Array.isArray(p.documents) ? p.documents : []),
-            ...(Array.isArray(p.propertyDocuments) ? p.propertyDocuments : []),
-            ...(Array.isArray(p.confidentialDocuments) ? p.confidentialDocuments : [])
+            ...(Array.isArray(p.propertyDocuments) ? p.propertyDocuments : [])
           ];
-
-          // Re-audit edits preservation across all sources
-          const hasPendingEdits = Boolean(
-            p.hasPendingEdits === true ||
-            prev.hasPendingEdits === true ||
-            Boolean(p.pendingReauditData) ||
-            Boolean(prev.pendingReauditData)
-          );
-          const pendingReauditData = p.pendingReauditData || prev.pendingReauditData || null;
-          const reAuditStatus = (
-            p.reAuditStatus ||
-            prev.reAuditStatus ||
-            (hasPendingEdits ? 'PENDING_VERIFICATION' : null)
-          );
-
-          const prevSt = String(prev.status || prev.listingStatus || '').toUpperCase();
-          const pSt = String(p.status || p.listingStatus || '').toUpperCase();
-          const prevTime = new Date(prev.updatedAt || 0).getTime();
-          const pTime = new Date(p.updatedAt || 0).getTime();
-
-          let finalStatus = p.status || prev.status || pSt || prevSt;
-          let finalListingStatus = p.listingStatus || prev.listingStatus || pSt || prevSt;
-
-          // If a property was explicitly resubmitted for verification (PENDING_VERIFICATION or UNDER_REVIEW),
-          // it must supersede any older CHANGES_REQUIRED, REJECTED, or DRAFT status!
-          if (pSt === 'PENDING_VERIFICATION' || pSt === 'UNDER_REVIEW') {
-            finalStatus = pSt;
-            finalListingStatus = pSt;
-          } else if (prevSt === 'PENDING_VERIFICATION' || prevSt === 'UNDER_REVIEW') {
-            if (pSt === 'CHANGES_REQUIRED' || pSt === 'REJECTED' || pSt === 'DRAFT') {
-              if (prevTime >= pTime) {
-                finalStatus = prevSt;
-                finalListingStatus = prevSt;
-              }
-            }
-          }
 
           queueMap.set(pId, {
             ...prev,
             ...p,
             id: pId,
             propertyId: pId,
-            status: finalStatus,
-            listingStatus: finalListingStatus,
-            hasPendingEdits,
-            pendingReauditData,
-            reAuditStatus,
-            media: mergedMedia.length > 0 ? mergedMedia : (p.media || prev.media || []),
+            status: p.status || p.listingStatus || prev.status,
+            listingStatus: p.listingStatus || p.status || prev.listingStatus,
+            listing_status: p.listing_status || p.listingStatus || p.status || prev.listing_status,
+            isPublished: Boolean(p.isPublished || p.is_published),
+            is_published: Boolean(p.is_published || p.isPublished),
+            isPlatformVerified: Boolean(p.isPlatformVerified),
+            hasPendingEdits: Boolean(p.hasPendingEdits),
+            pendingReauditData: p.pendingReauditData || null,
+            reAuditStatus: p.reAuditStatus || null,
+            deletedByAdmin: Boolean(p.deletedByAdmin || p.status === 'DELETED_BY_ADMIN' || p.listingStatus === 'DELETED_BY_ADMIN'),
+            isDeleted: Boolean(p.isDeleted || p.deletedByAdmin || p.status === 'DELETED_BY_ADMIN'),
+            media: (Array.isArray(p.media) && p.media.length > 0) ? p.media : (mergedMedia.length > 0 ? mergedMedia : prev.media || []),
             photos: (Array.isArray(p.photos) && p.photos.length > 0) ? p.photos : (prev.photos || []),
-            documents: mergedDocs.length > 0 ? mergedDocs : (p.documents || prev.documents || []),
+            documents: (Array.isArray(p.documents) && p.documents.length > 0) ? p.documents : (mergedDocs.length > 0 ? mergedDocs : prev.documents || []),
             videoUrl: p.videoUrl || prev.videoUrl || null,
             videoLink: p.videoLink || prev.videoLink || null,
             embeddedVideoUrl: p.embeddedVideoUrl || prev.embeddedVideoUrl || null,
@@ -1334,17 +1312,7 @@ export default function AdminPortal({ onNavigate }) {
       const adminName = user?.displayName || 'EaseLand Auditor';
       const note = feedbackNote || 'Verified & Approved by EaseLand Senior Admin Auditor.';
 
-      // 1. Cloud Firestore update
-      try {
-        await approvePropertyVerification(propId, adminUid, adminName, note);
-      } catch (e1) { }
-
-      // 2. Mock API memory store update
-      if (typeof mockApi.approvePropertyAdmin === 'function') {
-        mockApi.approvePropertyAdmin(propId, note);
-      }
-
-      // 3. PostgreSQL database sync (/api/properties)
+      // 1. PostgreSQL database save FIRST (Authoritative Primary Source)
       const pendingEdits = selectedProperty?.pendingReauditData || selectedProperty?.pendingEdits || {};
       const payload = {
         ...(selectedProperty || {}),
@@ -1356,9 +1324,14 @@ export default function AdminPortal({ onNavigate }) {
         pendingReauditData: null,
         pendingEdits: null,
         listingStatus: 'LIVE',
+        listing_status: 'LIVE',
         status: 'LIVE',
         isPlatformVerified: true,
         isPublished: true,
+        is_published: true,
+        isAdmin: true,
+        isAdminApproval: true,
+        adminVerified: true,
         verifiedDate: new Date().toISOString(),
         verificationNotes: note,
         verificationStatus: 'Platform Verified'
@@ -1370,6 +1343,16 @@ export default function AdminPortal({ onNavigate }) {
           body: JSON.stringify(payload)
         });
       } catch (pgErr) { }
+
+      // 2. Cloud Firestore update
+      try {
+        await approvePropertyVerification(propId, adminUid, adminName, note);
+      } catch (e1) { }
+
+      // 3. Mock API memory store update
+      if (typeof mockApi.approvePropertyAdmin === 'function') {
+        mockApi.approvePropertyAdmin(propId, note);
+      }
 
       // 4. LocalStorage update across all storage arrays
       try {
@@ -1483,14 +1466,7 @@ export default function AdminPortal({ onNavigate }) {
       const adminName = user?.displayName || 'EaseLand Auditor';
       const note = feedbackNote || 'Proposed modifications rejected by Admin auditor. The previously approved listing details remain live.';
 
-      try {
-        await rejectPropertyEdits(propId, adminUid, adminName, note);
-      } catch (e1) { }
-
-      if (typeof mockApi.rejectPropertyEditsAdmin === 'function') {
-        mockApi.rejectPropertyEditsAdmin(propId, note);
-      }
-
+      // 1. PostgreSQL Authoritative Update FIRST
       const payload = {
         ...(selectedProperty || {}),
         propertyId: propId,
@@ -1500,9 +1476,12 @@ export default function AdminPortal({ onNavigate }) {
         pendingReauditData: null,
         pendingEdits: null,
         listingStatus: 'LIVE',
+        listing_status: 'LIVE',
         status: 'LIVE',
         isPlatformVerified: true,
         isPublished: true,
+        is_published: true,
+        isAdmin: true,
         verificationNotes: note,
         adminFeedback: note,
         ownerFacingNotes: note
@@ -1515,6 +1494,16 @@ export default function AdminPortal({ onNavigate }) {
           body: JSON.stringify(payload)
         });
       } catch (pgErr) { }
+
+      // 2. Cloud Firestore update
+      try {
+        await rejectPropertyEdits(propId, adminUid, adminName, note);
+      } catch (e1) { }
+
+      // 3. Mock API memory store update
+      if (typeof mockApi.rejectPropertyEditsAdmin === 'function') {
+        mockApi.rejectPropertyEditsAdmin(propId, note);
+      }
 
       try {
         if (typeof window !== 'undefined') {
@@ -1630,22 +1619,18 @@ export default function AdminPortal({ onNavigate }) {
       const adminName = user?.displayName || 'EaseLand Auditor';
       const note = feedbackNote;
 
-      try {
-        await rejectPropertyVerification(propId, adminUid, adminName, note);
-      } catch (e1) { }
-
-      if (typeof mockApi.rejectPropertyAdmin === 'function') {
-        mockApi.rejectPropertyAdmin(propId, note);
-      }
-
+      // 1. PostgreSQL Authoritative Rejection FIRST
       const payload = {
         ...(selectedProperty || {}),
         propertyId: propId,
         id: propId,
         listingStatus: 'REJECTED',
+        listing_status: 'REJECTED',
         status: 'REJECTED',
         isPlatformVerified: false,
         isPublished: false,
+        is_published: false,
+        isAdmin: true,
         verificationNotes: note,
         ownerFacingNotes: note,
         adminNotes: note,
@@ -1660,6 +1645,16 @@ export default function AdminPortal({ onNavigate }) {
           body: JSON.stringify(payload)
         });
       } catch (pgErr) { }
+
+      // 2. Cloud Firestore update
+      try {
+        await rejectPropertyVerification(propId, adminUid, adminName, note);
+      } catch (e1) { }
+
+      // 3. Mock API memory store update
+      if (typeof mockApi.rejectPropertyAdmin === 'function') {
+        mockApi.rejectPropertyAdmin(propId, note);
+      }
 
       try {
         if (typeof window !== 'undefined') {
@@ -1771,14 +1766,7 @@ export default function AdminPortal({ onNavigate }) {
       const adminName = user?.displayName || 'EaseLand Auditor';
       const note = feedbackNote;
 
-      try {
-        await requestVerificationChanges(propId, adminUid, adminName, note);
-      } catch (e1) { }
-
-      if (typeof mockApi.requestChangesAdmin === 'function') {
-        mockApi.requestChangesAdmin(propId, note);
-      }
-
+      // 1. PostgreSQL Authoritative Changes Requested Save FIRST
       const payload = {
         ...(selectedProperty || {}),
         propertyId: propId,
@@ -1789,6 +1777,7 @@ export default function AdminPortal({ onNavigate }) {
         isPublished: false,
         is_published: false,
         isPlatformVerified: false,
+        isAdmin: true,
         hasPendingEdits: false,
         pendingReauditData: null,
         reAuditStatus: null,
@@ -1805,6 +1794,16 @@ export default function AdminPortal({ onNavigate }) {
           body: JSON.stringify(payload)
         });
       } catch (pgErr) { }
+
+      // 2. Cloud Firestore update
+      try {
+        await requestVerificationChanges(propId, adminUid, adminName, note);
+      } catch (e1) { }
+
+      // 3. Mock API memory store update
+      if (typeof mockApi.requestChangesAdmin === 'function') {
+        mockApi.requestChangesAdmin(propId, note);
+      }
 
       try {
         if (typeof window !== 'undefined') {
