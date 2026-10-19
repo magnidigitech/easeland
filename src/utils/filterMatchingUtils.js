@@ -699,10 +699,16 @@ export function matchesSearchFilters(p, searchState = {}) {
 
   // 8. Bedrooms / BHK
   if (effectiveState.bedrooms && effectiveState.bedrooms !== 'ANY' && effectiveState.bedrooms !== 'ALL') {
-    const targetBhk = Number(effectiveState.bedrooms);
+    const rawTarget = String(effectiveState.bedrooms).trim();
+    const isPlus = rawTarget.includes('+');
+    const targetBhk = Number(rawTarget.replace('+', ''));
     if (!isNaN(targetBhk) && targetBhk > 0) {
-      const pBhk = Number(p.bedrooms || p.bhk || p.specifications?.bedrooms || 0);
-      if (pBhk < targetBhk) return false;
+      const pBhk = Number(p.bedrooms || p.bhk || p.specifications?.bedrooms || p.specs?.bedrooms || 0);
+      if (isPlus) {
+        if (pBhk < targetBhk) return false;
+      } else {
+        if (pBhk !== targetBhk) return false;
+      }
     }
   }
 

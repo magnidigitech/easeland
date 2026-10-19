@@ -665,7 +665,11 @@ export default function DynamicFilterPanel({
   const currentAreaUnit = filters.areaUnit || 'sq ft';
   if (filters.minArea || filters.minAreaSqFt) activeChips.push({ label: `Min Area: ${filters.minArea || filters.minAreaSqFt} ${currentAreaUnit}`, key: 'minArea', val: '' });
   if (filters.maxArea || filters.maxAreaSqFt) activeChips.push({ label: `Max Area: ${filters.maxArea || filters.maxAreaSqFt} ${currentAreaUnit}`, key: 'maxArea', val: '' });
-  if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY' && filters.bedrooms !== 'ALL') activeChips.push({ label: `BHK: ${filters.bedrooms}+`, key: 'bedrooms', val: '' });
+  if (!isPlotOrLand && filters.bedrooms && filters.bedrooms !== 'ANY' && filters.bedrooms !== 'ALL') {
+    const bhkStr = String(filters.bedrooms).trim();
+    const chipText = bhkStr === '4+' ? '4+ BHK' : `${bhkStr} BHK`;
+    activeChips.push({ label: chipText, key: 'bedrooms', val: '' });
+  }
   if (filters.facing && filters.facing !== 'ALL' && filters.facing !== 'ANY') {
     const matchedFacing = FACING_OPTIONS.find(o => o.value === filters.facing);
     const facingLabel = matchedFacing ? matchedFacing.label : String(filters.facing).replace(/_/g, ' ');
@@ -1442,20 +1446,32 @@ export default function DynamicFilterPanel({
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
               Bedrooms (BHK)
             </label>
-            <div className="grid grid-cols-5 gap-1">
-              {['', '1', '2', '3', '4'].map(bhk => (
-                <button
-                  key={bhk}
-                  type="button"
-                  onClick={() => handleChange('bedrooms', bhk)}
-                  className={`py-2 rounded-lg text-xs font-bold border transition-colors ${(filters.bedrooms === bhk || (!filters.bedrooms && bhk === ''))
-                      ? 'bg-brand-yellow border-brand-yellow text-brand-charcoal'
-                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                >
-                  {bhk === '' ? 'Any' : `${bhk}+`}
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { value: '', label: 'Any' },
+                { value: '1', label: '1 BHK' },
+                { value: '2', label: '2 BHK' },
+                { value: '3', label: '3 BHK' },
+                { value: '4', label: '4 BHK' },
+                { value: '4+', label: '4+ BHK' }
+              ].map(opt => {
+                const isSelected = (!filters.bedrooms || filters.bedrooms === 'ANY' || filters.bedrooms === 'ALL')
+                  ? opt.value === ''
+                  : String(filters.bedrooms) === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleChange('bedrooms', (filters.bedrooms === opt.value ? '' : opt.value))}
+                    className={`py-2 px-1 rounded-lg text-xs font-bold border transition-colors text-center ${isSelected
+                        ? 'bg-brand-yellow border-brand-yellow text-brand-charcoal shadow-xs'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                      }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

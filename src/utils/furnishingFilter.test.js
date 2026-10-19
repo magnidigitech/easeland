@@ -149,3 +149,42 @@ test('matchesSearchFilters matches properties by their actual furnishing and doe
   assert.strictEqual(matchesSearchFilters(apartmentWithoutFurnishing, semiFilter), false);
   assert.strictEqual(matchesSearchFilters(apartmentWithoutFurnishing, allFilter), true);
 });
+
+test('matchesSearchFilters correctly performs exact BHK matching for 1, 2, 3, 4 and threshold matching for 4+ BHK', () => {
+  const prop1Bhk = { id: 'b1', title: '1 BHK Cozy Flat', propertyType: 'APARTMENT', specs: { bedrooms: 1 } };
+  const prop2Bhk = { id: 'b2', title: '2 BHK Modern Apartment', propertyType: 'APARTMENT', specs: { bedrooms: 2 } };
+  const prop3Bhk = { id: 'b3', title: '3 BHK Spacious Flat', propertyType: 'APARTMENT', specs: { bedrooms: 3 } };
+  const prop4Bhk = { id: 'b4', title: '4 BHK Luxury Penthouse', propertyType: 'APARTMENT', specs: { bedrooms: 4 } };
+  const prop5Bhk = { id: 'b5', title: '5 BHK Grand Villa', propertyType: 'VILLA', specs: { bedrooms: 5 } };
+
+  // 1 BHK filter: only prop1Bhk matches
+  assert.strictEqual(matchesSearchFilters(prop1Bhk, { bedrooms: '1' }), true);
+  assert.strictEqual(matchesSearchFilters(prop2Bhk, { bedrooms: '1' }), false);
+  assert.strictEqual(matchesSearchFilters(prop3Bhk, { bedrooms: '1' }), false);
+
+  // 2 BHK filter: only prop2Bhk matches
+  assert.strictEqual(matchesSearchFilters(prop1Bhk, { bedrooms: '2' }), false);
+  assert.strictEqual(matchesSearchFilters(prop2Bhk, { bedrooms: '2' }), true);
+  assert.strictEqual(matchesSearchFilters(prop3Bhk, { bedrooms: '2' }), false);
+  assert.strictEqual(matchesSearchFilters(prop4Bhk, { bedrooms: '2' }), false);
+
+  // 3 BHK filter: only prop3Bhk matches
+  assert.strictEqual(matchesSearchFilters(prop2Bhk, { bedrooms: '3' }), false);
+  assert.strictEqual(matchesSearchFilters(prop3Bhk, { bedrooms: '3' }), true);
+  assert.strictEqual(matchesSearchFilters(prop4Bhk, { bedrooms: '3' }), false);
+
+  // 4 BHK filter: only prop4Bhk matches (exact)
+  assert.strictEqual(matchesSearchFilters(prop3Bhk, { bedrooms: '4' }), false);
+  assert.strictEqual(matchesSearchFilters(prop4Bhk, { bedrooms: '4' }), true);
+  assert.strictEqual(matchesSearchFilters(prop5Bhk, { bedrooms: '4' }), false);
+
+  // 4+ BHK filter: matches 4 BHK and 5 BHK (and above)
+  assert.strictEqual(matchesSearchFilters(prop3Bhk, { bedrooms: '4+' }), false);
+  assert.strictEqual(matchesSearchFilters(prop4Bhk, { bedrooms: '4+' }), true);
+  assert.strictEqual(matchesSearchFilters(prop5Bhk, { bedrooms: '4+' }), true);
+
+  // Any or empty filter: all match
+  assert.strictEqual(matchesSearchFilters(prop1Bhk, { bedrooms: '' }), true);
+  assert.strictEqual(matchesSearchFilters(prop2Bhk, { bedrooms: 'ANY' }), true);
+  assert.strictEqual(matchesSearchFilters(prop5Bhk, { bedrooms: 'ALL' }), true);
+});
