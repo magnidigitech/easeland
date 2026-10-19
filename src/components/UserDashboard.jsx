@@ -307,10 +307,16 @@ export default function UserDashboard({
 
   // Combine Firestore and database properties cleanly so user always sees live status updates
   let deletedIdsSet = new Set();
+  let adminDeletedList = [];
+  let userDismissedSet = new Set();
   try {
     if (typeof window !== 'undefined') {
       const rawDel = localStorage.getItem('easeland_deleted_properties');
-      if (rawDel) JSON.parse(rawDel).forEach(id => deletedIdsSet.add(String(id)));
+      if (rawDel) JSON.parse(rawDel).forEach(id => deletedIdsSet.add(String(id).toLowerCase().trim()));
+      const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties');
+      if (rawAdminDel) adminDeletedList = JSON.parse(rawAdminDel);
+      const rawDismissed = localStorage.getItem('easeland_user_dismissed_properties');
+      if (rawDismissed) JSON.parse(rawDismissed).forEach(id => userDismissedSet.add(String(id).toLowerCase().trim()));
     }
   } catch (e) {}
 
@@ -330,9 +336,61 @@ export default function UserDashboard({
     if (!isOwned) return;
 
     const pId = String(p.propertyId || p.id || p.referenceId || '');
+    const pId1 = String(p.id || '').toLowerCase().trim();
+    const pId2 = String(p.propertyId || '').toLowerCase().trim();
+    const pId3 = String(p.referenceId || '').toLowerCase().trim();
+    const num1 = pId1.replace(/^(el-prop-|prop-)/i, '');
+    const num2 = pId2.replace(/^(el-prop-|prop-)/i, '');
+    const num3 = pId3.replace(/^(el-prop-|prop-)/i, '');
     const normTitle = (p.title || '').toLowerCase().trim();
 
-    if ((pId || normTitle) && !deletedIdsSet.has(pId) && !p.isDeleted && p.listingStatus !== 'DELETED' && p.status !== 'DELETED') {
+    const isUserDismissed = Boolean(
+      userDismissedSet.has(pId1) ||
+      userDismissedSet.has(pId2) ||
+      userDismissedSet.has(pId3) ||
+      (num1 && userDismissedSet.has(num1)) ||
+      (num2 && userDismissedSet.has(num2)) ||
+      (normTitle && userDismissedSet.has(normTitle))
+    );
+    if (isUserDismissed) return;
+
+    const pSt = String(p.status || p.listingStatus || '').toUpperCase();
+    const pLst = String(p.listingStatus || '').toUpperCase();
+
+    // Check if property was deleted by Admin
+    const isAdminDeleted = Boolean(
+      p.deletedByAdmin === true ||
+      p.deletionType === 'ADMIN_DELETED' ||
+      pSt === 'DELETED_BY_ADMIN' ||
+      pLst === 'DELETED_BY_ADMIN' ||
+      adminDeletedList.some(item => {
+        if (!item) return false;
+        const iId1 = String(item.id || '').toLowerCase().trim();
+        const iId2 = String(item.propertyId || '').toLowerCase().trim();
+        const iId3 = String(item.referenceId || '').toLowerCase().trim();
+        const iNum1 = iId1.replace(/^(el-prop-|prop-)/i, '');
+        const iNum2 = iId2.replace(/^(el-prop-|prop-)/i, '');
+        const iTitle = String(item.title || '').toLowerCase().trim();
+        return (
+          (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
+          (iId2 && (iId2 === pId1 || iId2 === pId2 || iId2 === pId3)) ||
+          (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
+          (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
+          (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+          (iTitle && normTitle && iTitle === normTitle)
+        );
+      }) ||
+      (
+        deletedIdsSet.has(pId1) ||
+        deletedIdsSet.has(pId2) ||
+        deletedIdsSet.has(pId3) ||
+        (num1 && deletedIdsSet.has(num1)) ||
+        (num2 && deletedIdsSet.has(num2)) ||
+        (normTitle && deletedIdsSet.has(normTitle))
+      )
+    );
+
+    if (pId || normTitle) {
       let existingKey = pId;
       let existing = combinedPropsMap.get(pId);
 
@@ -347,8 +405,26 @@ export default function UserDashboard({
       }
       existing = existing || {};
 
-      const pSt = String(p.status || p.listingStatus || '').toUpperCase();
-      const pLst = String(p.listingStatus || '').toUpperCase();
+      if (isAdminDeleted) {
+        combinedPropsMap.set(existingKey || pId, {
+          ...existing,
+          ...p,
+          id: existing.id || p.id || p.propertyId,
+          propertyId: existing.propertyId || p.propertyId || p.id,
+          listingStatus: 'DELETED_BY_ADMIN',
+          status: 'DELETED_BY_ADMIN',
+          verificationStatus: 'Deleted by Admin',
+          deletedByAdmin: true,
+          isDeleted: true,
+          isPlatformVerified: false,
+          isPublished: false,
+          adminFeedback: 'Notification: Deleted by Admin',
+          adminNotes: 'Deleted by Admin',
+          verificationNotes: 'Deleted by Admin'
+        });
+        return;
+      }
+
       const isPending = (pSt === 'PENDING_VERIFICATION' || pLst === 'PENDING_VERIFICATION' || pSt === 'UNDER_REVIEW' || pLst === 'UNDER_REVIEW');
 
       const isLive = !isPending && Boolean(
@@ -408,14 +484,23 @@ export default function UserDashboard({
 
     const propSt = String(p.status || p.listingStatus || '').toUpperCase();
     const propLst = String(p.listingStatus || '').toUpperCase();
-    const isPendingAudit = propSt === 'PENDING_VERIFICATION' || propLst === 'PENDING_VERIFICATION' || propSt === 'UNDER_REVIEW' || propLst === 'UNDER_REVIEW';
 
-    const isLiveProp = !isPendingAudit && Boolean(
+    const isAdminDeleted = Boolean(
+      p.deletedByAdmin === true ||
+      p.status === 'DELETED_BY_ADMIN' ||
+      p.listingStatus === 'DELETED_BY_ADMIN'
+    );
+
+    const isPendingAudit = !isAdminDeleted && (propSt === 'PENDING_VERIFICATION' || propLst === 'PENDING_VERIFICATION' || propSt === 'UNDER_REVIEW' || propLst === 'UNDER_REVIEW');
+
+    const isLiveProp = !isAdminDeleted && !isPendingAudit && Boolean(
       p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
       p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
     );
 
-    const statusVal = isPendingAudit
+    const statusVal = isAdminDeleted
+      ? 'DELETED_BY_ADMIN'
+      : isPendingAudit
       ? 'PENDING_VERIFICATION'
       : isLiveProp
       ? 'LIVE'
@@ -426,7 +511,9 @@ export default function UserDashboard({
       : (p.status || p.listingStatus || 'DRAFT');
 
     let adminNoteVal = p.verificationNotes || p.ownerFacingNotes || p.adminNotes || p.adminFeedback || p.rejectionReason || p.notes || p.auditorNotes || p.feedback || p.rawProperty?.verificationNotes || p.rawProperty?.ownerFacingNotes || p.rawProperty?.adminNotes || p.rawProperty?.adminFeedback;
-    if (!adminNoteVal) {
+    if (isAdminDeleted) {
+      adminNoteVal = 'Notification: Deleted by Admin. This property listing was removed by an EaseLand Admin from the marketplace.';
+    } else if (!adminNoteVal) {
       if (statusVal === 'LIVE') adminNoteVal = 'Platform Verified: Title and survey documents verified.';
       else if (statusVal === 'REJECTED') adminNoteVal = 'Listing rejected by platform auditor.';
       else if (statusVal === 'CHANGES_REQUIRED') adminNoteVal = 'Document changes requested by auditor.';
@@ -445,8 +532,8 @@ export default function UserDashboard({
       facing: p.specs?.facing || p.facing || 'East',
       area: p.areaDisplay || `${p.area || 0} sq ft`,
       status: statusVal,
-      isPlatformVerified: Boolean(p.isPlatformVerified || statusVal === 'LIVE'),
-      isPublished: Boolean(p.isPublished || statusVal === 'LIVE'),
+      isPlatformVerified: !isAdminDeleted && Boolean(p.isPlatformVerified || statusVal === 'LIVE'),
+      isPublished: !isAdminDeleted && Boolean(p.isPublished || statusVal === 'LIVE'),
       adminNote: adminNoteVal,
       dateListed: p.createdAt ? (p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toISOString().split('T')[0] : (typeof p.createdAt === 'string' ? p.createdAt.split('T')[0] : 'Recent')) : 'Recent',
       views: p.views || 0,
@@ -481,13 +568,30 @@ export default function UserDashboard({
       } else if (actionType === 'ARCHIVE') {
         res = await archiveProperty(propId, uId);
       } else if (actionType === 'DELETE') {
-        if (!window.confirm("Are you sure you want to PERMANENTLY delete this property listing? This action cannot be undone.")) return;
+        const isAlreadyAdminDeleted = targetProp?.status === 'DELETED_BY_ADMIN' || targetProp?.deletedByAdmin === true;
+        const confirmMsg = isAlreadyAdminDeleted
+          ? "Remove this listing from your dashboard view?"
+          : "Are you sure you want to PERMANENTLY delete this property listing? This action cannot be undone.";
+        if (!window.confirm(confirmMsg)) return;
 
         const targetStr = String(propId);
+        const refStr = String(targetProp?.referenceId || '');
+        const titleStr = String(targetProp?.title || '');
 
-        // 1. Immediately record in easeland_deleted_properties to prevent re-hydration
+        // 1. Record in easeland_user_dismissed_properties and easeland_deleted_properties
         try {
           if (typeof window !== 'undefined') {
+            const rawDismissed = localStorage.getItem('easeland_user_dismissed_properties') || '[]';
+            const parsedDismissed = JSON.parse(rawDismissed);
+            [targetStr, refStr, titleStr].filter(Boolean).forEach(id => {
+              const lower = String(id).toLowerCase().trim();
+              if (!parsedDismissed.includes(lower)) parsedDismissed.push(lower);
+              const numOnly = lower.replace(/^(el-prop-|prop-)/i, '');
+              if (numOnly && !parsedDismissed.includes(numOnly)) parsedDismissed.push(numOnly);
+              if (numOnly && !parsedDismissed.includes('el-prop-' + numOnly)) parsedDismissed.push('el-prop-' + numOnly);
+            });
+            localStorage.setItem('easeland_user_dismissed_properties', JSON.stringify(parsedDismissed));
+
             const rawDel = localStorage.getItem('easeland_deleted_properties') || '[]';
             const parsedDel = JSON.parse(rawDel);
             if (!parsedDel.includes(targetStr)) {
@@ -500,13 +604,25 @@ export default function UserDashboard({
         // 2. Immediately update UI state for 0ms deletion feedback
         setFbOwnerProperties(prev => prev.filter(p => {
           if (!p) return false;
-          const id1 = String(p.id || '');
-          const id2 = String(p.propertyId || '');
-          const id3 = String(p.referenceId || '');
-          return id1 !== targetStr && id2 !== targetStr && id3 !== targetStr;
+          const id1 = String(p.id || '').toLowerCase().trim();
+          const id2 = String(p.propertyId || '').toLowerCase().trim();
+          const id3 = String(p.referenceId || '').toLowerCase().trim();
+          const pTitle = (p.title || '').toLowerCase().trim();
+          const tLower = targetStr.toLowerCase().trim();
+          return id1 !== tLower && id2 !== tLower && id3 !== tLower && (!titleStr || pTitle !== titleStr.toLowerCase().trim());
         }));
 
-        res = await deletePropertyListing(propId, uId, false);
+        setMyPropertiesList(prev => prev.filter(p => {
+          if (!p) return false;
+          const id1 = String(p.id || '').toLowerCase().trim();
+          const id2 = String(p.propertyId || '').toLowerCase().trim();
+          const id3 = String(p.referenceId || '').toLowerCase().trim();
+          const pTitle = (p.title || '').toLowerCase().trim();
+          const tLower = targetStr.toLowerCase().trim();
+          return id1 !== tLower && id2 !== tLower && id3 !== tLower && (!titleStr || pTitle !== titleStr.toLowerCase().trim());
+        }));
+
+        res = await deletePropertyListing(propId, uId, false, targetProp);
       }
 
       if (res && res.success) {
@@ -940,7 +1056,7 @@ export default function UserDashboard({
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Verified Live</span>
                       <span className="text-2xl font-black text-emerald-600 mt-1 block">
-                        {userProperties.filter(p => p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished).length}
+                        {userProperties.filter(p => (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished) && p.status !== 'DELETED_BY_ADMIN').length}
                       </span>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
@@ -998,69 +1114,96 @@ export default function UserDashboard({
                   </div>
 
                   <div className="divide-y divide-gray-100">
-                    {userProperties.map((prop) => (
-                      <div
-                        key={prop.id}
-                        onClick={() => onNavigate && onNavigate('property/' + (prop.propertyId || prop.id))}
-                        className="py-4 px-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition-all rounded-xl border border-transparent hover:border-gray-200/80 group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <img
-                            src={getFirstUploadedImage(prop)}
-                            alt={prop.title}
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = getCategoryFallbackImage(prop);
-                            }}
-                            className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"
-                          />
-                          <div>
-                            <h3 className="font-extrabold text-sm text-brand-charcoal group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
-                              <span>{prop.title}</span>
-                              <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700" />
-                            </h3>
-                            <p className="text-xs text-gray-500 font-medium flex items-center gap-2 mt-0.5">
-                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                              <span>{prop.location}</span>
-                              <span>•</span>
-                              <span className="font-bold text-emerald-700">{prop.price}</span>
-                            </p>
+                    {userProperties.map((prop) => {
+                      const isDeletedByAdmin = prop.status === 'DELETED_BY_ADMIN';
+                      return (
+                        <div
+                          key={prop.id}
+                          onClick={() => {
+                            if (!isDeletedByAdmin) {
+                              onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
+                            }
+                          }}
+                          className={`py-4 px-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all rounded-xl border ${
+                            isDeletedByAdmin
+                              ? 'bg-red-50/20 border-red-200'
+                              : 'cursor-pointer hover:bg-slate-50/80 border-transparent hover:border-gray-200/80 group'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="relative">
+                              <img
+                                src={getFirstUploadedImage(prop)}
+                                alt={prop.title}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getCategoryFallbackImage(prop);
+                                }}
+                                className={`w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-60' : 'group-hover:scale-105 transition-transform'}`}
+                              />
+                              {isDeletedByAdmin && (
+                                <div className="absolute inset-0 bg-red-950/40 rounded-xl flex items-center justify-center">
+                                  <XCircle className="w-6 h-6 text-red-300" />
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <h3 className={`font-extrabold text-sm flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
+                                <span>{prop.title}</span>
+                                {!isDeletedByAdmin && <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700" />}
+                              </h3>
+                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+                                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                                <span>{prop.location}</span>
+                                <span>•</span>
+                                <span className={`font-bold ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-emerald-700'}`}>{prop.price}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {isDeletedByAdmin ? (
+                              <span className="bg-red-100 text-red-800 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-red-300">
+                                <XCircle className="w-3 h-3 text-red-600" />
+                                Deleted by Admin
+                              </span>
+                            ) : (prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) ? (
+                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                Live & Verified
+                              </span>
+                            ) : !(prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') ? (
+                              <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-blue-600" />
+                                Under Review
+                              </span>
+                            ) : prop.status === 'CHANGES_REQUIRED' ? (
+                              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                Action Required
+                              </span>
+                            ) : null}
+
+                            {!isDeletedByAdmin ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
+                                }}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-brand-charcoal hover:text-brand-yellow text-gray-800 text-xs font-bold rounded-lg flex items-center gap-1 transition-all shrink-0 cursor-pointer shadow-2xs"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View Listing</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2.5 py-1 rounded-lg border border-red-200">
+                                Removed
+                              </span>
+                            )}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-3">
-                          {(prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) && (
-                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              Live & Verified
-                            </span>
-                          )}
-                          {!(prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') && (
-                            <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-blue-600" />
-                              Under Review
-                            </span>
-                          )}
-                          {prop.status === 'CHANGES_REQUIRED' && (
-                            <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-600" />
-                              Action Required
-                            </span>
-                          )}
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
-                            }}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-brand-charcoal hover:text-brand-yellow text-gray-800 text-xs font-bold rounded-lg flex items-center gap-1 transition-all shrink-0 cursor-pointer shadow-2xs"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View Listing</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1108,12 +1251,13 @@ export default function UserDashboard({
                 {/* PROPERTY LIST CARDS WITH CANONICAL OWNER ACTIONS & ADMIN FEEDBACK BANNERS */}
                 {userProperties.filter(p => {
                   if (propertyFilter === 'ALL') return true;
-                  if (propertyFilter === 'LIVE') return p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished;
-                  if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED';
+                  if (p.status === 'DELETED_BY_ADMIN') return propertyFilter === 'SOLD_RENTED';
+                  if (propertyFilter === 'LIVE') return (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished) && p.status !== 'DELETED_BY_ADMIN';
+                  if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED' && p.status !== 'DELETED_BY_ADMIN';
                   if (propertyFilter === 'CHANGES_REQUIRED') return p.status === 'CHANGES_REQUIRED';
                   if (propertyFilter === 'UNAVAILABLE') return p.status === 'UNAVAILABLE';
                   if (propertyFilter === 'DRAFT') return p.status === 'DRAFT';
-                  if (propertyFilter === 'SOLD_RENTED') return ['SOLD', 'RENTED', 'ARCHIVED', 'REJECTED'].includes(p.status);
+                  if (propertyFilter === 'SOLD_RENTED') return ['SOLD', 'RENTED', 'ARCHIVED', 'REJECTED', 'DELETED_BY_ADMIN'].includes(p.status);
                   return true;
                 }).length === 0 ? (
                   <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm space-y-4">
@@ -1136,46 +1280,62 @@ export default function UserDashboard({
                   <div className="space-y-4">
                     {userProperties.filter(p => {
                       if (propertyFilter === 'ALL') return true;
-                      if (propertyFilter === 'LIVE') return p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished;
-                      if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED';
+                      if (p.status === 'DELETED_BY_ADMIN') return propertyFilter === 'SOLD_RENTED';
+                      if (propertyFilter === 'LIVE') return (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished) && p.status !== 'DELETED_BY_ADMIN';
+                      if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED' && p.status !== 'DELETED_BY_ADMIN';
                       if (propertyFilter === 'CHANGES_REQUIRED') return p.status === 'CHANGES_REQUIRED';
                       if (propertyFilter === 'UNAVAILABLE') return p.status === 'UNAVAILABLE';
                       if (propertyFilter === 'DRAFT') return p.status === 'DRAFT';
-                      if (propertyFilter === 'SOLD_RENTED') return ['SOLD', 'RENTED', 'ARCHIVED', 'REJECTED'].includes(p.status);
+                      if (propertyFilter === 'SOLD_RENTED') return ['SOLD', 'RENTED', 'ARCHIVED', 'REJECTED', 'DELETED_BY_ADMIN'].includes(p.status);
                       return true;
-                    }).map((prop) => (
-                      <div key={prop.id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
+                    }).map((prop) => {
+                      const isDeletedByAdmin = prop.status === 'DELETED_BY_ADMIN';
+                      return (
+                      <div key={prop.id} className={`rounded-2xl p-6 border shadow-sm space-y-4 transition-all ${
+                        isDeletedByAdmin ? 'bg-red-50/20 border-red-200' : 'bg-white border-gray-200'
+                      }`}>
 
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                           <div
-                            onClick={() => onNavigate && onNavigate('property/' + (prop.propertyId || prop.id))}
-                            className="flex items-center gap-4 cursor-pointer group"
+                            onClick={() => {
+                              if (!isDeletedByAdmin) {
+                                onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
+                              }
+                            }}
+                            className={`flex items-center gap-4 ${isDeletedByAdmin ? 'opacity-85' : 'cursor-pointer group'}`}
                           >
-                            <img
-                              src={getFirstUploadedImage(prop)}
-                              alt={prop.title}
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = getCategoryFallbackImage(prop);
-                              }}
-                              className="w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform"
-                            />
+                            <div className="relative flex-shrink-0">
+                              <img
+                                src={getFirstUploadedImage(prop)}
+                                alt={prop.title}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getCategoryFallbackImage(prop);
+                                }}
+                                className={`w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-60' : 'group-hover:scale-105 transition-transform'}`}
+                              />
+                              {isDeletedByAdmin && (
+                                <div className="absolute inset-0 bg-red-950/40 rounded-2xl flex items-center justify-center">
+                                  <XCircle className="w-8 h-8 text-red-300" />
+                                </div>
+                              )}
+                            </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-brand-yellow bg-brand-charcoal px-2.5 py-0.5 rounded-md">
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md ${isDeletedByAdmin ? 'text-gray-400 bg-gray-200 line-through' : 'text-brand-yellow bg-brand-charcoal'}`}>
                                   {prop.type}
                                 </span>
-                                <span className="text-xs font-semibold text-gray-500">• Ref: {prop.referenceId}</span>
+                                <span className={`text-xs font-semibold ${isDeletedByAdmin ? 'text-red-500 font-bold' : 'text-gray-500'}`}>• Ref: {prop.referenceId}</span>
                               </div>
-                              <h3 className="font-extrabold text-base text-brand-charcoal mt-1 group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
+                              <h3 className={`font-extrabold text-base mt-1 flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
                                 <span>{prop.title}</span>
-                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-amber-700" />
+                                {!isDeletedByAdmin && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-amber-700" />}
                               </h3>
-                              <p className="text-xs text-gray-500 font-medium flex items-center gap-2 mt-0.5">
+                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-gray-500'}`}>
                                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                                 <span>{prop.location}</span>
                                 <span>•</span>
-                                <span className="font-extrabold text-emerald-700 text-sm">{prop.price}</span>
+                                <span className={`font-extrabold text-sm ${isDeletedByAdmin ? 'line-through text-gray-400' : 'text-emerald-700'}`}>{prop.price}</span>
                                 <span>({prop.area})</span>
                               </p>
                             </div>
@@ -1183,7 +1343,12 @@ export default function UserDashboard({
 
                           {/* STATUS BADGE */}
                           <div>
-                            {prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW') ? (
+                            {isDeletedByAdmin ? (
+                              <span className="bg-red-100 text-red-800 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-red-300 shadow-xs">
+                                <XCircle className="w-4 h-4 text-red-600" />
+                                Deleted by Admin
+                              </span>
+                            ) : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW') ? (
                               <span className="bg-amber-100 text-amber-900 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-300 shadow-sm animate-pulse">
                                 <Clock className="w-4 h-4 text-amber-600" />
                                 Live (Re-Verification Pending)
@@ -1199,7 +1364,7 @@ export default function UserDashboard({
                                 Under Audit
                               </span>
                             ) : null}
-                            {!(prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
+                            {!isDeletedByAdmin && !(prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
                               <>
                                 {prop.status === 'CHANGES_REQUIRED' && (
                                   <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-200">
@@ -1251,28 +1416,39 @@ export default function UserDashboard({
                         {/* ADMIN FEEDBACK BANNER */}
                         <div className={
                           'p-4 rounded-xl border text-xs font-medium ' +
-                          (prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
-                            ? 'bg-amber-50 text-amber-950 border-amber-300 shadow-sm'
-                            : prop.status === 'CHANGES_REQUIRED'
-                              ? 'bg-amber-50 text-amber-900 border-amber-200'
-                              : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
-                                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                : 'bg-blue-50 text-blue-900 border-blue-200')
+                          (isDeletedByAdmin
+                            ? 'bg-red-50 text-red-950 border-red-300'
+                            : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
+                              ? 'bg-amber-50 text-amber-950 border-amber-300 shadow-sm'
+                              : prop.status === 'CHANGES_REQUIRED'
+                                ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
+                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                  : 'bg-blue-50 text-blue-900 border-blue-200')
                         }>
-                          <span className="font-extrabold uppercase tracking-wider block mb-1">
-                            Verification Status & Feedback:
-                          </span>
-                          <span>
-                            {prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
-                              ? 'Your recently modified details have been submitted for Admin Re-Audit. Your previously approved details remain active & LIVE to buyers on the marketplace without interruption. Once verified, the changes will automatically appear on the live listing.'
-                              : prop.adminNote || (
-                              (!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW'))
-                                ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
-                                : ((prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
-                                    ? 'Property audited and verified live on marketplace. Click "Edit Listing" anytime to update details (new changes will submit for re-audit while old details remain live).'
-                                    : 'Property draft created. Complete all steps to submit for verification.')
+                          <div className="flex items-center gap-1.5 font-black uppercase tracking-wider mb-1">
+                            {isDeletedByAdmin ? (
+                              <>
+                                <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                                <span className="text-red-700 font-extrabold">Notification: Deleted by Admin</span>
+                              </>
+                            ) : (
+                              <span>Verification Status & Feedback:</span>
                             )}
-                          </span>
+                          </div>
+                          <p className={isDeletedByAdmin ? 'text-red-800 font-medium' : ''}>
+                            {isDeletedByAdmin
+                              ? (prop.adminNote || 'Notification: Deleted by Admin. This property listing was removed from the marketplace by an EaseLand Admin.')
+                              : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
+                                ? 'Your recently modified details have been submitted for Admin Re-Audit. Your previously approved details remain active & LIVE to buyers on the marketplace without interruption. Once verified, the changes will automatically appear on the live listing.'
+                                : prop.adminNote || (
+                                (!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW'))
+                                  ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
+                                  : ((prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished)
+                                      ? 'Property audited and verified live on marketplace. Click "Edit Listing" anytime to update details (new changes will submit for re-audit while old details remain live).'
+                                      : 'Property draft created. Complete all steps to submit for verification.')
+                              )}
+                          </p>
                         </div>
 
                         {/* CARD FOOTER ACTIONS */}
@@ -1284,7 +1460,24 @@ export default function UserDashboard({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            {/* VIEW LISTING BUTTON */}
+                            {isDeletedByAdmin ? (
+                              <>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold border border-red-200">
+                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                  <span>Unlisted & Removed from Platform</span>
+                                </span>
+                                <button
+                                  onClick={() => handleOwnerPropertyAction('DELETE', prop)}
+                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm transition-colors cursor-pointer"
+                                  title="Remove from your dashboard view"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-white" />
+                                  <span>Remove from Dashboard</span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* VIEW LISTING BUTTON */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1416,11 +1609,14 @@ export default function UserDashboard({
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Delete Property</span>
                             </button>
-                          </div>
+                          </>
+                        )}
+                      </div>
                         </div>
 
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 )}
 

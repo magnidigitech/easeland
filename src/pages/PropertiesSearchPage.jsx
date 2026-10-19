@@ -17,8 +17,8 @@ import {
   MapPin, Map as MapIcon, List, RotateCcw, AlertCircle, Sparkles, Building, Loader2
 } from 'lucide-react';
 
-import { matchesSearchFilters, isPropertyPubliclyVisible } from '../utils/filterMatchingUtils.js';
-export { matchesSearchFilters, isPropertyPubliclyVisible };
+import { matchesSearchFilters, isPropertyPubliclyVisible, isPropertyDeleted } from '../utils/filterMatchingUtils.js';
+export { matchesSearchFilters, isPropertyPubliclyVisible, isPropertyDeleted };
 
 export default function PropertiesSearchPage({
   initialFilters = null,
@@ -123,7 +123,7 @@ export default function PropertiesSearchPage({
       const localData = mockApi.getPublicProperties(stateToUse) || [];
 
       // 3. Merge PostgreSQL + Firestore + LocalStorage properties and apply matchesSearchFilters
-      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData];
+      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p));
       setCandidateProperties(allCandidateProps);
 
       // Dynamically compute MIN and MAX price bounds from all candidate properties matching non-price filters
@@ -217,12 +217,14 @@ export default function PropertiesSearchPage({
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('easeland-property-approved', handlePropertyApproved);
     window.addEventListener('easeland-property-status-updated', handlePropertyApproved);
+    window.addEventListener('easeland-property-deleted', handlePropertyApproved);
     window.addEventListener('storage', handlePropertyApproved);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('easeland-property-approved', handlePropertyApproved);
       window.removeEventListener('easeland-property-status-updated', handlePropertyApproved);
+      window.removeEventListener('easeland-property-deleted', handlePropertyApproved);
       window.removeEventListener('storage', handlePropertyApproved);
     };
   }, [searchState, executeSearch]);

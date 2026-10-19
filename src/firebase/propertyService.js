@@ -500,13 +500,6 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
     if (!ownerId) return { success: false, error: 'Owner ID is required.' };
     let propertiesList = [];
 
-    let deletedIds = [];
-    try {
-      if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_properties');
-        if (rawDel) deletedIds = JSON.parse(rawDel);
-      }
-    } catch (e) {}
 
     // 1. Primary PostgreSQL database fetch (/api/properties)
     try {
@@ -540,6 +533,17 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       console.warn('Firestore getOwnerProperties note:', error);
     }
 
+    let deletedIds = [];
+    let adminDeletedList = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_properties');
+        if (rawDel) deletedIds = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+        const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties');
+        if (rawAdminDel) adminDeletedList = JSON.parse(rawAdminDel);
+      }
+    } catch (e) {}
+
     // Deduplicate and filter out deleted property IDs (by ID & title)
     const propMap = new Map();
     propertiesList.forEach(p => {
@@ -547,8 +551,56 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       const pId = String(p.id || p.propertyId || p.referenceId || '');
       const normTitle = (p.title || '').toLowerCase().trim();
       const pStatus = String(p.status || p.listingStatus || '').toUpperCase();
+      const pLst = String(p.listingStatus || '').toUpperCase();
 
-      if ((pId || normTitle) && !deletedIds.includes(pId) && pStatus !== 'DELETED') {
+      const pId1 = String(p.id || '').toLowerCase().trim();
+      const pId2 = String(p.propertyId || '').toLowerCase().trim();
+      const pId3 = String(p.referenceId || '').toLowerCase().trim();
+      const num1 = pId1.replace(/^(el-prop-|prop-)/i, '');
+      const num2 = pId2.replace(/^(el-prop-|prop-)/i, '');
+      const num3 = pId3.replace(/^(el-prop-|prop-)/i, '');
+
+      const isAdminDeleted = Boolean(
+        p.deletedByAdmin === true ||
+        pStatus === 'DELETED_BY_ADMIN' ||
+        pLst === 'DELETED_BY_ADMIN' ||
+        adminDeletedList.some(item => {
+          if (!item) return false;
+          const iId1 = String(item.id || '').toLowerCase().trim();
+          const iId2 = String(item.propertyId || '').toLowerCase().trim();
+          const iId3 = String(item.referenceId || '').toLowerCase().trim();
+          const iNum1 = iId1.replace(/^(el-prop-|prop-)/i, '');
+          const iNum2 = iId2.replace(/^(el-prop-|prop-)/i, '');
+          const iTitle = String(item.title || '').toLowerCase().trim();
+          return (
+            (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
+            (iId2 && (iId2 === pId1 || iId2 === pId2 || iId2 === pId3)) ||
+            (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
+            (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
+            (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+            (iTitle && normTitle && iTitle === normTitle)
+          );
+        })
+      );
+
+      const isUserDeleted = !isAdminDeleted && (
+        p.isDeleted === true ||
+        pStatus === 'DELETED' ||
+        pLst === 'DELETED' ||
+        deletedIds.some(d => {
+          const dStr = String(d || '').toLowerCase().trim();
+          const dNum = dStr.replace(/^(el-prop-|prop-)/i, '');
+          return (
+            (dStr && (dStr === pId1 || dStr === pId2 || dStr === pId3)) ||
+            (dNum && ((num1 && dNum === num1) || (num2 && dNum === num2) || (num3 && dNum === num3))) ||
+            (normTitle && dStr === normTitle)
+          );
+        })
+      );
+
+      if (isUserDeleted) return;
+
+      if (pId || normTitle) {
         let existingKey = pId;
         let existing = propMap.get(pId);
 
@@ -562,6 +614,26 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
           }
         }
         existing = existing || {};
+
+        if (isAdminDeleted) {
+          propMap.set(existingKey || pId, {
+            ...existing,
+            ...p,
+            id: existing.id || p.id || p.propertyId,
+            propertyId: existing.propertyId || p.propertyId || p.id,
+            status: 'DELETED_BY_ADMIN',
+            listingStatus: 'DELETED_BY_ADMIN',
+            verificationStatus: 'Deleted by Admin',
+            deletedByAdmin: true,
+            isDeleted: true,
+            isPlatformVerified: false,
+            isPublished: false,
+            adminFeedback: 'Notification: Deleted by Admin',
+            verificationNotes: 'Deleted by Admin',
+            adminNotes: 'Deleted by Admin'
+          });
+          return;
+        }
 
         const isLive = Boolean(
           p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' || p.status === 'APPROVED_LIVE' ||
@@ -1631,38 +1703,130 @@ export async function getPublicPropertyById(propertyId) {
 /**
  * Permanently Delete Property Listing (PostgreSQL + Firestore + Local Storage)
  */
-export async function deletePropertyListing(propertyId, ownerId = null, isAdmin = false) {
+export async function deletePropertyListing(propertyId, ownerId = null, isAdmin = false, propertyObj = null) {
   try {
-    if (!propertyId) return { success: false, error: 'Property ID is required.' };
-    const pIdStr = String(propertyId);
+    if (!propertyId && !propertyObj) return { success: false, error: 'Property ID is required.' };
+    const pIdStr = String(propertyId || propertyObj?.id || propertyObj?.propertyId || '');
+    const id2 = String(propertyObj?.propertyId || '');
+    const id3 = String(propertyObj?.referenceId || '');
+    const num1 = pIdStr.replace(/^(el-prop-|prop-)/i, '');
+    const num2 = id2.replace(/^(el-prop-|prop-)/i, '');
+    const num3 = id3.replace(/^(el-prop-|prop-)/i, '');
+    const normTitle = String(propertyObj?.title || '').toLowerCase().trim();
+
+    const allAliases = new Set([
+      pIdStr.toLowerCase(),
+      id2.toLowerCase(),
+      id3.toLowerCase(),
+      num1 ? `el-prop-${num1}`.toLowerCase() : '',
+      num1 ? `prop-${num1}`.toLowerCase() : '',
+      num1 ? num1.toLowerCase() : '',
+      num2 ? `el-prop-${num2}`.toLowerCase() : '',
+      num2 ? num2.toLowerCase() : '',
+      num3 ? `el-prop-${num3}`.toLowerCase() : '',
+      num3 ? num3.toLowerCase() : ''
+    ].filter(Boolean));
+
+    const matchesAlias = (p) => {
+      if (!p) return false;
+      const pid = String(p.id || '').toLowerCase().trim();
+      const ppid = String(p.propertyId || '').toLowerCase().trim();
+      const pref = String(p.referenceId || '').toLowerCase().trim();
+      const pnum = pid.replace(/^(el-prop-|prop-)/i, '');
+      const ptitle = String(p.title || '').toLowerCase().trim();
+
+      return (
+        allAliases.has(pid) ||
+        allAliases.has(ppid) ||
+        allAliases.has(pref) ||
+        (pnum && allAliases.has(pnum)) ||
+        (normTitle && ptitle && ptitle === normTitle)
+      );
+    };
 
     // 1. Record in localStorage deleted IDs list immediately
     if (typeof window !== 'undefined') {
       try {
         const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
         const parsedDeleted = JSON.parse(rawDeleted);
-        if (!parsedDeleted.includes(pIdStr)) {
-          parsedDeleted.push(pIdStr);
-          localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+        allAliases.forEach(alias => {
+          if (!parsedDeleted.includes(alias)) parsedDeleted.push(alias);
+        });
+        if (normTitle && !parsedDeleted.includes(normTitle)) parsedDeleted.push(normTitle);
+        localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+
+        if (isAdmin) {
+          const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties') || '[]';
+          const parsedAdminDel = JSON.parse(rawAdminDel);
+          const exists = parsedAdminDel.some(item => matchesAlias(item));
+          if (!exists) {
+            parsedAdminDel.push({
+              id: pIdStr,
+              propertyId: id2 || pIdStr,
+              referenceId: id3 || `EL-PROP-${num1 || pIdStr}`,
+              title: propertyObj?.title || '',
+              deletedByAdmin: true,
+              adminFeedback: 'Notification: Deleted by Admin',
+              adminNotes: 'Deleted by Admin',
+              deletedAt: new Date().toISOString()
+            });
+            localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(parsedAdminDel));
+          }
         }
 
         const rawLocal = localStorage.getItem('easeland_user_properties');
         if (rawLocal) {
           const parsed = JSON.parse(rawLocal);
-          const updated = parsed.filter(p => String(p.id || p.propertyId) !== pIdStr);
+          const updated = parsed.map(p => {
+            if (matchesAlias(p)) {
+              if (isAdmin) {
+                return {
+                  ...p,
+                  status: 'DELETED_BY_ADMIN',
+                  listingStatus: 'DELETED_BY_ADMIN',
+                  deletedByAdmin: true,
+                  isDeleted: true,
+                  isPublished: false,
+                  adminFeedback: 'Notification: Deleted by Admin',
+                  adminNotes: 'Deleted by Admin'
+                };
+              }
+              return null;
+            }
+            return p;
+          }).filter(Boolean);
           localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
         }
 
         const rawStored = localStorage.getItem('easeland_properties');
         if (rawStored) {
           const parsed = JSON.parse(rawStored);
-          const updated = parsed.filter(p => String(p.id || p.propertyId) !== pIdStr);
+          const updated = parsed.map(p => {
+            if (matchesAlias(p)) {
+              if (isAdmin) {
+                return {
+                  ...p,
+                  status: 'DELETED_BY_ADMIN',
+                  listingStatus: 'DELETED_BY_ADMIN',
+                  deletedByAdmin: true,
+                  isDeleted: true,
+                  isPublished: false,
+                  adminFeedback: 'Notification: Deleted by Admin',
+                  adminNotes: 'Deleted by Admin'
+                };
+              }
+              return null;
+            }
+            return p;
+          }).filter(Boolean);
           localStorage.setItem('easeland_properties', JSON.stringify(updated));
         }
 
-        localStorage.removeItem('easeland_media_' + pIdStr);
-        localStorage.removeItem('easeland_docs_' + pIdStr);
-        localStorage.removeItem('easeland_wizard_location_' + pIdStr);
+        allAliases.forEach(alias => {
+          localStorage.removeItem('easeland_media_' + alias);
+          localStorage.removeItem('easeland_docs_' + alias);
+          localStorage.removeItem('easeland_wizard_location_' + alias);
+        });
         localStorage.removeItem('easeland_wizard_location_guest');
         if (ownerId) {
           localStorage.removeItem('easeland_wizard_location_' + ownerId);
@@ -1672,7 +1836,7 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
           if (rawEditing) {
             try {
               const parsedEditing = JSON.parse(rawEditing);
-              if (String(parsedEditing?.id || parsedEditing?.propertyId || parsedEditing?.referenceId) === pIdStr) {
+              if (matchesAlias(parsedEditing)) {
                 sessionStorage.removeItem('easeland_editing_property');
               }
             } catch (e) {}
@@ -1683,22 +1847,42 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
 
     // 2. Call backend API DELETE /api/properties/:id
     try {
-      await fetch(`/api/properties/${propertyId}`, { method: 'DELETE' });
+      await fetch(`/api/properties/${encodeURIComponent(propertyId)}${isAdmin ? '?isAdmin=true' : ''}`, { method: 'DELETE' });
     } catch (e) {}
 
-    // 3. Remove from Firestore
+    // 3. Update or Remove from Firestore
     try {
       const propRef = doc(db, 'properties', propertyId);
-      await deleteDoc(propRef);
+      if (isAdmin) {
+        try {
+          await updateDoc(propRef, {
+            status: 'DELETED_BY_ADMIN',
+            listingStatus: 'DELETED_BY_ADMIN',
+            deletedByAdmin: true,
+            isDeleted: true,
+            isPublished: false,
+            adminFeedback: 'Notification: Deleted by Admin',
+            verificationNotes: 'Deleted by Admin'
+          });
+        } catch (updErr) {
+          await deleteDoc(propRef);
+        }
+      } else {
+        await deleteDoc(propRef);
+      }
     } catch (e) {}
 
-    // 4. Remove from mockApi
+    // 4. Remove/update in mockApi
     try {
       const { mockApi } = await import('../services/mockApi.js');
       if (typeof mockApi.deleteProperty === 'function') {
-        mockApi.deleteProperty(propertyId);
+        mockApi.deleteProperty(propertyId, propertyObj, isAdmin);
       }
     } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: pIdStr, isAdmin } }));
+    }
 
     return { success: true };
   } catch (error) {

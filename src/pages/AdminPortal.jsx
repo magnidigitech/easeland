@@ -1108,38 +1108,97 @@ export default function AdminPortal({ onNavigate }) {
     });
   }, [allProperties, allPropSearchQuery, allPropStatusFilter]);
 
-  const handleDeletePropertyFromAdmin = async (propId) => {
-    if (!propId) return;
+  const handleDeletePropertyFromAdmin = async (propId, propObj = null) => {
+    if (!propId && !propObj) return;
     const confirmDel = window.confirm('Are you sure you want to permanently delete this property listing?');
     if (!confirmDel) return;
 
-    const pIdStr = String(propId);
+    const pIdStr = String(propId || propObj?.id || propObj?.propertyId || '');
+    const matchedObj = propObj || allProperties.find(p => p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr));
+
+    const id2 = String(matchedObj?.propertyId || '');
+    const id3 = String(matchedObj?.referenceId || '');
+    const num1 = pIdStr.replace(/^(el-prop-|prop-)/i, '');
+    const num2 = id2.replace(/^(el-prop-|prop-)/i, '');
+    const num3 = id3.replace(/^(el-prop-|prop-)/i, '');
+    const normTitle = String(matchedObj?.title || '').toLowerCase().trim();
+
+    const allAliases = new Set([
+      pIdStr.toLowerCase(),
+      id2.toLowerCase(),
+      id3.toLowerCase(),
+      num1 ? `el-prop-${num1}`.toLowerCase() : '',
+      num1 ? `prop-${num1}`.toLowerCase() : '',
+      num1 ? num1.toLowerCase() : '',
+      num2 ? `el-prop-${num2}`.toLowerCase() : '',
+      num2 ? num2.toLowerCase() : '',
+      num3 ? `el-prop-${num3}`.toLowerCase() : '',
+      num3 ? num3.toLowerCase() : ''
+    ].filter(Boolean));
+
+    const matchesAlias = (p) => {
+      if (!p) return false;
+      const pid = String(p.id || '').toLowerCase().trim();
+      const ppid = String(p.propertyId || '').toLowerCase().trim();
+      const pref = String(p.referenceId || '').toLowerCase().trim();
+      const pnum = pid.replace(/^(el-prop-|prop-)/i, '');
+      const ptitle = String(p.title || '').toLowerCase().trim();
+
+      return (
+        allAliases.has(pid) ||
+        allAliases.has(ppid) ||
+        allAliases.has(pref) ||
+        (pnum && allAliases.has(pnum)) ||
+        (normTitle && ptitle && ptitle === normTitle)
+      );
+    };
+
     try {
       const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
       const parsedDeleted = JSON.parse(rawDeleted);
-      if (!parsedDeleted.includes(pIdStr)) parsedDeleted.push(pIdStr);
+      allAliases.forEach(alias => {
+        if (!parsedDeleted.includes(alias)) parsedDeleted.push(alias);
+      });
+      if (normTitle && !parsedDeleted.includes(normTitle)) parsedDeleted.push(normTitle);
       localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+
+      const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties') || '[]';
+      const parsedAdminDel = JSON.parse(rawAdminDel);
+      const exists = parsedAdminDel.some(item => matchesAlias(item));
+      if (!exists) {
+        parsedAdminDel.push({
+          id: pIdStr,
+          propertyId: id2 || pIdStr,
+          referenceId: id3 || `EL-PROP-${num1 || pIdStr}`,
+          title: matchedObj?.title || '',
+          deletedByAdmin: true,
+          adminFeedback: 'Notification: Deleted by Admin',
+          adminNotes: 'Deleted by Admin',
+          deletedAt: new Date().toISOString()
+        });
+        localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(parsedAdminDel));
+      }
     } catch (e) { }
 
-    setAllProperties(prev => prev.filter(p => p && String(p.id || p.propertyId) !== pIdStr));
-    setVerificationQueue(prev => prev.filter(p => p && String(p.id || p.propertyId) !== pIdStr));
+    setAllProperties(prev => prev.filter(p => !matchesAlias(p)));
+    setVerificationQueue(prev => prev.filter(p => !matchesAlias(p)));
 
     try {
       const { deletePropertyListing } = await import('../firebase/propertyService.js');
-      await deletePropertyListing(propId, user?.uid, true);
+      await deletePropertyListing(propId, user?.uid, true, matchedObj);
     } catch (e) { }
 
     try {
       const { mockApi } = await import('../services/mockApi.js');
       if (typeof mockApi.deleteProperty === 'function') {
-        mockApi.deleteProperty(propId);
+        mockApi.deleteProperty(propId, matchedObj, true);
       }
     } catch (e) { }
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: propId } }));
+      window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: pIdStr, isAdmin: true } }));
     }
-    logAdminActivity(`deleted property listing ${propId}.`);
+    logAdminActivity(`deleted property listing ${pIdStr}.`);
 
     await loadData();
   };
@@ -3726,7 +3785,7 @@ export default function AdminPortal({ onNavigate }) {
                               </button>
 
                               <button
-                                onClick={() => handleDeletePropertyFromAdmin(prop.id || prop.propertyId)}
+                                onClick={() => handleDeletePropertyFromAdmin(prop.id || prop.propertyId, prop)}
                                 className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[11px] px-2 py-1 rounded-lg border border-red-200"
                                 title="Delete Listing"
                               >

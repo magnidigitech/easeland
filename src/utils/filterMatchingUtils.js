@@ -4,10 +4,75 @@ import { convertAreaToSqFt } from '../firebase/propertyService.js';
 import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
 
 /**
- * Dynamic check for property public visibility (Admin approved, LIVE, not blocked/draft)
+ * Helper to check if a property is deleted (by Admin or Owner)
+ */
+export function isPropertyDeleted(p) {
+  if (!p) return true;
+  if (p.isDeleted === true || p.deletedByAdmin === true || p.deletionType === 'ADMIN_DELETED') return true;
+  const st = String(p.status || p.listingStatus || '').toUpperCase();
+  const lst = String(p.listingStatus || '').toUpperCase();
+  if (st === 'DELETED' || st === 'DELETED_BY_ADMIN' || lst === 'DELETED' || lst === 'DELETED_BY_ADMIN') return true;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const pId1 = String(p.id || '').toLowerCase().trim();
+      const pId2 = String(p.propertyId || '').toLowerCase().trim();
+      const pId3 = String(p.referenceId || '').toLowerCase().trim();
+      const num1 = pId1.replace(/^(el-prop-|prop-)/, '');
+      const num2 = pId2.replace(/^(el-prop-|prop-)/, '');
+      const num3 = pId3.replace(/^(el-prop-|prop-)/, '');
+      const normTitle = String(p.title || '').toLowerCase().trim();
+
+      const rawDel = localStorage.getItem('easeland_deleted_properties');
+      if (rawDel) {
+        const delArr = JSON.parse(rawDel);
+        const isMatch = delArr.some(d => {
+          const dStr = String(d || '').toLowerCase().trim();
+          const dNum = dStr.replace(/^(el-prop-|prop-)/, '');
+          return (
+            (dStr && (dStr === pId1 || dStr === pId2 || dStr === pId3)) ||
+            (dNum && ((num1 && dNum === num1) || (num2 && dNum === num2) || (num3 && dNum === num3))) ||
+            (normTitle && dStr === normTitle)
+          );
+        });
+        if (isMatch) return true;
+      }
+
+      const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties');
+      if (rawAdminDel) {
+        const adminDelArr = JSON.parse(rawAdminDel);
+        const isMatchAdmin = adminDelArr.some(item => {
+          if (!item) return false;
+          const iId1 = String(item.id || '').toLowerCase().trim();
+          const iId2 = String(item.propertyId || '').toLowerCase().trim();
+          const iId3 = String(item.referenceId || '').toLowerCase().trim();
+          const iNum1 = iId1.replace(/^(el-prop-|prop-)/, '');
+          const iNum2 = iId2.replace(/^(el-prop-|prop-)/, '');
+          const iTitle = String(item.title || '').toLowerCase().trim();
+          return (
+            (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
+            (iId2 && (iId2 === pId1 || iId2 === pId2 || iId2 === pId3)) ||
+            (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
+            (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
+            (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+            (iTitle && normTitle && iTitle === normTitle)
+          );
+        });
+        if (isMatchAdmin) return true;
+      }
+    } catch (e) {}
+  }
+
+  return false;
+}
+
+/**
+ * Dynamic check for property public visibility (Admin approved, LIVE, not blocked/draft/deleted)
  */
 export function isPropertyPubliclyVisible(p) {
   if (!p) return false;
+  if (isPropertyDeleted(p)) return false;
+
   const st = String(p.status || p.listingStatus || '').toUpperCase();
   const lst = String(p.listingStatus || '').toUpperCase();
   const vst = String(p.verificationStatus || '').toUpperCase();
@@ -36,9 +101,15 @@ export function isPropertyPubliclyVisible(p) {
 
   const isBlocked = st === 'REJECTED' ||
                     st === 'DRAFT' ||
+                    st === 'DELETED' ||
+                    st === 'DELETED_BY_ADMIN' ||
                     lst === 'REJECTED' ||
                     lst === 'DRAFT' ||
+                    lst === 'DELETED' ||
+                    lst === 'DELETED_BY_ADMIN' ||
                     st === 'CHANGES_REQUIRED' ||
+                    p.isDeleted === true ||
+                    p.deletedByAdmin === true ||
                     p.isBlocked === true;
 
   return (isLive || isApproved) && !isBlocked;

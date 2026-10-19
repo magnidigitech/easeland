@@ -497,6 +497,7 @@ export const mockApi = {
 
     let localProps = [];
     let deletedIds = [];
+    let adminDeletedList = [];
     try {
       if (typeof window !== 'undefined') {
         const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
@@ -509,9 +510,57 @@ export const mockApi = {
           }
         });
         const delRaw = localStorage.getItem('easeland_deleted_properties');
-        if (delRaw) deletedIds = JSON.parse(delRaw).map(String);
+        if (delRaw) deletedIds = JSON.parse(delRaw).map(v => String(v).toLowerCase().trim());
+        const adminDelRaw = localStorage.getItem('easeland_admin_deleted_properties');
+        if (adminDelRaw) adminDeletedList = JSON.parse(adminDelRaw);
       }
     } catch (e) {}
+
+    const isDeletedProp = (p) => {
+      if (!p) return true;
+      if (p.isDeleted === true || p.deletedByAdmin === true) return true;
+      const st = String(p.status || p.listingStatus || '').toUpperCase();
+      const lst = String(p.listingStatus || '').toUpperCase();
+      if (st === 'DELETED' || st === 'DELETED_BY_ADMIN' || lst === 'DELETED' || lst === 'DELETED_BY_ADMIN') return true;
+
+      const pId1 = String(p.id || '').toLowerCase().trim();
+      const pId2 = String(p.propertyId || '').toLowerCase().trim();
+      const pId3 = String(p.referenceId || '').toLowerCase().trim();
+      const num1 = pId1.replace(/^(el-prop-|prop-)/, '');
+      const num2 = pId2.replace(/^(el-prop-|prop-)/, '');
+      const num3 = pId3.replace(/^(el-prop-|prop-)/, '');
+      const normTitle = String(p.title || '').toLowerCase().trim();
+
+      const inDeletedIds = deletedIds.some(d => {
+        const dStr = String(d || '').toLowerCase().trim();
+        const dNum = dStr.replace(/^(el-prop-|prop-)/, '');
+        return (
+          (dStr && (dStr === pId1 || dStr === pId2 || dStr === pId3)) ||
+          (dNum && ((num1 && dNum === num1) || (num2 && dNum === num2) || (num3 && dNum === num3))) ||
+          (normTitle && dStr === normTitle)
+        );
+      });
+      if (inDeletedIds) return true;
+
+      const inAdminDel = adminDeletedList.some(item => {
+        if (!item) return false;
+        const iId1 = String(item.id || '').toLowerCase().trim();
+        const iId2 = String(item.propertyId || '').toLowerCase().trim();
+        const iId3 = String(item.referenceId || '').toLowerCase().trim();
+        const iNum1 = iId1.replace(/^(el-prop-|prop-)/, '');
+        const iNum2 = iId2.replace(/^(el-prop-|prop-)/, '');
+        const iTitle = String(item.title || '').toLowerCase().trim();
+        return (
+          (iId1 && (iId1 === pId1 || iId1 === pId2 || iId1 === pId3)) ||
+          (iId2 && (iId2 === pId1 || iId2 === pId2 || iId2 === pId3)) ||
+          (iId3 && (iId3 === pId1 || iId3 === pId2 || iId3 === pId3)) ||
+          (iNum1 && ((num1 && iNum1 === num1) || (num2 && iNum1 === num2) || (num3 && iNum1 === num3))) ||
+          (iNum2 && ((num1 && iNum2 === num1) || (num2 && iNum2 === num2) || (num3 && iNum2 === num3))) ||
+          (iTitle && normTitle && iTitle === normTitle)
+        );
+      });
+      return inAdminDel;
+    };
 
     const baseList = (typeof mockApi !== 'undefined' && typeof mockApi.getProperties === 'function')
       ? mockApi.getProperties()
@@ -519,9 +568,9 @@ export const mockApi = {
     const combined = [...INITIAL_PROPERTIES, ...baseList, ...localProps];
     const candidateMap = new Map();
     combined.forEach(p => {
-      if (!p) return;
+      if (!p || isDeletedProp(p)) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
-      if (pId && !deletedIds.includes(pId)) {
+      if (pId) {
         const existing = candidateMap.get(pId);
         if (!existing) {
           candidateMap.set(pId, { ...p });
@@ -1196,39 +1245,132 @@ export const mockApi = {
     return true;
   },
 
-  deleteProperty: (propertyId) => {
-    if (!propertyId) return false;
-    const pIdStr = String(propertyId);
+  deleteProperty: (propertyId, propertyObj = null, isAdmin = true) => {
+    if (!propertyId && !propertyObj) return false;
+    const pIdStr = String(propertyId || propertyObj?.id || propertyObj?.propertyId || '');
+    const id2 = String(propertyObj?.propertyId || '');
+    const id3 = String(propertyObj?.referenceId || '');
+    const num1 = pIdStr.replace(/^(el-prop-|prop-)/i, '');
+    const num2 = id2.replace(/^(el-prop-|prop-)/i, '');
+    const num3 = id3.replace(/^(el-prop-|prop-)/i, '');
+    const normTitle = String(propertyObj?.title || '').toLowerCase().trim();
+
+    const allAliases = new Set([
+      pIdStr.toLowerCase(),
+      id2.toLowerCase(),
+      id3.toLowerCase(),
+      num1 ? `el-prop-${num1}`.toLowerCase() : '',
+      num1 ? `prop-${num1}`.toLowerCase() : '',
+      num1 ? num1.toLowerCase() : '',
+      num2 ? `el-prop-${num2}`.toLowerCase() : '',
+      num2 ? num2.toLowerCase() : '',
+      num3 ? `el-prop-${num3}`.toLowerCase() : '',
+      num3 ? num3.toLowerCase() : ''
+    ].filter(Boolean));
+
+    const matchesAlias = (p) => {
+      if (!p) return false;
+      const pid = String(p.id || '').toLowerCase().trim();
+      const ppid = String(p.propertyId || '').toLowerCase().trim();
+      const pref = String(p.referenceId || '').toLowerCase().trim();
+      const pnum = pid.replace(/^(el-prop-|prop-)/i, '');
+      const ptitle = String(p.title || '').toLowerCase().trim();
+
+      return (
+        allAliases.has(pid) ||
+        allAliases.has(ppid) ||
+        allAliases.has(pref) ||
+        (pnum && allAliases.has(pnum)) ||
+        (normTitle && ptitle && ptitle === normTitle)
+      );
+    };
 
     // 1. Remove from in-memory properties array
-    const idx = properties.findIndex(p => p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr));
-    if (idx !== -1) {
-      properties.splice(idx, 1);
+    for (let i = properties.length - 1; i >= 0; i--) {
+      if (matchesAlias(properties[i])) {
+        properties.splice(i, 1);
+      }
     }
 
-    // 2. Remove from stored easeland_properties in localStorage
+    // 2. Remove/update in stored easeland_properties in localStorage
     const currentProps = getStoredData('easeland_properties', properties);
-    const updatedProps = currentProps.filter(p => p && !isFakeProperty(p) && String(p.id) !== pIdStr && String(p.propertyId) !== pIdStr);
+    const updatedProps = currentProps.map(p => {
+      if (matchesAlias(p)) {
+        if (isAdmin) {
+          return {
+            ...p,
+            status: 'DELETED_BY_ADMIN',
+            listingStatus: 'DELETED_BY_ADMIN',
+            deletedByAdmin: true,
+            isDeleted: true,
+            isPublished: false,
+            adminFeedback: 'Notification: Deleted by Admin',
+            adminNotes: 'Deleted by Admin'
+          };
+        }
+        return null;
+      }
+      return p;
+    }).filter(Boolean);
     setStoredData('easeland_properties', updatedProps);
 
-    // 3. Track deleted ID in localStorage to prevent re-hydration
+    // 3. Track deleted IDs & admin deletion metadata in localStorage
     try {
       if (typeof window !== 'undefined') {
         const rawUserProps = localStorage.getItem('easeland_user_properties');
         if (rawUserProps) {
           const parsed = JSON.parse(rawUserProps);
-          const updatedUserProps = parsed.filter(p => p && !isFakeProperty(p) && String(p.id || p.propertyId) !== pIdStr);
+          const updatedUserProps = parsed.map(p => {
+            if (matchesAlias(p)) {
+              if (isAdmin) {
+                return {
+                  ...p,
+                  status: 'DELETED_BY_ADMIN',
+                  listingStatus: 'DELETED_BY_ADMIN',
+                  deletedByAdmin: true,
+                  isDeleted: true,
+                  isPublished: false,
+                  adminFeedback: 'Notification: Deleted by Admin',
+                  adminNotes: 'Deleted by Admin'
+                };
+              }
+              return null;
+            }
+            return p;
+          }).filter(Boolean);
           localStorage.setItem('easeland_user_properties', JSON.stringify(updatedUserProps));
         }
 
         const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
         const parsedDeleted = JSON.parse(rawDeleted);
-        if (!parsedDeleted.includes(pIdStr)) {
-          parsedDeleted.push(pIdStr);
-          localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+        allAliases.forEach(alias => {
+          if (!parsedDeleted.includes(alias)) parsedDeleted.push(alias);
+        });
+        if (normTitle && !parsedDeleted.includes(normTitle)) {
+          parsedDeleted.push(normTitle);
+        }
+        localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
+
+        if (isAdmin) {
+          const rawAdminDel = localStorage.getItem('easeland_admin_deleted_properties') || '[]';
+          const parsedAdminDel = JSON.parse(rawAdminDel);
+          const exists = parsedAdminDel.some(item => matchesAlias(item));
+          if (!exists) {
+            parsedAdminDel.push({
+              id: pIdStr,
+              propertyId: id2 || pIdStr,
+              referenceId: id3 || `EL-PROP-${num1 || pIdStr}`,
+              title: propertyObj?.title || '',
+              deletedByAdmin: true,
+              adminFeedback: 'Notification: Deleted by Admin',
+              adminNotes: 'Deleted by Admin',
+              deletedAt: new Date().toISOString()
+            });
+            localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(parsedAdminDel));
+          }
         }
 
-        window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: pIdStr } }));
+        window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: pIdStr, isAdmin } }));
       }
     } catch (e) {}
 

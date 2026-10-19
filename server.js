@@ -848,6 +848,85 @@ app.get('/api/properties', async (req, res) => {
   }
 });
 
+// API Endpoint: Delete/Mark Deleted property record from Local Disk Store + PostgreSQL
+app.delete('/api/properties/:id', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    if (!targetId) {
+      return res.status(400).json({ success: false, error: 'Property ID is required.' });
+    }
+    const tLower = targetId.toLowerCase().trim();
+    const isAdmin = req.query.isAdmin === 'true' || req.body?.isAdmin === true;
+
+    // Find and update/delete in localPropsMap
+    const matchedKeys = [];
+    for (const [k, v] of localPropsMap.entries()) {
+      if (v) {
+        const id1 = String(v.id || '').toLowerCase().trim();
+        const id2 = String(v.propertyId || '').toLowerCase().trim();
+        const id3 = String(v.referenceId || '').toLowerCase().trim();
+        const tTitle = String(v.title || '').toLowerCase().trim();
+        if (id1 === tLower || id2 === tLower || id3 === tLower || (tTitle && tTitle === tLower) || k.toLowerCase().trim() === tLower) {
+          matchedKeys.push(k);
+        }
+      }
+    }
+
+    matchedKeys.forEach(k => {
+      const existing = localPropsMap.get(k);
+      if (existing) {
+        if (isAdmin) {
+          localPropsMap.set(k, {
+            ...existing,
+            status: 'DELETED_BY_ADMIN',
+            listingStatus: 'DELETED_BY_ADMIN',
+            listing_status: 'DELETED_BY_ADMIN',
+            deletedByAdmin: true,
+            isDeleted: true,
+            isPublished: false,
+            is_published: false,
+            adminFeedback: 'Notification: Deleted by Admin',
+            adminNotes: 'Deleted by Admin',
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          localPropsMap.delete(k);
+        }
+      }
+    });
+
+    try {
+      const arrayToStore = Array.from(localPropsMap.values());
+      fs.writeFileSync(propertiesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
+    } catch (err) {
+      console.warn('Local properties disk write note after delete:', err.message);
+    }
+
+    // Update / Delete in PostgreSQL
+    try {
+      const ph1 = String.fromCharCode(36) + '1';
+      if (isAdmin) {
+        await pgPool.query(
+          "UPDATE properties SET listing_status = 'DELETED_BY_ADMIN', is_published = false, raw_data = jsonb_set(jsonb_set(raw_data, '{status}', '\"DELETED_BY_ADMIN\"'), '{deletedByAdmin}', 'true') WHERE property_id = " + ph1 + " OR reference_id = " + ph1 + " OR raw_data->>'id' = " + ph1 + " OR raw_data->>'propertyId' = " + ph1 + " OR raw_data->>'referenceId' = " + ph1 + ";",
+          [targetId]
+        );
+      } else {
+        await pgPool.query(
+          "DELETE FROM properties WHERE property_id = " + ph1 + " OR reference_id = " + ph1 + " OR raw_data->>'id' = " + ph1 + " OR raw_data->>'propertyId' = " + ph1 + " OR raw_data->>'referenceId' = " + ph1 + ";",
+          [targetId]
+        );
+      }
+    } catch (pgErr) {
+      console.warn('PostgreSQL property delete note:', pgErr.message);
+    }
+
+    return res.json({ success: true, message: 'Property deleted successfully' });
+  } catch (err) {
+    console.error('Property delete handler error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API Endpoint: Get single property by ID from Local Store / PostgreSQL
 app.get('/api/properties/:id', async (req, res) => {
   const targetId = req.params.id;
