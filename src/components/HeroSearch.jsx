@@ -28,16 +28,19 @@ function normalizeCategoryValue(val, purpVal) {
   if (lower.includes('house') || lower.includes('villa') || lower.includes('independent')) return 'Independent House/Villa';
   if (lower.includes('city') && lower.includes('plot')) return 'Open Plot (City)';
   if (lower.includes('plot') || lower.includes('venture') || lower === 'open_plot' || lower === 'open_plots') return 'Open Plot Ventures';
-  if (lower.includes('rent')) return 'Others';
 
   return 'All';
 }
 
 export default function HeroSearch({ onSearch, isCompact = false, initialState = null }) {
 
-  const [purpose, setPurpose] = useState(initialState?.purpose === 'RENT' ? 'rent' : 'buy');
+  const [purpose, setPurpose] = useState(() => {
+    if (initialState?.purpose === 'RENT') return 'rent';
+    if (initialState?.purpose === 'SALE') return 'buy';
+    return isCompact ? '' : 'buy';
+  });
   const [query, setQuery] = useState(initialState?.query || initialState?.address || '');
-  const [category, setCategory] = useState(() => normalizeCategoryValue(initialState?.category || initialState?.propertyType, initialState?.purpose));
+  const [category, setCategory] = useState(() => normalizeCategoryValue(initialState?.category, initialState?.purpose));
   const [isLocating, setIsLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
@@ -59,10 +62,14 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   useEffect(() => {
     if (initialState) {
       if (initialState.query !== undefined) setQuery(initialState.query || '');
-      if (initialState.purpose !== undefined) setPurpose(initialState.purpose === 'RENT' ? 'rent' : 'buy');
-      setCategory(normalizeCategoryValue(initialState.category || initialState.propertyType, initialState.purpose));
+      if (initialState.purpose !== undefined) {
+        if (initialState.purpose === 'RENT') setPurpose('rent');
+        else if (initialState.purpose === 'SALE') setPurpose('buy');
+        else setPurpose(isCompact ? '' : 'buy');
+      }
+      setCategory(normalizeCategoryValue(initialState.category, initialState.purpose));
     }
-  }, [initialState]);
+  }, [initialState, isCompact]);
 
   // Handle clicking outside suggestions dropdown
   useEffect(() => {
@@ -144,33 +151,39 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   const triggerSearch = (textQuery, currentPurpose, currentCategory, extraData = {}) => {
     const parsedNL = parseNaturalLanguageQuery(textQuery);
 
-    let propType = 'ALL';
-    let purp = currentPurpose === 'buy' ? 'SALE' : (currentPurpose === 'rent' ? 'RENT' : currentPurpose);
+    const resolvedCategory = (currentCategory && currentCategory !== 'All') ? currentCategory : 'All';
 
-    const catStr = String(currentCategory || '').toLowerCase();
-    if (catStr.includes('amaravathi') || catStr.includes('lps')) propType = 'OPEN_PLOT';
-    else if (catStr.includes('agricultural') || catStr.includes('farm')) propType = 'LAND';
-    else if (catStr.includes('commercial') || catStr.includes('commeric')) propType = 'COMMERCIAL';
-    else if (catStr.includes('apartment') || catStr.includes('flat')) propType = 'APARTMENT';
-    else if (catStr.includes('house') || catStr.includes('villa') || catStr.includes('independent')) propType = 'HOUSE';
-    else if (catStr.includes('city') && catStr.includes('plot')) propType = 'OPEN_PLOT';
-    else if (catStr.includes('venture') || catStr.includes('plot')) propType = 'OPEN_PLOT';
-    else if (catStr.includes('other')) propType = 'OTHER';
-    else if (catStr.includes('rent')) { purp = 'RENT'; propType = 'ALL'; }
+    // Purpose resolution:
+    // 1. Natural language query takes top priority (e.g. user typed "for rent" or "for sale")
+    // 2. Active tab from homepage if explicitly selected ('rent' -> 'RENT', 'buy' -> 'SALE')
+    // 3. In compact mode, preserve existing initialState.purpose if set, else leave empty/ALL
+    let resolvedPurpose = '';
+    if (parsedNL.purpose && parsedNL.purpose !== 'ALL') {
+      resolvedPurpose = parsedNL.purpose;
+    } else if (currentPurpose === 'rent') {
+      resolvedPurpose = 'RENT';
+    } else if (currentPurpose === 'buy') {
+      resolvedPurpose = 'SALE';
+    } else if (initialState?.purpose && initialState.purpose !== 'ALL') {
+      resolvedPurpose = initialState.purpose;
+    }
 
-    const resolvedPropertyType = (propType !== 'ALL')
-      ? propType
-      : (parsedNL.propertyType && parsedNL.propertyType !== 'ALL' ? parsedNL.propertyType : 'ALL');
-
-    const resolvedPurpose = (parsedNL.purpose && parsedNL.purpose !== 'ALL')
-      ? parsedNL.purpose
-      : purp;
+    // PropertyType resolution:
+    // Only set propertyType if natural language specifically detected it (e.g. "villa in Perecherla"),
+    // or preserve existing initialState.propertyType if already selected.
+    // Do NOT forcefully synthesize propertyType from category dropdown!
+    let resolvedPropertyType = 'ALL';
+    if (parsedNL.propertyType && parsedNL.propertyType !== 'ALL') {
+      resolvedPropertyType = parsedNL.propertyType;
+    } else if (initialState?.propertyType && initialState.propertyType !== 'ALL') {
+      resolvedPropertyType = initialState.propertyType;
+    }
 
     onSearch({
       ...parsedNL,
       purpose: resolvedPurpose,
       propertyType: resolvedPropertyType,
-      category: currentCategory,
+      category: resolvedCategory,
       query: textQuery,
       address: textQuery,
       ...extraData

@@ -462,7 +462,8 @@ export function matchesSearchFilters(p, searchState = {}) {
       const isLand = pType.includes('LAND') || pCat.includes('LAND') || pType.includes('AGRICULTURAL') || pCat.includes('AGRI') || pCat.includes('FARM');
       if (!isLand) return false;
     } else if (targetType === 'OTHER') {
-      if (!pType.includes('OTHER') && !pCat.includes('OTHER') && !pCat.includes('WAREHOUSE')) return false;
+      const pBadge = String(getCategoryBadgeLabel(p)).toLowerCase();
+      if (pBadge !== 'others' && !pType.includes('OTHER') && !pCat.includes('OTHER') && !pCat.includes('WAREHOUSE')) return false;
     }
   }
 
@@ -502,7 +503,7 @@ export function matchesSearchFilters(p, searchState = {}) {
         const isCityPlot = (pBadge === 'open plot (city)' || (pCat.includes('CITY') && !pCat.includes('VENTURE')));
         isCategoryMatch = !isCommercialProp && isPlot && !isAmaravathi && !isCityPlot;
       } else if (targetCat.includes('other')) {
-        isCategoryMatch = (pType.includes('OTHER') || pCat.includes('OTHER') || pTitle.includes('OTHER') || pCat.includes('WAREHOUSE'));
+        isCategoryMatch = (pBadge === 'others' || pType.includes('OTHER') || pCat.includes('OTHER') || pTitle.includes('OTHER') || pCat.includes('WAREHOUSE'));
       }
     }
 

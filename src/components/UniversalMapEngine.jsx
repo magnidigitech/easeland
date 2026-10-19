@@ -1122,9 +1122,23 @@ export default function UniversalMapEngine({
                       </span>
                     </div>
 
-                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md backdrop-blur-sm">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (typeof setFilters === 'function') {
+                          const cat = getCategoryBadgeLabel(prop);
+                          setFilters(prev => ({
+                            ...prev,
+                            category: (prev.category === cat ? 'All' : cat)
+                          }));
+                        }
+                      }}
+                      className="absolute top-3 right-3 bg-slate-900/90 hover:bg-slate-800 text-amber-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md backdrop-blur-sm cursor-pointer transition-colors"
+                      title={`Filter by ${getCategoryBadgeLabel(prop)}`}
+                    >
                       {getCategoryBadgeLabel(prop)}
-                    </div>
+                    </button>
 
                     <button
                       onClick={(e) => {
@@ -1157,9 +1171,23 @@ export default function UniversalMapEngine({
                           <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-emerald-200/60">
                             Direct Owner
                           </span>
-                          <span className="text-sky-800 bg-sky-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-sky-200">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (typeof setFilters === 'function') {
+                                const cat = getCategoryBadgeLabel(prop);
+                                setFilters(prev => ({
+                                  ...prev,
+                                  category: (prev.category === cat ? 'All' : cat)
+                                }));
+                              }
+                            }}
+                            className="text-sky-800 bg-sky-50 hover:bg-sky-100 hover:border-sky-300 transition-colors px-2 py-0.5 rounded font-extrabold text-[10px] border border-sky-200 cursor-pointer"
+                            title={`Filter by ${getCategoryBadgeLabel(prop)}`}
+                          >
                             {getCategoryBadgeLabel(prop)}
-                          </span>
+                          </button>
                         </div>
                       </div>
 

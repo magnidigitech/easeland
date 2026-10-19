@@ -188,3 +188,46 @@ test('matchesSearchFilters correctly performs exact BHK matching for 1, 2, 3, 4 
   assert.strictEqual(matchesSearchFilters(prop2Bhk, { bedrooms: 'ANY' }), true);
   assert.strictEqual(matchesSearchFilters(prop5Bhk, { bedrooms: 'ALL' }), true);
 });
+
+test('matchesSearchFilters matches properties categorized as Others including rental farm houses without purpose forcing', () => {
+  const rentalFarmHouse = {
+    id: 'prop-farm-1',
+    title: 'Farm House for Rental Purpose',
+    purpose: 'RENT',
+    priceDisplay: 'Rs. 40,000 / month',
+    price: 40000,
+    area: 2000,
+    category: 'Others',
+    propertyType: 'HOUSE'
+  };
+
+  const saleWarehouse = {
+    id: 'prop-ware-2',
+    title: 'Industrial Warehouse for Sale',
+    purpose: 'SALE',
+    price: 15000000,
+    category: 'Others',
+    propertyType: 'OTHER'
+  };
+
+  const regularApartment = {
+    id: 'prop-apt-3',
+    title: '3BHK Flat',
+    purpose: 'SALE',
+    category: 'Apartments/Flat',
+    propertyType: 'APARTMENT'
+  };
+
+  // Category "Others" filter matches both rental farmhouse and warehouse
+  assert.strictEqual(matchesSearchFilters(rentalFarmHouse, { category: 'Others' }), true);
+  assert.strictEqual(matchesSearchFilters(saleWarehouse, { category: 'Others' }), true);
+  assert.strictEqual(matchesSearchFilters(regularApartment, { category: 'Others' }), false);
+
+  // If user explicitly filters by RENT + Others, only rentalFarmHouse matches
+  assert.strictEqual(matchesSearchFilters(rentalFarmHouse, { category: 'Others', purpose: 'RENT' }), true);
+  assert.strictEqual(matchesSearchFilters(saleWarehouse, { category: 'Others', purpose: 'RENT' }), false);
+
+  // If user explicitly filters by SALE + Others, only saleWarehouse matches
+  assert.strictEqual(matchesSearchFilters(rentalFarmHouse, { category: 'Others', purpose: 'SALE' }), false);
+  assert.strictEqual(matchesSearchFilters(saleWarehouse, { category: 'Others', purpose: 'SALE' }), true);
+});
