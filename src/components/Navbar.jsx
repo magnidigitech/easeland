@@ -1,17 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Heart, PlusCircle, User, ShieldCheck, LogOut, Settings, Briefcase, Search, Key, Tag, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Building2, Heart, PlusCircle, User, ShieldCheck, LogOut, Settings, Briefcase, Search, Key, Tag, Sparkles, CheckCircle2, ArrowRight, Download } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
+import { promptPwaInstall, isPwaInstalled, isIOSDevice, hasDeferredPrompt } from '../utils/pwaManager';
 
 export default function Navbar({ activePage, setActivePage, wishlistCount, user, onLoginClick, onLogoutClick, onPostPropertyClick, onOpenProfileSettings }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
   const [hoveredNav, setHoveredNav] = useState(null);
+  const [canInstallPwa, setCanInstallPwa] = useState(false);
+  const [isPwaRunning, setIsPwaRunning] = useState(false);
 
   useEffect(() => {
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
     window.addEventListener('easeland-site-config-updated', handleConfigUpdated);
     return () => window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const installed = isPwaInstalled();
+    setIsPwaRunning(installed);
+    if (!installed && (hasDeferredPrompt() || isIOSDevice())) {
+      setCanInstallPwa(true);
+    }
+    const handleInstallable = () => {
+      if (!isPwaInstalled()) setCanInstallPwa(true);
+    };
+    const handleInstalled = () => {
+      setIsPwaRunning(true);
+      setCanInstallPwa(false);
+    };
+    window.addEventListener('easeland-pwa-installable', handleInstallable);
+    window.addEventListener('easeland-pwa-installed', handleInstalled);
+    return () => {
+      window.removeEventListener('easeland-pwa-installable', handleInstallable);
+      window.removeEventListener('easeland-pwa-installed', handleInstalled);
+    };
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (isIOSDevice()) {
+      window.dispatchEvent(new CustomEvent('easeland-open-ios-install'));
+      return;
+    }
+    const res = await promptPwaInstall();
+    if (res.outcome === 'accepted') {
+      setCanInstallPwa(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl text-slate-900 border-b border-slate-200 shadow-sm">
@@ -190,6 +226,18 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           {/* RIGHT ACTION CONTROLS */}
           <div className="hidden lg:flex items-center gap-4">
 
+            {/* PWA INSTALL APP BUTTON (DESKTOP) */}
+            {canInstallPwa && !isPwaRunning && (
+              <button
+                onClick={handleInstallPwa}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black text-amber-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-300 rounded-xl transition-all shadow-md transform hover:scale-105 active:scale-95 select-none"
+                title="Install EaseLand App on your device"
+              >
+                <Download className="w-4 h-4 stroke-[2.5]" />
+                <span>INSTALL APP</span>
+              </button>
+            )}
+
             {/* WISHLIST BUTTON - ONLY SHOWN WHEN USER IS LOGGED IN */}
             {user && (
               <button
@@ -325,6 +373,23 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
       {/* MOBILE MENU DRAWER */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3">
+          {/* PWA INSTALL BUTTON (MOBILE) */}
+          {canInstallPwa && !isPwaRunning && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleInstallPwa();
+              }}
+              className="w-full text-left py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 text-slate-950 font-black text-xs flex items-center justify-between shadow-md mb-2 border border-amber-300 animate-pulse"
+            >
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4 stroke-[2.5]" />
+                <span>INSTALL EASELAND APP</span>
+              </div>
+              <span className="text-[10px] bg-slate-950 text-amber-400 px-2 py-0.5 rounded-full font-bold">1-Tap Fast</span>
+            </button>
+          )}
+
           <button
             onClick={() => { onPostPropertyClick(); setMobileMenuOpen(false); }}
             className="w-full bg-metallic-gold text-slate-950 font-black text-xs py-3 rounded-xl shadow-md border border-amber-300 flex items-center justify-center gap-2 mb-2"

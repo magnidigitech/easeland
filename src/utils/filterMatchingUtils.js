@@ -9,9 +9,10 @@ import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms }
 export function isPropertyDeleted(p) {
   if (!p) return true;
   if (p.isDeleted === true || p.deletedByAdmin === true || p.deletionType === 'ADMIN_DELETED') return true;
-  const st = String(p.status || p.listingStatus || '').toUpperCase();
-  const lst = String(p.listingStatus || '').toUpperCase();
-  if (st === 'DELETED' || st === 'DELETED_BY_ADMIN' || lst === 'DELETED' || lst === 'DELETED_BY_ADMIN') return true;
+  const st = String(p.status || p.listingStatus || p.listing_status || '').toUpperCase();
+  const lst = String(p.listingStatus || p.listing_status || '').toUpperCase();
+  const plst = String(p.listing_status || '').toUpperCase();
+  if (st === 'DELETED' || st === 'DELETED_BY_ADMIN' || lst === 'DELETED' || lst === 'DELETED_BY_ADMIN' || plst === 'DELETED' || plst === 'DELETED_BY_ADMIN') return true;
 
   if (typeof window !== 'undefined') {
     try {
@@ -67,14 +68,18 @@ export function isPropertyDeleted(p) {
 }
 
 /**
- * Dynamic check for property public visibility (Admin approved, LIVE, not blocked/draft/deleted)
+ * Dynamic check for property public visibility (Admin approved, LIVE, not blocked/draft/deleted/under audit)
  */
 export function isPropertyPubliclyVisible(p) {
   if (!p) return false;
   if (isPropertyDeleted(p)) return false;
 
-  const st = String(p.status || p.listingStatus || '').toUpperCase();
-  const lst = String(p.listingStatus || '').toUpperCase();
+  // Strict check on published flag
+  if (p.isPublished === false || p.is_published === false) return false;
+
+  const st = String(p.status || p.listingStatus || p.listing_status || '').toUpperCase();
+  const lst = String(p.listingStatus || p.listing_status || '').toUpperCase();
+  const plst = String(p.listing_status || '').toUpperCase();
   const vst = String(p.verificationStatus || '').toUpperCase();
 
   const isApproved = p.adminApprovalStatus === 'APPROVED' ||
@@ -95,24 +100,50 @@ export function isPropertyPubliclyVisible(p) {
                  lst === 'APPROVED' ||
                  lst === 'PLATFORM VERIFIED' ||
                  lst === 'VERIFIED' ||
-                 p.isPublished === true ||
-                 p.published === true ||
-                 (!p.status && !p.listingStatus && Boolean(p.title));
+                 plst === 'LIVE' ||
+                 plst === 'APPROVED_LIVE' ||
+                 plst === 'APPROVED' ||
+                 plst === 'PLATFORM VERIFIED' ||
+                 plst === 'VERIFIED';
 
   const isBlocked = st === 'REJECTED' ||
                     st === 'DRAFT' ||
                     st === 'DELETED' ||
                     st === 'DELETED_BY_ADMIN' ||
+                    st === 'CHANGES_REQUIRED' ||
+                    st === 'CHANGES_REQUESTED' ||
+                    st === 'PENDING_VERIFICATION' ||
+                    st === 'UNDER_REVIEW' ||
+                    st === 'PENDING_AUDIT' ||
+                    st === 'UNDER_AUDIT' ||
+                    st === 'PENDING' ||
+                    st === 'SUBMITTED' ||
+                    st === 'IN_AUDIT' ||
                     lst === 'REJECTED' ||
                     lst === 'DRAFT' ||
                     lst === 'DELETED' ||
                     lst === 'DELETED_BY_ADMIN' ||
-                    st === 'CHANGES_REQUIRED' ||
+                    lst === 'CHANGES_REQUIRED' ||
+                    lst === 'CHANGES_REQUESTED' ||
+                    lst === 'PENDING_VERIFICATION' ||
+                    lst === 'UNDER_REVIEW' ||
+                    lst === 'PENDING_AUDIT' ||
+                    lst === 'UNDER_AUDIT' ||
+                    lst === 'PENDING' ||
+                    lst === 'SUBMITTED' ||
+                    lst === 'IN_AUDIT' ||
+                    plst === 'REJECTED' ||
+                    plst === 'DRAFT' ||
+                    plst === 'DELETED' ||
+                    plst === 'DELETED_BY_ADMIN' ||
+                    plst === 'PENDING_VERIFICATION' ||
+                    plst === 'UNDER_REVIEW' ||
                     p.isDeleted === true ||
                     p.deletedByAdmin === true ||
                     p.isBlocked === true;
 
-  return (isLive || isApproved) && !isBlocked;
+  if (isBlocked) return false;
+  return isLive || isApproved;
 }
 
 /**

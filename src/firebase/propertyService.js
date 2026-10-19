@@ -1847,7 +1847,17 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
 
     // 2. Call backend API DELETE /api/properties/:id
     try {
-      await fetch(`/api/properties/${encodeURIComponent(propertyId)}${isAdmin ? '?isAdmin=true' : ''}`, { method: 'DELETE' });
+      await fetch(`/api/properties/${encodeURIComponent(pIdStr)}${isAdmin ? '?isAdmin=true' : ''}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isAdmin,
+          propertyId: pIdStr,
+          referenceId: id3,
+          title: propertyObj?.title || '',
+          property: propertyObj
+        })
+      });
     } catch (e) {}
 
     // 3. Update or Remove from Firestore

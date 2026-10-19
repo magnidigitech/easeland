@@ -19,6 +19,9 @@ import EaseLandCRM from './pages/EaseLandCRM';
 import UserDashboard from './components/UserDashboard';
 import PropertiesSearchPage, { matchesSearchFilters } from './pages/PropertiesSearchPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import PwaInstallBanner from './components/PwaInstallBanner';
+import OfflineIndicator from './components/OfflineIndicator';
+import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 import { mockApi, applySiteTheme, safeArray, deduplicateProperties } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams, createDefaultFilterState } from './firebase/searchUrl.js';
@@ -675,6 +678,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-offwhite text-brand-charcoal font-sans flex flex-col">
       
+      {/* PWA STATUS & PROMPTS */}
+      <OfflineIndicator />
+      <PwaUpdatePrompt />
+      <PwaInstallBanner />
+
       {/* NAVBAR */}
       <Navbar
         activePage={activePage}

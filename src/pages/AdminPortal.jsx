@@ -94,6 +94,7 @@ import {
 } from '../firebase/visitorService.js';
 import VerificationLocationBoundaryCard from '../components/VerificationLocationBoundaryCard.jsx';
 import { computeReauditDiff, formatInr } from '../utils/reauditDiffUtils.js';
+import { isPropertyDeleted } from '../utils/filterMatchingUtils.js';
 
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
@@ -711,10 +712,25 @@ export default function AdminPortal({ onNavigate }) {
       const FAKE_DEMO_IDS = ['prop-102', 'prop-104', 'prop-105'];
       allMergedProps = Array.from(queueMap.values()).filter(p => {
         if (!p) return false;
-        const id1 = String(p.id || '');
-        const id2 = String(p.propertyId || '');
-        const id3 = String(p.referenceId || '');
-        if (deletedIds.includes(id1) || deletedIds.includes(id2) || deletedIds.includes(id3)) return false;
+        if (isPropertyDeleted(p)) return false;
+        const st = String(p.status || p.listingStatus || '').toUpperCase();
+        const lst = String(p.listingStatus || '').toUpperCase();
+        if (st === 'DELETED_BY_ADMIN' || lst === 'DELETED_BY_ADMIN' || p.deletedByAdmin === true || p.isDeleted === true) return false;
+        const id1 = String(p.id || '').toLowerCase().trim();
+        const id2 = String(p.propertyId || '').toLowerCase().trim();
+        const id3 = String(p.referenceId || '').toLowerCase().trim();
+        const num1 = id1.replace(/^(el-prop-|prop-)/i, '');
+        const num2 = id2.replace(/^(el-prop-|prop-)/i, '');
+        const num3 = id3.replace(/^(el-prop-|prop-)/i, '');
+        const isDel = deletedIds.some(d => {
+          const dStr = String(d || '').toLowerCase().trim();
+          const dNum = dStr.replace(/^(el-prop-|prop-)/i, '');
+          return (
+            (dStr && (dStr === id1 || dStr === id2 || dStr === id3)) ||
+            (dNum && ((num1 && dNum === num1) || (num2 && dNum === num2) || (num3 && dNum === num3)))
+          );
+        });
+        if (isDel) return false;
         if (FAKE_DEMO_IDS.includes(id1) || FAKE_DEMO_IDS.includes(id2) || FAKE_DEMO_IDS.includes(id3)) return false;
         const ownerName = String(p.owner?.name || p.ownerPublicName || '').toLowerCase();
         const ownerEmail = String(p.owner?.email || p.ownerPrivateEmail || '').toLowerCase();
@@ -1108,13 +1124,19 @@ export default function AdminPortal({ onNavigate }) {
     });
   }, [allProperties, allPropSearchQuery, allPropStatusFilter]);
 
-  const handleDeletePropertyFromAdmin = async (propId, propObj = null) => {
-    if (!propId && !propObj) return;
+  const handleDeletePropertyFromAdmin = async (targetProp, propObj = null) => {
+    const propId = typeof targetProp === 'object' && targetProp !== null
+      ? (targetProp.id || targetProp.propertyId || targetProp.referenceId)
+      : (targetProp || propObj?.id || propObj?.propertyId);
+    if (!propId) return;
+
     const confirmDel = window.confirm('Are you sure you want to permanently delete this property listing?');
     if (!confirmDel) return;
 
-    const pIdStr = String(propId || propObj?.id || propObj?.propertyId || '');
-    const matchedObj = propObj || allProperties.find(p => p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr));
+    const pIdStr = String(propId || '');
+    const matchedObj = (typeof targetProp === 'object' && targetProp !== null)
+      ? targetProp
+      : (propObj || allProperties.find(p => p && (String(p.id) === pIdStr || String(p.propertyId) === pIdStr || String(p.referenceId) === pIdStr)) || selectedProperty);
 
     const id2 = String(matchedObj?.propertyId || '');
     const id3 = String(matchedObj?.referenceId || '');
@@ -1153,6 +1175,24 @@ export default function AdminPortal({ onNavigate }) {
       );
     };
 
+    // 1. Authoritative PostgreSQL DELETE FIRST
+    try {
+      await fetch(`/api/properties/${encodeURIComponent(pIdStr)}?isAdmin=true`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isAdmin: true,
+          propertyId: pIdStr,
+          referenceId: id3,
+          title: matchedObj?.title || '',
+          property: matchedObj
+        })
+      });
+    } catch (pgErr) {
+      console.warn('PostgreSQL property delete request note:', pgErr);
+    }
+
+    // 2. LocalStorage updates across all stores
     try {
       const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
       const parsedDeleted = JSON.parse(rawDeleted);
@@ -1172,31 +1212,66 @@ export default function AdminPortal({ onNavigate }) {
           referenceId: id3 || `EL-PROP-${num1 || pIdStr}`,
           title: matchedObj?.title || '',
           deletedByAdmin: true,
+          status: 'DELETED_BY_ADMIN',
+          listingStatus: 'DELETED_BY_ADMIN',
           adminFeedback: 'Notification: Deleted by Admin',
           adminNotes: 'Deleted by Admin',
           deletedAt: new Date().toISOString()
         });
         localStorage.setItem('easeland_admin_deleted_properties', JSON.stringify(parsedAdminDel));
       }
+
+      const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
+      keys.forEach(k => {
+        const rawLocal = localStorage.getItem(k);
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map(p => {
+              if (matchesAlias(p)) {
+                return {
+                  ...p,
+                  status: 'DELETED_BY_ADMIN',
+                  listingStatus: 'DELETED_BY_ADMIN',
+                  deletedByAdmin: true,
+                  isDeleted: true,
+                  isPublished: false,
+                  adminFeedback: 'Notification: Deleted by Admin',
+                  adminNotes: 'Deleted by Admin'
+                };
+              }
+              return p;
+            });
+            localStorage.setItem(k, JSON.stringify(updated));
+          }
+        }
+      });
     } catch (e) { }
 
+    // 3. Immediately update UI state
     setAllProperties(prev => prev.filter(p => !matchesAlias(p)));
     setVerificationQueue(prev => prev.filter(p => !matchesAlias(p)));
+    setIsWorkspaceOpen(false);
+    setSelectedProperty(null);
 
+    // 4. Cloud Firestore deletion / admin mark
     try {
       const { deletePropertyListing } = await import('../firebase/propertyService.js');
-      await deletePropertyListing(propId, user?.uid, true, matchedObj);
+      await deletePropertyListing(pIdStr, user?.uid, true, matchedObj);
     } catch (e) { }
 
+    // 5. Mock API store update
     try {
       const { mockApi } = await import('../services/mockApi.js');
       if (typeof mockApi.deleteProperty === 'function') {
-        mockApi.deleteProperty(propId, matchedObj, true);
+        mockApi.deleteProperty(pIdStr, matchedObj, true);
       }
     } catch (e) { }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { propertyId: pIdStr, isAdmin: true } }));
+      window.dispatchEvent(new CustomEvent('easeland-property-status-updated', { detail: { propertyId: pIdStr, status: 'DELETED_BY_ADMIN' } }));
+      window.dispatchEvent(new Event('storage'));
     }
     logAdminActivity(`deleted property listing ${pIdStr}.`);
 
@@ -1825,61 +1900,8 @@ export default function AdminPortal({ onNavigate }) {
     }
   };
 
-  const handleDeleteProperty = async (targetProp) => {
-    const propId = typeof targetProp === 'object' ? (targetProp?.id || targetProp?.propertyId || targetProp?.referenceId) : targetProp;
-    if (adminActionProcessing || !propId) {
-      console.warn('Cannot delete property listing: Property ID is undefined or missing', targetProp);
-      return;
-    }
-
-    if (!window.confirm('Are you sure you want to PERMANENTLY delete this property listing from the platform? This cannot be undone.')) return;
-
-    setAdminActionProcessing(true);
-    try {
-      const pIdStr = String(propId);
-      try {
-        const rawDeleted = localStorage.getItem('easeland_deleted_properties') || '[]';
-        const parsedDeleted = JSON.parse(rawDeleted);
-        const idsToAdd = [pIdStr];
-        if (selectedProperty) {
-          if (selectedProperty.id) idsToAdd.push(String(selectedProperty.id));
-          if (selectedProperty.propertyId) idsToAdd.push(String(selectedProperty.propertyId));
-          if (selectedProperty.referenceId) idsToAdd.push(String(selectedProperty.referenceId));
-        }
-        idsToAdd.forEach(idVal => {
-          if (idVal && !parsedDeleted.includes(idVal)) parsedDeleted.push(idVal);
-        });
-        localStorage.setItem('easeland_deleted_properties', JSON.stringify(parsedDeleted));
-      } catch (e) { }
-
-      // Immediately remove from UI state for 0ms lag
-      setVerificationQueue(prev => prev.filter(p => {
-        if (!p) return false;
-        const id1 = String(p.id || '');
-        const id2 = String(p.propertyId || '');
-        const id3 = String(p.referenceId || '');
-        return id1 !== pIdStr && id2 !== pIdStr && id3 !== pIdStr;
-      }));
-
-      const { deletePropertyListing } = await import('../firebase/propertyService.js');
-      await deletePropertyListing(propId, user?.uid, true);
-
-      try {
-        const { mockApi } = await import('../services/mockApi.js');
-        if (typeof mockApi.deleteProperty === 'function') {
-          mockApi.deleteProperty(propId);
-        }
-      } catch (e) { }
-
-      setPublishSuccessMessage('Property listing deleted successfully.');
-      logAdminActivity(`deleted property listing ${propId}.`);
-      setIsWorkspaceOpen(false);
-      setSelectedProperty(null);
-      await loadData();
-      setTimeout(() => setPublishSuccessMessage(''), 4000);
-    } finally {
-      setAdminActionProcessing(false);
-    }
+  const handleDeleteProperty = async (targetProp, propObj = null) => {
+    return handleDeletePropertyFromAdmin(targetProp, propObj);
   };
 
   const handleCreateFollowUp = (e) => {

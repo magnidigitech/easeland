@@ -95,10 +95,10 @@ export default function PropertiesSearchPage({
     setErrorMsg(null);
 
     try {
-      // 1. Primary DB Source: Fetch from PostgreSQL database endpoint (/api/properties)
+      // 1. Primary DB Source: Fetch from PostgreSQL database endpoint (/api/properties?publicOnly=true)
       let pgProperties = [];
       try {
-        const res = await fetch('/api/properties');
+        const res = await fetch('/api/properties?publicOnly=true');
         if (res.ok) {
           const json = await res.json();
           if (json.success && Array.isArray(json.properties)) {
@@ -123,7 +123,7 @@ export default function PropertiesSearchPage({
       const localData = mockApi.getPublicProperties(stateToUse) || [];
 
       // 3. Merge PostgreSQL + Firestore + LocalStorage properties and apply matchesSearchFilters
-      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p));
+      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p) && isPropertyPubliclyVisible(p));
       setCandidateProperties(allCandidateProps);
 
       // Dynamically compute MIN and MAX price bounds from all candidate properties matching non-price filters

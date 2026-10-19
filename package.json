@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test src/utils/metaPixel.test.js src/services/siteConfigSanitization.test.js src/services/locationProvider.test.js src/utils/furnishingFilter.test.js src/utils/urlRouting.test.js src/utils/dynamicPriceRange.test.js src/services/reverificationPendingEdits.test.js src/services/verificationWorkspaceDiff.test.js src/services/userGovernanceSync.test.js src/utils/adminPropertyDeletion.test.js",
+    "test": "node --test src/utils/metaPixel.test.js src/services/siteConfigSanitization.test.js src/services/locationProvider.test.js src/utils/furnishingFilter.test.js src/utils/urlRouting.test.js src/utils/dynamicPriceRange.test.js src/services/reverificationPendingEdits.test.js src/services/verificationWorkspaceDiff.test.js src/services/userGovernanceSync.test.js src/utils/adminPropertyDeletion.test.js src/utils/pwaManager.test.js",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

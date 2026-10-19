@@ -64,6 +64,38 @@ app.use('/uploads', express.static(uploadsDir, {
   immutable: true
 }));
 
+// PWA Service Worker: Never cache sw.js so client devices detect updates instantly
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Content-Type', 'application/javascript');
+  const swPath = path.join(__dirname, 'dist', 'sw.js');
+  if (fs.existsSync(swPath)) {
+    return res.sendFile(swPath);
+  }
+  const publicSwPath = path.join(__dirname, 'public', 'sw.js');
+  if (fs.existsSync(publicSwPath)) {
+    return res.sendFile(publicSwPath);
+  }
+  return res.status(404).send('Service worker not found');
+});
+
+// PWA Web App Manifest with correct MIME type
+app.get('/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  const manifestPath = path.join(__dirname, 'dist', 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    return res.sendFile(manifestPath);
+  }
+  const publicManifestPath = path.join(__dirname, 'public', 'manifest.json');
+  if (fs.existsSync(publicManifestPath)) {
+    return res.sendFile(publicManifestPath);
+  }
+  return res.status(404).send('Manifest not found');
+});
+
 // Serve static Vite frontend bundle
 app.use(express.static(path.join(__dirname, 'dist')));
 
@@ -736,59 +768,78 @@ app.get('/api/media/:mediaId', async (req, res) => {
   }
 });
 
-// API Endpoint: Sync/Save property record to Local Disk + PostgreSQL DB (Zero Downtime)
+// API Endpoint: Sync/Save property record to PostgreSQL DB + Local Disk (Zero Downtime)
 app.post('/api/properties', async (req, res) => {
   try {
     const p = req.body;
     if (!p || (!p.propertyId && !p.id)) {
       return res.status(400).json({ success: false, error: 'Property payload with propertyId is required.' });
     }
-    const pId = p.propertyId || p.id;
+    const pId = String(p.propertyId || p.id);
+    const refId = String(p.referenceId || ('EL-PROP-' + pId));
+    const pTitle = String(p.title || 'Untitled Property');
 
-    // Check PostgreSQL database if existing record is not yet in local memory
-    let existing = localPropsMap.get(pId);
-    if (!existing || (!existing.status && !existing.listingStatus)) {
-      try {
-        const ph = String.fromCharCode(36) + '1';
-        const pgCheck = await pgPool.query(
-          "SELECT raw_data FROM properties WHERE property_id = " + ph + " OR reference_id = " + ph + " OR raw_data->>'id' = " + ph + " OR raw_data->>'propertyId' = " + ph + ";",
-          [pId]
-        );
-        if (pgCheck.rows.length > 0 && pgCheck.rows[0].raw_data) {
-          existing = pgCheck.rows[0].raw_data;
-          localPropsMap.set(pId, existing);
-        }
-      } catch (e) {}
+    // 1. Check existing in PostgreSQL FIRST (Primary Database Source)
+    let existing = null;
+    try {
+      const ph1 = String.fromCharCode(36) + '1';
+      const ph2 = String.fromCharCode(36) + '2';
+      const pgCheck = await pgPool.query(
+        "SELECT raw_data FROM properties WHERE LOWER(property_id) = LOWER(" + ph1 + ") OR LOWER(reference_id) = LOWER(" + ph1 + ") OR LOWER(reference_id) = LOWER(" + ph2 + ") OR (LOWER(title) = LOWER(" + ph2 + ") AND " + ph2 + " <> '') LIMIT 1;",
+        [pId, refId]
+      );
+      if (pgCheck.rows.length > 0 && pgCheck.rows[0].raw_data) {
+        existing = pgCheck.rows[0].raw_data;
+      }
+    } catch (e) {}
+
+    if (!existing) {
+      existing = localPropsMap.get(pId) || {};
     }
 
-    // 1. ALWAYS Save to Local Persistent Disk & In-Memory Store FIRST (100% Reliable & Immediate)
+    // Compute updated property object
     const savedLocal = saveLocalProperty(p, existing);
 
-    // 2. Try background sync to PostgreSQL (Non-blocking fallback)
+    // 2. ALWAYS Save to PostgreSQL FIRST
     try {
-      const queryText = `
-        INSERT INTO properties (
-          property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW()
-        )
-        ON CONFLICT (property_id) DO UPDATE SET
-          reference_id = EXCLUDED.reference_id,
-          owner_id = EXCLUDED.owner_id,
-          title = EXCLUDED.title,
-          property_type = EXCLUDED.property_type,
-          purpose = EXCLUDED.purpose,
-          price = EXCLUDED.price,
-          area = EXCLUDED.area,
-          location = EXCLUDED.location,
-          specs = EXCLUDED.specs,
-          amenities = EXCLUDED.amenities,
-          media = EXCLUDED.media,
-          listing_status = EXCLUDED.listing_status,
-          is_published = EXCLUDED.is_published,
-          raw_data = EXCLUDED.raw_data,
-          updated_at = NOW();
-      `;
+      const ph1 = String.fromCharCode(36) + '1';
+      const ph2 = String.fromCharCode(36) + '2';
+      const ph3 = String.fromCharCode(36) + '3';
+      const ph4 = String.fromCharCode(36) + '4';
+      const ph5 = String.fromCharCode(36) + '5';
+      const ph6 = String.fromCharCode(36) + '6';
+      const ph7 = String.fromCharCode(36) + '7';
+      const ph8 = String.fromCharCode(36) + '8';
+      const ph9 = String.fromCharCode(36) + '9';
+      const ph10 = String.fromCharCode(36) + '10';
+      const ph11 = String.fromCharCode(36) + '11';
+      const ph12 = String.fromCharCode(36) + '12';
+      const ph13 = String.fromCharCode(36) + '13';
+      const ph14 = String.fromCharCode(36) + '14';
+      const ph15 = String.fromCharCode(36) + '15';
+
+      const queryText =
+        "INSERT INTO properties (" +
+        "  property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at" +
+        ") VALUES (" +
+        "  " + ph1 + ", " + ph2 + ", " + ph3 + ", " + ph4 + ", " + ph5 + ", " + ph6 + ", " + ph7 + ", " + ph8 + ", " + ph9 + ", " + ph10 + ", " + ph11 + ", " + ph12 + ", " + ph13 + ", " + ph14 + ", " + ph15 + ", NOW()" +
+        ") " +
+        "ON CONFLICT (property_id) DO UPDATE SET " +
+        "  reference_id = EXCLUDED.reference_id, " +
+        "  owner_id = EXCLUDED.owner_id, " +
+        "  title = EXCLUDED.title, " +
+        "  property_type = EXCLUDED.property_type, " +
+        "  purpose = EXCLUDED.purpose, " +
+        "  price = EXCLUDED.price, " +
+        "  area = EXCLUDED.area, " +
+        "  location = EXCLUDED.location, " +
+        "  specs = EXCLUDED.specs, " +
+        "  amenities = EXCLUDED.amenities, " +
+        "  media = EXCLUDED.media, " +
+        "  listing_status = EXCLUDED.listing_status, " +
+        "  is_published = EXCLUDED.is_published, " +
+        "  raw_data = EXCLUDED.raw_data, " +
+        "  updated_at = NOW();";
 
       const values = [
         savedLocal.propertyId || savedLocal.id,
@@ -810,7 +861,7 @@ app.post('/api/properties', async (req, res) => {
 
       await pgPool.query(queryText, values);
     } catch (pgErr) {
-      console.warn('PostgreSQL property save background sync note (Saved to local disk store):', pgErr.message);
+      console.warn('PostgreSQL property save note (Saved to local disk store fallback):', pgErr.message);
     }
 
     return res.json({ success: true, message: 'Property saved successfully.', property: savedLocal });
@@ -820,35 +871,97 @@ app.post('/api/properties', async (req, res) => {
   }
 });
 
-// API Endpoint: Get all property records (Combines PostgreSQL + Local Disk Store)
+// Also support PUT & PATCH for RESTful updates
+app.put('/api/properties/:id', (req, res) => {
+  req.body = req.body || {};
+  req.body.propertyId = req.params.id;
+  return app._router.handle(req, res);
+});
+
+// API Endpoint: Get all property records (PostgreSQL Primary + Local Disk Store Fallback)
 app.get('/api/properties', async (req, res) => {
   try {
-    const localList = getLocalProperties();
+    const isPublicOnly = req.query.publicOnly === 'true' || req.query.public === 'true';
     let pgProperties = [];
 
     try {
-      const result = await pgPool.query('SELECT raw_data FROM properties ORDER BY updated_at DESC LIMIT 100;');
-      pgProperties = result.rows.map(row => row.raw_data).filter(Boolean);
+      const result = await pgPool.query(
+        'SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at FROM properties ORDER BY updated_at DESC;'
+      );
+      pgProperties = result.rows.map(row => {
+        const raw = row.raw_data || {};
+        const listingStatus = row.listing_status || raw.listing_status || raw.listingStatus || 'DRAFT';
+        const isPublished = row.is_published !== null && row.is_published !== undefined ? Boolean(row.is_published) : Boolean(raw.is_published || raw.isPublished);
+        const isAdminDeleted = listingStatus === 'DELETED_BY_ADMIN' || raw.status === 'DELETED_BY_ADMIN' || raw.deletedByAdmin === true;
+
+        return {
+          ...raw,
+          propertyId: row.property_id || raw.propertyId || raw.id,
+          id: row.property_id || raw.id || raw.propertyId,
+          referenceId: row.reference_id || raw.referenceId,
+          ownerId: row.owner_id || raw.ownerId,
+          title: row.title || raw.title,
+          propertyType: row.property_type || raw.propertyType,
+          purpose: row.purpose || raw.purpose,
+          price: row.price !== null ? Number(row.price) : raw.price,
+          area: row.area !== null ? Number(row.area) : raw.area,
+          location: row.location || raw.location,
+          specs: row.specs || raw.specs,
+          amenities: row.amenities || raw.amenities,
+          media: row.media || raw.media,
+          listing_status: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
+          listingStatus: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
+          status: isAdminDeleted ? 'DELETED_BY_ADMIN' : (raw.status || listingStatus),
+          deletedByAdmin: Boolean(isAdminDeleted),
+          isDeleted: Boolean(isAdminDeleted || raw.isDeleted),
+          is_published: isAdminDeleted ? false : isPublished,
+          isPublished: isAdminDeleted ? false : isPublished,
+          adminFeedback: isAdminDeleted ? 'Notification: Deleted by Admin' : (raw.adminFeedback || raw.verificationNotes || raw.adminNotes)
+        };
+      }).filter(Boolean);
     } catch (pgErr) {
-      console.warn('PostgreSQL fetch fallback note (Serving local disk store):', pgErr.message);
+      console.warn('PostgreSQL fetch note (Serving local disk store fallback):', pgErr.message);
     }
 
+    const localList = getLocalProperties();
     const mergedMap = new Map();
-    [...localList, ...pgProperties].forEach(p => {
+
+    // 1. Seed from localList first
+    localList.forEach(p => {
       if (p && (p.propertyId || p.id)) {
-        const pId = p.propertyId || p.id;
-        mergedMap.set(pId, { ...mergedMap.get(pId), ...p });
+        const pId = String(p.propertyId || p.id);
+        mergedMap.set(pId, p);
       }
     });
 
-    const properties = Array.from(mergedMap.values());
+    // 2. Overlay with PostgreSQL (PostgreSQL is Authoritative Primary Source)
+    pgProperties.forEach(p => {
+      if (p && (p.propertyId || p.id)) {
+        const pId = String(p.propertyId || p.id);
+        const localItem = mergedMap.get(pId) || {};
+        mergedMap.set(pId, { ...localItem, ...p });
+      }
+    });
+
+    let properties = Array.from(mergedMap.values());
+
+    if (isPublicOnly) {
+      properties = properties.filter(p => {
+        const st = String(p.status || p.listingStatus || '').toUpperCase();
+        const lst = String(p.listingStatus || '').toUpperCase();
+        const isDel = p.deletedByAdmin === true || p.isDeleted === true || st === 'DELETED_BY_ADMIN' || lst === 'DELETED_BY_ADMIN' || st === 'DELETED' || lst === 'DELETED';
+        const isPub = p.isPublished === true || p.is_published === true;
+        return !isDel && isPub;
+      });
+    }
+
     return res.json({ success: true, properties });
   } catch (err) {
     return res.json({ success: true, properties: getLocalProperties() });
   }
 });
 
-// API Endpoint: Delete/Mark Deleted property record from Local Disk Store + PostgreSQL
+// API Endpoint: Delete/Mark Deleted property record from PostgreSQL + Local Disk Store
 app.delete('/api/properties/:id', async (req, res) => {
   try {
     const targetId = req.params.id;
@@ -856,19 +969,126 @@ app.delete('/api/properties/:id', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Property ID is required.' });
     }
     const tLower = targetId.toLowerCase().trim();
+    const cleanNum = tLower.replace(/^(el-prop-|prop-)/i, '').trim();
+    const refWithPrefix = cleanNum ? ('el-prop-' + cleanNum) : '';
+    const propWithPrefix = cleanNum ? ('prop-' + cleanNum) : '';
+    const reqTitle = String(req.body?.title || req.body?.property?.title || req.query.title || '').toLowerCase().trim();
+    const extraId = String(req.body?.propertyId || req.body?.property?.id || req.query.propertyId || '').toLowerCase().trim();
+    const extraRef = String(req.body?.referenceId || req.body?.property?.referenceId || req.query.referenceId || '').toLowerCase().trim();
+
     const isAdmin = req.query.isAdmin === 'true' || req.body?.isAdmin === true;
 
-    // Find and update/delete in localPropsMap
+    // 1. PostgreSQL Authoritative Update / Delete FIRST
+    try {
+      const ph1 = String.fromCharCode(36) + '1';
+      const ph2 = String.fromCharCode(36) + '2';
+      const ph3 = String.fromCharCode(36) + '3';
+      const ph4 = String.fromCharCode(36) + '4';
+      const ph5 = String.fromCharCode(36) + '5';
+
+      if (isAdmin) {
+        await pgPool.query(
+          "UPDATE properties " +
+          "SET listing_status = 'DELETED_BY_ADMIN', " +
+          "    is_published = false, " +
+          "    raw_data = jsonb_set(" +
+          "      jsonb_set(" +
+          "        jsonb_set(" +
+          "          jsonb_set(" +
+          "            jsonb_set(COALESCE(raw_data, '{}'::jsonb), '{status}', '\"DELETED_BY_ADMIN\"'), " +
+          "            '{listingStatus}', '\"DELETED_BY_ADMIN\"' " +
+          "          ), " +
+          "          '{listing_status}', '\"DELETED_BY_ADMIN\"' " +
+          "        ), " +
+          "        '{deletedByAdmin}', 'true' " +
+          "      ), " +
+          "      '{adminFeedback}', '\"Notification: Deleted by Admin\"' " +
+          "    ), " +
+          "    updated_at = NOW() " +
+          "WHERE LOWER(property_id) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph1 + ") " +
+          "   OR (" + ph2 + " <> '' AND (" +
+          "        LOWER(property_id) = LOWER(" + ph2 + ") " +
+          "     OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph2 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph2 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph2 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph2 + ")" +
+          "   )) " +
+          "   OR (" + ph3 + " <> '' AND (" +
+          "        LOWER(property_id) = LOWER(" + ph3 + ") " +
+          "     OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph3 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph3 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph3 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph3 + ")" +
+          "   )) " +
+          "   OR (" + ph4 + " <> '' AND (" +
+          "        LOWER(COALESCE(title, '')) = LOWER(" + ph4 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'title', '')) = LOWER(" + ph4 + ")" +
+          "   )) " +
+          "   OR (" + ph5 + " <> '' AND (" +
+          "        LOWER(property_id) = LOWER(" + ph5 + ") " +
+          "     OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph5 + ") " +
+          "     OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph5 + ")" +
+          "   ));",
+          [tLower, cleanNum, refWithPrefix || propWithPrefix, reqTitle, extraId || extraRef]
+        );
+      } else {
+        await pgPool.query(
+          "DELETE FROM properties " +
+          "WHERE LOWER(property_id) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph1 + ") " +
+          "   OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph1 + ") " +
+          "   OR (" + ph2 + " <> '' AND (LOWER(property_id) = LOWER(" + ph2 + ") OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph2 + "))) " +
+          "   OR (" + ph3 + " <> '' AND (LOWER(property_id) = LOWER(" + ph3 + ") OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph3 + "))) " +
+          "   OR (" + ph4 + " <> '' AND (LOWER(COALESCE(title, '')) = LOWER(" + ph4 + ") OR LOWER(COALESCE(raw_data->>'title', '')) = LOWER(" + ph4 + ")));",
+          [tLower, cleanNum, refWithPrefix || propWithPrefix, reqTitle]
+        );
+        await pgPool.query(
+          "DELETE FROM media_files WHERE LOWER(property_id) = LOWER(" + ph1 + ") OR (" + ph2 + " <> '' AND LOWER(property_id) = LOWER(" + ph2 + "));",
+          [tLower, cleanNum]
+        );
+      }
+    } catch (pgErr) {
+      console.warn('PostgreSQL property delete note:', pgErr.message);
+    }
+
+    // 2. Update / Remove from Local Disk Store
+    const allAliases = new Set([
+      tLower,
+      cleanNum,
+      refWithPrefix,
+      propWithPrefix,
+      reqTitle,
+      extraId,
+      extraRef
+    ].filter(Boolean));
+
+    const matchesAlias = (v) => {
+      if (!v) return false;
+      const id1 = String(v.id || '').toLowerCase().trim();
+      const id2 = String(v.propertyId || '').toLowerCase().trim();
+      const id3 = String(v.referenceId || '').toLowerCase().trim();
+      const num = id1.replace(/^(el-prop-|prop-)/i, '').trim();
+      const vTitle = String(v.title || '').toLowerCase().trim();
+
+      return (
+        allAliases.has(id1) ||
+        allAliases.has(id2) ||
+        allAliases.has(id3) ||
+        (num && allAliases.has(num)) ||
+        (vTitle && allAliases.has(vTitle))
+      );
+    };
+
     const matchedKeys = [];
     for (const [k, v] of localPropsMap.entries()) {
-      if (v) {
-        const id1 = String(v.id || '').toLowerCase().trim();
-        const id2 = String(v.propertyId || '').toLowerCase().trim();
-        const id3 = String(v.referenceId || '').toLowerCase().trim();
-        const tTitle = String(v.title || '').toLowerCase().trim();
-        if (id1 === tLower || id2 === tLower || id3 === tLower || (tTitle && tTitle === tLower) || k.toLowerCase().trim() === tLower) {
-          matchedKeys.push(k);
-        }
+      if (allAliases.has(String(k).toLowerCase().trim()) || matchesAlias(v)) {
+        matchedKeys.push(k);
       }
     }
 
@@ -900,24 +1120,6 @@ app.delete('/api/properties/:id', async (req, res) => {
       fs.writeFileSync(propertiesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
     } catch (err) {
       console.warn('Local properties disk write note after delete:', err.message);
-    }
-
-    // Update / Delete in PostgreSQL
-    try {
-      const ph1 = String.fromCharCode(36) + '1';
-      if (isAdmin) {
-        await pgPool.query(
-          "UPDATE properties SET listing_status = 'DELETED_BY_ADMIN', is_published = false, raw_data = jsonb_set(jsonb_set(raw_data, '{status}', '\"DELETED_BY_ADMIN\"'), '{deletedByAdmin}', 'true') WHERE property_id = " + ph1 + " OR reference_id = " + ph1 + " OR raw_data->>'id' = " + ph1 + " OR raw_data->>'propertyId' = " + ph1 + " OR raw_data->>'referenceId' = " + ph1 + ";",
-          [targetId]
-        );
-      } else {
-        await pgPool.query(
-          "DELETE FROM properties WHERE property_id = " + ph1 + " OR reference_id = " + ph1 + " OR raw_data->>'id' = " + ph1 + " OR raw_data->>'propertyId' = " + ph1 + " OR raw_data->>'referenceId' = " + ph1 + ";",
-          [targetId]
-        );
-      }
-    } catch (pgErr) {
-      console.warn('PostgreSQL property delete note:', pgErr.message);
     }
 
     return res.json({ success: true, message: 'Property deleted successfully' });
@@ -1002,30 +1204,6 @@ app.get('/api/properties/:id', async (req, res) => {
   return res.status(404).json({ success: false, error: 'Property not found.' });
 });
 
-// API Endpoint: Delete Property Listing (from Local Store + PostgreSQL)
-app.delete('/api/properties/:id', async (req, res) => {
-  try {
-    const targetId = req.params.id;
-    if (!targetId) return res.status(400).json({ success: false, error: 'Property ID required' });
-
-    // 1. Remove from localPropsMap & disk store
-    localPropsMap.delete(targetId);
-    try {
-      const arrayToStore = Array.from(localPropsMap.values());
-      fs.writeFileSync(propertiesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-    } catch (e) {}
-
-    // 2. Remove from PostgreSQL
-    try {
-      await pgPool.query('DELETE FROM properties WHERE property_id = $1;', [targetId]);
-      await pgPool.query('DELETE FROM media_files WHERE property_id = $1;', [targetId]);
-    } catch (e) {}
-
-    return res.json({ success: true, message: 'Property deleted successfully.' });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message || 'Delete failed' });
-  }
-});
 
 // API Endpoint: Remove Document from Property Listing
 app.delete('/api/properties/:id/documents', async (req, res) => {
