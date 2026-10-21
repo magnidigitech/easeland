@@ -318,7 +318,7 @@ export default function PropertiesSearchPage({
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (searchState.purpose && searchState.purpose !== 'ALL' && searchState.purpose !== 'ANY') count++;
-    if (searchState.propertyType && searchState.propertyType !== 'ALL' && searchState.propertyType !== 'ANY') count++;
+    if ((searchState.category && searchState.category !== 'All') || (searchState.propertyType && searchState.propertyType !== 'ALL' && searchState.propertyType !== 'ANY')) count++;
     if (searchState.state) count++;
     if (searchState.district) count++;
     if (searchState.city) count++;

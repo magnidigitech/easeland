@@ -1,4 +1,4 @@
-import { getCategoryBadgeLabel } from './categoryUtils.js';
+import { getCategoryBadgeLabel, getPropertyTypeFromCategory } from './categoryUtils.js';
 import { extractCoordinates, resolvePlaceCoordinates, calculateDistanceKm } from '../services/locationProvider.js';
 import { convertAreaToSqFt } from '../firebase/propertyService.js';
 import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
@@ -437,10 +437,19 @@ export function matchesSearchFilters(p, searchState = {}) {
   }
 
   // 2. Property Type filter
-  if (effectiveState.propertyType && effectiveState.propertyType !== 'ALL' && effectiveState.propertyType !== 'ANY') {
+  // Guard against stale propertyType conflict when an explicit category filter is selected
+  let effectivePropType = effectiveState.propertyType;
+  if (effectiveState.category && effectiveState.category !== 'All' && effectiveState.category !== 'ALL') {
+    const mappedType = getPropertyTypeFromCategory(effectiveState.category);
+    if (mappedType && effectivePropType && effectivePropType !== 'ALL' && effectivePropType !== 'ANY') {
+      effectivePropType = mappedType;
+    }
+  }
+
+  if (effectivePropType && effectivePropType !== 'ALL' && effectivePropType !== 'ANY') {
     const pType = String(p.propertyType || p.type || '').toUpperCase();
     const pCat = String(p.category || p.title || '').toUpperCase();
-    const targetType = String(effectiveState.propertyType).toUpperCase();
+    const targetType = String(effectivePropType).toUpperCase();
     const isCommercialProp = pType.includes('COMMERCIAL') || pCat.includes('COMMERCIAL') || pCat.includes('COMMERIC') || pCat.includes('OFFICE') || pCat.includes('SHOP');
 
     if (targetType === 'OPEN_PLOT' || targetType === 'PLOT') {

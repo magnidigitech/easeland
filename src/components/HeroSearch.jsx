@@ -3,6 +3,7 @@ import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2, Sparkles
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 import { fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider.js';
+import { STANDARD_CATEGORIES, getPropertyTypeFromCategory } from '../utils/categoryUtils.js';
 
 function normalizeCategoryValue(val, purpVal) {
   if (!val || val === 'All' || val === 'ALL') {
@@ -67,7 +68,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         else if (initialState.purpose === 'SALE') setPurpose('buy');
         else setPurpose(isCompact ? '' : 'buy');
       }
-      setCategory(normalizeCategoryValue(initialState.category, initialState.purpose));
+      setCategory(normalizeCategoryValue(initialState.category || initialState.propertyType, initialState.purpose));
     }
   }, [initialState, isCompact]);
 
@@ -169,14 +170,16 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     }
 
     // PropertyType resolution:
-    // Only set propertyType if natural language specifically detected it (e.g. "villa in Perecherla"),
-    // or preserve existing initialState.propertyType if already selected.
-    // Do NOT forcefully synthesize propertyType from category dropdown!
+    // If natural language specifically detected a propertyType, use it.
+    // Otherwise, align propertyType directly with the selected category so they can never conflict.
+    // If "All Categories" is selected, reset propertyType to 'ALL'.
     let resolvedPropertyType = 'ALL';
     if (parsedNL.propertyType && parsedNL.propertyType !== 'ALL') {
       resolvedPropertyType = parsedNL.propertyType;
-    } else if (initialState?.propertyType && initialState.propertyType !== 'ALL') {
-      resolvedPropertyType = initialState.propertyType;
+    } else if (resolvedCategory && resolvedCategory !== 'All') {
+      resolvedPropertyType = getPropertyTypeFromCategory(resolvedCategory) || 'ALL';
+    } else {
+      resolvedPropertyType = 'ALL';
     }
 
     onSearch({
@@ -422,14 +425,9 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           className="py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
         >
           <option value="All" className="bg-slate-900 text-white font-semibold">All Categories</option>
-          <option value="Open Plot Ventures" className="bg-slate-900 text-white font-semibold">Open Plot Ventures</option>
-          <option value="Open Plot (City)" className="bg-slate-900 text-white font-semibold">Open Plot (City)</option>
-          <option value="Apartments/Flat" className="bg-slate-900 text-white font-semibold">Apartments/Flat</option>
-          <option value="Independent House/Villa" className="bg-slate-900 text-white font-semibold">Independent House/Villa</option>
-          <option value="Commerical Property" className="bg-slate-900 text-white font-semibold">Commerical Property</option>
-          <option value="Agricultural Lands" className="bg-slate-900 text-white font-semibold">Agricultural Lands</option>
-          <option value="Amaravathi LPS layout plots" className="bg-slate-900 text-white font-semibold">Amaravathi LPS layout plots</option>
-          <option value="Others" className="bg-slate-900 text-white font-semibold">Others</option>
+          {STANDARD_CATEGORIES.map(cat => (
+            <option key={cat} value={cat} className="bg-slate-900 text-white font-semibold">{cat}</option>
+          ))}
         </select>
 
         <button
@@ -622,14 +620,9 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
               >
                 <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
-                <option value="Open Plot Ventures" className="bg-slate-900 text-white font-bold">Open Plot Ventures</option>
-                <option value="Open Plot (City)" className="bg-slate-900 text-white font-bold">Open Plot (City)</option>
-                <option value="Apartments/Flat" className="bg-slate-900 text-white font-bold">Apartments/Flat</option>
-                <option value="Independent House/Villa" className="bg-slate-900 text-white font-bold">Independent House/Villa</option>
-                <option value="Commerical Property" className="bg-slate-900 text-white font-bold">Commerical Property</option>
-                <option value="Agricultural Lands" className="bg-slate-900 text-white font-bold">Agricultural Lands</option>
-                <option value="Amaravathi LPS layout plots" className="bg-slate-900 text-white font-bold">Amaravathi LPS layout plots</option>
-                <option value="Others" className="bg-slate-900 text-white font-bold">Others</option>
+                {STANDARD_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat} className="bg-slate-900 text-white font-bold">{cat}</option>
+                ))}
               </select>
             </div>
 

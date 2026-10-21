@@ -14,6 +14,11 @@ import {
   getScaleMarkers,
   filterBudgetPresets
 } from '../utils/dynamicPriceRange.js';
+import {
+  STANDARD_CATEGORIES,
+  getPropertyTypeFromCategory,
+  getCategoryFromPropertyType
+} from '../utils/categoryUtils.js';
 
 export const AREA_UNIT_OPTIONS = [
   { label: 'Sq Ft', value: 'sq ft' },
@@ -117,7 +122,9 @@ export default function DynamicFilterPanel({
     });
   }, [priceBounds, candidateProperties, properties, filters?.purpose]);
 
-  const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType);
+  const effectiveCat = String(filters?.category || '').toLowerCase();
+  const isPlotOrLandCategory = effectiveCat.includes('plot') || effectiveCat.includes('land') || effectiveCat.includes('amaravathi') || effectiveCat.includes('lps') || effectiveCat.includes('venture');
+  const isPlotOrLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(filters?.propertyType) || isPlotOrLandCategory;
 
   const [cityQuery, setCityQuery] = useState(filters?.city || '');
   const [citySuggestions, setCitySuggestions] = useState([]);
@@ -649,8 +656,29 @@ export default function DynamicFilterPanel({
   // Active filter chips list
   const activeChips = [];
   if (filters.purpose && filters.purpose !== 'ALL' && filters.purpose !== 'ANY') activeChips.push({ label: `Purpose: ${filters.purpose}`, key: 'purpose', val: '' });
-  if (filters.propertyType && filters.propertyType !== 'ALL' && filters.propertyType !== 'ANY') activeChips.push({ label: `Type: ${filters.propertyType.replace(/_/g, ' ')}`, key: 'propertyType', val: '' });
-  if (filters.category && filters.category !== 'All') activeChips.push({ label: `Category: ${filters.category}`, key: 'category', val: 'All' });
+  if (filters.category && filters.category !== 'All') {
+    activeChips.push({
+      label: `Category: ${filters.category}`,
+      customAction: () => {
+        setFilters(prev => ({
+          ...prev,
+          category: 'All',
+          propertyType: ''
+        }));
+      }
+    });
+  } else if (filters.propertyType && filters.propertyType !== 'ALL' && filters.propertyType !== 'ANY') {
+    activeChips.push({
+      label: `Type: ${filters.propertyType.replace(/_/g, ' ')}`,
+      customAction: () => {
+        setFilters(prev => ({
+          ...prev,
+          propertyType: '',
+          category: 'All'
+        }));
+      }
+    });
+  }
   if (filters.state) activeChips.push({ label: `State: ${filters.state}`, key: 'state', val: '' });
   if (filters.district) activeChips.push({ label: `District: ${filters.district}`, key: 'district', val: '' });
   if (filters.city) activeChips.push({ label: `City: ${filters.city}`, customAction: handleClearCity });
@@ -774,32 +802,33 @@ export default function DynamicFilterPanel({
           </div>
         </div>
 
-        {/* Property Type Select */}
+        {/* Property Category Select */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
-            Property Type
+            Property Category
           </label>
           <select
-            value={filters.propertyType || ''}
+            value={
+              (filters.category && filters.category !== 'All')
+                ? filters.category
+                : (getCategoryFromPropertyType(filters.propertyType) !== 'All' ? getCategoryFromPropertyType(filters.propertyType) : '')
+            }
             onChange={(e) => {
-              const selectedType = e.target.value;
+              const selectedCategory = e.target.value;
+              const mappedType = getPropertyTypeFromCategory(selectedCategory);
               setFilters(prev => ({
                 ...prev,
                 cleared: false,
-                propertyType: selectedType,
-                category: 'All'
+                category: selectedCategory || 'All',
+                propertyType: mappedType || ''
               }));
             }}
             className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-brand-charcoal focus:ring-2 focus:ring-brand-yellow focus:outline-none"
           >
-            <option value="">All Property Types</option>
-            <option value={PropertyType.OPEN_PLOT}>Open Plot Ventures / City</option>
-            <option value={PropertyType.HOUSE}>Independent House / Villa</option>
-            <option value={PropertyType.APARTMENT}>Apartments / Flat</option>
-            <option value={PropertyType.VILLA}>Villa</option>
-            <option value={PropertyType.COMMERCIAL}>Commercial Property</option>
-            <option value={PropertyType.LAND}>Agricultural Lands</option>
-            <option value={PropertyType.OTHER}>Others</option>
+            <option value="">All Categories</option>
+            {STANDARD_CATEGORIES.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
           </select>
         </div>
 

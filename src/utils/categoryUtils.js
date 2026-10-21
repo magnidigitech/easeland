@@ -21,6 +21,48 @@ export const STANDARD_CATEGORIES = [
   'Others'
 ];
 
+/**
+ * Resolves underlying PropertyType enum string from a standard category label
+ */
+export function getPropertyTypeFromCategory(category) {
+  if (!category || category === 'All' || category === 'ALL') return '';
+  const clean = String(category).trim().toLowerCase();
+  if (clean.includes('amaravathi') || clean.includes('lps') || clean.includes('venture') || (clean.includes('city') && clean.includes('plot')) || clean.includes('plot')) {
+    return 'OPEN_PLOT';
+  }
+  if (clean.includes('apartment') || clean.includes('flat')) {
+    return 'APARTMENT';
+  }
+  if (clean.includes('house') || clean.includes('villa') || clean.includes('independent')) {
+    return 'HOUSE';
+  }
+  if (clean.includes('commercial') || clean.includes('commeric')) {
+    return 'COMMERCIAL';
+  }
+  if (clean.includes('agricultural') || clean.includes('farm') || clean.includes('land')) {
+    return 'LAND';
+  }
+  if (clean.includes('other')) {
+    return 'OTHER';
+  }
+  return '';
+}
+
+/**
+ * Resolves standard user-facing category string from a PropertyType enum
+ */
+export function getCategoryFromPropertyType(propType) {
+  if (!propType || propType === 'ALL' || propType === 'ANY') return 'All';
+  const clean = String(propType).trim().toUpperCase();
+  if (clean === 'OPEN_PLOT' || clean === 'PLOT') return 'Open Plot Ventures';
+  if (clean === 'APARTMENT' || clean === 'FLAT') return 'Apartments/Flat';
+  if (clean === 'HOUSE' || clean === 'VILLA') return 'Independent House/Villa';
+  if (clean === 'COMMERCIAL') return 'Commerical Property';
+  if (clean === 'LAND' || clean === 'AGRICULTURAL_LAND') return 'Agricultural Lands';
+  if (clean === 'OTHER') return 'Others';
+  return 'All';
+}
+
 export function getCategoryBadgeLabel(property) {
   if (!property) return 'Open Plot Ventures';
 
