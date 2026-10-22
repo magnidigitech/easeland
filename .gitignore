@@ -7,3 +7,4 @@ dist
 serviceAccountKey.json
 *service-account*.json
 *serviceAccount*.json
+uploads/

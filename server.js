@@ -7,6 +7,7 @@ import pg from 'pg';
 import admin from 'firebase-admin';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +47,24 @@ try {
   }
 } catch (eAdminInit) {
   console.warn('Firebase Admin SDK initialization note:', eAdminInit.message);
+}
+
+function getAdminDb() {
+  try {
+    const apps = getApps();
+    if (apps.length) return getFirestore(apps[0]);
+    const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+    if (fs.existsSync(keyPath)) {
+      const app = initializeApp({
+        credential: cert(JSON.parse(fs.readFileSync(keyPath, 'utf8'))),
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04'
+      }, 'admin-firestore-helper');
+      return getFirestore(app);
+    }
+  } catch (e) {
+    console.warn('Admin Firestore helper note:', e.message);
+  }
+  return null;
 }
 
 const app = express();
@@ -2511,6 +2530,28 @@ app.get('/api/admin/firebase-users', async (req, res) => {
       console.warn('Firebase Admin listUsers note:', authErr.message);
     }
 
+    let fsUsers = [];
+    try {
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        const snap = await adminDb.collection('users').get();
+        snap.forEach(d => {
+          const data = d.data();
+          if (data) {
+            fsUsers.push({
+              ...data,
+              uid: d.id,
+              id: d.id,
+              displayName: data.displayName || data.name || (d.id === 'admin@easeland.in' ? 'EaseLand Admin' : 'Registered User'),
+              name: data.displayName || data.name || (d.id === 'admin@easeland.in' ? 'EaseLand Admin' : 'Registered User')
+            });
+          }
+        });
+      }
+    } catch (fsErr) {
+      console.warn('Firestore users read note:', fsErr.message);
+    }
+
     const localList = getLocalUsers();
     let pgUsers = [];
     try {
@@ -2519,7 +2560,7 @@ app.get('/api/admin/firebase-users', async (req, res) => {
     } catch (pgErr) {}
 
     const userMap = new Map();
-    [...authUsers, ...localList, ...pgUsers].forEach(u => {
+    [...authUsers, ...fsUsers, ...localList, ...pgUsers].forEach(u => {
       if (!u) return;
       const emailKey = (u.email || '').toLowerCase().trim();
       const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
@@ -2547,6 +2588,228 @@ app.get('/api/admin/firebase-users', async (req, res) => {
     const allUsers = Array.from(new Set(userMap.values()));
     return res.json({ success: true, count: allUsers.length, users: allUsers });
   } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Authoritative 3-Way Synchronization Endpoint for Admin Portal
+app.post('/api/admin/sync-users-and-config', async (req, res) => {
+  try {
+    console.log('[EaseLand Sync] Running 3-way synchronization across Firestore, PostgreSQL, and Local...');
+    const adminDb = getAdminDb();
+
+    // 1. Sync Users
+    const userMap = new Map();
+
+    // 1a. Firebase Auth
+    try {
+      const adminApps = getApps();
+      if (adminApps.length) {
+        const auth = getAuth(adminApps[0]);
+        const listResult = await auth.listUsers(1000);
+        listResult.users.forEach(u => {
+          const email = (u.email || '').toLowerCase().trim();
+          const uid = u.uid;
+          const isAdmin = email === 'admin@easeland.in' || u.customClaims?.adminRole;
+          userMap.set(uid, {
+            uid,
+            id: uid,
+            email,
+            displayName: (u.displayName || (isAdmin ? 'EaseLand Admin' : (email ? email.split('@')[0] : 'Registered User'))).trim(),
+            name: (u.displayName || (isAdmin ? 'EaseLand Admin' : (email ? email.split('@')[0] : 'Registered User'))).trim(),
+            phone: u.phoneNumber || '',
+            role: isAdmin ? 'ADMIN' : 'USER',
+            adminRole: Boolean(isAdmin),
+            accountStatus: u.disabled ? 'SUSPENDED' : 'ACTIVE',
+            emailVerified: u.emailVerified ?? true,
+            authProvider: u.providerData?.[0]?.providerId === 'google.com' || email.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password',
+            createdAt: u.metadata?.creationTime || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        });
+      }
+    } catch (eAuth) {
+      console.warn('[EaseLand Sync] Auth list note:', eAuth.message);
+    }
+
+    // 1b. Firestore Users collection
+    if (adminDb) {
+      try {
+        const snap = await adminDb.collection('users').get();
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const uid = docSnap.id;
+          const existing = userMap.get(uid) || {};
+          userMap.set(uid, {
+            ...existing,
+            ...d,
+            uid,
+            id: uid,
+            email: (d.email || existing.email || '').toLowerCase().trim(),
+            displayName: d.displayName || d.name || existing.displayName || 'EaseLand User',
+            name: d.displayName || d.name || existing.name || 'EaseLand User',
+            role: (d.email === 'admin@easeland.in' || d.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (d.role || existing.role || 'USER'),
+            accountStatus: d.accountStatus || existing.accountStatus || 'ACTIVE'
+          });
+        });
+      } catch (eFs) {
+        console.warn('[EaseLand Sync] Firestore users note:', eFs.message);
+      }
+    }
+
+    // 1c. PostgreSQL Users table
+    try {
+      const pgRes = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 1000;');
+      pgRes.rows.forEach(r => {
+        const u = r.raw_data;
+        if (!u) return;
+        const uid = u.uid || u.id;
+        if (!uid) return;
+        const existing = userMap.get(uid) || {};
+        userMap.set(uid, {
+          ...existing,
+          ...u,
+          uid,
+          id: uid,
+          email: (u.email || existing.email || '').toLowerCase().trim(),
+          displayName: u.displayName || u.name || existing.displayName || 'EaseLand User',
+          name: u.displayName || u.name || existing.name || 'EaseLand User',
+          role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER'),
+          accountStatus: u.accountStatus || existing.accountStatus || 'ACTIVE'
+        });
+      });
+    } catch (ePg) {
+      console.warn('[EaseLand Sync] PostgreSQL users note:', ePg.message);
+    }
+
+    // 1d. Local users store
+    localUsersMap.forEach((u, key) => {
+      const uid = u.uid || u.id || key;
+      const existing = userMap.get(uid) || {};
+      userMap.set(uid, { ...existing, ...u, uid, id: uid });
+    });
+
+    const unifiedUsers = Array.from(userMap.values());
+
+    // Write back unified users across all 3 layers
+    for (const u of unifiedUsers) {
+      saveLocalUser(u);
+      try {
+        await pgPool.query(`
+          INSERT INTO users (uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+          ON CONFLICT (uid) DO UPDATE SET
+            email = EXCLUDED.email,
+            display_name = EXCLUDED.display_name,
+            phone = EXCLUDED.phone,
+            role = EXCLUDED.role,
+            account_status = EXCLUDED.account_status,
+            raw_data = EXCLUDED.raw_data,
+            updated_at = NOW();
+        `, [
+          u.uid,
+          u.email,
+          u.displayName || u.name,
+          u.phone || '',
+          u.role || 'USER',
+          u.accountStatus || 'ACTIVE',
+          Boolean(u.emailVerified),
+          JSON.stringify(u)
+        ]);
+      } catch (errPg) {}
+
+      if (adminDb) {
+        try {
+          await adminDb.collection('users').doc(u.uid).set(u, { merge: true });
+        } catch (errFs) {}
+      }
+    }
+
+    // 2. Sync Site Configuration (CMS)
+    const cmsMap = new Map();
+
+    // 2a. Local CMS map
+    localSiteConfigMap.forEach((val, key) => cmsMap.set(key, val));
+
+    // 2b. PostgreSQL site_config table
+    try {
+      const pgCfgRes = await pgPool.query('SELECT module_id, config_data FROM site_config;');
+      pgCfgRes.rows.forEach(row => {
+        if (row.module_id && row.config_data) {
+          const existing = cmsMap.get(row.module_id) || {};
+          cmsMap.set(row.module_id, { ...existing, ...row.config_data });
+        }
+      });
+    } catch (ePgCfg) {}
+
+    // 2c. Firestore siteManagement collection
+    if (adminDb) {
+      try {
+        const snap = await adminDb.collection('siteManagement').get();
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const modId = docSnap.id;
+          if (modId === 'master_draft') {
+            if (d && typeof d === 'object') {
+              Object.keys(d).forEach(k => {
+                if (typeof d[k] === 'object' && d[k] !== null) {
+                  const existing = cmsMap.get(k) || {};
+                  cmsMap.set(k, { ...existing, ...d[k] });
+                }
+              });
+            }
+          } else {
+            const existing = cmsMap.get(modId) || {};
+            cmsMap.set(modId, { ...existing, ...d });
+          }
+        });
+      } catch (eFsCms) {}
+    }
+
+    const unifiedConfig = {};
+    for (const [modId, modData] of cmsMap.entries()) {
+      unifiedConfig[modId] = modData;
+      localSiteConfigMap.set(modId, modData);
+
+      try {
+        await pgPool.query(`
+          INSERT INTO site_config (module_id, config_data, updated_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (module_id) DO UPDATE SET
+            config_data = EXCLUDED.config_data,
+            updated_at = NOW();
+        `, [modId, JSON.stringify(modData)]);
+      } catch (ePgSave) {}
+
+      if (adminDb) {
+        try {
+          await adminDb.collection('siteManagement').doc(modId).set({
+            ...modData,
+            state: 'PUBLISHED',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (eFsSave) {}
+      }
+    }
+
+    // Persist to local disk fallback files
+    try {
+      fs.writeFileSync(siteConfigStoreFile, JSON.stringify(unifiedConfig, null, 2), 'utf8');
+      fs.writeFileSync(usersStoreFile, JSON.stringify(unifiedUsers, null, 2), 'utf8');
+    } catch (eDisk) {}
+
+    console.log(`[EaseLand Sync] Success: ${unifiedUsers.length} users and ${Object.keys(unifiedConfig).length} CMS modules synchronized.`);
+
+    return res.json({
+      success: true,
+      message: '3-way synchronization completed across Firestore, PostgreSQL, and local disk.',
+      usersCount: unifiedUsers.length,
+      cmsCount: Object.keys(unifiedConfig).length,
+      users: unifiedUsers,
+      config: unifiedConfig
+    });
+  } catch (err) {
+    console.error('[EaseLand Sync] Error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

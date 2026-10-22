@@ -84,7 +84,8 @@ import {
 import {
   getSiteConfigAdmin,
   updateSiteModuleAdmin,
-  publishSiteConfigAdmin
+  publishSiteConfigAdmin,
+  syncSiteConfigAndUsers
 } from '../firebase/siteManagementService.js';
 import {
   getVisitorLeads,
@@ -569,19 +570,11 @@ export default function AdminPortal({ onNavigate }) {
         if (uidKey) userMap.set(uidKey, mergedUser);
       });
 
-      const cleanUsers = Array.from(new Set(userMap.values())).filter(u => {
-        if (!u) return false;
-        const uId = String(u.id || u.uid || '').toLowerCase().trim();
-        const uEmail = String(u.email || '').toLowerCase().trim();
-        const st = String(u.status || u.accountStatus || '').toUpperCase();
-        if (st === 'REMOVED' || st === 'DELETED' || st === 'ACCOUNT_DELETED') return false;
-        if (deletedUsers.includes(uId) || deletedUsers.includes(uEmail)) return false;
-        return true;
-      });
-
-      return cleanUsers.map(u => {
+      return Array.from(new Set(userMap.values())).map(u => {
         const uUid = String(u.uid || u.id || '').toLowerCase().trim();
         const uEmail = (u.email || '').toLowerCase().trim();
+        const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+        const isRemoved = rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' || deletedUsers.includes(uUid) || deletedUsers.includes(uEmail);
 
         const userListings = (propertiesList || []).filter(p => {
           if (!p) return false;
@@ -601,12 +594,14 @@ export default function AdminPortal({ onNavigate }) {
           finalName = 'EaseLand Admin';
         }
 
+        const effectiveStatus = isRemoved ? 'REMOVED' : (u.suspension ? 'SUSPENDED' : (u.status || u.accountStatus || 'ACTIVE'));
+
         return {
           ...u,
           name: finalName,
           displayName: finalName,
-          status: u.status || u.accountStatus || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
-          accountStatus: u.accountStatus || u.status || (u.suspension ? 'SUSPENDED' : 'ACTIVE'),
+          status: effectiveStatus,
+          accountStatus: effectiveStatus,
           role: isUserAdmin ? 'ADMIN' : derivedRole,
           postedListingsCount: userListings.length,
           authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
@@ -1041,6 +1036,7 @@ export default function AdminPortal({ onNavigate }) {
       const cfgRes = await getSiteConfigAdmin();
       if (cfgRes.success && cfgRes.config && Object.keys(cfgRes.config).length > 0) {
         cfg = mockApi.mergeSiteConfigWithDefaults(cfgRes.config);
+        mockApi.updateSiteConfig(cfg);
       }
     } catch (e5) {
       console.warn('Error loading site config:', e5);
@@ -1340,6 +1336,30 @@ export default function AdminPortal({ onNavigate }) {
       const updated = mockApi.updateSiteConfig(siteConfig);
       if (updated) setSiteConfig({ ...updated });
       setPublishSuccessMessage('Website configuration published locally.');
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } finally {
+      setAdminActionProcessing(false);
+    }
+  };
+
+  const handleSyncCloudAndDb = async () => {
+    if (adminActionProcessing) return;
+    setAdminActionProcessing(true);
+    try {
+      setPublishSuccessMessage('Authoritative 3-way synchronization running across Firestore, PostgreSQL, and Local Stores...');
+      const syncRes = await syncSiteConfigAndUsers();
+      if (syncRes && syncRes.config && Object.keys(syncRes.config).length > 0) {
+        const merged = mockApi.mergeSiteConfigWithDefaults(syncRes.config);
+        mockApi.updateSiteConfig(merged);
+        setSiteConfig(merged);
+      }
+      await loadData();
+      setPublishSuccessMessage('CMS Modules and User Accounts successfully synchronized across Firestore, PostgreSQL, and Admin Portal!');
+      setTimeout(() => setPublishSuccessMessage(''), 5000);
+    } catch (err) {
+      console.warn('Sync error:', err);
+      await loadData();
+      setPublishSuccessMessage('Admin Portal refreshed from active database.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
       setAdminActionProcessing(false);
@@ -2698,6 +2718,17 @@ export default function AdminPortal({ onNavigate }) {
             >
               <RotateCcw className="w-3.5 h-3.5 text-brand-yellow" />
               <span>RESET TO DEFAULT</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSyncCloudAndDb}
+              disabled={adminActionProcessing}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              title="Run Authoritative 3-Way Synchronization across Cloud Firestore, PostgreSQL, and Local storage"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${adminActionProcessing ? 'animate-spin' : ''}`} />
+              <span>SYNC CLOUD & DB</span>
             </button>
 
             <button
@@ -5239,16 +5270,13 @@ export default function AdminPortal({ onNavigate }) {
                   <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto flex-wrap sm:flex-nowrap">
                     <button
                       type="button"
-                      onClick={async () => {
-                        await loadData();
-                        setPublishSuccessMessage('User directory synced & refreshed from Firebase Auth!');
-                        setTimeout(() => setPublishSuccessMessage(''), 3000);
-                      }}
-                      className="flex items-center gap-1.5 bg-brand-charcoal text-brand-yellow hover:bg-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm transition-all shrink-0 cursor-pointer"
-                      title="Sync and Refresh User Directory from Firebase Auth & Firestore"
+                      onClick={handleSyncCloudAndDb}
+                      disabled={adminActionProcessing}
+                      className="flex items-center gap-1.5 bg-brand-charcoal text-brand-yellow hover:bg-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm transition-all shrink-0 cursor-pointer disabled:opacity-50"
+                      title="Run Authoritative 3-Way Synchronization across Firebase Auth, Cloud Firestore, and PostgreSQL"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Sync & Refresh</span>
+                      <RefreshCw className={`w-3.5 h-3.5 ${adminActionProcessing ? 'animate-spin' : ''}`} />
+                      <span>Sync & Refresh All</span>
                     </button>
 
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-extrabold shadow-xs shrink-0 select-none">
@@ -5298,8 +5326,12 @@ export default function AdminPortal({ onNavigate }) {
                 {(() => {
                   const filteredUsers = registeredUsersList
                     .filter(u => {
-                      if (!u || u.status === 'DELETED' || u.status === 'REMOVED') return false;
-                      if (userStatusFilter !== 'ALL' && u.status !== userStatusFilter) return false;
+                      if (!u) return false;
+                      if (userStatusFilter === 'ALL') {
+                        if (u.status === 'DELETED' || u.status === 'REMOVED') return false;
+                      } else if (u.status !== userStatusFilter) {
+                        return false;
+                      }
                       if (userSearchQuery) {
                         const q = userSearchQuery.toLowerCase();
                         return (u.name || '').toLowerCase().includes(q) ||

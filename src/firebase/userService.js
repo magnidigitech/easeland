@@ -173,10 +173,6 @@ import { ensureAuthSession } from './authService.js';
  */
 export async function getAllUsersAdmin() {
   try {
-    await ensureAuthSession();
-    const usersRef = collection(db, 'users');
-    const snapshot = await getDocs(usersRef);
-
     let deletedUsers = [];
     try {
       if (typeof window !== 'undefined') {
@@ -187,56 +183,89 @@ export async function getAllUsersAdmin() {
 
     const fetchedMap = new Map();
 
-    snapshot.forEach((docSnap) => {
-      try {
-        const data = docSnap.data();
-        const docId = String(docSnap.id || '').toLowerCase().trim();
-        const userEmail = String(data.email || '').toLowerCase().trim();
-        const uStatus = String(data.accountStatus || data.status || '').toUpperCase();
-
-        if (uStatus === 'REMOVED' || uStatus === 'DELETED' || uStatus === 'ACCOUNT_DELETED') return;
-        if (deletedUsers.includes(docId) || deletedUsers.includes(userEmail)) return;
-
-        const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || data.telePhone || '';
-
-        let createdAtFormatted = null;
-        if (data.createdAt) {
-          try {
-            if (typeof data.createdAt.toDate === 'function') {
-              createdAtFormatted = data.createdAt.toDate().toISOString();
-            } else if (typeof data.createdAt.seconds === 'number') {
-              createdAtFormatted = new Date(data.createdAt.seconds * 1000).toISOString();
-            } else if (typeof data.createdAt === 'string' || typeof data.createdAt === 'number') {
-              createdAtFormatted = new Date(data.createdAt).toISOString();
-            }
-          } catch (e) {
-            createdAtFormatted = new Date().toISOString();
-          }
+    // 1. Fetch from server backend (/api/admin/firebase-users - combines Firebase Auth + PostgreSQL + Local)
+    try {
+      const serverRes = await fetch('/api/admin/firebase-users');
+      if (serverRes.ok) {
+        const serverJson = await serverRes.json();
+        if (serverJson.success && Array.isArray(serverJson.users)) {
+          serverJson.users.forEach(u => {
+            if (!u) return;
+            const uId = String(u.uid || u.id || '').toLowerCase().trim();
+            const uEmail = String(u.email || '').toLowerCase().trim();
+            if (deletedUsers.includes(uId) || deletedUsers.includes(uEmail)) return;
+            const key = uEmail || uId;
+            if (key) fetchedMap.set(key, u);
+          });
         }
-
-        const userObj = {
-          id: docSnap.id,
-          uid: docSnap.id,
-          name: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
-          displayName: data.displayName || data.name || data.fullName || 'User ' + docSnap.id.substring(0, 5),
-          email: data.email || '',
-          emailVerified: data.emailVerified ?? (data.email?.endsWith('@gmail.com') ? true : false),
-          authProvider: data.authProvider || data.providerId || (data.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
-          phone: extractedPhone,
-          phoneNumber: extractedPhone,
-          role: data.adminRole ? 'ADMIN' : (data.role || 'USER'),
-          status: data.accountStatus || 'ACTIVE',
-          postedListingsCount: data.postedListingsCount || 0,
-          createdAt: createdAtFormatted,
-          suspension: data.suspension || null
-        };
-
-        const key = (userObj.email || userObj.uid).toLowerCase();
-        fetchedMap.set(key, userObj);
-      } catch (errDoc) {
-        console.error('Error processing user document ' + docSnap.id + ':', errDoc);
       }
-    });
+    } catch (eServer) {
+      console.warn('Backend users fetch note:', eServer.message);
+    }
+
+    // 2. Fetch and merge from Cloud Firestore users collection
+    try {
+      await ensureAuthSession();
+      const usersRef = collection(db, 'users');
+      const snapshot = await getDocs(usersRef);
+
+      snapshot.forEach((docSnap) => {
+        try {
+          const data = docSnap.data();
+          const docId = String(docSnap.id || '').toLowerCase().trim();
+          const userEmail = String(data.email || '').toLowerCase().trim();
+          const uStatus = String(data.accountStatus || data.status || '').toUpperCase();
+
+          if (uStatus === 'REMOVED' || uStatus === 'DELETED' || uStatus === 'ACCOUNT_DELETED') return;
+          if (deletedUsers.includes(docId) || deletedUsers.includes(userEmail)) return;
+
+          const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || data.telePhone || '';
+
+          let createdAtFormatted = null;
+          if (data.createdAt) {
+            try {
+              if (typeof data.createdAt.toDate === 'function') {
+                createdAtFormatted = data.createdAt.toDate().toISOString();
+              } else if (typeof data.createdAt.seconds === 'number') {
+                createdAtFormatted = new Date(data.createdAt.seconds * 1000).toISOString();
+              } else if (typeof data.createdAt === 'string' || typeof data.createdAt === 'number') {
+                createdAtFormatted = new Date(data.createdAt).toISOString();
+              }
+            } catch (e) {
+              createdAtFormatted = new Date().toISOString();
+            }
+          }
+
+          const existing = fetchedMap.get(userEmail) || fetchedMap.get(docId) || {};
+          const userObj = {
+            ...existing,
+            ...data,
+            id: docSnap.id,
+            uid: docSnap.id,
+            name: data.displayName || data.name || data.fullName || existing.name || existing.displayName || ('User ' + docSnap.id.substring(0, 5)),
+            displayName: data.displayName || data.name || data.fullName || existing.displayName || existing.name || ('User ' + docSnap.id.substring(0, 5)),
+            email: data.email || existing.email || '',
+            emailVerified: data.emailVerified ?? existing.emailVerified ?? (data.email?.endsWith('@gmail.com') ? true : false),
+            authProvider: data.authProvider || data.providerId || existing.authProvider || (data.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
+            phone: extractedPhone || existing.phone || '',
+            phoneNumber: extractedPhone || existing.phoneNumber || '',
+            role: (data.adminRole || data.role === 'ADMIN' || existing.role === 'ADMIN' || data.email === 'admin@easeland.in') ? 'ADMIN' : (data.role || existing.role || 'USER'),
+            status: data.accountStatus || data.status || existing.status || 'ACTIVE',
+            accountStatus: data.accountStatus || data.status || existing.accountStatus || 'ACTIVE',
+            postedListingsCount: data.postedListingsCount || existing.postedListingsCount || 0,
+            createdAt: createdAtFormatted || existing.createdAt || new Date().toISOString(),
+            suspension: data.suspension || existing.suspension || null
+          };
+
+          const key = (userObj.email || userObj.uid).toLowerCase();
+          fetchedMap.set(key, userObj);
+        } catch (errDoc) {
+          console.error('Error processing user document ' + docSnap.id + ':', errDoc);
+        }
+      });
+    } catch (fsErr) {
+      console.warn('Firestore getAllUsersAdmin note:', fsErr.message);
+    }
 
     const users = Array.from(fetchedMap.values());
     return { success: true, users };

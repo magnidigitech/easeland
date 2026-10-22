@@ -20,37 +20,60 @@ const CMS_MODULE_KEYS = [
  * Fetch all 16 CMS Site Management modules from PostgreSQL database (/api/site-config).
  */
 export async function getSiteConfigAdmin() {
+  const mergedConfig = {};
+
+  // 1. Primary: Fetch from PostgreSQL /api/site-config
   try {
     const res = await fetch('/api/site-config');
     if (res.ok) {
       const json = await res.json();
-      if (json.success && json.config && Object.keys(json.config).length > 0) {
-        return { success: true, config: sanitizeSiteConfig(json.config) };
+      if (json.success && json.config && typeof json.config === 'object') {
+        Object.assign(mergedConfig, json.config);
       }
     }
   } catch (err) {}
 
+  // 2. Secondary: Fetch and merge from Cloud Firestore siteManagement collection
   try {
     const siteConfigRef = collection(db, 'siteManagement');
     const snapshot = await getDocs(siteConfigRef);
-    const config = {};
 
     snapshot.forEach((docSnap) => {
       if (docSnap.id === 'master_draft') {
         const draftData = docSnap.data();
         if (draftData && typeof draftData === 'object') {
-          Object.assign(config, draftData);
+          Object.assign(mergedConfig, draftData);
         }
       } else {
-        config[docSnap.id] = docSnap.data();
+        const existing = mergedConfig[docSnap.id] || {};
+        mergedConfig[docSnap.id] = { ...existing, ...docSnap.data() };
       }
     });
-
-    return { success: true, config: sanitizeSiteConfig(config) };
   } catch (error) {
-    console.error('Error fetching site config:', error);
-    return { success: false, error: error.message, config: {} };
+    console.warn('Firestore siteManagement fetch note:', error.message);
   }
+
+  // 3. Fallback: Local storage cache
+  if (Object.keys(mergedConfig).length === 0 && typeof window !== 'undefined') {
+    try {
+      const rawStored = localStorage.getItem('easeland_site_config');
+      if (rawStored) {
+        const parsed = JSON.parse(rawStored);
+        if (parsed && typeof parsed === 'object') {
+          Object.assign(mergedConfig, parsed);
+        }
+      }
+    } catch (e) {}
+  }
+
+  const sanitized = sanitizeSiteConfig(mergedConfig);
+  if (typeof window !== 'undefined' && Object.keys(sanitized).length > 0) {
+    try {
+      localStorage.setItem('easeland_site_config', JSON.stringify(sanitized));
+    } catch (e) {}
+  }
+
+  return { success: true, config: sanitized };
 }
 
 /**
@@ -141,8 +164,26 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   }
 
   if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('easeland_site_config', JSON.stringify(fullConfig));
+    } catch (e) {}
     window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: fullConfig }));
   }
 
   return { success: true };
+}
+
+/**
+ * Trigger on-demand 3-way synchronization across Firestore, PostgreSQL, and Local Stores.
+ */
+export async function syncSiteConfigAndUsers() {
+  try {
+    const res = await fetch('/api/admin/sync-users-and-config', { method: 'POST' });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Sync API network note:', err.message);
+  }
+  return { success: false };
 }
