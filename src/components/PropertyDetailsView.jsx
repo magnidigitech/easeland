@@ -569,7 +569,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <MessageCircle className="w-5 h-5 fill-current" />
-                    <span>WhatsApp EaseLand (+91 6300691560)</span>
+                    <span>WhatsApp EaseLand</span>
                   </a>
 
                   <a
@@ -578,7 +578,7 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                     className="w-full bg-brand-charcoal hover:bg-black text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center"
                   >
                     <Phone className="w-5 h-5 text-brand-yellow" />
-                    <span>Call EaseLand (+91 6300691560)</span>
+                    <span>Call EaseLand</span>
                   </a>
                 </div>
 
