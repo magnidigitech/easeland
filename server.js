@@ -1603,7 +1603,8 @@ app.delete('/api/properties/:id', async (req, res) => {
           } catch (e) {}
         }
       }
-    } catch (adminFsErr) {
+    }
+  } catch (adminFsErr) {
       console.warn('Firebase Admin Firestore purge note:', adminFsErr.message);
     }
 
