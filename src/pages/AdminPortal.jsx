@@ -2491,36 +2491,69 @@ export default function AdminPortal({ onNavigate }) {
     const targetId = String(targetUser.id || targetUser.uid || '').toLowerCase().trim();
     const targetEmail = String(targetUser.email || '').toLowerCase().trim();
 
-    // 1. Immediate optimistic UI update
+    // 1. Immediate optimistic UI update - registered users list
     setRegisteredUsersList(prev => prev.filter(u => {
       const id1 = String(u.id || u.uid || '').toLowerCase().trim();
       const em1 = String(u.email || '').toLowerCase().trim();
-      return id1 !== targetId && em1 !== targetEmail;
+      return id1 !== targetId && (!targetEmail || em1 !== targetEmail);
+    }));
+
+    // 2. Find and immediately purge all properties belonging to this user from Admin Portal state
+    const propertiesOfUser = allProperties.filter(p => {
+      if (!p) return false;
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      return pOwner === targetId || (targetEmail && pEmail === targetEmail);
+    });
+
+    setAllProperties(prev => prev.filter(p => {
+      if (!p) return false;
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      return pOwner !== targetId && (!targetEmail || pEmail !== targetEmail);
+    }));
+
+    setVerificationQueue(prev => prev.filter(p => {
+      if (!p) return false;
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      return pOwner !== targetId && (!targetEmail || pEmail !== targetEmail);
     }));
 
     setIsRemoveModalOpen(false);
     setSelectedUserForRemoval(null);
-    setPublishSuccessMessage('User account permanently deleted.');
+    setPublishSuccessMessage('User account and all posted properties permanently deleted.');
     setTimeout(() => setPublishSuccessMessage(''), 4000);
 
-    // 2. Persist to Firestore
+    // 3. Cascade delete each property listing
     try {
-      await removeUserAccount(targetUser.id || targetUser.uid, user?.uid || 'admin_uid_001', removalReason);
+      const { deletePropertyListing } = await import('../firebase/propertyService.js');
+      for (const prop of propertiesOfUser) {
+        try {
+          await deletePropertyListing(prop.id || prop.propertyId, targetUser.id || targetUser.uid, true, prop);
+        } catch (pDelErr) {}
+      }
+    } catch (importErr) {}
+
+    // 4. Persist user removal to Firestore with userEmail
+    try {
+      await removeUserAccount(targetUser.id || targetUser.uid, user?.uid || 'admin_uid_001', removalReason, targetUser.email);
     } catch (e) {
       console.warn('Firestore remove note:', e);
     }
 
-    // 3. Persist to mockApi and logs
+    // 5. Persist to mockApi and logs
     mockApi.removeUserAdmin(targetUser.id || targetUser.uid, removalReason);
-    logAdminActivity('permanently removed user account ' + (targetUser.name || targetUser.email || 'User') + '.');
+    logAdminActivity('permanently removed user account ' + (targetUser.name || targetUser.email || 'User') + ' and cascade deleted all posted properties.');
 
-    // 4. Delete from PostgreSQL backend
+    // 6. Delete from PostgreSQL backend
     try {
       const uidParam = encodeURIComponent(targetUser.uid || targetUser.id || targetEmail);
-      await fetch('/api/users/' + uidParam, { method: 'DELETE' });
+      const emailParam = targetUser.email ? ('?email=' + encodeURIComponent(targetUser.email)) : '';
+      await fetch('/api/users/' + uidParam + emailParam, { method: 'DELETE' });
     } catch (apiErr) { }
 
-    // 5. Update local storage and broadcast cross-tab events
+    // 7. Update local storage and broadcast cross-tab events
     try {
       if (typeof window !== 'undefined') {
         const rawDel = localStorage.getItem('easeland_deleted_users');
@@ -2537,7 +2570,7 @@ export default function AdminPortal({ onNavigate }) {
               if (!u) return false;
               const id1 = String(u.id || u.uid || '').toLowerCase().trim();
               const em1 = String(u.email || '').toLowerCase().trim();
-              return id1 !== targetId && em1 !== targetEmail;
+              return id1 !== targetId && (!targetEmail || em1 !== targetEmail);
             });
             localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
           }

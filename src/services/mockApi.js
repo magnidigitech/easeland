@@ -2020,16 +2020,29 @@ export const mockApi = {
 
   removeUserAdmin: (userId, reason = 'Account permanently deleted by platform admin') => {
     const usrIndex = registeredUsers.findIndex(u => u.id === userId || u.email === userId);
+    let removedUser = null;
     if (usrIndex !== -1) {
-      const removedUser = registeredUsers[usrIndex];
+      removedUser = registeredUsers[usrIndex];
       registeredUsers.splice(usrIndex, 1);
       setStoredData('easeland_registered_users', registeredUsers);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: registeredUsers }));
       }
-      return removedUser;
     }
-    return null;
+
+    // Cascade delete any properties posted from this account in mockApi
+    const uLow = String(userId || '').toLowerCase().trim();
+    const uEmail = removedUser?.email ? String(removedUser.email).toLowerCase().trim() : '';
+    const userProps = properties.filter(p => {
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      return pOwner === uLow || (uEmail && pEmail === uEmail);
+    });
+    userProps.forEach(p => {
+      mockApi.deleteProperty(p.id || p.propertyId, p, true);
+    });
+
+    return removedUser;
   },
 
   getCurrentUser: () => {

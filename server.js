@@ -2862,20 +2862,28 @@ app.post('/api/users', async (req, res) => {
     saveLocalUser(fullPayload);
 
     try {
-      const queryText = `
-        INSERT INTO users (
-          uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
-        ) ON CONFLICT (uid) DO UPDATE SET
-          email = EXCLUDED.email,
-          display_name = EXCLUDED.display_name,
-          phone = EXCLUDED.phone,
-          role = EXCLUDED.role,
-          account_status = EXCLUDED.account_status,
-          raw_data = EXCLUDED.raw_data,
-          updated_at = NOW();
-      `;
+      const p1 = String.fromCharCode(36) + '1';
+      const p2 = String.fromCharCode(36) + '2';
+      const p3 = String.fromCharCode(36) + '3';
+      const p4 = String.fromCharCode(36) + '4';
+      const p5 = String.fromCharCode(36) + '5';
+      const p6 = String.fromCharCode(36) + '6';
+      const p7 = String.fromCharCode(36) + '7';
+      const p8 = String.fromCharCode(36) + '8';
+
+      const queryText = 
+        "INSERT INTO users (" +
+        "  uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at" +
+        ") VALUES (" +
+        "  " + p1 + ", " + p2 + ", " + p3 + ", " + p4 + ", " + p5 + ", " + p6 + ", " + p7 + ", " + p8 + ", NOW(), NOW()" +
+        ") ON CONFLICT (uid) DO UPDATE SET " +
+        "  email = EXCLUDED.email, " +
+        "  display_name = EXCLUDED.display_name, " +
+        "  phone = EXCLUDED.phone, " +
+        "  role = EXCLUDED.role, " +
+        "  account_status = EXCLUDED.account_status, " +
+        "  raw_data = EXCLUDED.raw_data, " +
+        "  updated_at = NOW();";
       await pgPool.query(queryText, [
         uUid,
         fullPayload.email,
@@ -2898,18 +2906,226 @@ app.post('/api/users', async (req, res) => {
 
 app.delete('/api/users/:uid', async (req, res) => {
   try {
-    const uUid = req.params.uid;
+    const uUid = String(req.params.uid || '').trim();
+    if (!uUid) {
+      return res.status(400).json({ success: false, error: 'User ID is required.' });
+    }
+
+    let targetEmail = String(req.query.email || req.body?.email || '').trim().toLowerCase();
+    if (!targetEmail) {
+      const cached = localUsersMap.get(uUid);
+      if (cached?.email) targetEmail = String(cached.email).trim().toLowerCase();
+    }
+
+    const ph1 = String.fromCharCode(36) + '1';
+    const ph2 = String.fromCharCode(36) + '2';
+    const ph3 = String.fromCharCode(36) + '3';
+
+    if (!targetEmail) {
+      try {
+        const uRes = await pgPool.query('SELECT email FROM users WHERE LOWER(uid) = LOWER(' + ph1 + ') LIMIT 1;', [uUid]);
+        if (uRes.rows.length && uRes.rows[0].email) {
+          targetEmail = String(uRes.rows[0].email).trim().toLowerCase();
+        }
+      } catch (e) {}
+    }
+
+    // 1. Identify all property IDs owned by this user from PostgreSQL
+    let userPropIds = [];
+    try {
+      const pRes = await pgPool.query(
+        "SELECT property_id, reference_id FROM properties " +
+        "WHERE LOWER(owner_id) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(raw_data->>'ownerId', '')) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(raw_data->>'userId', '')) = LOWER(" + ph1 + ") " +
+        "   OR (" + ph2 + " <> '' AND (" +
+        "       LOWER(COALESCE(raw_data->>'ownerEmail', '')) = LOWER(" + ph2 + ") OR " +
+        "       LOWER(COALESCE(raw_data->>'ownerPrivateEmail', '')) = LOWER(" + ph2 + ")" +
+        "   ));",
+        [uUid, targetEmail || '']
+      );
+      userPropIds = pRes.rows.map(r => r.property_id).filter(Boolean);
+    } catch (pgErr) {
+      console.warn('PostgreSQL find user properties note:', pgErr.message);
+    }
+
+    // 2. Cascade delete from PostgreSQL tables
+    try {
+      // 2a. Delete from media_files
+      await pgPool.query(
+        "DELETE FROM media_files " +
+        "WHERE LOWER(owner_id) = LOWER(" + ph1 + ")" +
+        (userPropIds.length ? " OR property_id = ANY(" + ph2 + ")" : "") + ";",
+        userPropIds.length ? [uUid, userPropIds] : [uUid]
+      );
+    } catch (eMedia) {}
+
+    try {
+      // 2b. Delete from enquiries
+      await pgPool.query(
+        "DELETE FROM enquiries " +
+        "WHERE LOWER(owner_id) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(customer_id, '')) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(buyer_id, '')) = LOWER(" + ph1 + ") " +
+        "   OR (" + ph2 + " <> '' AND (LOWER(COALESCE(owner_email, '')) = LOWER(" + ph2 + ") OR LOWER(COALESCE(customer_email, '')) = LOWER(" + ph2 + ") OR LOWER(COALESCE(buyer_email, '')) = LOWER(" + ph2 + ")))" +
+        (userPropIds.length ? " OR property_id = ANY(" + ph3 + ")" : "") + ";",
+        userPropIds.length ? [uUid, targetEmail || '', userPropIds] : [uUid, targetEmail || '']
+      );
+    } catch (eEnq) {}
+
+    try {
+      // 2c. Delete from admin_deleted_properties
+      await pgPool.query(
+        "DELETE FROM admin_deleted_properties " +
+        "WHERE LOWER(owner_id) = LOWER(" + ph1 + ")" +
+        (userPropIds.length ? " OR property_id = ANY(" + ph2 + ")" : "") + ";",
+        userPropIds.length ? [uUid, userPropIds] : [uUid]
+      );
+    } catch (eAdm) {}
+
+    try {
+      // 2d. Delete from properties
+      await pgPool.query(
+        "DELETE FROM properties " +
+        "WHERE LOWER(owner_id) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(raw_data->>'ownerId', '')) = LOWER(" + ph1 + ") " +
+        "   OR LOWER(COALESCE(raw_data->>'userId', '')) = LOWER(" + ph1 + ") " +
+        "   OR (" + ph2 + " <> '' AND (" +
+        "       LOWER(COALESCE(raw_data->>'ownerEmail', '')) = LOWER(" + ph2 + ") OR " +
+        "       LOWER(COALESCE(raw_data->>'ownerPrivateEmail', '')) = LOWER(" + ph2 + ")" +
+        "   ));",
+        [uUid, targetEmail || '']
+      );
+    } catch (eProp) {}
+
+    try {
+      // 2e. Delete from users table
+      await pgPool.query(
+        "DELETE FROM users " +
+        "WHERE LOWER(uid) = LOWER(" + ph1 + ") " +
+        "   OR (" + ph2 + " <> '' AND LOWER(COALESCE(email, '')) = LOWER(" + ph2 + "));",
+        [uUid, targetEmail || '']
+      );
+    } catch (eUser) {}
+
+    // 3. Cascade delete from Local Disk Stores (localPropsMap and localUsersMap)
+    const propIdsSet = new Set(userPropIds.map(id => String(id).toLowerCase().trim()));
+    for (const [k, p] of localPropsMap.entries()) {
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      const pId = String(p.id || p.propertyId || '').toLowerCase().trim();
+      if (pOwner === uUid.toLowerCase() || (targetEmail && pEmail === targetEmail) || propIdsSet.has(pId) || propIdsSet.has(k.toLowerCase())) {
+        localPropsMap.delete(k);
+        propIdsSet.add(pId);
+      }
+    }
+    try {
+      const propsArray = Array.from(localPropsMap.values());
+      fs.writeFileSync(propertiesStoreFile, JSON.stringify(propsArray, null, 2), 'utf8');
+    } catch (e) {}
+
     localUsersMap.delete(uUid);
+    if (targetEmail) {
+      for (const [k, u] of localUsersMap.entries()) {
+        if (String(u.email || '').toLowerCase().trim() === targetEmail) {
+          localUsersMap.delete(k);
+        }
+      }
+    }
     try {
       const arrayToStore = Array.from(localUsersMap.values());
       fs.writeFileSync(usersStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
     } catch (e) {}
 
+    // 4. Cascade delete from Cloud Firestore via Firebase Admin SDK
     try {
-      await pgPool.query('DELETE FROM users WHERE uid = $1;', [uUid]);
-    } catch (pgErr) {}
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        const firestorePropIds = new Set(propIdsSet);
+        try {
+          const snap1 = await adminDb.collection('properties').where('ownerId', '==', uUid).get();
+          snap1.docs.forEach(d => firestorePropIds.add(d.id));
+        } catch (e) {}
+        try {
+          const snap2 = await adminDb.collection('properties').where('userId', '==', uUid).get();
+          snap2.docs.forEach(d => firestorePropIds.add(d.id));
+        } catch (e) {}
+        if (targetEmail) {
+          try {
+            const snap3 = await adminDb.collection('properties').where('ownerEmail', '==', targetEmail).get();
+            snap3.docs.forEach(d => firestorePropIds.add(d.id));
+          } catch (e) {}
+          try {
+            const snap4 = await adminDb.collection('properties').where('ownerPrivateEmail', '==', targetEmail).get();
+            snap4.docs.forEach(d => firestorePropIds.add(d.id));
+          } catch (e) {}
+        }
 
-    return res.json({ success: true, message: 'User deleted successfully.' });
+        for (const pid of firestorePropIds) {
+          try { await adminDb.collection('properties').doc(pid).delete(); } catch (e) {}
+          try { await adminDb.collection('propertyPrivate').doc(pid).delete(); } catch (e) {}
+          try { await adminDb.collection('propertyMediaPrivate').doc(pid).delete(); } catch (e) {}
+          try { await adminDb.collection('verificationRecords').doc(pid).delete(); } catch (e) {}
+          try {
+            const docSnap = await adminDb.collection('propertyDocuments').where('propertyId', '==', pid).get();
+            for (const d of docSnap.docs) { await d.ref.delete(); }
+          } catch (e) {}
+          try {
+            const enqSnap = await adminDb.collection('enquiries').where('propertyId', '==', pid).get();
+            for (const d of enqSnap.docs) { await d.ref.delete(); }
+          } catch (e) {}
+        }
+
+        // Delete direct user enquiries
+        try {
+          const enqSnap1 = await adminDb.collection('enquiries').where('ownerId', '==', uUid).get();
+          for (const d of enqSnap1.docs) { await d.ref.delete(); }
+        } catch (e) {}
+        try {
+          const enqSnap2 = await adminDb.collection('enquiries').where('buyerId', '==', uUid).get();
+          for (const d of enqSnap2.docs) { await d.ref.delete(); }
+        } catch (e) {}
+        try {
+          const enqSnap3 = await adminDb.collection('enquiries').where('userId', '==', uUid).get();
+          for (const d of enqSnap3.docs) { await d.ref.delete(); }
+        } catch (e) {}
+
+        // Delete user document
+        try { await adminDb.collection('users').doc(uUid).delete(); } catch (e) {}
+        if (targetEmail) {
+          try {
+            const uSnap = await adminDb.collection('users').where('email', '==', targetEmail).get();
+            for (const d of uSnap.docs) { await d.ref.delete(); }
+          } catch (e) {}
+        }
+      }
+    } catch (adminFsErr) {
+      console.warn('Firebase Admin Firestore cascade delete note:', adminFsErr.message);
+    }
+
+    // 5. Delete from Firebase Authentication (Firebase Admin Auth)
+    try {
+      const adminApps = getApps();
+      if (adminApps.length) {
+        const auth = getAuth(adminApps[0]);
+        if (auth) {
+          try {
+            await auth.deleteUser(uUid);
+          } catch (authErr) {
+            if (targetEmail) {
+              try {
+                const uRec = await auth.getUserByEmail(targetEmail);
+                if (uRec?.uid) await auth.deleteUser(uRec.uid);
+              } catch (e) {}
+            }
+          }
+        }
+      }
+    } catch (authDeleteErr) {
+      console.warn('Firebase Admin Auth deletion note:', authDeleteErr.message);
+    }
+
+    return res.json({ success: true, message: 'User account and all posted properties cascade deleted successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

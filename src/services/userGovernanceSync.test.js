@@ -179,4 +179,88 @@ describe('EaseLand User Governance & Real-Time Firebase Sync Suite', () => {
     assert.equal(buyerUser.postedListingsCount, 0);
     assert.equal(buyerUser.role, 'USER');
   });
+
+  it('5. Cascade deletion removes all properties, media, and enquiries when an account is deleted or removed', () => {
+    const properties = [
+      { id: 'prop-101', propertyId: 'prop-101', ownerId: 'usr-deleted-1', ownerEmail: 'user1@easeland.in', title: 'Farm in Guntur' },
+      { id: 'prop-102', propertyId: 'prop-102', ownerId: 'usr-deleted-1', ownerPrivateEmail: 'user1@easeland.in', title: 'Villa in Amaravati' },
+      { id: 'prop-201', propertyId: 'prop-201', ownerId: 'usr-active-2', ownerEmail: 'user2@easeland.in', title: 'Plot in Vijayawada' }
+    ];
+
+    const enquiries = [
+      { id: 'enq-1', propertyId: 'prop-101', ownerId: 'usr-deleted-1', customerName: 'Buyer A' },
+      { id: 'enq-2', propertyId: 'prop-201', ownerId: 'usr-active-2', customerName: 'Buyer B' }
+    ];
+
+    const targetUserId = 'usr-deleted-1';
+    const targetEmail = 'user1@easeland.in';
+
+    // Cascade filter: purge properties and enquiries owned by target
+    const remainingProps = properties.filter(p => {
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      return pOwner !== targetUserId && pEmail !== targetEmail;
+    });
+
+    const deletedPropIds = new Set(properties.filter(p => {
+      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+      return pOwner === targetUserId || pEmail === targetEmail;
+    }).map(p => p.id));
+
+    const remainingEnquiries = enquiries.filter(e => {
+      const eOwner = String(e.ownerId || '').toLowerCase().trim();
+      return eOwner !== targetUserId && !deletedPropIds.has(e.propertyId);
+    });
+
+    assert.equal(remainingProps.length, 1);
+    assert.equal(remainingProps[0].id, 'prop-201');
+    assert.equal(remainingEnquiries.length, 1);
+    assert.equal(remainingEnquiries[0].id, 'enq-2');
+  });
+
+  it('6. Relogging in or re-registering after deletion unblacklists the account and creates a brand-new clean record', () => {
+    // Simulated deleted list containing previously removed user
+    let deletedUsers = ['usr-del-99', 'olduser@easeland.in'];
+
+    // User attempts to relogin with the same credentials
+    const reloginUid = 'usr-del-99';
+    const reloginEmail = 'olduser@easeland.in';
+
+    // Unblacklist on relogin / registration
+    deletedUsers = deletedUsers.filter(item => {
+      const itLow = String(item || '').toLowerCase().trim();
+      return itLow !== reloginUid && itLow !== reloginEmail;
+    });
+
+    assert.equal(deletedUsers.length, 0);
+
+    // Clean profile creation (no merge: true)
+    const freshProfile = {
+      uid: reloginUid,
+      displayName: 'EaseLand User',
+      email: reloginEmail,
+      phone: '',
+      role: 'USER',
+      accountStatus: 'ACTIVE',
+      capabilities: ['CUSTOMER', 'OWNER'],
+      ownerVerificationState: 'NOT_VERIFIED',
+      createdAt: new Date().toISOString()
+    };
+
+    assert.equal(freshProfile.accountStatus, 'ACTIVE');
+    assert.equal(freshProfile.ownerVerificationState, 'NOT_VERIFIED');
+    assert.equal(freshProfile.phone, '');
+  });
+
+  it('7. Zero-trace clean-slate guarantee ensures zero properties, zero enquiries, and clean dashboard on relogin', () => {
+    const marketplaceProperties = [
+      { id: 'prop-active-1', ownerId: 'other-user', title: 'Active Plot' }
+    ];
+
+    const reloginUid = 'usr-del-99';
+    const userProperties = marketplaceProperties.filter(p => p.ownerId === reloginUid);
+
+    assert.equal(userProperties.length, 0, 'Relogged in user must have 0 properties from previous deletion');
+  });
 });

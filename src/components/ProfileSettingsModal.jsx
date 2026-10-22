@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { X, User, Mail, Phone, MapPin, Lock, ShieldCheck, Check, AlertCircle, Eye, EyeOff, Key, Bell, Save } from 'lucide-react';
+import { X, User, Mail, Phone, MapPin, Lock, ShieldCheck, Check, AlertCircle, Eye, EyeOff, Key, Bell, Save, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated }) {
-  const { user, profile, updateProfileData, updatePreferencesData } = useAuth();
+  const { user, profile, updateProfileData, updatePreferencesData, deleteOwnAccount } = useAuth();
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'security'
 
@@ -51,6 +51,28 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const handleConfirmDeleteAccount = async () => {
+    try {
+      setIsDeletingAccount(true);
+      const res = await deleteOwnAccount('User self-requested account deletion');
+      setIsDeletingAccount(false);
+      if (res && res.success) {
+        setShowDeleteConfirm(false);
+        onClose();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+      } else {
+        setError(res?.error || 'Failed to delete account');
+      }
+    } catch (err) {
+      setIsDeletingAccount(false);
+      setError('Failed to delete account: ' + (err.message || 'Server error'));
+    }
+  };
 
   React.useEffect(() => {
     if (isOpen) {
@@ -487,6 +509,24 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                 </div>
               </div>
 
+              {/* DANGER ZONE - DELETE ACCOUNT */}
+              <div className="pt-4 border-t border-red-100">
+                <div className="bg-red-50/80 border border-red-200/80 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="block text-xs font-bold text-red-800">Delete Account & Posted Properties</span>
+                    <span className="block text-[11px] text-red-600/90 mt-0.5">Permanently deletes your account and removes all properties posted from it.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition-all shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Account</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="pt-3 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -509,6 +549,49 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
         </div>
 
       </div>
+
+      {/* DELETE ACCOUNT CONFIRMATION MODAL */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-red-200">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-black text-brand-charcoal text-center">Permanently Delete Account?</h3>
+            <p className="text-xs text-gray-600 text-center mt-2 leading-relaxed">
+              This action is <span className="font-bold text-red-600">irreversible</span>. All properties posted from this account will be permanently deleted across all databases and search results.
+            </p>
+            <p className="text-[11px] text-gray-500 text-center mt-1.5 bg-gray-50 p-2 rounded-lg border border-gray-100">
+              If you sign in with this account again in the future, it will be treated as a brand new account with zero trace of old data.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeletingAccount}
+                className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAccount}
+                disabled={isDeletingAccount}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                {isDeletingAccount ? (
+                  <span>Deleting Everything...</span>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm & Delete Account</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

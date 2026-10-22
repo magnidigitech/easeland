@@ -7,6 +7,8 @@ import {
   updateDoc,
   deleteDoc,
   deleteField,
+  query,
+  where,
   serverTimestamp,
   onSnapshot
 } from 'firebase/firestore';
@@ -57,9 +59,52 @@ export async function syncUserToPostgres(userData) {
 
 /**
  * Create a new user profile document in users/{uid}.
+ * Ensures clean-slate creation with zero trace of old data or removed status.
  */
 export async function createUserProfile(uid, data) {
   try {
+    if (!uid) return { success: false, error: 'UID is required' };
+
+    // 1. Unblacklist user from local deleted users list upon new registration or relogin
+    if (typeof window !== 'undefined') {
+      try {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        if (rawDel) {
+          const delArr = JSON.parse(rawDel);
+          const uIdLow = String(uid || '').toLowerCase().trim();
+          const emLow = String(data.email || '').toLowerCase().trim();
+          const filtered = delArr.filter(item => {
+            const itLow = String(item || '').toLowerCase().trim();
+            return itLow !== uIdLow && (!emLow || itLow !== emLow);
+          });
+          localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
+        }
+      } catch (e) {}
+
+      // 2. Wipe stale profile, draft, and wizard location caches to prevent data leakage
+      try {
+        localStorage.removeItem('easeland_user_profile_' + uid);
+        localStorage.removeItem('easeland_draft_' + uid);
+        localStorage.removeItem('easeland_wizard_location_' + uid);
+        
+        // Clean any old properties from local user properties cache
+        const rawProps = localStorage.getItem('easeland_user_properties');
+        if (rawProps) {
+          const parsed = JSON.parse(rawProps);
+          if (Array.isArray(parsed)) {
+            const uIdLow = String(uid || '').toLowerCase().trim();
+            const emLow = String(data.email || '').toLowerCase().trim();
+            const cleaned = parsed.filter(p => {
+              const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+              const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+              return pOwner !== uIdLow && (!emLow || pEmail !== emLow);
+            });
+            localStorage.setItem('easeland_user_properties', JSON.stringify(cleaned));
+          }
+        }
+      } catch (e) {}
+    }
+
     const userRef = doc(db, 'users', uid);
     const profile = {
       uid,
@@ -73,7 +118,9 @@ export async function createUserProfile(uid, data) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
-    await setDoc(userRef, profile, { merge: true });
+
+    // Clean overwrite without merge: true to wipe any old removed fields or residual notes
+    await setDoc(userRef, profile);
     syncUserToPostgres({ ...profile, id: uid, uid });
     return { success: true, user: profile };
   } catch (error) {
@@ -92,6 +139,12 @@ export async function getCurrentUserProfile(uid) {
     const snap = await getDoc(userRef);
     if (snap.exists()) {
       const data = snap.data();
+      const uStatus = String(data.accountStatus || data.status || '').toUpperCase();
+      // If document is flagged as REMOVED or DELETED, treat as non-existent to trigger fresh registration
+      if (uStatus === 'REMOVED' || uStatus === 'DELETED' || uStatus === 'ACCOUNT_DELETED') {
+        return { success: false, error: 'Account was removed' };
+      }
+
       const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || '';
       const extractedName = data.displayName || data.name || data.fullName || '';
       return {
@@ -453,14 +506,58 @@ export async function unsuspendUserAccount(userId, adminUid) {
 }
 
 /**
- * Permanently remove user account document from Firestore.
+ * Permanently remove user account and all posted properties.
  */
-export async function removeUserAccount(userId, adminUid, reason = 'Policy Violation') {
+export async function removeUserAccount(userId, adminUid, reason = 'Policy Violation', userEmail = '') {
   try {
     if (!userId) {
       throw new Error('User ID is required to remove account.');
     }
 
+    const targetIdStr = String(userId).toLowerCase().trim();
+    const targetEmStr = String(userEmail || '').toLowerCase().trim();
+
+    // 1. Cascade delete all properties posted by this user from Cloud Firestore
+    try {
+      const pColl = collection(db, 'properties');
+      const propertyIds = new Set();
+
+      try {
+        const q1 = query(pColl, where('ownerId', '==', userId));
+        const snap1 = await getDocs(q1);
+        snap1.docs.forEach(d => propertyIds.add(d.id));
+      } catch (e1) {}
+
+      try {
+        const q2 = query(pColl, where('userId', '==', userId));
+        const snap2 = await getDocs(q2);
+        snap2.docs.forEach(d => propertyIds.add(d.id));
+      } catch (e2) {}
+
+      if (userEmail) {
+        try {
+          const q3 = query(pColl, where('ownerEmail', '==', userEmail));
+          const snap3 = await getDocs(q3);
+          snap3.docs.forEach(d => propertyIds.add(d.id));
+        } catch (e3) {}
+        try {
+          const q4 = query(pColl, where('ownerPrivateEmail', '==', userEmail));
+          const snap4 = await getDocs(q4);
+          snap4.docs.forEach(d => propertyIds.add(d.id));
+        } catch (e4) {}
+      }
+
+      for (const pId of propertyIds) {
+        try { await deleteDoc(doc(db, 'properties', pId)); } catch (e) {}
+        try { await deleteDoc(doc(db, 'propertyPrivate', pId)); } catch (e) {}
+        try { await deleteDoc(doc(db, 'propertyMediaPrivate', pId)); } catch (e) {}
+        try { await deleteDoc(doc(db, 'verificationRecords', pId)); } catch (e) {}
+      }
+    } catch (fsCascadeErr) {
+      console.warn('Firestore property cascade deletion note:', fsCascadeErr);
+    }
+
+    // 2. Delete user account document from Cloud Firestore
     const userRef = doc(db, 'users', userId);
     try {
       await deleteDoc(userRef);
@@ -473,25 +570,50 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
       }, { merge: true });
     }
 
-    // Call DELETE on server backend
+    // 3. Call authoritative DELETE on server backend (cascades PostgreSQL + local stores + Firebase Auth)
     try {
-      await fetch('/api/users/' + encodeURIComponent(userId), { method: 'DELETE' });
+      const emailQuery = userEmail ? ('?email=' + encodeURIComponent(userEmail)) : '';
+      await fetch('/api/users/' + encodeURIComponent(userId) + emailQuery, { method: 'DELETE' });
     } catch (eDel) { }
 
+    // 4. Update localStorage caches and purge user-specific local traces
     try {
       if (typeof window !== 'undefined') {
         const rawDel = localStorage.getItem('easeland_deleted_users');
         let delArr = rawDel ? JSON.parse(rawDel) : [];
-        const targetStr = String(userId).toLowerCase().trim();
-        if (userId && !delArr.includes(targetStr)) delArr.push(targetStr);
+        if (userId && !delArr.includes(targetIdStr)) delArr.push(targetIdStr);
+        if (userEmail && !delArr.includes(targetEmStr)) delArr.push(targetEmStr);
         localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
 
         const rawReg = localStorage.getItem('easeland_registered_users');
         if (rawReg) {
           const parsed = JSON.parse(rawReg);
           if (Array.isArray(parsed)) {
-            const updated = parsed.filter(u => u && String(u.id || u.uid || '').toLowerCase().trim() !== targetStr && String(u.email || '').toLowerCase().trim() !== targetStr);
+            const updated = parsed.filter(u => {
+              if (!u) return false;
+              const uId = String(u.id || u.uid || '').toLowerCase().trim();
+              const uEm = String(u.email || '').toLowerCase().trim();
+              return uId !== targetIdStr && (!targetEmStr || uEm !== targetEmStr);
+            });
             localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+
+        // Remove user-specific profile, draft, location, and user properties
+        localStorage.removeItem('easeland_user_profile_' + userId);
+        localStorage.removeItem('easeland_draft_' + userId);
+        localStorage.removeItem('easeland_wizard_location_' + userId);
+
+        const rawUserProps = localStorage.getItem('easeland_user_properties');
+        if (rawUserProps) {
+          const parsed = JSON.parse(rawUserProps);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter(p => {
+              const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+              const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+              return pOwner !== targetIdStr && (!targetEmStr || pEmail !== targetEmStr);
+            });
+            localStorage.setItem('easeland_user_properties', JSON.stringify(cleaned));
           }
         }
       }
@@ -499,7 +621,7 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
 
     await logAdminActivity(
       'USER_REMOVED',
-      'User ' + userId + ' account permanently removed by admin. Reason: ' + reason,
+      'User ' + userId + ' account and associated properties permanently removed. Reason: ' + reason,
       adminUid || 'admin_uid_001'
     );
 

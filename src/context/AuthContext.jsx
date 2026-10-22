@@ -44,7 +44,8 @@ const AuthContext = createContext({
   updateProfileData: async () => {},
   updatePreferencesData: async () => {},
   complete2FASession: () => {},
-  cancel2FASession: () => {}
+  cancel2FASession: () => {},
+  deleteOwnAccount: async () => {}
 });
 
 export function AuthProvider({ children }) {
@@ -97,10 +98,18 @@ export function AuthProvider({ children }) {
   const reloadProfile = async (uid) => {
     if (!uid) return;
     const result = await getCurrentUserProfile(uid);
-    const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + uid) || '{}');
-    if (result.success) {
-      setProfile({ ...result.profile, ...storedProfile });
-    } else if (Object.keys(storedProfile).length > 0) {
+    let storedProfile = {};
+    try {
+      storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + uid) || '{}');
+      if (storedProfile.accountStatus === 'REMOVED' || storedProfile.status === 'REMOVED') {
+        localStorage.removeItem('easeland_user_profile_' + uid);
+        storedProfile = {};
+      }
+    } catch (e) {}
+
+    if (result.success && result.profile) {
+      setProfile(result.profile);
+    } else if (Object.keys(storedProfile).length > 0 && storedProfile.accountStatus !== 'REMOVED') {
       setProfile(prev => ({
         uid: uid,
         displayName: storedProfile.displayName || storedProfile.name || 'EaseLand User',
@@ -111,7 +120,7 @@ export function AuthProvider({ children }) {
         role: 'USER',
         accountStatus: 'ACTIVE',
         capabilities: ['CUSTOMER', 'OWNER'],
-        ownerVerificationState: 'VERIFIED',
+        ownerVerificationState: 'NOT_VERIFIED',
         ...(prev || {}),
         ...storedProfile
       }));
@@ -453,7 +462,17 @@ export function AuthProvider({ children }) {
 
     if (result.success && result.user) {
       loggedInUser = result.user;
-      const pRes = await getCurrentUserProfile(result.user.uid);
+      let pRes = await getCurrentUserProfile(result.user.uid);
+      if (!pRes.success || !pRes.profile) {
+        try {
+          await createUserProfile(result.user.uid, {
+            displayName: result.user.displayName || 'EaseLand User',
+            email: result.user.email || lowerEmail,
+            phone: result.user.phoneNumber || ''
+          });
+          pRes = await getCurrentUserProfile(result.user.uid);
+        } catch (e) {}
+      }
       if (pRes.success && pRes.profile) {
         userProfileData = pRes.profile;
       }
@@ -758,6 +777,25 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = async () => {
     const result = await apiLoginWithGoogle();
     if (result.success && result.user) {
+      if (typeof window !== 'undefined') {
+        try {
+          const rawDel = localStorage.getItem('easeland_deleted_users');
+          if (rawDel) {
+            const delArr = JSON.parse(rawDel);
+            const uIdLow = String(result.user.uid || '').toLowerCase().trim();
+            const emLow = String(result.user.email || '').toLowerCase().trim();
+            const filtered = delArr.filter(item => {
+              const itLow = String(item || '').toLowerCase().trim();
+              return itLow !== uIdLow && (!emLow || itLow !== emLow);
+            });
+            localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
+          }
+          localStorage.removeItem('easeland_user_profile_' + result.user.uid);
+          localStorage.removeItem('easeland_draft_' + result.user.uid);
+          localStorage.removeItem('easeland_wizard_location_' + result.user.uid);
+        } catch (e) {}
+      }
+
       let pRes = await getCurrentUserProfile(result.user.uid);
       if (!pRes.success || !pRes.profile) {
         try {
@@ -823,6 +861,38 @@ export function AuthProvider({ children }) {
       return { success: true, user: activeUserObj };
     }
     return result;
+  };
+
+  const deleteOwnAccount = async (reason = 'User self-deletion') => {
+    if (!user) return { success: false, error: 'Unauthenticated.' };
+    const uid = user.uid || user.id;
+    const userEmail = user.email || '';
+
+    try {
+      setLoading(true);
+      const { removeUserAccount } = await import('../firebase/userService.js');
+      await removeUserAccount(uid, uid, reason, userEmail);
+
+      // Reset local auth context states
+      setUser(null);
+      setProfile(null);
+      setPending2FASession(null);
+
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('easeland_session_user');
+        localStorage.removeItem('easeland_user_profile_' + uid);
+        localStorage.removeItem('easeland_draft_' + uid);
+        localStorage.removeItem('easeland_wizard_location_' + uid);
+        localStorage.removeItem('easeland_active_user');
+      }
+
+      await apiLogoutUser();
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      setLoading(false);
+      return { success: false, error: err.message };
+    }
   };
 
   const complete2FASession = () => {
@@ -967,7 +1037,8 @@ export function AuthProvider({ children }) {
     updatePreferencesData,
     reloadProfile,
     complete2FASession,
-    cancel2FASession
+    cancel2FASession,
+    deleteOwnAccount
   };
 
   return (
