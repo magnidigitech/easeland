@@ -4,3 +4,6 @@ dist
 .env.local
 .DS_Store
 *.log
+serviceAccountKey.json
+*service-account*.json
+*serviceAccount*.json

@@ -2062,6 +2062,8 @@ export async function purgeAllMarketplaceProperties() {
 
   // 2. Client-side Firestore non-blocking wipe (in case running without full Admin SDK)
   const isNodeTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  let clientFirestoreWipedCount = 0;
+  const clientFirestoreErrors = [];
   if (!isNodeTest && db) {
     try {
       const collectionsToWipe = ['properties', 'propertyPrivate', 'propertyMediaPrivate', 'propertyDocuments', 'verificationRecords', 'enquiries'];
@@ -2069,12 +2071,23 @@ export async function purgeAllMarketplaceProperties() {
         try {
           const snap = await getDocs(collection(db, colName));
           for (const d of snap.docs) {
-            try { await deleteDoc(d.ref); } catch (e) {}
+            try {
+              await deleteDoc(d.ref);
+              clientFirestoreWipedCount++;
+            } catch (delErr) {
+              clientFirestoreErrors.push(colName + '/' + d.id + ': ' + (delErr.message || delErr));
+            }
           }
-        } catch (e) {}
+        } catch (getErr) {
+          clientFirestoreErrors.push(colName + ' query failed: ' + (getErr.message || getErr));
+        }
       }
     } catch (fsErr) {
       console.warn('Client Firestore purge note:', fsErr);
+      clientFirestoreErrors.push('Root error: ' + (fsErr.message || fsErr));
+    }
+    if (clientFirestoreErrors.length > 0) {
+      console.warn('Client Firestore purge encountered permission or rule constraints:', clientFirestoreErrors);
     }
   }
 

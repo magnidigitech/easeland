@@ -5,23 +5,48 @@ import fs from 'fs';
 import cors from 'cors';
 import pg from 'pg';
 import admin from 'firebase-admin';
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { fileURLToPath } from 'url';
 
-// Initialize Firebase Admin SDK
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Initialize Firebase Admin SDK with Service Account Key if available
 try {
   if (!getApps().length) {
-    initializeApp({
+    let credential = undefined;
+    const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+    if (fs.existsSync(keyPath)) {
+      try {
+        const rawKey = fs.readFileSync(keyPath, 'utf8');
+        credential = cert(JSON.parse(rawKey));
+        console.log('Firebase Admin initialized with local serviceAccountKey.json');
+      } catch (e) {
+        console.warn('Error reading local serviceAccountKey.json:', e.message);
+      }
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      try {
+        const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim();
+        const parsedKey = raw.startsWith('{') ? JSON.parse(raw) : JSON.parse(fs.readFileSync(raw, 'utf8'));
+        credential = cert(parsedKey);
+        console.log('Firebase Admin initialized with FIREBASE_SERVICE_ACCOUNT_KEY env var');
+      } catch (e) {
+        console.warn('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', e.message);
+      }
+    }
+
+    const adminConfig = {
       projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04'
-    });
+    };
+    if (credential) {
+      adminConfig.credential = credential;
+    }
+    initializeApp(adminConfig);
   }
 } catch (eAdminInit) {
   console.warn('Firebase Admin SDK initialization note:', eAdminInit.message);
 }
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
