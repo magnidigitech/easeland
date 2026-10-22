@@ -153,7 +153,12 @@ async function runPurge() {
         'propertyMediaPrivate',
         'propertyDocuments',
         'verificationRecords',
-        'enquiries'
+        'enquiries',
+        'activityLogs',
+        'crm_deals',
+        'crm_leads',
+        'deals',
+        'followUps'
       ];
 
       console.log('Purging Cloud Firestore collections in batches of 300...');

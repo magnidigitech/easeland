@@ -1757,7 +1757,12 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
             'propertyMediaPrivate',
             'propertyDocuments',
             'verificationRecords',
-            'enquiries'
+            'enquiries',
+            'activityLogs',
+            'crm_deals',
+            'crm_leads',
+            'deals',
+            'followUps'
           ];
 
           for (const colName of targetCollections) {
