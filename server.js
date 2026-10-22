@@ -679,6 +679,17 @@ async function initPgDb() {
       );
     `);
 
+    // 8. Admin Deleted Users Ledger Table (Authoritative Multi-Layer Deletion Tracking)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_deleted_users (
+        uid VARCHAR(100) PRIMARY KEY,
+        email VARCHAR(255),
+        reason TEXT DEFAULT 'Account deleted',
+        deleted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+
     try {
       const allPg = await client.query('SELECT property_id, reference_id, title, owner_id, listing_status, raw_data FROM properties;');
       allPg.rows.forEach(r => {
@@ -780,6 +791,40 @@ function saveLocalUser(u) {
 
 function getLocalUsers() {
   return Array.from(localUsersMap.values());
+}
+
+// Local Persistent Disk & Memory Store for Deleted Users
+const deletedUsersStoreFile = path.join(uploadsDir, 'deleted_users_store.json');
+const localDeletedUsersSet = new Set();
+
+try {
+  if (fs.existsSync(deletedUsersStoreFile)) {
+    const rawDisk = fs.readFileSync(deletedUsersStoreFile, 'utf8');
+    const parsedDisk = JSON.parse(rawDisk);
+    if (Array.isArray(parsedDisk)) {
+      parsedDisk.forEach(item => {
+        if (item) localDeletedUsersSet.add(String(item).toLowerCase().trim());
+      });
+    }
+  }
+} catch (e) {
+  console.warn('Local deleted users store initialization note:', e.message);
+}
+
+function addLocalDeletedUser(uidOrEmail) {
+  if (!uidOrEmail) return;
+  localDeletedUsersSet.add(String(uidOrEmail).toLowerCase().trim());
+  try {
+    fs.writeFileSync(deletedUsersStoreFile, JSON.stringify(Array.from(localDeletedUsersSet)), 'utf8');
+  } catch (e) {}
+}
+
+function removeLocalDeletedUser(uidOrEmail) {
+  if (!uidOrEmail) return;
+  localDeletedUsersSet.delete(String(uidOrEmail).toLowerCase().trim());
+  try {
+    fs.writeFileSync(deletedUsersStoreFile, JSON.stringify(Array.from(localDeletedUsersSet)), 'utf8');
+  } catch (e) {}
 }
 
 // Local Persistent Disk & Memory Store for Site Visitors (100% Availability Fallback)
@@ -2207,42 +2252,6 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
 });
 
 
-// API Endpoint: Upsert user to PostgreSQL DB & Local Disk
-app.post('/api/users', async (req, res) => {
-  try {
-    const u = req.body;
-    if (!u || (!u.uid && !u.id && !u.email)) {
-      return res.status(400).json({ success: false, error: 'User payload required.' });
-    }
-    const saved = saveLocalUser(u);
-    const uId = String(u.uid || u.id || u.email);
-    const uEmail = String(u.email || '').toLowerCase().trim();
-    const uName = u.displayName || u.name || '';
-    const uPhone = u.phone || u.phoneNumber || '';
-    const uRole = u.role || 'USER';
-
-    try {
-      const queryText = `
-        INSERT INTO users (uid, email, display_name, phone, role, raw_data, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (uid) DO UPDATE SET
-          email = EXCLUDED.email,
-          display_name = EXCLUDED.display_name,
-          phone = EXCLUDED.phone,
-          role = EXCLUDED.role,
-          raw_data = EXCLUDED.raw_data,
-          updated_at = NOW();
-      `;
-      await pgPool.query(queryText, [uId, uEmail, uName, uPhone, uRole, JSON.stringify(saved)]);
-    } catch (pgErr) {
-      console.warn('PostgreSQL user sync background note:', pgErr.message);
-    }
-
-    return res.json({ success: true, user: saved });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 // API Endpoint: Get user by ID or email
 app.get('/api/users/:id', async (req, res) => {
@@ -2559,12 +2568,25 @@ app.get('/api/admin/firebase-users', async (req, res) => {
       pgUsers = result.rows.map(row => row.raw_data).filter(Boolean);
     } catch (pgErr) {}
 
+    const deletedUsersSet = new Set(localDeletedUsersSet);
+    try {
+      const delRes = await pgPool.query('SELECT uid, email FROM admin_deleted_users;');
+      delRes.rows.forEach(r => {
+        if (r.uid) deletedUsersSet.add(String(r.uid).toLowerCase().trim());
+        if (r.email) deletedUsersSet.add(String(r.email).toLowerCase().trim());
+      });
+    } catch (eDelFetch) {}
+
     const userMap = new Map();
     [...authUsers, ...fsUsers, ...localList, ...pgUsers].forEach(u => {
       if (!u) return;
       const emailKey = (u.email || '').toLowerCase().trim();
       const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
       if (!emailKey && !uidKey) return;
+
+      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
+      if (deletedUsersSet.has(uidKey) || (emailKey && deletedUsersSet.has(emailKey))) return;
 
       const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
       const isAdmin = u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN';
@@ -2585,7 +2607,14 @@ app.get('/api/admin/firebase-users', async (req, res) => {
       if (uidKey) userMap.set(uidKey, mergedObj);
     });
 
-    const allUsers = Array.from(new Set(userMap.values()));
+    const allUsers = Array.from(new Set(userMap.values())).filter(u => {
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      const uEm = String(u.email || '').toLowerCase().trim();
+      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return false;
+      return !deletedUsersSet.has(uUid) && (!uEm || !deletedUsersSet.has(uEm));
+    });
+
     return res.json({ success: true, count: allUsers.length, users: allUsers });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -2600,6 +2629,14 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
 
     // 1. Sync Users
     const userMap = new Map();
+    const deletedUsersSet = new Set(localDeletedUsersSet);
+    try {
+      const delRes = await pgPool.query('SELECT uid, email FROM admin_deleted_users;');
+      delRes.rows.forEach(r => {
+        if (r.uid) deletedUsersSet.add(String(r.uid).toLowerCase().trim());
+        if (r.email) deletedUsersSet.add(String(r.email).toLowerCase().trim());
+      });
+    } catch (eDelFetch) {}
 
     // 1a. Firebase Auth
     try {
@@ -2610,6 +2647,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
         listResult.users.forEach(u => {
           const email = (u.email || '').toLowerCase().trim();
           const uid = u.uid;
+          if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
           const isAdmin = email === 'admin@easeland.in' || u.customClaims?.adminRole;
           userMap.set(uid, {
             uid,
@@ -2639,6 +2677,10 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
         snap.forEach(docSnap => {
           const d = docSnap.data();
           const uid = docSnap.id;
+          const email = (d.email || '').toLowerCase().trim();
+          const uSt = String(d.accountStatus || d.status || '').toUpperCase();
+          if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
+          if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
           const existing = userMap.get(uid) || {};
           userMap.set(uid, {
             ...existing,
@@ -2665,6 +2707,10 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
         if (!u) return;
         const uid = u.uid || u.id;
         if (!uid) return;
+        const email = (u.email || '').toLowerCase().trim();
+        const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+        if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
+        if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
         const existing = userMap.get(uid) || {};
         userMap.set(uid, {
           ...existing,
@@ -2685,28 +2731,50 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
     // 1d. Local users store
     localUsersMap.forEach((u, key) => {
       const uid = u.uid || u.id || key;
+      const email = (u.email || '').toLowerCase().trim();
+      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
+      if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
       const existing = userMap.get(uid) || {};
       userMap.set(uid, { ...existing, ...u, uid, id: uid });
     });
 
-    const unifiedUsers = Array.from(userMap.values());
+    const unifiedUsers = Array.from(userMap.values()).filter(u => {
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      const uEm = String(u.email || '').toLowerCase().trim();
+      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return false;
+      return !deletedUsersSet.has(uUid) && (!uEm || !deletedUsersSet.has(uEm));
+    });
 
     // Write back unified users across all 3 layers
+    const syncP1 = String.fromCharCode(36) + '1';
+    const syncP2 = String.fromCharCode(36) + '2';
+    const syncP3 = String.fromCharCode(36) + '3';
+    const syncP4 = String.fromCharCode(36) + '4';
+    const syncP5 = String.fromCharCode(36) + '5';
+    const syncP6 = String.fromCharCode(36) + '6';
+    const syncP7 = String.fromCharCode(36) + '7';
+    const syncP8 = String.fromCharCode(36) + '8';
+
+    const syncUpsertQuery = 
+      "INSERT INTO users (" +
+      "  uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at" +
+      ") VALUES (" +
+      "  " + syncP1 + ", " + syncP2 + ", " + syncP3 + ", " + syncP4 + ", " + syncP5 + ", " + syncP6 + ", " + syncP7 + ", " + syncP8 + ", NOW(), NOW()" +
+      ") ON CONFLICT (uid) DO UPDATE SET " +
+      "  email = EXCLUDED.email, " +
+      "  display_name = EXCLUDED.display_name, " +
+      "  phone = EXCLUDED.phone, " +
+      "  role = EXCLUDED.role, " +
+      "  account_status = EXCLUDED.account_status, " +
+      "  raw_data = EXCLUDED.raw_data, " +
+      "  updated_at = NOW();";
+
     for (const u of unifiedUsers) {
       saveLocalUser(u);
       try {
-        await pgPool.query(`
-          INSERT INTO users (uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-          ON CONFLICT (uid) DO UPDATE SET
-            email = EXCLUDED.email,
-            display_name = EXCLUDED.display_name,
-            phone = EXCLUDED.phone,
-            role = EXCLUDED.role,
-            account_status = EXCLUDED.account_status,
-            raw_data = EXCLUDED.raw_data,
-            updated_at = NOW();
-        `, [
+        await pgPool.query(syncUpsertQuery, [
           u.uid,
           u.email,
           u.displayName || u.name,
@@ -2861,6 +2929,18 @@ app.post('/api/users', async (req, res) => {
 
     saveLocalUser(fullPayload);
 
+    // Unblacklist user from deleted ledger on fresh registration or relogin
+    try {
+      const unbP1 = String.fromCharCode(36) + '1';
+      const unbP2 = String.fromCharCode(36) + '2';
+      await pgPool.query(
+        "DELETE FROM admin_deleted_users WHERE LOWER(uid) = LOWER(" + unbP1 + ") OR (" + unbP2 + " <> '' AND LOWER(COALESCE(email, '')) = LOWER(" + unbP2 + "));",
+        [uUid, (fullPayload.email || '').toLowerCase().trim()]
+      );
+    } catch (eUnb) {}
+    removeLocalDeletedUser(uUid);
+    if (fullPayload.email) removeLocalDeletedUser(fullPayload.email);
+
     try {
       const p1 = String.fromCharCode(36) + '1';
       const p2 = String.fromCharCode(36) + '2';
@@ -2929,6 +3009,18 @@ app.delete('/api/users/:uid', async (req, res) => {
         }
       } catch (e) {}
     }
+
+    // Record in persistent admin_deleted_users ledger so no background sync can ever resurrect this user
+    try {
+      await pgPool.query(
+        "INSERT INTO admin_deleted_users (uid, email, reason) " +
+        "VALUES (" + ph1 + ", " + ph2 + ", " + ph3 + ") " +
+        "ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email, deleted_at = NOW();",
+        [uUid, targetEmail || '', 'Account deleted']
+      );
+    } catch (eLedger) {}
+    addLocalDeletedUser(uUid);
+    if (targetEmail) addLocalDeletedUser(targetEmail);
 
     // 1. Identify all property IDs owned by this user from PostgreSQL
     let userPropIds = [];

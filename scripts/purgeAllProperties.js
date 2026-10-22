@@ -49,7 +49,7 @@ const args = process.argv.slice(2);
 const isConfirmed = args.includes('--confirm');
 
 if (!isConfirmed) {
-  console.log('SAFETY CHECK: This script will authoritatively wipe ALL test properties across PostgreSQL, Cloud Firestore, and Local Storage.');
+  console.log('SAFETY CHECK: This script will authoritatively wipe ALL properties across PostgreSQL, Cloud Firestore, and Local Storage. Use with caution.');
   console.log('User accounts and site configurations will be preserved.');
   console.log('');
   console.log('To execute the purge, run:');

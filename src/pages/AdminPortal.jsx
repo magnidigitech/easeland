@@ -466,8 +466,8 @@ export default function AdminPortal({ onNavigate }) {
       setFollowUps([]);
       setVisitorLeads([]);
       
-      logAdminActivity('authoritatively wiped all test property listings, media, documents, enquiries, and CRM leads across PostgreSQL, Firestore, and Local Storage.');
-      setPublishSuccessMessage('All test properties and cascaded collections have been wiped clean across all 3 layers!');
+      logAdminActivity('authoritatively wiped all property listings, media, documents, enquiries, and CRM leads across PostgreSQL, Firestore, and Local Storage.');
+      setPublishSuccessMessage('All properties and cascaded collections have been wiped clean across all 3 layers!');
       setPurgeResultSummary(res?.backendResult || { success: true });
       setTimeout(() => setPublishSuccessMessage(''), 5000);
       setIsPurgeModalOpen(false);
@@ -539,10 +539,22 @@ export default function AdminPortal({ onNavigate }) {
       }
     } catch (e) { }
 
+    const isUserDeleted = (u) => {
+      if (!u) return true;
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      const uEmail = (u.email || '').toLowerCase().trim();
+      const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+      return rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
+        (uUid && deletedUsers.includes(uUid)) || (uEmail && deletedUsers.includes(uEmail));
+    };
+
     setRegisteredUsersList(prev => {
       const userMap = new Map();
-      [...(prev || []), ...(incomingUsers || [])].forEach(u => {
-        if (!u) return;
+      const cleanPrev = (prev || []).filter(u => !isUserDeleted(u));
+      const cleanIncoming = (incomingUsers || []).filter(u => !isUserDeleted(u));
+
+      [...cleanPrev, ...cleanIncoming].forEach(u => {
+        if (!u || isUserDeleted(u)) return;
         const emailKey = (u.email || '').toLowerCase().trim();
         const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
         if (!emailKey && !uidKey) return;
@@ -570,44 +582,44 @@ export default function AdminPortal({ onNavigate }) {
         if (uidKey) userMap.set(uidKey, mergedUser);
       });
 
-      return Array.from(new Set(userMap.values())).map(u => {
-        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-        const uEmail = (u.email || '').toLowerCase().trim();
-        const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
-        const isRemoved = rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' || deletedUsers.includes(uUid) || deletedUsers.includes(uEmail);
+      return Array.from(new Set(userMap.values()))
+        .filter(u => !isUserDeleted(u))
+        .map(u => {
+          const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+          const uEmail = (u.email || '').toLowerCase().trim();
 
-        const userListings = (propertiesList || []).filter(p => {
-          if (!p) return false;
-          const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
-          const pEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
-          return (uUid && pOwnerId && uUid === pOwnerId) || (uEmail && pEmail && uEmail === pEmail);
+          const userListings = (propertiesList || []).filter(p => {
+            if (!p) return false;
+            const pOwnerId = String(p.ownerId || p.owner?.id || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
+            const pEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
+            return (uUid && pOwnerId && uUid === pOwnerId) || (uEmail && pEmail && uEmail === pEmail);
+          });
+
+          const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in' || uUid === 'admin-101';
+          let derivedRole = u.role;
+          if (!isUserAdmin) {
+            derivedRole = userListings.length > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : 'USER';
+          }
+
+          let finalName = u.name || u.displayName || 'EaseLand User';
+          if (isUserAdmin || finalName.includes('Scarlett') || uEmail === 'admin@easeland.in') {
+            finalName = 'EaseLand Admin';
+          }
+
+          const effectiveStatus = u.suspension ? 'SUSPENDED' : (u.status || u.accountStatus || 'ACTIVE');
+
+          return {
+            ...u,
+            name: finalName,
+            displayName: finalName,
+            status: effectiveStatus,
+            accountStatus: effectiveStatus,
+            role: isUserAdmin ? 'ADMIN' : derivedRole,
+            postedListingsCount: userListings.length,
+            authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
+            emailVerified: u.emailVerified ?? (u.email ? true : false)
+          };
         });
-
-        const isUserAdmin = u.role === 'ADMIN' || u.email === 'admin@easeland.in' || uUid === 'admin-101';
-        let derivedRole = u.role;
-        if (!isUserAdmin) {
-          derivedRole = userListings.length > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : 'USER';
-        }
-
-        let finalName = u.name || u.displayName || 'EaseLand User';
-        if (isUserAdmin || finalName.includes('Scarlett') || uEmail === 'admin@easeland.in') {
-          finalName = 'EaseLand Admin';
-        }
-
-        const effectiveStatus = isRemoved ? 'REMOVED' : (u.suspension ? 'SUSPENDED' : (u.status || u.accountStatus || 'ACTIVE'));
-
-        return {
-          ...u,
-          name: finalName,
-          displayName: finalName,
-          status: effectiveStatus,
-          accountStatus: effectiveStatus,
-          role: isUserAdmin ? 'ADMIN' : derivedRole,
-          postedListingsCount: userListings.length,
-          authProvider: u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'),
-          emailVerified: u.emailVerified ?? (u.email ? true : false)
-        };
-      });
     });
   };
 
@@ -812,13 +824,31 @@ export default function AdminPortal({ onNavigate }) {
     }
 
     // 2. Users (Combines Firebase Auth + PostgreSQL /api/admin/firebase-users + Firestore + Local Storage)
+    let deletedUsers = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+      }
+    } catch (e) { }
+
+    const isUserExplicitlyDeleted = (uid, email, status, accountStatus) => {
+      const uId = String(uid || '').toLowerCase().trim();
+      const uEm = String(email || '').toLowerCase().trim();
+      const rawSt = String(status || accountStatus || '').toUpperCase();
+      if (rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED') return true;
+      if (uId && deletedUsers.includes(uId)) return true;
+      if (uEm && deletedUsers.includes(uEm)) return true;
+      return false;
+    };
+
     let pgServerUsers = [];
     try {
       const res = await fetch('/api/admin/firebase-users');
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.users)) {
-          pgServerUsers = json.users;
+          pgServerUsers = json.users.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
         }
       }
     } catch (ePg) {
@@ -828,7 +858,7 @@ export default function AdminPortal({ onNavigate }) {
     let firestoreUsers = [];
     try {
       const usersRes = await getAllUsersAdmin();
-      firestoreUsers = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users : [];
+      firestoreUsers = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)) : [];
     } catch (e2) {
       console.warn('Error loading users from Firestore:', e2);
     }
@@ -840,7 +870,9 @@ export default function AdminPortal({ onNavigate }) {
         const rawReg = localStorage.getItem('easeland_registered_users');
         if (rawReg) {
           const parsed = JSON.parse(rawReg);
-          if (Array.isArray(parsed)) localRegisteredUsers = parsed;
+          if (Array.isArray(parsed)) {
+            localRegisteredUsers = parsed.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+          }
         }
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -849,7 +881,9 @@ export default function AdminPortal({ onNavigate }) {
             if (rawProf) {
               const profObj = JSON.parse(rawProf);
               if (profObj && (profObj.uid || profObj.id || profObj.email)) {
-                localProfileUsers.push(profObj);
+                if (!isUserExplicitlyDeleted(profObj.uid || profObj.id, profObj.email, profObj.status, profObj.accountStatus)) {
+                  localProfileUsers.push(profObj);
+                }
               }
             }
           }
@@ -864,6 +898,7 @@ export default function AdminPortal({ onNavigate }) {
       const oName = (p.ownerPublicName || p.owner?.name || 'Property Owner').trim();
       const oPhone = (p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || p.phone || '').trim();
       const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy;
+      if (isUserExplicitlyDeleted(oId, oEmail)) return;
       if (oEmail || oPhone || oId) {
         propertyOwnerUsers.push({
           uid: oId || `owner-${oEmail || oPhone}`,
@@ -882,7 +917,7 @@ export default function AdminPortal({ onNavigate }) {
 
     const userMap = new Map();
     [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
-      if (!u) return;
+      if (!u || isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)) return;
       const emailKey = (u.email || '').toLowerCase().trim();
       const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
       if (!emailKey && !uidKey) return;
@@ -908,7 +943,7 @@ export default function AdminPortal({ onNavigate }) {
       if (uidKey) userMap.set(uidKey, mergedUser);
     });
 
-    let users = Array.from(new Set(userMap.values()));
+    let users = Array.from(new Set(userMap.values())).filter(u => !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
 
     // Enrich verification queue properties with matching registered user account details
     queue = queue.map(p => {
@@ -3779,11 +3814,15 @@ export default function AdminPortal({ onNavigate }) {
                     <button
                       type="button"
                       onClick={() => setIsPurgeModalOpen(true)}
-                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-300 font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
-                      title="Wipe all test property listings, private specs, media, documents, and enquiries across PostgreSQL, Firestore, and Local Storage"
+                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-300 font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow"
+                      title="Wipe ALL property listings across PostgreSQL, Firestore, and Local Storage — Use with Caution"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                      <span>Wipe All Test Properties</span>
+                      <Trash2 className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      <span>Wipe ALL Properties</span>
+                      <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shrink-0">
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        Use with Caution
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -6576,8 +6615,11 @@ export default function AdminPortal({ onNavigate }) {
                   <Trash2 className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-brand-charcoal">Wipe All Test Properties?</h3>
-                  <span className="text-[10px] uppercase font-bold text-red-600 tracking-wider">Authoritative 3-Way Cascade Wipe</span>
+                  <h3 className="font-extrabold text-base text-brand-charcoal">Wipe ALL Properties?</h3>
+                  <span className="text-[10px] uppercase font-bold text-red-600 tracking-wider flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
+                    <span>Authoritative 3-Way Cascade Wipe • DANGER: USE WITH CAUTION</span>
+                  </span>
                 </div>
               </div>
               <button
@@ -6588,8 +6630,18 @@ export default function AdminPortal({ onNavigate }) {
               </button>
             </div>
 
+            <div className="p-3.5 bg-amber-50 rounded-2xl border-2 border-amber-300 text-amber-900 text-xs font-bold flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-black text-amber-900 uppercase tracking-wider text-[10px] mb-0.5">Warning: Use with Caution</div>
+                <div className="text-[11px] font-medium text-amber-800 leading-snug">
+                  This irreversible action permanently erases all property listings, private specs, uploaded media, confidential documents, verification records, and customer enquiries across all layers.
+                </div>
+              </div>
+            </div>
+
             <p className="text-xs text-gray-600 font-semibold leading-relaxed">
-              This action will permanently delete all test property listings, private specs, uploaded media, confidential documents, verification records, and customer enquiries.
+              This action will permanently delete all property listings, private specs, uploaded media, confidential documents, verification records, and customer enquiries.
             </p>
 
             <div className="p-3.5 bg-red-50 rounded-2xl border border-red-200 text-[11px] font-bold text-red-800 space-y-1.5">
@@ -6640,7 +6692,7 @@ export default function AdminPortal({ onNavigate }) {
                 ) : (
                   <>
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Permanently Wipe All Properties</span>
+                    <span>Permanently Wipe ALL Properties</span>
                   </>
                 )}
               </button>

@@ -2025,9 +2025,25 @@ export const mockApi = {
       removedUser = registeredUsers[usrIndex];
       registeredUsers.splice(usrIndex, 1);
       setStoredData('easeland_registered_users', registeredUsers);
-      if (typeof window !== 'undefined') {
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const uIdStr = String(userId || '').toLowerCase().trim();
+        const uEmStr = removedUser?.email ? String(removedUser.email).toLowerCase().trim() : '';
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        let delArr = rawDel ? JSON.parse(rawDel) : [];
+        if (uIdStr && !delArr.includes(uIdStr)) delArr.push(uIdStr);
+        if (uEmStr && !delArr.includes(uEmStr)) delArr.push(uEmStr);
+        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
+
+        if (uIdStr) {
+          localStorage.removeItem('easeland_user_profile_' + uIdStr);
+          localStorage.removeItem('easeland_draft_' + uIdStr);
+          localStorage.removeItem('easeland_wizard_location_' + uIdStr);
+        }
         window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: registeredUsers }));
-      }
+      } catch (e) {}
     }
 
     // Cascade delete any properties posted from this account in mockApi

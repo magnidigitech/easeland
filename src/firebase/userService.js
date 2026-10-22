@@ -517,6 +517,49 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
     const targetIdStr = String(userId).toLowerCase().trim();
     const targetEmStr = String(userEmail || '').toLowerCase().trim();
 
+    // 0. Update localStorage caches and blacklist user BEFORE ANY ASYNC CALLS
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        let delArr = rawDel ? JSON.parse(rawDel) : [];
+        if (userId && !delArr.includes(targetIdStr)) delArr.push(targetIdStr);
+        if (userEmail && !delArr.includes(targetEmStr)) delArr.push(targetEmStr);
+        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
+
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.filter(u => {
+              if (!u) return false;
+              const uId = String(u.id || u.uid || '').toLowerCase().trim();
+              const uEm = String(u.email || '').toLowerCase().trim();
+              return uId !== targetIdStr && (!targetEmStr || uEm !== targetEmStr);
+            });
+            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+
+        // Remove user-specific profile, draft, location, and user properties
+        localStorage.removeItem('easeland_user_profile_' + userId);
+        localStorage.removeItem('easeland_draft_' + userId);
+        localStorage.removeItem('easeland_wizard_location_' + userId);
+
+        const rawUserProps = localStorage.getItem('easeland_user_properties');
+        if (rawUserProps) {
+          const parsed = JSON.parse(rawUserProps);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter(p => {
+              const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+              const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+              return pOwner !== targetIdStr && (!targetEmStr || pEmail !== targetEmStr);
+            });
+            localStorage.setItem('easeland_user_properties', JSON.stringify(cleaned));
+          }
+        }
+      }
+    } catch (e) { }
+
     // 1. Cascade delete all properties posted by this user from Cloud Firestore
     try {
       const pColl = collection(db, 'properties');
@@ -576,48 +619,6 @@ export async function removeUserAccount(userId, adminUid, reason = 'Policy Viola
       await fetch('/api/users/' + encodeURIComponent(userId) + emailQuery, { method: 'DELETE' });
     } catch (eDel) { }
 
-    // 4. Update localStorage caches and purge user-specific local traces
-    try {
-      if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_users');
-        let delArr = rawDel ? JSON.parse(rawDel) : [];
-        if (userId && !delArr.includes(targetIdStr)) delArr.push(targetIdStr);
-        if (userEmail && !delArr.includes(targetEmStr)) delArr.push(targetEmStr);
-        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
-
-        const rawReg = localStorage.getItem('easeland_registered_users');
-        if (rawReg) {
-          const parsed = JSON.parse(rawReg);
-          if (Array.isArray(parsed)) {
-            const updated = parsed.filter(u => {
-              if (!u) return false;
-              const uId = String(u.id || u.uid || '').toLowerCase().trim();
-              const uEm = String(u.email || '').toLowerCase().trim();
-              return uId !== targetIdStr && (!targetEmStr || uEm !== targetEmStr);
-            });
-            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
-          }
-        }
-
-        // Remove user-specific profile, draft, location, and user properties
-        localStorage.removeItem('easeland_user_profile_' + userId);
-        localStorage.removeItem('easeland_draft_' + userId);
-        localStorage.removeItem('easeland_wizard_location_' + userId);
-
-        const rawUserProps = localStorage.getItem('easeland_user_properties');
-        if (rawUserProps) {
-          const parsed = JSON.parse(rawUserProps);
-          if (Array.isArray(parsed)) {
-            const cleaned = parsed.filter(p => {
-              const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
-              const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
-              return pOwner !== targetIdStr && (!targetEmStr || pEmail !== targetEmStr);
-            });
-            localStorage.setItem('easeland_user_properties', JSON.stringify(cleaned));
-          }
-        }
-      }
-    } catch (e) { }
 
     await logAdminActivity(
       'USER_REMOVED',
