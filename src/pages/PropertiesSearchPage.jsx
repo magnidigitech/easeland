@@ -69,10 +69,15 @@ export default function PropertiesSearchPage({
   const [wishlistNotice, setWishlistNotice] = useState(null);
 
   // 4. UI View Mode (Responsive Split vs Mobile Toggle)
-  const [viewMode, setViewMode] = useState('split'); // 'split', 'list', 'map'
+  const [viewMode, setViewMode] = useState('list'); // 'split', 'list', 'map'
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [focusedProperty, setFocusedProperty] = useState(null);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+
+  // Synchronize viewMode whenever isSidePanelOpen changes
+  useEffect(() => {
+    setViewMode(isSidePanelOpen ? 'list' : 'map');
+  }, [isSidePanelOpen]);
 
   // Load User Wishlist for Authenticated Customer
   useEffect(() => {
@@ -399,16 +404,28 @@ export default function PropertiesSearchPage({
               {/* Mobile View Switcher (List vs Map) */}
               <div className="flex md:hidden items-center bg-gray-800 p-0.5 rounded-xl border border-gray-700">
                 <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'list' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
-                    }`}
+                  onClick={() => {
+                    setViewMode('list');
+                    setIsSidePanelOpen(true);
+                  }}
+                  className={'p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors ' + (
+                    isSidePanelOpen ? 'bg-brand-yellow text-brand-charcoal shadow-sm' : 'text-gray-400 hover:text-white'
+                  )}
+                  title="View Property List"
+                  aria-label="View Property List"
                 >
                   <List className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('map')}
-                  className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 ${viewMode === 'map' ? 'bg-brand-yellow text-brand-charcoal' : 'text-gray-400'
-                    }`}
+                  onClick={() => {
+                    setViewMode('map');
+                    setIsSidePanelOpen(false);
+                  }}
+                  className={'p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors ' + (
+                    !isSidePanelOpen ? 'bg-brand-yellow text-brand-charcoal shadow-sm' : 'text-gray-400 hover:text-white'
+                  )}
+                  title="View Map"
+                  aria-label="View Map"
                 >
                   <MapIcon className="w-4 h-4" />
                 </button>

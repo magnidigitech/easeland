@@ -325,9 +325,13 @@ export default function UniversalMapEngine({
 
   useEffect(() => {
     if (mapInstanceRef.current) {
-      setTimeout(() => {
-        try { mapInstanceRef.current.invalidateSize(); } catch(e) {}
-      }, 300);
+      const timers = [
+        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 50),
+        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 150),
+        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 300),
+        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 450)
+      ];
+      return () => timers.forEach(t => clearTimeout(t));
     }
   }, [isSidePanelOpen]);
 
@@ -1046,9 +1050,9 @@ export default function UniversalMapEngine({
       
       {/* LEFT PROPERTY LIST CONTAINER (Fixed Width 380px/400px Collapsible Side Panel) */}
       {!hideSidePanel && (
-        <div className={`w-full md:w-[380px] lg:w-[400px] flex-shrink-0 h-full bg-white border-r border-gray-200 flex flex-col z-[35] md:z-10 shadow-lg transition-all duration-300 ease-in-out ${
-          isSidePanelOpen ? 'ml-0' : '-ml-[100%] md:-ml-[380px] lg:-ml-[400px]'
-        }`}>
+        <div className={'w-full md:w-[380px] lg:w-[400px] flex-shrink-0 h-full bg-white border-r border-gray-200 flex flex-col z-[35] md:z-10 shadow-lg transition-all duration-300 ease-in-out ' + (
+          isSidePanelOpen ? 'ml-0 pointer-events-auto' : '-ml-[100%] md:-ml-[380px] lg:-ml-[400px] pointer-events-none md:pointer-events-auto'
+        )}>
           
           {/* LIST HEADER WITH CLOSE TOGGLE BUTTON */}
           <div className="p-4 border-b border-gray-100 bg-brand-charcoal text-white flex items-center justify-between">
