@@ -457,7 +457,9 @@ export default function AdminPortal({ onNavigate }) {
 
       setAllProperties([]);
       setVerificationQueue([]);
-      setRawProperties([]);
+      setEnquiries([]);
+      setSelectedProperty(null);
+      setIsWorkspaceOpen(false);
       
       logAdminActivity('authoritatively wiped all test property listings, media, documents, and enquiries across PostgreSQL, Firestore, and Local Storage.');
       setPublishSuccessMessage('All test properties and cascaded collections have been wiped clean across all 3 layers!');
