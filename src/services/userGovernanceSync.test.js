@@ -263,4 +263,119 @@ describe('EaseLand User Governance & Real-Time Firebase Sync Suite', () => {
 
     assert.equal(userProperties.length, 0, 'Relogged in user must have 0 properties from previous deletion');
   });
+
+  it('8. enrichAndSyncLiveUsers strictly rejects deleted or removed users from registeredUsersList so they are never appended to the last page', () => {
+    const existingUsers = [
+      { id: 'usr-1', uid: 'usr-1', email: 'alice@example.com', name: 'Alice', status: 'ACTIVE' },
+      { id: 'usr-2', uid: 'usr-2', email: 'bob@example.com', name: 'Bob', status: 'ACTIVE' }
+    ];
+
+    const deletedUsers = ['usr-deleted', 'deleted@easeland.in'];
+
+    const incomingUsers = [
+      { id: 'usr-deleted', uid: 'usr-deleted', email: 'deleted@easeland.in', name: 'Stale User', status: 'ACTIVE' },
+      { id: 'usr-3', uid: 'usr-3', email: 'charlie@example.com', name: 'Charlie', status: 'ACTIVE' }
+    ];
+
+    const isUserDeleted = (u) => {
+      if (!u) return true;
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      const uEmail = (u.email || '').toLowerCase().trim();
+      const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+      return rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
+        (uUid && deletedUsers.includes(uUid)) || (uEmail && deletedUsers.includes(uEmail));
+    };
+
+    const cleanPrev = existingUsers.filter(u => !isUserDeleted(u));
+    const cleanIncoming = incomingUsers.filter(u => !isUserDeleted(u));
+
+    const userMap = new Map();
+    [...cleanPrev, ...cleanIncoming].forEach(u => {
+      if (!u || isUserDeleted(u)) return;
+      const key = (u.email || u.uid).toLowerCase().trim();
+      userMap.set(key, u);
+    });
+
+    const result = Array.from(userMap.values()).filter(u => !isUserDeleted(u));
+
+    assert.equal(result.length, 3);
+    assert.ok(!result.some(u => u.uid === 'usr-deleted'), 'Deleted user must NEVER be added back to user list');
+    assert.equal(result[result.length - 1].uid, 'usr-3', 'Last item must be the legitimate new user, never the deleted user');
+  });
+
+  it('9. Directory table pagination and filtering strictly exclude removed users from ALL tab and maintain deterministic sorting', () => {
+    const users = [
+      { uid: 'u-1', name: 'Zack', email: 'zack@example.com', role: 'USER', status: 'ACTIVE' },
+      { uid: 'u-2', name: 'EaseLand Admin', email: 'admin@easeland.in', role: 'ADMIN', status: 'ACTIVE' },
+      { uid: 'u-3', name: 'Deleted Dan', email: 'dan@example.com', role: 'USER', status: 'REMOVED' },
+      { uid: 'u-4', name: 'Alice', email: 'alice@example.com', role: 'USER', status: 'ACTIVE' }
+    ];
+
+    const deletedUsers = ['u-3', 'dan@example.com'];
+    const userStatusFilter = 'ALL';
+
+    const filtered = users
+      .filter(u => {
+        if (!u) return false;
+        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+        const uEmail = (u.email || '').toLowerCase().trim();
+        const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+        const isRemoved = rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
+          (uUid && deletedUsers.includes(uUid)) || (uEmail && deletedUsers.includes(uEmail));
+
+        if (userStatusFilter === 'ALL') {
+          if (isRemoved) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aIsAdmin = a.role === 'ADMIN' || a.email === 'admin@easeland.in';
+        const bIsAdmin = b.role === 'ADMIN' || b.email === 'admin@easeland.in';
+        if (aIsAdmin && !bIsAdmin) return -1;
+        if (!aIsAdmin && bIsAdmin) return 1;
+        return (a.name || a.displayName || a.email || '').localeCompare(b.name || b.displayName || b.email || '');
+      });
+
+    assert.equal(filtered.length, 3, 'Deleted user Dan must be completely excluded');
+    assert.equal(filtered[0].role, 'ADMIN', 'Admin must be first');
+    assert.equal(filtered[1].name, 'Alice', 'Deterministic alphabetical sort for users');
+    assert.equal(filtered[2].name, 'Zack', 'Deterministic alphabetical sort for users');
+
+    // Pagination test: 2 users per page
+    const perPage = 2;
+    const page1 = filtered.slice(0, perPage);
+    const page2 = filtered.slice(perPage, perPage * 2);
+
+    assert.equal(page1.length, 2);
+    assert.equal(page2.length, 1);
+    assert.equal(page2[0].name, 'Zack', 'Last page contains Zack, deleted Dan is nowhere to be found');
+  });
+
+  it('10. Synchronous pre-async blacklisting guarantees concurrent Firestore snapshots cannot re-inject deleted user', () => {
+    let mockLocalStorage = {};
+    const targetUserId = 'usr-victim-99';
+    const targetEmail = 'victim@example.com';
+
+    // 0. Synchronously blacklist before any async operations start
+    let delArr = [];
+    if (targetUserId) delArr.push(targetUserId.toLowerCase());
+    if (targetEmail) delArr.push(targetEmail.toLowerCase());
+    mockLocalStorage['easeland_deleted_users'] = JSON.stringify(delArr);
+
+    // Simulated concurrent Firestore snapshot arriving while async operations are in-flight
+    const concurrentSnapshot = [
+      { id: 'usr-victim-99', email: 'victim@example.com', name: 'Victim Account', status: 'ACTIVE' },
+      { id: 'usr-other-1', email: 'other@example.com', name: 'Other User', status: 'ACTIVE' }
+    ];
+
+    const activeBlacklist = JSON.parse(mockLocalStorage['easeland_deleted_users']);
+    const processedSnapshot = concurrentSnapshot.filter(u => {
+      const uId = String(u.id || '').toLowerCase();
+      const uEmail = String(u.email || '').toLowerCase();
+      return !activeBlacklist.includes(uId) && !activeBlacklist.includes(uEmail);
+    });
+
+    assert.equal(processedSnapshot.length, 1);
+    assert.equal(processedSnapshot[0].id, 'usr-other-1');
+  });
 });

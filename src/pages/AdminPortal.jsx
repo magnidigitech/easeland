@@ -1082,13 +1082,6 @@ export default function AdminPortal({ onNavigate }) {
     setVerificationQueue(queue);
     setEnquiries(enqs);
     setAllProperties(allMergedProps);
-    let deletedUsers = [];
-    try {
-      if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_users');
-        if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
-      }
-    } catch (e) { }
 
     enrichAndSyncLiveUsers(users, allMergedProps);
     setSiteConfig(cfg);
@@ -2526,8 +2519,38 @@ export default function AdminPortal({ onNavigate }) {
     const targetId = String(targetUser.id || targetUser.uid || '').toLowerCase().trim();
     const targetEmail = String(targetUser.email || '').toLowerCase().trim();
 
+    // 0. Synchronously blacklist in localStorage BEFORE ANY ASYNC CALLS so all listeners/sync reject this user
+    try {
+      if (typeof window !== 'undefined') {
+        const rawDel = localStorage.getItem('easeland_deleted_users');
+        let delArr = rawDel ? JSON.parse(rawDel) : [];
+        if (targetId && !delArr.includes(targetId)) delArr.push(targetId);
+        if (targetEmail && !delArr.includes(targetEmail)) delArr.push(targetEmail);
+        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
+
+        localStorage.removeItem('easeland_user_profile_' + targetId);
+        localStorage.removeItem('easeland_draft_' + targetId);
+        localStorage.removeItem('easeland_wizard_location_' + targetId);
+
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.filter(u => {
+              if (!u) return false;
+              const id1 = String(u.id || u.uid || '').toLowerCase().trim();
+              const em1 = String(u.email || '').toLowerCase().trim();
+              return id1 !== targetId && (!targetEmail || em1 !== targetEmail);
+            });
+            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
+          }
+        }
+      }
+    } catch (e) { }
+
     // 1. Immediate optimistic UI update - registered users list
-    setRegisteredUsersList(prev => prev.filter(u => {
+    setRegisteredUsersList(prev => (prev || []).filter(u => {
+      if (!u) return false;
       const id1 = String(u.id || u.uid || '').toLowerCase().trim();
       const em1 = String(u.email || '').toLowerCase().trim();
       return id1 !== targetId && (!targetEmail || em1 !== targetEmail);
@@ -2588,28 +2611,9 @@ export default function AdminPortal({ onNavigate }) {
       await fetch('/api/users/' + uidParam + emailParam, { method: 'DELETE' });
     } catch (apiErr) { }
 
-    // 7. Update local storage and broadcast cross-tab events
+    // 7. Broadcast cross-tab events after authoritative deletion has completed
     try {
       if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_users');
-        let delArr = rawDel ? JSON.parse(rawDel) : [];
-        if (targetId && !delArr.includes(targetId)) delArr.push(targetId);
-        if (targetEmail && !delArr.includes(targetEmail)) delArr.push(targetEmail);
-        localStorage.setItem('easeland_deleted_users', JSON.stringify(delArr));
-
-        const rawReg = localStorage.getItem('easeland_registered_users');
-        if (rawReg) {
-          const parsed = JSON.parse(rawReg);
-          if (Array.isArray(parsed)) {
-            const updated = parsed.filter(u => {
-              if (!u) return false;
-              const id1 = String(u.id || u.uid || '').toLowerCase().trim();
-              const em1 = String(u.email || '').toLowerCase().trim();
-              return id1 !== targetId && (!targetEmail || em1 !== targetEmail);
-            });
-            localStorage.setItem('easeland_registered_users', JSON.stringify(updated));
-          }
-        }
         window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: { userId: targetId, status: 'REMOVED' } }));
         window.dispatchEvent(new CustomEvent('easeland-user-status-changed', { detail: { userId: targetId, email: targetEmail, status: 'REMOVED' } }));
       }
@@ -5396,17 +5400,34 @@ export default function AdminPortal({ onNavigate }) {
 
                 {/* REGISTERED USERS DIRECTORY TABLE WITH PAGINATION */}
                 {(() => {
+                  let activeDeletedUsers = [];
+                  try {
+                    if (typeof window !== 'undefined') {
+                      const rawDel = localStorage.getItem('easeland_deleted_users');
+                      if (rawDel) activeDeletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+                    }
+                  } catch (e) { }
+
                   const filteredUsers = registeredUsersList
                     .filter(u => {
                       if (!u) return false;
+                      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+                      const uEmail = (u.email || '').toLowerCase().trim();
+                      const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+                      const isRemoved = rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
+                        (uUid && activeDeletedUsers.includes(uUid)) || (uEmail && activeDeletedUsers.includes(uEmail));
+
                       if (userStatusFilter === 'ALL') {
-                        if (u.status === 'DELETED' || u.status === 'REMOVED') return false;
-                      } else if (u.status !== userStatusFilter) {
+                        if (isRemoved) return false;
+                      } else if (userStatusFilter === 'REMOVED') {
+                        if (!isRemoved) return false;
+                      } else if (u.status !== userStatusFilter && u.accountStatus !== userStatusFilter) {
                         return false;
                       }
                       if (userSearchQuery) {
                         const q = userSearchQuery.toLowerCase();
                         return (u.name || '').toLowerCase().includes(q) ||
+                          (u.displayName || '').toLowerCase().includes(q) ||
                           (u.email || '').toLowerCase().includes(q) ||
                           (u.phone || '').includes(q) ||
                           (u.uid || '').toLowerCase().includes(q);
@@ -5418,7 +5439,7 @@ export default function AdminPortal({ onNavigate }) {
                       const bIsAdmin = b.role === 'ADMIN' || b.email === 'admin@easeland.in';
                       if (aIsAdmin && !bIsAdmin) return -1;
                       if (!aIsAdmin && bIsAdmin) return 1;
-                      return 0;
+                      return (a.name || a.displayName || a.email || '').localeCompare(b.name || b.displayName || b.email || '');
                     });
 
                   const totalUsers = filteredUsers.length;
