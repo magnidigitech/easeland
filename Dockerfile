@@ -1,5 +1,5 @@
 # Step 1: Build Vite React application
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
@@ -29,13 +29,14 @@ ENV VITE_POSTGRES_URL=$VITE_POSTGRES_URL
 RUN npm run build
 
 # Step 2: Serve application and Hostinger Storage API using Node.js
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY --from=build /app/dist ./dist
+COPY public ./public
 COPY server.js ./
 
 # Create uploads volume directory

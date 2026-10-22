@@ -7,7 +7,6 @@ import pg from 'pg';
 import admin from 'firebase-admin';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import { fileURLToPath } from 'url';
 
 // Initialize Firebase Admin SDK
@@ -1560,15 +1559,23 @@ app.delete('/api/properties/:id', async (req, res) => {
     try {
       const adminApps = getApps();
       if (adminApps.length) {
-        const adminDb = getAdminFirestore(adminApps[0]);
-        const idsToPurge = Array.from(new Set([
-          targetId,
-          cleanNum,
-          refWithPrefix,
-          propWithPrefix,
-          extraId,
-          extraRef
-        ].filter(Boolean)));
+        let adminDb = null;
+        try {
+          const { getFirestore } = await import('firebase-admin/firestore');
+          adminDb = getFirestore(adminApps[0]);
+        } catch (fsImportErr) {
+          console.warn('Firebase Admin Firestore import note:', fsImportErr.message);
+        }
+
+        if (adminDb) {
+          const idsToPurge = Array.from(new Set([
+            targetId,
+            cleanNum,
+            refWithPrefix,
+            propWithPrefix,
+            extraId,
+            extraRef
+          ].filter(Boolean)));
 
         for (const cid of idsToPurge) {
           // Direct doc deletions across collections
