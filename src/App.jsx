@@ -247,12 +247,104 @@ export default function App() {
     refreshWishlist();
   };
 
+  const [editingPropertyId, setEditingPropertyId] = useState(null);
+  const [incompleteProfileFields, setIncompleteProfileFields] = useState([]);
+  const [isProfileWarningOpen, setIsProfileWarningOpen] = useState(false);
+
+  const checkProfileComplete = (u, p) => {
+    const missing = [];
+    const uid = u?.uid || p?.uid || authUser?.uid;
+    let localStored = {};
+    if (typeof window !== 'undefined' && uid) {
+      try {
+        const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
+        if (storedStr) localStored = JSON.parse(storedStr);
+      } catch (e) {}
+    }
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+
+    const name = (u?.name || u?.displayName || p?.name || p?.displayName || localStored.displayName || localStored.name || '').trim();
+    const email = (u?.email || p?.email || localStored.email || '').trim();
+    const phone = sanitizePhone(
+      u?.phone || u?.phoneNumber ||
+      p?.phone || p?.phoneNumber ||
+      localStored.phone || localStored.phoneNumber ||
+      adminPhone
+    );
+    const city = (
+      u?.city || u?.location ||
+      p?.city || p?.location ||
+      localStored.city || localStored.location ||
+      adminCity
+    ).trim();
+
+    if (!name) missing.push('Full Name');
+    if (!email) missing.push('Email Address');
+    if (!phone) missing.push('Phone Number');
+    if (!city) missing.push('City / Location');
+
+    return missing;
+  };
+
+  const navigateToAccountSettings = (mode = 'dashboard') => {
+    setIsProfileWarningOpen(false);
+
+    if (mode === 'popup') {
+      setIsProfileModalOpen(true);
+      return;
+    }
+
+    setDashboardTab('account');
+    setDashboardTabKey(Date.now());
+    changeActivePage('dashboard', { tab: 'account' });
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    setTimeout(() => {
+      const section = document.getElementById('account-profile-settings-section');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const missingName = document.getElementById('account-profile-name');
+      const missingEmail = document.getElementById('account-profile-email');
+      const missingPhone = document.getElementById('account-profile-phone');
+      const missingCity = document.getElementById('account-profile-city');
+
+      if (missingName && !missingName.value) missingName.focus();
+      else if (missingEmail && !missingEmail.value) missingEmail.focus();
+      else if (missingPhone && !missingPhone.value) missingPhone.focus();
+      else if (missingCity && !missingCity.value) missingCity.focus();
+      else if (missingPhone) missingPhone.focus();
+    }, 300);
+  };
+
   const changeActivePage = (pageName, propIdOrFilters = null) => {
     let resolvedPage = pageName;
     let resolvedPropId = typeof propIdOrFilters === 'string' ? propIdOrFilters : null;
 
     if (authUser && isProfileIncomplete && (resolvedPage === 'dashboard' || resolvedPage === 'crm' || resolvedPage === 'post-property')) {
       return;
+    }
+
+    // Never allow navigating to post-property without complete profile details
+    if (resolvedPage === 'post-property' && !editingPropertyId) {
+      if (!currentUser && !authLoading) {
+        setAuthIntent('post-property');
+        setIsAuthModalOpen(true);
+        return;
+      }
+      if (currentUser) {
+        const missing = checkProfileComplete(currentUser, authProfile);
+        if (missing.length > 0) {
+          setIncompleteProfileFields(missing);
+          navigateToAccountSettings('dashboard');
+          setIsProfileWarningOpen(true);
+          return;
+        }
+      }
     }
 
     if (typeof pageName === 'string') {
@@ -309,6 +401,29 @@ export default function App() {
       }
     } catch (err) {}
   };
+
+  // Route-level protection: Never allow staying on or accessing post-property without complete profile details
+  useEffect(() => {
+    if (activePage === 'post-property' && !editingPropertyId) {
+      if (!currentUser && !authLoading) {
+        setAuthIntent('post-property');
+        setIsAuthModalOpen(true);
+        setActivePage('home');
+        return;
+      }
+      if (currentUser) {
+        const missing = checkProfileComplete(currentUser, authProfile);
+        if (missing.length > 0) {
+          setIncompleteProfileFields(missing);
+          navigateToAccountSettings('dashboard');
+          setIsProfileWarningOpen(true);
+          try {
+            window.history.replaceState(null, '', '/dashboard?tab=account');
+          } catch (e) {}
+        }
+      }
+    }
+  }, [activePage, currentUser, authProfile, authLoading, editingPropertyId]);
 
   const syncStateFromUrl = () => {
     const route = getInitialPageState();
@@ -519,46 +634,6 @@ export default function App() {
     loadProperties();
   };
 
-  const [editingPropertyId, setEditingPropertyId] = useState(null);
-  const [incompleteProfileFields, setIncompleteProfileFields] = useState([]);
-  const [isProfileWarningOpen, setIsProfileWarningOpen] = useState(false);
-
-  const checkProfileComplete = (u, p) => {
-    const missing = [];
-    const uid = u?.uid || p?.uid || authUser?.uid;
-    let localStored = {};
-    if (typeof window !== 'undefined' && uid) {
-      try {
-        const storedStr = localStorage.getItem('easeland_user_profile_' + uid) || localStorage.getItem('easeland_session_user');
-        if (storedStr) localStored = JSON.parse(storedStr);
-      } catch (e) {}
-    }
-    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
-    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
-
-    const name = (u?.name || u?.displayName || p?.name || p?.displayName || localStored.displayName || localStored.name || '').trim();
-    const email = (u?.email || p?.email || localStored.email || '').trim();
-    const phone = sanitizePhone(
-      u?.phone || u?.phoneNumber ||
-      p?.phone || p?.phoneNumber ||
-      localStored.phone || localStored.phoneNumber ||
-      adminPhone
-    );
-    const city = (
-      u?.city || u?.location ||
-      p?.city || p?.location ||
-      localStored.city || localStored.location ||
-      adminCity
-    ).trim();
-
-    if (!name) missing.push('Full Name');
-    if (!email) missing.push('Email Address');
-    if (!phone) missing.push('Phone Number');
-    if (!city) missing.push('City / Location');
-
-    return missing;
-  };
-
   const handlePostPropertyClick = (propParam = null) => {
     let targetPropId = null;
     let targetPropObj = null;
@@ -599,44 +674,12 @@ export default function App() {
     const missingFields = checkProfileComplete(currentUser, authProfile);
     if (missingFields.length > 0) {
       setIncompleteProfileFields(missingFields);
+      navigateToAccountSettings('dashboard');
       setIsProfileWarningOpen(true);
-    } else {
-      changeActivePage('post-property');
-    }
-  };
-
-  const navigateToAccountSettings = (mode = 'dashboard') => {
-    setIsProfileWarningOpen(false);
-
-    if (mode === 'popup') {
-      setIsProfileModalOpen(true);
       return;
     }
 
-    setDashboardTab('account');
-    setDashboardTabKey(Date.now());
-    changeActivePage('dashboard', { tab: 'account' });
-
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    setTimeout(() => {
-      const section = document.getElementById('account-profile-settings-section');
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      const missingName = document.getElementById('account-profile-name');
-      const missingEmail = document.getElementById('account-profile-email');
-      const missingPhone = document.getElementById('account-profile-phone');
-      const missingCity = document.getElementById('account-profile-city');
-
-      if (missingName && !missingName.value) missingName.focus();
-      else if (missingEmail && !missingEmail.value) missingEmail.focus();
-      else if (missingPhone && !missingPhone.value) missingPhone.focus();
-      else if (missingCity && !missingCity.value) missingCity.focus();
-      else if (missingPhone) missingPhone.focus();
-    }, 300);
+    changeActivePage('post-property');
   };
 
   const handleAuthSuccess = (authenticatedUser, intent) => {
@@ -647,6 +690,7 @@ export default function App() {
       const missingFields = checkProfileComplete(authenticatedUser, authProfile);
       if (missingFields.length > 0) {
         setIncompleteProfileFields(missingFields);
+        navigateToAccountSettings('dashboard');
         setIsProfileWarningOpen(true);
       } else {
         changeActivePage('post-property');
@@ -1033,7 +1077,7 @@ export default function App() {
             onCancel={() => {
               setEditingPropertyId(null);
               try { sessionStorage.removeItem('easeland_editing_property'); } catch (e) {}
-              changeActivePage('dashboard');
+              navigateToAccountSettings('dashboard');
             }}
           />
         )}

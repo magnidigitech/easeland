@@ -85,6 +85,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
     return missing;
   }, [resumePropertyId, propertyId, user, profile]);
 
+  // Mandatory profile completeness check: force exit to account settings if required criteria are missing
+  useEffect(() => {
+    if (missingProfileCriteria.length > 0 && !resumePropertyId && !propertyId) {
+      if (onCancel) onCancel();
+    }
+  }, [missingProfileCriteria.length, resumePropertyId, propertyId, onCancel]);
+
   // Clear step-specific validation errors when changing steps
   useEffect(() => {
     setErrorMsg(null);
@@ -810,61 +817,71 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         </div>
       </div>
 
-      {/* PROFILE CRITERIA WARNING */}
-      {missingProfileCriteria.length > 0 && (
-        <div className="mb-6 p-5 bg-amber-50 border-2 border-amber-300 rounded-2xl space-y-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-200/70 text-amber-900 flex items-center justify-center font-extrabold shrink-0">
-              <AlertCircle className="w-5 h-5 text-amber-700" />
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-amber-950">Profile Criteria Required Before Posting</h3>
-              <p className="text-xs text-amber-800 font-semibold">
-                Your Account &amp; Profile settings are missing required fields. Please complete these details in Account Settings before posting your property.
-              </p>
-            </div>
+      {/* PROFILE CRITERIA BLOCKING SCREEN / WIZARD STEP CONTAINER */}
+      {missingProfileCriteria.length > 0 ? (
+        <div className="bg-white rounded-3xl p-8 sm:p-12 border-2 border-amber-300 shadow-xl max-w-2xl mx-auto text-center space-y-6 my-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto font-black shadow-inner">
+            <AlertCircle className="w-8 h-8 text-amber-600" />
           </div>
-          <div className="pl-13 space-y-1">
-            <span className="text-[11px] font-black uppercase text-amber-900 tracking-wider">Missing Required Fields ({missingProfileCriteria.length}):</span>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Profile Criteria Required Before Posting</h2>
+            <p className="text-xs text-slate-600 font-semibold max-w-md mx-auto leading-relaxed">
+              Your Account &amp; Profile settings are missing required details. You must complete these details in Account Settings before you can list a property.
+            </p>
+          </div>
+
+          <div className="bg-amber-50/80 rounded-2xl p-5 border border-amber-200 text-left space-y-2.5">
+            <span className="text-[11px] font-black uppercase text-amber-900 tracking-wider block">
+              Missing Required Fields ({missingProfileCriteria.length}):
+            </span>
             <ul className="flex flex-wrap gap-2 pt-1">
               {missingProfileCriteria.map((field) => (
-                <li key={field} className="bg-amber-200/60 text-amber-950 text-xs font-bold px-2.5 py-1 rounded-lg border border-amber-300 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                <li key={field} className="bg-amber-100 text-amber-950 text-xs font-black px-3.5 py-1.5 rounded-xl border border-amber-300 flex items-center gap-2 shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-amber-600"></span>
                   <span>{field}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="pt-2 flex items-center gap-3">
+
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               type="button"
               onClick={onCancel}
-              className="bg-brand-navy hover:bg-brand-navyLight text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5"
+              className="w-full sm:w-auto bg-brand-charcoal hover:bg-black text-white text-xs font-extrabold px-6 py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Settings className="w-4 h-4 text-brand-yellow" />
-              <span>Go to Account Settings to Complete</span>
+              <span>Fill Details in Account Settings</span>
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="w-full sm:w-auto px-5 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+            >
+              Exit to Dashboard
             </button>
           </div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* MESSAGES */}
+          {errorMsg && (
+            <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-      {/* MESSAGES */}
-      {errorMsg && (
-        <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+          {successMsg && (
+            <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold rounded-xl flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
 
-      {successMsg && (
-        <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold rounded-xl flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
-
-      {/* WIZARD STEP CONTAINER */}
-      <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
+          {/* WIZARD STEP CONTAINER */}
+          <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
         
         {/* STEP 1: PROPERTY TYPE & PURPOSE */}
         {step === 1 && (
@@ -1419,6 +1436,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
         )}
 
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 }
