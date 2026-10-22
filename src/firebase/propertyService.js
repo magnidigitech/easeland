@@ -2102,7 +2102,12 @@ export async function purgeAllMarketplaceProperties() {
       'easeland_admin_deleted_properties',
       'easeland_deleted_media',
       'easeland_active_property_id',
-      'easeland_post_property_draft'
+      'easeland_post_property_draft',
+      'easeland_admin_activity_logs',
+      'easeland_crm_deals',
+      'easeland_crm_leads',
+      'easeland_crm_visits',
+      'easeland_visitor_leads'
     ];
     keysToRemove.forEach(k => {
       try { localStorage.removeItem(k); } catch (e) {}
@@ -2110,13 +2115,13 @@ export async function purgeAllMarketplaceProperties() {
 
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && (k.startsWith('easeland_prop_') || k.startsWith('easeland_wizard_') || k.startsWith('easeland_draft_'))) {
+      if (k && (k.startsWith('easeland_prop_') || k.startsWith('easeland_wizard_') || k.startsWith('easeland_draft_') || k.startsWith('easeland_crm_'))) {
         try { localStorage.removeItem(k); } catch (e) {}
       }
     }
   }
 
-  // 4. Clear mockApi stores
+  // 4. Clear mockApi and CRM stores
   try {
     const { mockApi } = await import('../services/mockApi.js');
     if (typeof mockApi.clearAllProperties === 'function') {
@@ -2124,10 +2129,18 @@ export async function purgeAllMarketplaceProperties() {
     }
   } catch (e) {}
 
+  try {
+    const { clearAllCrmData } = await import('./crmService.js');
+    if (typeof clearAllCrmData === 'function') {
+      await clearAllCrmData();
+    }
+  } catch (e) {}
+
   // 5. Notify all listeners
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { purgeAll: true, isAdmin: true } }));
     window.dispatchEvent(new CustomEvent('easeland-properties-purged'));
+    window.dispatchEvent(new CustomEvent('easeland-crm-storage-updated', { detail: { purgeAll: true } }));
   }
 
   return { success: true, backendResult };

@@ -460,8 +460,12 @@ export default function AdminPortal({ onNavigate }) {
       setEnquiries([]);
       setSelectedProperty(null);
       setIsWorkspaceOpen(false);
+      setActivityLogs([]);
+      setDeals([]);
+      setFollowUps([]);
+      setVisitorLeads([]);
       
-      logAdminActivity('authoritatively wiped all test property listings, media, documents, and enquiries across PostgreSQL, Firestore, and Local Storage.');
+      logAdminActivity('authoritatively wiped all test property listings, media, documents, enquiries, and CRM leads across PostgreSQL, Firestore, and Local Storage.');
       setPublishSuccessMessage('All test properties and cascaded collections have been wiped clean across all 3 layers!');
       setPurgeResultSummary(res?.backendResult || { success: true });
       setTimeout(() => setPublishSuccessMessage(''), 5000);

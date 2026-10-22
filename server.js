@@ -188,74 +188,9 @@ try {
 const adminDeletedStoreFile = path.join(uploadsDir, 'admin_deleted_store.json');
 const localAdminDeletedMap = new Map();
 
-// Seed initial ledger with known Admin Deleted properties
-const SEED_ADMIN_DELETED_PROPERTIES = [
-  {
-    propertyId: '63727',
-    id: '63727',
-    referenceId: 'EL-PROP-63727',
-    title: 'MAGNI DIGI TECH',
-    status: 'DELETED_BY_ADMIN',
-    listingStatus: 'DELETED_BY_ADMIN',
-    listing_status: 'DELETED_BY_ADMIN',
-    deletedByAdmin: true,
-    isDeleted: true,
-    isPublished: false,
-    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
-    deletedAt: '2026-10-18T10:00:00.000Z'
-  },
-  {
-    propertyId: '84040',
-    id: '84040',
-    referenceId: 'EL-PROP-84040',
-    title: 'Furnished 3BHK in Vidyanagar',
-    status: 'DELETED_BY_ADMIN',
-    listingStatus: 'DELETED_BY_ADMIN',
-    listing_status: 'DELETED_BY_ADMIN',
-    deletedByAdmin: true,
-    isDeleted: true,
-    isPublished: false,
-    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
-    deletedAt: '2026-10-18T10:00:00.000Z'
-  },
-  {
-    propertyId: '64847',
-    id: '64847',
-    referenceId: 'EL-PROP-64847',
-    title: 'Fertile Land in Perecherla',
-    status: 'DELETED_BY_ADMIN',
-    listingStatus: 'DELETED_BY_ADMIN',
-    listing_status: 'DELETED_BY_ADMIN',
-    deletedByAdmin: true,
-    isDeleted: true,
-    isPublished: false,
-    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
-    deletedAt: '2026-10-18T10:00:00.000Z'
-  },
-  {
-    propertyId: 'prop_1792224332032',
-    id: 'prop_1792224332032',
-    referenceId: 'EL-PROP-prop_1792224332032',
-    title: 'LEM',
-    status: 'DELETED_BY_ADMIN',
-    listingStatus: 'DELETED_BY_ADMIN',
-    listing_status: 'DELETED_BY_ADMIN',
-    deletedByAdmin: true,
-    isDeleted: true,
-    isPublished: false,
-    adminFeedback: 'Notification: Deleted by Admin. This listing was removed from the marketplace by an EaseLand Admin Auditor.',
-    deletedAt: '2026-10-18T10:00:00.000Z'
-  }
-];
+// Empty seed ledger to ensure clean platform state
+const SEED_ADMIN_DELETED_PROPERTIES = [];
 
-SEED_ADMIN_DELETED_PROPERTIES.forEach(p => {
-  const k1 = String(p.propertyId || p.id).toLowerCase();
-  const k2 = String(p.referenceId).toLowerCase();
-  const k3 = String(p.title).toLowerCase().trim();
-  localAdminDeletedMap.set(k1, p);
-  localAdminDeletedMap.set(k2, p);
-  localAdminDeletedMap.set(k3, p);
-});
 
 try {
   if (fs.existsSync(adminDeletedStoreFile)) {
@@ -1798,8 +1733,13 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
       localEnquiriesMap.clear();
       fs.writeFileSync(enquiriesStoreFile, JSON.stringify([], null, 2), 'utf8');
 
-      localAdminDeletedStore.clear();
+      localAdminDeletedMap.clear();
       fs.writeFileSync(adminDeletedStoreFile, JSON.stringify([], null, 2), 'utf8');
+
+      try {
+        localVisitorsMap.clear();
+        fs.writeFileSync(visitorsStoreFile, JSON.stringify([], null, 2), 'utf8');
+      } catch (visErr) {}
 
       // Clean uploads folders on disk
       try {
