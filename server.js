@@ -7,6 +7,7 @@ import pg from 'pg';
 import admin from 'firebase-admin';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import { fileURLToPath } from 'url';
 
 // Initialize Firebase Admin SDK
@@ -1515,53 +1516,23 @@ app.delete('/api/properties/:id', async (req, res) => {
           console.warn('PostgreSQL admin deleted ledger insert note:', lErr.message);
         }
 
+        // Hard DELETE from properties and media_files in PostgreSQL for Admin
         await pgPool.query(
-          "UPDATE properties " +
-          "SET listing_status = 'DELETED_BY_ADMIN', " +
-          "    is_published = false, " +
-          "    raw_data = jsonb_set(" +
-          "      jsonb_set(" +
-          "        jsonb_set(" +
-          "          jsonb_set(" +
-          "            jsonb_set(COALESCE(raw_data, '{}'::jsonb), '{status}', '\"DELETED_BY_ADMIN\"'), " +
-          "            '{listingStatus}', '\"DELETED_BY_ADMIN\"' " +
-          "          ), " +
-          "          '{listing_status}', '\"DELETED_BY_ADMIN\"' " +
-          "        ), " +
-          "        '{deletedByAdmin}', 'true' " +
-          "      ), " +
-          "      '{adminFeedback}', '\"Notification: Deleted by Admin\"' " +
-          "    ), " +
-          "    updated_at = NOW() " +
+          "DELETE FROM properties " +
           "WHERE LOWER(property_id) = LOWER(" + ph1 + ") " +
           "   OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph1 + ") " +
           "   OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph1 + ") " +
           "   OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph1 + ") " +
           "   OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph1 + ") " +
-          "   OR (" + ph2 + " <> '' AND (" +
-          "        LOWER(property_id) = LOWER(" + ph2 + ") " +
-          "     OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph2 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph2 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph2 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph2 + ")" +
-          "   )) " +
-          "   OR (" + ph3 + " <> '' AND (" +
-          "        LOWER(property_id) = LOWER(" + ph3 + ") " +
-          "     OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph3 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph3 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'propertyId', '')) = LOWER(" + ph3 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'referenceId', '')) = LOWER(" + ph3 + ")" +
-          "   )) " +
-          "   OR (" + ph4 + " <> '' AND (" +
-          "        LOWER(COALESCE(title, '')) = LOWER(" + ph4 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'title', '')) = LOWER(" + ph4 + ")" +
-          "   )) " +
-          "   OR (" + ph5 + " <> '' AND (" +
-          "        LOWER(property_id) = LOWER(" + ph5 + ") " +
-          "     OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph5 + ") " +
-          "     OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph5 + ")" +
-          "   ));",
+          "   OR (" + ph2 + " <> '' AND (LOWER(property_id) = LOWER(" + ph2 + ") OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph2 + "))) " +
+          "   OR (" + ph3 + " <> '' AND (LOWER(property_id) = LOWER(" + ph3 + ") OR LOWER(COALESCE(reference_id, '')) = LOWER(" + ph3 + "))) " +
+          "   OR (" + ph4 + " <> '' AND (LOWER(COALESCE(title, '')) = LOWER(" + ph4 + ") OR LOWER(COALESCE(raw_data->>'title', '')) = LOWER(" + ph4 + "))) " +
+          "   OR (" + ph5 + " <> '' AND (LOWER(property_id) = LOWER(" + ph5 + ") OR LOWER(COALESCE(raw_data->>'id', '')) = LOWER(" + ph5 + ")));",
           [tLower, cleanNum, refWithPrefix || propWithPrefix, reqTitle, extraId || extraRef]
+        );
+        await pgPool.query(
+          "DELETE FROM media_files WHERE LOWER(property_id) = LOWER(" + ph1 + ") OR (" + ph2 + " <> '' AND LOWER(property_id) = LOWER(" + ph2 + "));",
+          [tLower, cleanNum]
         );
       } else {
         await pgPool.query(
@@ -1583,6 +1554,50 @@ app.delete('/api/properties/:id', async (req, res) => {
       }
     } catch (pgErr) {
       console.warn('PostgreSQL property delete note:', pgErr.message);
+    }
+
+    // 2. Authoritative Cloud Firestore Cascade Deletion (Firebase Admin SDK)
+    try {
+      const adminApps = getApps();
+      if (adminApps.length) {
+        const adminDb = getAdminFirestore(adminApps[0]);
+        const idsToPurge = Array.from(new Set([
+          targetId,
+          cleanNum,
+          refWithPrefix,
+          propWithPrefix,
+          extraId,
+          extraRef
+        ].filter(Boolean)));
+
+        for (const cid of idsToPurge) {
+          // Direct doc deletions across collections
+          try { await adminDb.collection('properties').doc(cid).delete(); } catch (e) {}
+          try { await adminDb.collection('propertyPrivate').doc(cid).delete(); } catch (e) {}
+          try { await adminDb.collection('propertyMediaPrivate').doc(cid).delete(); } catch (e) {}
+          try { await adminDb.collection('verificationRecords').doc(cid).delete(); } catch (e) {}
+
+          // Query matching properties by propertyId or referenceId
+          try {
+            const pSnap = await adminDb.collection('properties').where('propertyId', '==', cid).get();
+            for (const d of pSnap.docs) { await d.ref.delete(); }
+          } catch (e) {}
+
+          // Query matching confidential documents
+          try {
+            const docSnap = await adminDb.collection('propertyDocuments').where('propertyId', '==', cid).get();
+            for (const d of docSnap.docs) { await d.ref.delete(); }
+          } catch (e) {}
+
+          // Query matching enquiries
+          try {
+            const enqSnap = await adminDb.collection('enquiries').where('propertyId', '==', cid).get();
+            for (const d of enqSnap.docs) { await d.ref.delete(); }
+          } catch (e) {}
+        }
+      }
+    } catch (adminFsErr) {
+      console.warn('Firebase Admin Firestore purge note:', adminFsErr.message);
     }
 
     // 2. Update / Remove from Local Disk Store

@@ -4,6 +4,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -1904,48 +1905,14 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
         const rawLocal = localStorage.getItem('easeland_user_properties');
         if (rawLocal) {
           const parsed = JSON.parse(rawLocal);
-          const updated = parsed.map(p => {
-            if (matchesAlias(p)) {
-              if (isAdmin) {
-                return {
-                  ...p,
-                  status: 'DELETED_BY_ADMIN',
-                  listingStatus: 'DELETED_BY_ADMIN',
-                  deletedByAdmin: true,
-                  isDeleted: true,
-                  isPublished: false,
-                  adminFeedback: 'Notification: Deleted by Admin',
-                  adminNotes: 'Deleted by Admin'
-                };
-              }
-              return null;
-            }
-            return p;
-          }).filter(Boolean);
+          const updated = parsed.filter(p => !matchesAlias(p));
           localStorage.setItem('easeland_user_properties', JSON.stringify(updated));
         }
 
         const rawStored = localStorage.getItem('easeland_properties');
         if (rawStored) {
           const parsed = JSON.parse(rawStored);
-          const updated = parsed.map(p => {
-            if (matchesAlias(p)) {
-              if (isAdmin) {
-                return {
-                  ...p,
-                  status: 'DELETED_BY_ADMIN',
-                  listingStatus: 'DELETED_BY_ADMIN',
-                  deletedByAdmin: true,
-                  isDeleted: true,
-                  isPublished: false,
-                  adminFeedback: 'Notification: Deleted by Admin',
-                  adminNotes: 'Deleted by Admin'
-                };
-              }
-              return null;
-            }
-            return p;
-          }).filter(Boolean);
+          const updated = parsed.filter(p => !matchesAlias(p));
           localStorage.setItem('easeland_properties', JSON.stringify(updated));
         }
 
@@ -1974,7 +1941,8 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
 
     // 2. Call backend API DELETE /api/properties/:id
     try {
-      await fetch(`/api/properties/${encodeURIComponent(pIdStr)}${isAdmin ? '?isAdmin=true' : ''}`, {
+      const adminQuery = isAdmin ? '?isAdmin=true' : '';
+      await fetch('/api/properties/' + encodeURIComponent(pIdStr) + adminQuery, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1987,27 +1955,64 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
       });
     } catch (e) {}
 
-    // 3. Update or Remove from Firestore
-    try {
-      const propRef = doc(db, 'properties', propertyId);
-      if (isAdmin) {
+    // 3. Cascade Delete across Cloud Firestore collections
+    const isNodeTest = typeof process !== 'undefined' && Boolean(process?.versions?.node) && !process?.env?.VITE_DEV_SERVER;
+    if (!isNodeTest) {
+      try {
+      const idsToDelete = Array.from(new Set([
+        propertyId,
+        pIdStr,
+        id2,
+        id3,
+        num1 ? ('prop-' + num1) : '',
+        num1 ? ('el-prop-' + num1) : '',
+        num1
+      ].filter(Boolean)));
+
+      for (const tId of idsToDelete) {
+        // 3a. Delete from properties (direct ID + query matching)
+        try { await deleteDoc(doc(db, 'properties', tId)); } catch (e) {}
         try {
-          await updateDoc(propRef, {
-            status: 'DELETED_BY_ADMIN',
-            listingStatus: 'DELETED_BY_ADMIN',
-            deletedByAdmin: true,
-            isDeleted: true,
-            isPublished: false,
-            adminFeedback: 'Notification: Deleted by Admin',
-            verificationNotes: 'Deleted by Admin'
-          });
-        } catch (updErr) {
-          await deleteDoc(propRef);
-        }
-      } else {
-        await deleteDoc(propRef);
+          const pQuery = query(collection(db, 'properties'), where('propertyId', '==', tId));
+          const pSnap = await getDocs(pQuery);
+          for (const pDoc of pSnap.docs) {
+            try { await deleteDoc(pDoc.ref); } catch (e) {}
+          }
+        } catch (e) {}
+
+        // 3b. Delete from propertyPrivate
+        try { await deleteDoc(doc(db, 'propertyPrivate', tId)); } catch (e) {}
+        // 3c. Delete from propertyMediaPrivate
+        try { await deleteDoc(doc(db, 'propertyMediaPrivate', tId)); } catch (e) {}
+        // 3d. Delete from verificationRecords
+        try { await deleteDoc(doc(db, 'verificationRecords', tId)); } catch (e) {}
       }
-    } catch (e) {}
+
+      // 3e. Delete associated documents from propertyDocuments
+      try {
+        for (const tId of idsToDelete) {
+          const docsQuery = query(collection(db, 'propertyDocuments'), where('propertyId', '==', tId));
+          const docsSnap = await getDocs(docsQuery);
+          for (const dSnap of docsSnap.docs) {
+            try { await deleteDoc(dSnap.ref); } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
+      // 3f. Delete associated enquiries from enquiries
+      try {
+        for (const tId of idsToDelete) {
+          const enqQuery = query(collection(db, 'enquiries'), where('propertyId', '==', tId));
+          const enqSnap = await getDocs(enqQuery);
+          for (const eSnap of enqSnap.docs) {
+            try { await deleteDoc(eSnap.ref); } catch (e) {}
+          }
+        }
+      } catch (e) {}
+    } catch (fsErr) {
+      console.warn('Firestore cascade delete note:', fsErr);
+    }
+  }
 
     // 4. Remove/update in mockApi
     try {

@@ -1294,26 +1294,9 @@ export const mockApi = {
       }
     }
 
-    // 2. Remove/update in stored easeland_properties in localStorage
+    // 2. Remove in stored easeland_properties in localStorage
     const currentProps = getStoredData('easeland_properties', properties);
-    const updatedProps = currentProps.map(p => {
-      if (matchesAlias(p)) {
-        if (isAdmin) {
-          return {
-            ...p,
-            status: 'DELETED_BY_ADMIN',
-            listingStatus: 'DELETED_BY_ADMIN',
-            deletedByAdmin: true,
-            isDeleted: true,
-            isPublished: false,
-            adminFeedback: 'Notification: Deleted by Admin',
-            adminNotes: 'Deleted by Admin'
-          };
-        }
-        return null;
-      }
-      return p;
-    }).filter(Boolean);
+    const updatedProps = currentProps.filter(p => !matchesAlias(p));
     setStoredData('easeland_properties', updatedProps);
 
     // 3. Track deleted IDs & admin deletion metadata in localStorage
@@ -1322,24 +1305,7 @@ export const mockApi = {
         const rawUserProps = localStorage.getItem('easeland_user_properties');
         if (rawUserProps) {
           const parsed = JSON.parse(rawUserProps);
-          const updatedUserProps = parsed.map(p => {
-            if (matchesAlias(p)) {
-              if (isAdmin) {
-                return {
-                  ...p,
-                  status: 'DELETED_BY_ADMIN',
-                  listingStatus: 'DELETED_BY_ADMIN',
-                  deletedByAdmin: true,
-                  isDeleted: true,
-                  isPublished: false,
-                  adminFeedback: 'Notification: Deleted by Admin',
-                  adminNotes: 'Deleted by Admin'
-                };
-              }
-              return null;
-            }
-            return p;
-          }).filter(Boolean);
+          const updatedUserProps = parsed.filter(p => !matchesAlias(p));
           localStorage.setItem('easeland_user_properties', JSON.stringify(updatedUserProps));
         }
 

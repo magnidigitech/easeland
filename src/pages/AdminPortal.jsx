@@ -1224,21 +1224,7 @@ export default function AdminPortal({ onNavigate }) {
         if (rawLocal) {
           const parsed = JSON.parse(rawLocal);
           if (Array.isArray(parsed)) {
-            const updated = parsed.map(p => {
-              if (matchesAlias(p)) {
-                return {
-                  ...p,
-                  status: 'DELETED_BY_ADMIN',
-                  listingStatus: 'DELETED_BY_ADMIN',
-                  deletedByAdmin: true,
-                  isDeleted: true,
-                  isPublished: false,
-                  adminFeedback: 'Notification: Deleted by Admin',
-                  adminNotes: 'Deleted by Admin'
-                };
-              }
-              return p;
-            });
+            const updated = parsed.filter(p => !matchesAlias(p));
             localStorage.setItem(k, JSON.stringify(updated));
           }
         }
