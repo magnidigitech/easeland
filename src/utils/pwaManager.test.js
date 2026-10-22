@@ -111,4 +111,21 @@ test('EaseLand PWA Suite — Manifest, Service Worker, and PWA Architecture', as
     assert.strictEqual(promptResult.outcome, 'unavailable', 'promptPwaInstall must report unavailable when no prompt is deferred');
   });
 
+  await t.test('7. Cache buster configurations exist across server.js, nginx.conf, and sw.js', () => {
+    const serverPath = path.join(rootDir, 'server.js');
+    const serverContent = fs.readFileSync(serverPath, 'utf8');
+    assert.ok(serverContent.includes("app.use('/api'"), 'server.js must have cache-busting middleware for /api');
+    assert.ok(serverContent.includes("app.use('/assets'"), 'server.js must have immutable caching for /assets');
+    assert.ok(serverContent.includes("['/', '/index.html']"), 'server.js must have dedicated no-cache route for index.html');
+
+    const nginxPath = path.join(rootDir, 'nginx.conf');
+    const nginxContent = fs.readFileSync(nginxPath, 'utf8');
+    assert.ok(nginxContent.includes('/assets/'), 'nginx.conf must configure immutable caching for /assets/');
+
+    const swPath = path.join(rootDir, 'public', 'sw.js');
+    const swContent = fs.readFileSync(swPath, 'utf8');
+    assert.ok(swContent.includes('SW_VERSION'), 'sw.js must support dynamic SW_VERSION from query parameter');
+  });
+
 });
+

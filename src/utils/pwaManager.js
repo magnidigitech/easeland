@@ -3,6 +3,8 @@
  * Handles Service Worker registration, install prompts, update lifecycle, and offline awareness.
  */
 
+import { getAppVersion } from './cacheBuster.js';
+
 let deferredPrompt = null;
 let swRegistration = null;
 
@@ -58,10 +60,20 @@ export function registerServiceWorker() {
   });
 
   window.addEventListener('load', () => {
+    const swUrl = '/sw.js?v=' + encodeURIComponent(getAppVersion());
     navigator.serviceWorker
-      .register('/sw.js', { scope: '/' })
+      .register(swUrl, { scope: '/', updateViaCache: 'none' })
       .then((reg) => {
         swRegistration = reg;
+
+        // Auto-check for updates when tab regains focus or visibility
+        if (typeof document !== 'undefined') {
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && reg && typeof reg.update === 'function') {
+              reg.update().catch(() => {});
+            }
+          });
+        }
 
         // Check if there is an updated worker already waiting
         if (reg.waiting) {

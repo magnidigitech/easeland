@@ -64,6 +64,14 @@ app.use('/uploads', express.static(uploadsDir, {
   immutable: true
 }));
 
+// Cache Buster: Prevent browser, proxy, and CDN caching on all dynamic API endpoints
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // PWA Service Worker: Never cache sw.js so client devices detect updates instantly
 app.get('/sw.js', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
@@ -96,8 +104,34 @@ app.get('/manifest.json', (req, res) => {
   return res.status(404).send('Manifest not found');
 });
 
-// Serve static Vite frontend bundle
-app.use(express.static(path.join(__dirname, 'dist')));
+// Cache Buster: Serve hashed Vite bundle assets with 1-year immutable caching
+app.use('/assets', express.static(path.join(__dirname, 'dist', 'assets'), {
+  maxAge: '1y',
+  immutable: true
+}));
+
+// Cache Buster: Guarantee index.html is never cached so client devices instantly pick up new builds
+app.get(['/', '/index.html'], (req, res, next) => {
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.sendFile(indexPath);
+  }
+  next();
+});
+
+// Serve static Vite frontend bundle with strict no-cache on HTML
+app.use(express.static(path.join(__dirname, 'dist'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('sw.js')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Health check endpoint for Coolify / load balancers
 app.get('/health', (req, res) => {
@@ -2499,8 +2533,11 @@ app.delete('/api/users/:uid', async (req, res) => {
   }
 });
 
-// SPA Routing Fallback (for React Router / single page app)
+// SPA Routing Fallback (for React Router / single page app) with Cache Buster
 app.use((req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { clearAppCaches } from '../utils/cacheBuster.js';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -19,6 +20,7 @@ export class ErrorBoundary extends React.Component {
       localStorage.removeItem('easeland_active_page');
       // If site config was corrupted, remove cached version to force default re-hydration
       localStorage.removeItem('easeland_site_config');
+      clearAppCaches().catch(() => {});
     } catch (e) {}
     window.location.href = '/';
   };

@@ -4,8 +4,11 @@
  * Provides robust offline support, intelligent asset caching, and graceful offline fallback.
  */
 
-const CACHE_NAME = 'easeland-static-v1.0.0';
-const RUNTIME_CACHE = 'easeland-runtime-v1.0.0';
+// Extract version from query param if available (e.g. /sw.js?v=20261022), fallback to v1.0.0
+const swQuery = new URLSearchParams(self.location.search);
+const SW_VERSION = swQuery.get('v') || 'v1.0.0';
+const CACHE_NAME = 'easeland-static-' + SW_VERSION;
+const RUNTIME_CACHE = 'easeland-runtime-' + SW_VERSION;
 
 // Core App Shell assets cached during installation
 const PRECACHE_ASSETS = [
