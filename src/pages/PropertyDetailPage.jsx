@@ -298,7 +298,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         const map = new gMaps.Map(mapContainerRef.current, {
           center: mapPos,
           zoom: 17,
-          mapTypeId: 'roadmap',
+          mapTypeId: gMaps.MapTypeId?.HYBRID || 'hybrid',
           fullscreenControl: true,
           streetViewControl: false,
           zoomControl: true
