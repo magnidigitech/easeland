@@ -335,8 +335,8 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
 
   if (isCompact) {
     return (
-      <form onSubmit={handleSearchSubmit} className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full">
-        <div ref={isCompact ? searchContainerRef : undefined} className="relative flex-1 min-w-[200px]">
+      <form onSubmit={handleSearchSubmit} className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full min-w-0">
+        <div ref={isCompact ? searchContainerRef : undefined} className="relative w-full sm:flex-1 min-w-0">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
           <input
             ref={inputRef}
@@ -347,7 +347,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               if (suggestions.length > 0) setSuggestionsOpen(true);
             }}
             placeholder="Search by locality, city, project name, or property type..."
-            className="w-full pl-10 pr-16 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow"
+            className="w-full pl-10 pr-16 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow truncate"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
             {/* BIN ICON TO CLICK AND CLEAR THE SEARCH */}
@@ -355,11 +355,11 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               type="button"
               onClick={handleClearSearch}
               title="Clear search"
-              className={`w-6 h-6 rounded-full flex items-center justify-center transition-all border group cursor-pointer ${
+              className={'w-6 h-6 rounded-full flex items-center justify-center transition-all border group cursor-pointer ' + (
                 query
                   ? 'bg-slate-700/80 hover:bg-rose-900/60 text-slate-300 hover:text-rose-400 border-slate-600 hover:border-rose-500/50'
                   : 'bg-slate-800/80 hover:bg-slate-700 text-slate-500 hover:text-slate-300 border-slate-700/80 hover:border-slate-600'
-              }`}
+              )}
             >
               <Trash2 className="w-3 h-3 transition-transform group-hover:scale-110" />
             </button>
@@ -415,28 +415,30 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           )}
         </div>
 
-        <select
-          value={category}
-          onChange={(e) => {
-            const val = e.target.value;
-            setCategory(val);
-            triggerSearch(query, purpose, val);
-          }}
-          className="py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
-        >
-          <option value="All" className="bg-slate-900 text-white font-semibold">All Categories</option>
-          {STANDARD_CATEGORIES.map(cat => (
-            <option key={cat} value={cat} className="bg-slate-900 text-white font-semibold">{cat}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-between sm:justify-start">
+          <select
+            value={category}
+            onChange={(e) => {
+              const val = e.target.value;
+              setCategory(val);
+              triggerSearch(query, purpose, val);
+            }}
+            className="flex-1 sm:flex-none py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer min-w-0 max-w-[200px] sm:max-w-[170px] truncate"
+          >
+            <option value="All" className="bg-slate-900 text-white font-semibold">All Categories</option>
+            {STANDARD_CATEGORIES.map(cat => (
+              <option key={cat} value={cat} className="bg-slate-900 text-white font-semibold">{cat}</option>
+            ))}
+          </select>
 
-        <button
-          type="submit"
-          className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-1 shrink-0 shadow-sm"
-        >
-          <Search className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Search</span>
-        </button>
+          <button
+            type="submit"
+            className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-1 shrink-0 shadow-sm"
+          >
+            <Search className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Search</span>
+          </button>
+        </div>
       </form>
     );
   }

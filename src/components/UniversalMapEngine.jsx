@@ -329,11 +329,27 @@ export default function UniversalMapEngine({
         setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 50),
         setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 150),
         setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 300),
-        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 450)
+        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 450),
+        setTimeout(() => { try { mapInstanceRef.current?.invalidateSize(); } catch (e) {} }, 600)
       ];
       return () => timers.forEach(t => clearTimeout(t));
     }
   }, [isSidePanelOpen]);
+
+  // Dynamic ResizeObserver ensures map canvas always fills 100% of container when drawer or viewport changes
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.invalidateSize();
+        } catch (e) {}
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Center & 200% deep zoom in directly onto focusedProperty if redirected from PropertyDetailsView
   useEffect(() => {

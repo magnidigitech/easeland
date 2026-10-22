@@ -677,7 +677,9 @@ export default function App() {
   }));
 
   return (
-    <div className="min-h-screen bg-brand-offwhite text-brand-charcoal font-sans flex flex-col">
+    <div className={'bg-brand-offwhite text-brand-charcoal font-sans flex flex-col w-full max-w-full overflow-x-hidden ' + (
+      (activePage === 'map' || activePage === 'properties') ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen'
+    )}>
       
       {/* PWA STATUS & PROMPTS */}
       <OfflineIndicator />
@@ -716,7 +718,9 @@ export default function App() {
       )}
 
       {/* PAGE ROUTING BODY */}
-      <main className="flex-1">
+      <main className={'w-full max-w-full min-w-0 ' + (
+        (activePage === 'map' || activePage === 'properties') ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1'
+      )}>
 
         {/* PAGE 1: HOME */}
         {(activePage === 'home' || !['map', 'properties', 'property-detail', 'buy', 'rent', 'sell', 'post-property', 'admin', 'crm', 'dashboard', 'wishlist', 'privacy-policy', 'privacy'].includes(activePage)) && (

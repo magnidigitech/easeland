@@ -342,19 +342,19 @@ export default function PropertiesSearchPage({
   }, [searchState]);
 
   return (
-    <div className="w-full flex flex-col font-sans text-brand-charcoal bg-brand-offwhite">
+    <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden max-w-full font-sans text-brand-charcoal bg-brand-offwhite">
 
       {/* SEARCH HEADER & NAVIGATION BAR */}
-      <div className="sticky top-20 z-40 bg-brand-charcoal text-white border-b border-gray-800 shrink-0 shadow-md">
+      <div className="bg-brand-charcoal text-white border-b border-gray-800 shrink-0 shadow-md z-40 w-full max-w-full">
         <div className="w-full flex flex-col md:flex-row items-center justify-between">
 
           {/* Alignment spacer matching the Side Panel width (380px on md, 400px on lg) */}
-          <div className={`hidden md:block shrink-0 transition-all duration-300 ease-in-out border-r border-gray-800/80 ${
+          <div className={'hidden md:block shrink-0 transition-all duration-300 ease-in-out border-r border-gray-800/80 ' + (
             isSidePanelOpen ? 'md:w-[380px] lg:w-[400px] h-14' : 'w-0 border-r-0'
-          }`} />
+          )} />
 
           {/* Right Section: Aligned with the Map Canvas (starts at right edge of side panel) */}
-          <div className="flex-1 flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-2.5 min-w-0 w-full">
+          <div className="flex-1 flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-3 px-2.5 sm:px-4 py-2 sm:py-2.5 min-w-0 w-full max-w-full">
 
             {/* Quick Search Controls (Search input, All Categories, Search button - aligned with right of side panel) */}
             <div className="w-full md:w-auto flex items-center gap-2 flex-1 max-w-3xl min-w-0">
@@ -366,31 +366,31 @@ export default function PropertiesSearchPage({
             </div>
 
             {/* Filter & View Mode Controls */}
-            <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
               <button
                 onClick={() => setFilterPanelOpen(prev => !prev)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all shrink-0 ${
+                className={'flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold border transition-all shrink-0 ' + (
                   filterPanelOpen
                     ? 'bg-brand-yellow text-brand-charcoal border-brand-yellow shadow-md ring-2 ring-brand-yellow/30'
                     : 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700'
-                }`}
+                )}
                 title={filterPanelOpen ? 'Close filters' : 'Open filters'}
               >
-                <SlidersHorizontal className={`w-4 h-4 ${filterPanelOpen ? 'text-brand-charcoal' : 'text-brand-yellow'}`} />
+                <SlidersHorizontal className={'w-3.5 h-3.5 sm:w-4 sm:h-4 ' + (filterPanelOpen ? 'text-brand-charcoal' : 'text-brand-yellow')} />
                 <span>Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="w-5 h-5 bg-white text-slate-900 rounded-full text-[10px] font-black flex items-center justify-center shadow-sm">
+                  <span className="w-4 h-4 sm:w-5 sm:h-5 bg-white text-slate-900 rounded-full text-[10px] font-black flex items-center justify-center shadow-sm">
                     {activeFilterCount}
                   </span>
                 )}
               </button>
 
               {/* Sort Dropdown */}
-              <div className="relative shrink-0">
+              <div className="relative shrink-0 min-w-0 max-w-[130px] sm:max-w-none">
                 <select
                   value={searchState.sortBy || 'newest'}
                   onChange={(e) => handleSortChange(e.target.value)}
-                  className="appearance-none bg-slate-900 text-white text-xs font-bold py-2 pl-3 pr-8 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer"
+                  className="w-full appearance-none bg-slate-900 text-white text-xs font-bold py-1.5 sm:py-2 pl-2.5 sm:pl-3 pr-7 sm:pr-8 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer truncate"
                 >
                   <option value="newest" className="bg-slate-900 text-white font-bold">Newest First</option>
                   <option value="price_asc" className="bg-slate-900 text-white font-bold">Price: Low to High</option>
@@ -398,11 +398,11 @@ export default function PropertiesSearchPage({
                   <option value="area_asc" className="bg-slate-900 text-white font-bold">Area: Small to Large</option>
                   <option value="area_desc" className="bg-slate-900 text-white font-bold">Area: Large to Small</option>
                 </select>
-                <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
+                <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2 top-2 sm:top-2.5 pointer-events-none" />
               </div>
 
               {/* Mobile View Switcher (List vs Map) */}
-              <div className="flex md:hidden items-center bg-gray-800 p-0.5 rounded-xl border border-gray-700">
+              <div className="flex md:hidden items-center bg-gray-800 p-0.5 rounded-xl border border-gray-700 shrink-0">
                 <button
                   onClick={() => {
                     setViewMode('list');
@@ -453,7 +453,7 @@ export default function PropertiesSearchPage({
       )}
 
       {/* MAIN CONTENT AREA: MAP IS THE MAIN VIEWPORT (100% SCREEN), PROPERTY LIST IN SIDEBAR */}
-      <div className="w-full h-[calc(100dvh-148px)] relative overflow-hidden shrink-0">
+      <div className="w-full flex-1 min-h-0 relative overflow-hidden">
         <UniversalMapEngine
           hideSidePanel={false}
           isSidePanelOpen={isSidePanelOpen}
