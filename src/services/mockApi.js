@@ -1345,6 +1345,27 @@ export const mockApi = {
     return true;
   },
 
+  clearAllProperties: () => {
+    properties = [];
+    rawProperties = [];
+    if (typeof window !== 'undefined') {
+      const keys = [
+        'easeland_properties',
+        'easeland_user_properties',
+        'easeland_owner_properties',
+        'easeland_submitted_properties',
+        'easeland_deleted_properties',
+        'easeland_admin_deleted_properties',
+        'easeland_deleted_media'
+      ];
+      keys.forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+      window.dispatchEvent(new CustomEvent('easeland-properties-purged'));
+    }
+    return true;
+  },
+
   // -------------------------------------------------------------
   // 3. ADMIN VERIFICATION & MANAGEMENT APIS
   // -------------------------------------------------------------

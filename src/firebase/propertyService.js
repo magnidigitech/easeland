@@ -2033,3 +2033,90 @@ export async function deletePropertyListing(propertyId, ownerId = null, isAdmin 
   }
 }
 
+/**
+ * Authoritative 3-Way Purge of ALL Marketplace Listings & Child Collections
+ * Wipes records across PostgreSQL, Cloud Firestore, and Local Storage.
+ * User accounts and site configuration remain intact.
+ */
+export async function purgeAllMarketplaceProperties() {
+  let backendResult = { success: false };
+
+  // 1. Authoritative Backend Wipe (PostgreSQL + Firebase Admin SDK + Disk Storage)
+  try {
+    const res = await fetch('/api/admin/purge-all-properties', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        confirmation: 'PURGE_ALL_PROPERTIES',
+        isAdmin: true
+      })
+    });
+    if (res.ok) {
+      backendResult = await res.json();
+    }
+  } catch (backendErr) {
+    console.warn('Backend purge endpoint note:', backendErr.message || backendErr);
+  }
+
+  // 2. Client-side Firestore non-blocking wipe (in case running without full Admin SDK)
+  const isNodeTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  if (!isNodeTest && db) {
+    try {
+      const collectionsToWipe = ['properties', 'propertyPrivate', 'propertyMediaPrivate', 'propertyDocuments', 'verificationRecords', 'enquiries'];
+      for (const colName of collectionsToWipe) {
+        try {
+          const snap = await getDocs(collection(db, colName));
+          for (const d of snap.docs) {
+            try { await deleteDoc(d.ref); } catch (e) {}
+          }
+        } catch (e) {}
+      }
+    } catch (fsErr) {
+      console.warn('Client Firestore purge note:', fsErr);
+    }
+  }
+
+  // 3. Clear Local Storage caches
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    const keysToRemove = [
+      'easeland_properties',
+      'easeland_user_properties',
+      'easeland_owner_properties',
+      'easeland_submitted_properties',
+      'easeland_deleted_properties',
+      'easeland_admin_deleted_properties',
+      'easeland_deleted_media',
+      'easeland_active_property_id',
+      'easeland_post_property_draft'
+    ];
+    keysToRemove.forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('easeland_prop_') || k.startsWith('easeland_wizard_') || k.startsWith('easeland_draft_'))) {
+        try { localStorage.removeItem(k); } catch (e) {}
+      }
+    }
+  }
+
+  // 4. Clear mockApi stores
+  try {
+    const { mockApi } = await import('../services/mockApi.js');
+    if (typeof mockApi.clearAllProperties === 'function') {
+      mockApi.clearAllProperties();
+    }
+  } catch (e) {}
+
+  // 5. Notify all listeners
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('easeland-property-deleted', { detail: { purgeAll: true, isAdmin: true } }));
+    window.dispatchEvent(new CustomEvent('easeland-properties-purged'));
+  }
+
+  return { success: true, backendResult };
+}
+

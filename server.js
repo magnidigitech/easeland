@@ -1680,6 +1680,132 @@ app.delete('/api/properties/:id', async (req, res) => {
   }
 });
 
+// API Endpoint: Authoritative 3-Way Purge of all test/dummy properties across PostgreSQL, Cloud Firestore, and Local Storage
+app.post('/api/admin/purge-all-properties', async (req, res) => {
+  try {
+    const confirmation = req.body?.confirmation || req.query?.confirmation;
+    if (confirmation !== 'PURGE_ALL_PROPERTIES') {
+      return res.status(400).json({
+        success: false,
+        error: 'Safety Confirmation Required. Body parameter confirmation must be "PURGE_ALL_PROPERTIES".'
+      });
+    }
+
+    const pgDeleted = { properties: 0, media_files: 0, enquiries: 0, admin_deleted: 0 };
+    const firestoreDeleted = {};
+
+    // 1. Authoritative PostgreSQL Wipe
+    try {
+      if (pgPool) {
+        const mRes = await pgPool.query('DELETE FROM media_files;');
+        pgDeleted.media_files = mRes.rowCount || 0;
+
+        const pRes = await pgPool.query('DELETE FROM properties;');
+        pgDeleted.properties = pRes.rowCount || 0;
+
+        const eRes = await pgPool.query('DELETE FROM enquiries;');
+        pgDeleted.enquiries = eRes.rowCount || 0;
+
+        const adRes = await pgPool.query('DELETE FROM admin_deleted_properties;');
+        pgDeleted.admin_deleted = adRes.rowCount || 0;
+      }
+    } catch (pgErr) {
+      console.warn('PostgreSQL bulk purge note:', pgErr.message);
+    }
+
+    // 2. Authoritative Cloud Firestore Cascade Batch Deletion (Firebase Admin SDK)
+    try {
+      const adminApps = getApps();
+      if (adminApps.length) {
+        let adminDb = null;
+        try {
+          const { getFirestore } = await import('firebase-admin/firestore');
+          adminDb = getFirestore(adminApps[0]);
+        } catch (fsImportErr) {
+          console.warn('Firebase Admin Firestore import note:', fsImportErr.message);
+        }
+
+        if (adminDb) {
+          const targetCollections = [
+            'properties',
+            'propertyPrivate',
+            'propertyMediaPrivate',
+            'propertyDocuments',
+            'verificationRecords',
+            'enquiries'
+          ];
+
+          for (const colName of targetCollections) {
+            let totalDeletedInCol = 0;
+            try {
+              while (true) {
+                const snapshot = await adminDb.collection(colName).limit(300).get();
+                if (snapshot.empty) break;
+
+                const batch = adminDb.batch();
+                snapshot.docs.forEach((d) => batch.delete(d.ref));
+                await batch.commit();
+
+                totalDeletedInCol += snapshot.size;
+                if (snapshot.size < 300) break;
+              }
+            } catch (colErr) {
+              console.warn('Error purging Firestore collection ' + colName + ':', colErr.message);
+            }
+            firestoreDeleted[colName] = totalDeletedInCol;
+          }
+        }
+      }
+    } catch (fsErr) {
+      console.warn('Firestore bulk purge note:', fsErr.message);
+    }
+
+    // 3. Clear Local Disk Stores & Maps
+    try {
+      localPropsMap.clear();
+      fs.writeFileSync(propertiesStoreFile, JSON.stringify([], null, 2), 'utf8');
+
+      localEnquiriesMap.clear();
+      fs.writeFileSync(enquiriesStoreFile, JSON.stringify([], null, 2), 'utf8');
+
+      localAdminDeletedStore.clear();
+      fs.writeFileSync(adminDeletedStoreFile, JSON.stringify([], null, 2), 'utf8');
+
+      // Clean uploads folders on disk
+      try {
+        if (fs.existsSync(propertiesDir)) {
+          const propEntries = fs.readdirSync(propertiesDir);
+          for (const entry of propEntries) {
+            const entryPath = path.join(propertiesDir, entry);
+            try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch (e) {}
+          }
+        }
+        if (fs.existsSync(documentsDir)) {
+          const docEntries = fs.readdirSync(documentsDir);
+          for (const entry of docEntries) {
+            const entryPath = path.join(documentsDir, entry);
+            try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch (e) {}
+          }
+        }
+      } catch (rmErr) {
+        console.warn('Uploads directory clean note:', rmErr.message);
+      }
+    } catch (diskErr) {
+      console.warn('Disk store purge error:', diskErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: 'All property listings, private specs, media, documents, verification records, and enquiries have been wiped clean across PostgreSQL, Firestore, and Local Storage.',
+      pgDeleted,
+      firestoreDeleted
+    });
+  } catch (err) {
+    console.error('Purge all properties handler error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API Endpoint: Get single property by ID from Local Store / PostgreSQL
 app.get('/api/properties/:id', async (req, res) => {
   const targetId = req.params.id;

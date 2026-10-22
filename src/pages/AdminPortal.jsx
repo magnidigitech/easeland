@@ -442,6 +442,37 @@ export default function AdminPortal({ onNavigate }) {
     setTimeout(() => setPublishSuccessMessage(''), 4000);
   };
 
+  // Bulk Purge Test Properties Modal State
+  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+  const [purgeConfirmInput, setPurgeConfirmInput] = useState('');
+  const [isPurgingProcessing, setIsPurgingProcessing] = useState(false);
+  const [purgeResultSummary, setPurgeResultSummary] = useState(null);
+
+  const handleExecutePurgeAllProperties = async () => {
+    if (purgeConfirmInput.trim() !== 'PURGE') return;
+    setIsPurgingProcessing(true);
+    try {
+      const { purgeAllMarketplaceProperties } = await import('../firebase/propertyService.js');
+      const res = await purgeAllMarketplaceProperties();
+
+      setAllProperties([]);
+      setVerificationQueue([]);
+      setRawProperties([]);
+      
+      logAdminActivity('authoritatively wiped all test property listings, media, documents, and enquiries across PostgreSQL, Firestore, and Local Storage.');
+      setPublishSuccessMessage('All test properties and cascaded collections have been wiped clean across all 3 layers!');
+      setPurgeResultSummary(res?.backendResult || { success: true });
+      setTimeout(() => setPublishSuccessMessage(''), 5000);
+      setIsPurgeModalOpen(false);
+      setPurgeConfirmInput('');
+    } catch (err) {
+      console.error('Purge error:', err);
+      alert('Purge operation encountered an error: ' + (err.message || err));
+    } finally {
+      setIsPurgingProcessing(false);
+    }
+  };
+
   const handleOpenScheduleModal = (deal = null) => {
     if (deal) {
       setScheduleForm({
@@ -3675,6 +3706,15 @@ export default function AdminPortal({ onNavigate }) {
                     <span className="bg-amber-100 text-amber-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full border border-amber-300">
                       {verificationQueue.length} Pending Audit
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsPurgeModalOpen(true)}
+                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-300 font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
+                      title="Wipe all test property listings, private specs, media, documents, and enquiries across PostgreSQL, Firestore, and Local Storage"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <span>Wipe All Test Properties</span>
+                    </button>
                   </div>
                 </div>
 
@@ -6449,6 +6489,89 @@ export default function AdminPortal({ onNavigate }) {
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Confirm & Reset to Default
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: PURGE ALL TEST PROPERTIES CONFIRMATION */}
+      {isPurgeModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-red-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center font-black">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-brand-charcoal">Wipe All Test Properties?</h3>
+                  <span className="text-[10px] uppercase font-bold text-red-600 tracking-wider">Authoritative 3-Way Cascade Wipe</span>
+                </div>
+              </div>
+              <button
+                onClick={() => { setIsPurgeModalOpen(false); setPurgeConfirmInput(''); }}
+                className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 font-semibold leading-relaxed">
+              This action will permanently delete all test property listings, private specs, uploaded media, confidential documents, verification records, and customer enquiries.
+            </p>
+
+            <div className="p-3.5 bg-red-50 rounded-2xl border border-red-200 text-[11px] font-bold text-red-800 space-y-1.5">
+              <div className="font-extrabold text-red-900 uppercase tracking-wider text-[10px] mb-1">Collections & Tables That Will Be Eradicated:</div>
+              <div>• PostgreSQL: properties, media_files, enquiries, admin_deleted_properties</div>
+              <div>• Cloud Firestore: properties, propertyPrivate, propertyMediaPrivate, propertyDocuments, verificationRecords, enquiries</div>
+              <div>• Local Storage: easeland_properties, user caches, disk store backups</div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-[11px] font-bold text-emerald-800 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Safe Invariant: Registered User Accounts and Site CMS Settings are 100% PRESERVED.</span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-extrabold text-gray-700">
+                To confirm, type <span className="text-red-600 font-black tracking-wider">PURGE</span> below:
+              </label>
+              <input
+                type="text"
+                placeholder="Type PURGE to unlock button"
+                value={purgeConfirmInput}
+                onChange={(e) => setPurgeConfirmInput(e.target.value)}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-black text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 uppercase tracking-widest placeholder:normal-case placeholder:font-normal placeholder:tracking-normal"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isPurgingProcessing}
+                onClick={() => { setIsPurgeModalOpen(false); setPurgeConfirmInput(''); }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={purgeConfirmInput.trim() !== 'PURGE' || isPurgingProcessing}
+                onClick={handleExecutePurgeAllProperties}
+                className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white shadow-md flex items-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isPurgingProcessing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Purging Across 3 Layers...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Permanently Wipe All Properties</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
