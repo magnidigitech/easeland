@@ -53,6 +53,7 @@ export default function UserDashboard({
   onWishlistToggle,
   onNavigate,
   onPostProperty,
+  onTabChange,
   initialTab = 'overview',
   tabKey = 0
 }) {
@@ -79,16 +80,81 @@ export default function UserDashboard({
     }
   };
 
-  const [activeTab, setActiveTab] = useState(initialTab || 'overview'); // 'overview', 'properties', 'verification', 'enquiries', 'wishlist', 'notifications', 'account'
+  const normalizeDashboardTab = (t) => {
+    if (!t) return 'overview';
+    const lower = String(t).toLowerCase().trim();
+    if (lower === 'properties' || lower === 'my-properties' || lower === 'listings') return 'properties';
+    if (lower === 'verification' || lower === 'verification-status') return 'verification';
+    if (lower === 'wishlist' || lower === 'saved') return 'wishlist';
+    if (lower === 'account' || lower === 'account-settings' || lower === 'settings' || lower === 'profile') return 'account';
+    if (lower === 'enquiries' || lower === 'inquiries' || lower === 'messages') return 'enquiries';
+    if (lower === 'notifications') return 'notifications';
+    return 'overview';
+  };
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabFromUrl = urlParams.get('tab');
+      if (tabFromUrl) return normalizeDashboardTab(tabFromUrl);
+      try {
+        const savedTab = sessionStorage.getItem('easeland_active_dashboard_tab');
+        if (savedTab) return normalizeDashboardTab(savedTab);
+      } catch (e) {}
+    }
+    return normalizeDashboardTab(initialTab);
+  });
+
+  const handleTabChange = (targetTab) => {
+    const validTab = normalizeDashboardTab(targetTab);
+    setActiveTab(validTab);
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('easeland_active_dashboard_tab', validTab);
+        const targetUrl = validTab === 'overview' ? '/dashboard' : '/dashboard?tab=' + validTab;
+        if (window.location.pathname + window.location.search !== targetUrl) {
+          window.history.replaceState(null, '', targetUrl);
+        }
+      }
+    } catch (e) {}
+    if (typeof onTabChange === 'function') {
+      onTabChange(validTab);
+    }
+  };
 
   useEffect(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const tabFromUrl = urlParams ? urlParams.get('tab') : null;
-    const targetTab = tabFromUrl || initialTab;
-    if (targetTab) {
+    let targetTab = null;
+    if (tabFromUrl) {
+      targetTab = normalizeDashboardTab(tabFromUrl);
+    } else if (initialTab) {
+      targetTab = normalizeDashboardTab(initialTab);
+    }
+    if (targetTab && targetTab !== activeTab) {
       setActiveTab(targetTab);
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('easeland_active_dashboard_tab', targetTab);
+        }
+      } catch (e) {}
     }
   }, [initialTab, tabKey]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('easeland_active_dashboard_tab', activeTab);
+        const targetUrl = activeTab === 'overview' ? '/dashboard' : '/dashboard?tab=' + activeTab;
+        if (window.location.pathname + window.location.search !== targetUrl) {
+          window.history.replaceState(null, '', targetUrl);
+        }
+      }
+    } catch (e) {}
+    if (typeof onTabChange === 'function') {
+      onTabChange(activeTab);
+    }
+  }, [activeTab]);
 
   const [propertyFilter, setPropertyFilter] = useState('ALL'); // 'ALL', 'LIVE', 'PENDING_VERIFICATION', 'CHANGES_REQUIRED', 'REJECTED', 'DRAFT', 'UNAVAILABLE', 'SOLD', 'RENTED', 'ARCHIVED'
   const [enquiryType, setEnquiryType] = useState('RECEIVED'); // 'RECEIVED', 'SENT'
@@ -1057,7 +1123,7 @@ export default function UserDashboard({
               )}
 
               <button
-                onClick={() => setActiveTab('overview')}
+                onClick={() => handleTabChange('overview')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'overview'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
                     : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
@@ -1071,7 +1137,7 @@ export default function UserDashboard({
               </button>
 
               <button
-                onClick={() => setActiveTab('properties')}
+                onClick={() => handleTabChange('properties')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'properties'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
                     : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
@@ -1085,7 +1151,7 @@ export default function UserDashboard({
               </button>
 
               <button
-                onClick={() => setActiveTab('verification')}
+                onClick={() => handleTabChange('verification')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'verification'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
                     : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
@@ -1101,7 +1167,7 @@ export default function UserDashboard({
               </button>
 
               <button
-                onClick={() => setActiveTab('wishlist')}
+                onClick={() => handleTabChange('wishlist')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'wishlist'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
                     : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
@@ -1115,7 +1181,7 @@ export default function UserDashboard({
               </button>
 
               <button
-                onClick={() => setActiveTab('account')}
+                onClick={() => handleTabChange('account')}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border ${activeTab === 'account'
                     ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md'
                     : 'text-slate-700 border-transparent hover:bg-slate-100 hover:text-slate-900'
@@ -1185,7 +1251,7 @@ export default function UserDashboard({
                           {deletedUserProperties.length} Listing{deletedUserProperties.length > 1 ? 's' : ''} Removed by Admin Auditor
                         </h3>
                         <button
-                          onClick={() => setActiveTab('properties')}
+                          onClick={() => handleTabChange('properties')}
                           className="text-xs font-extrabold text-red-700 underline hover:text-red-950 cursor-pointer"
                         >
                           View Listings
@@ -1208,7 +1274,7 @@ export default function UserDashboard({
                       <div className="flex items-center justify-between">
                         <h3 className="font-extrabold text-amber-900 text-sm">Verification Action Required</h3>
                         <button
-                          onClick={() => setActiveTab('verification')}
+                          onClick={() => handleTabChange('verification')}
                           className="text-xs font-extrabold text-amber-800 underline hover:text-amber-950"
                         >
                           View Details
@@ -1228,7 +1294,7 @@ export default function UserDashboard({
                   <div className="flex items-center justify-between">
                     <h2 className="font-extrabold text-base text-brand-charcoal">Recent Posted Properties</h2>
                     <button
-                      onClick={() => setActiveTab('properties')}
+                      onClick={() => handleTabChange('properties')}
                       className="text-xs font-extrabold text-brand-charcoal hover:text-amber-700 flex items-center gap-1"
                     >
                       <span>View All ({userProperties.length})</span>

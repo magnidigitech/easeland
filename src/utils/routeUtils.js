@@ -54,8 +54,15 @@ export function parseRouteFromUrl(customLocation = null) {
   if (cleanPath === '/post-property') return { page: 'post-property', propId: null, filters: null, tab: 'overview' };
 
   if (cleanPath === '/dashboard') {
-    const tabParam = urlParams.get('tab') || 'overview';
-    return { page: 'dashboard', propId: null, filters: null, tab: tabParam };
+    let tabParam = urlParams.get('tab');
+    if (!tabParam && !customLocation && typeof window !== 'undefined') {
+      try {
+        const savedTab = sessionStorage.getItem('easeland_active_dashboard_tab');
+        if (savedTab) tabParam = savedTab;
+      } catch (e) {}
+    }
+    const tab = tabParam || 'overview';
+    return { page: 'dashboard', propId: null, filters: null, tab };
   }
 
   if (cleanPath === '/wishlist') return { page: 'wishlist', propId: null, filters: null, tab: 'overview' };

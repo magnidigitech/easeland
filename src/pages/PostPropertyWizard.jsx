@@ -15,7 +15,7 @@ import { determineResumeStep } from '../utils/draftResumeUtils.js';
 
 export { determineResumeStep };
 
-export default function PostPropertyWizard({ onComplete, onCancel, resumePropertyId = null }) {
+export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccountSettings, resumePropertyId = null, propertyId: propIdParam = null }) {
   const { user, profile } = useAuth();
 
   const [step, setStep] = useState(1);
@@ -88,9 +88,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
   // Mandatory profile completeness check: force exit to account settings if required criteria are missing
   useEffect(() => {
     if (missingProfileCriteria.length > 0 && !resumePropertyId && !propertyId) {
-      if (onCancel) onCancel();
+      if (onGoToAccountSettings) {
+        onGoToAccountSettings();
+      } else if (onCancel) {
+        onCancel();
+      }
     }
-  }, [missingProfileCriteria.length, resumePropertyId, propertyId, onCancel]);
+  }, [missingProfileCriteria.length, resumePropertyId, propertyId, onGoToAccountSettings, onCancel]);
 
   // Clear step-specific validation errors when changing steps
   useEffect(() => {
@@ -848,7 +852,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, resumePropert
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={onGoToAccountSettings || onCancel}
               className="w-full sm:w-auto bg-brand-charcoal hover:bg-black text-white text-xs font-extrabold px-6 py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Settings className="w-4 h-4 text-brand-yellow" />

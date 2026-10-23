@@ -54,3 +54,12 @@ test('getInitialPageState supports hash routing as seamless fallback', () => {
   assert.strictEqual(res.page, 'property-detail');
   assert.strictEqual(res.propId, 'prop_hash_999');
 });
+
+test('getInitialPageState parses specific dashboard tabs accurately', () => {
+  assert.strictEqual(getInitialPageState({ pathname: '/dashboard', search: '?tab=properties', hash: '' }).tab, 'properties');
+  assert.strictEqual(getInitialPageState({ pathname: '/dashboard', search: '?tab=verification', hash: '' }).tab, 'verification');
+  assert.strictEqual(getInitialPageState({ pathname: '/dashboard', search: '?tab=wishlist', hash: '' }).tab, 'wishlist');
+  assert.strictEqual(getInitialPageState({ pathname: '/dashboard', search: '?tab=account', hash: '' }).tab, 'account');
+  assert.strictEqual(getInitialPageState({ pathname: '/dashboard', search: '', hash: '' }).tab, 'overview');
+});
+

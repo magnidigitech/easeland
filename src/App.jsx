@@ -142,7 +142,18 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [authIntent, setAuthIntent] = useState(null);
-  const [dashboardTab, setDashboardTab] = useState('overview');
+  const [dashboardTab, setDashboardTab] = useState(() => {
+    if (initialPageState.page === 'dashboard' && initialPageState.tab) {
+      return initialPageState.tab;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('easeland_active_dashboard_tab');
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return 'overview';
+  });
   const [dashboardTabKey, setDashboardTabKey] = useState(Date.now());
 
   // Search & Filter State
@@ -435,8 +446,14 @@ export default function App() {
       const parsedFilters = urlParamsToSearchState(window.location.search || '');
       setFilters(createDefaultFilterState(parsedFilters));
     }
-    if (route.page === 'dashboard' && route.tab) {
-      setDashboardTab(route.tab);
+    if (route.page === 'dashboard') {
+      let tabToUse = route.tab;
+      if (!tabToUse && typeof window !== 'undefined') {
+        try {
+          tabToUse = sessionStorage.getItem('easeland_active_dashboard_tab');
+        } catch (e) {}
+      }
+      setDashboardTab(tabToUse || 'overview');
       setDashboardTabKey(Date.now());
     }
   };
@@ -1077,6 +1094,11 @@ export default function App() {
             onCancel={() => {
               setEditingPropertyId(null);
               try { sessionStorage.removeItem('easeland_editing_property'); } catch (e) {}
+              changeActivePage('dashboard');
+            }}
+            onGoToAccountSettings={() => {
+              setEditingPropertyId(null);
+              try { sessionStorage.removeItem('easeland_editing_property'); } catch (e) {}
               navigateToAccountSettings('dashboard');
             }}
           />
@@ -1098,6 +1120,9 @@ export default function App() {
             user={currentUser}
             initialTab={dashboardTab}
             tabKey={dashboardTabKey}
+            onTabChange={(newTab) => {
+              setDashboardTab(newTab);
+            }}
             properties={properties}
             wishlist={wishlistProperties}
             onWishlistToggle={handleWishlistToggle}
