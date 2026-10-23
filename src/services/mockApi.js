@@ -1,6 +1,6 @@
 import { INITIAL_PROPERTIES, INITIAL_ENQUIRIES, INITIAL_DEALS, INITIAL_FOLLOW_UPS } from './mockData.js';
 import { extractCoordinates } from './locationProvider.js';
-import { getCategoryBadgeLabel } from '../utils/categoryUtils.js';
+import { getCategoryBadgeLabel, NO_PHOTO_PLACEHOLDER } from '../utils/categoryUtils.js';
 import { parseNaturalLanguageQuery, REAL_ESTATE_STOPWORDS, getSemanticSynonyms } from '../firebase/searchParser.js';
 import { normalizeFurnishing, normalizeFacing } from '../utils/filterMatchingUtils.js';
 
@@ -305,7 +305,7 @@ export const DEFAULT_SITE_CONFIG = {
   media: {
     heroBannerUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80',
     mapPlaceholderUrl: 'https://mt1.google.com/vt/lyrs=m&x=1468&y=948&z=11',
-    fallbackPropertyImageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
+    fallbackPropertyImageUrl: NO_PHOTO_PLACEHOLDER
   },
   mapsConfig: {
     defaultLat: 16.3124,

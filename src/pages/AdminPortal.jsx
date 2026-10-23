@@ -101,6 +101,7 @@ import {
 import VerificationLocationBoundaryCard from '../components/VerificationLocationBoundaryCard.jsx';
 import { computeReauditDiff, formatInr } from '../utils/reauditDiffUtils.js';
 import { isPropertyDeleted } from '../utils/filterMatchingUtils.js';
+import { getFirstUploadedImage, getPropertyCoverOrFirstImage, NO_PHOTO_PLACEHOLDER } from '../utils/categoryUtils.js';
 
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
@@ -2340,7 +2341,7 @@ export default function AdminPortal({ onNavigate }) {
         setSelectedProperty(prev => {
           if (!prev) return prev;
           const updatedPhotos = (prev.photos || []).filter(u => u !== photoUrl);
-          const updatedMedia = (prev.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl);
+          const updatedMedia = (prev.media || []).filter(m => (typeof m === 'string' ? m : (m.publicUrl || m.url)) !== photoUrl);
           return {
             ...prev,
             photos: updatedPhotos,
@@ -2354,7 +2355,7 @@ export default function AdminPortal({ onNavigate }) {
             return {
               ...p,
               photos: (p.photos || []).filter(u => u !== photoUrl),
-              media: (p.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl)
+              media: (p.media || []).filter(m => (typeof m === 'string' ? m : (m.publicUrl || m.url)) !== photoUrl)
             };
           }
           return p;
@@ -2365,7 +2366,7 @@ export default function AdminPortal({ onNavigate }) {
             return {
               ...p,
               photos: (p.photos || []).filter(u => u !== photoUrl),
-              media: (p.media || []).filter(m => (typeof m === 'string' ? m : m.url) !== photoUrl)
+              media: (p.media || []).filter(m => (typeof m === 'string' ? m : (m.publicUrl || m.url)) !== photoUrl)
             };
           }
           return p;
@@ -4199,7 +4200,7 @@ export default function AdminPortal({ onNavigate }) {
                     <div className="divide-y divide-gray-100">
                       {promotedPropertiesList.map((prop, idx) => {
                         const pId = String(prop.id || prop.propertyId || prop.referenceId || '');
-                        const imgUrl = prop.photos?.[0] || (Array.isArray(prop.media) && prop.media[0] ? (typeof prop.media[0] === 'string' ? prop.media[0] : prop.media[0].url) : '') || siteConfig?.media?.fallbackPropertyImageUrl || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                        const imgUrl = getFirstUploadedImage(prop);
                         const pPrice = prop.price ? formatInr(prop.price) : (prop.priceLabel || 'Price on Request');
                         const pLoc = [prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || 'Andhra Pradesh';
                         const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered Customer';
@@ -4241,7 +4242,7 @@ export default function AdminPortal({ onNavigate }) {
                                   alt={prop.title || 'Property'}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
-                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                                    e.currentTarget.src = NO_PHOTO_PLACEHOLDER;
                                   }}
                                 />
                                 <span className="absolute top-1 left-1 bg-brand-charcoal/80 backdrop-blur-xs text-amber-300 font-extrabold text-[9px] px-1.5 py-0.5 rounded">
@@ -4403,7 +4404,7 @@ export default function AdminPortal({ onNavigate }) {
                         const pId = String(prop.id || prop.propertyId || prop.referenceId || '');
                         const isAlreadyPromoted = promotedPropertyIds.includes(pId);
                         const promoIndex = promotedPropertyIds.indexOf(pId);
-                        const imgUrl = prop.photos?.[0] || (Array.isArray(prop.media) && prop.media[0] ? (typeof prop.media[0] === 'string' ? prop.media[0] : prop.media[0].url) : '') || siteConfig?.media?.fallbackPropertyImageUrl || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                        const imgUrl = getFirstUploadedImage(prop);
                         const pPrice = prop.price ? formatInr(prop.price) : (prop.priceLabel || 'Price on Request');
                         const pLoc = [prop.location?.locality || prop.locality, prop.location?.city || prop.city].filter(Boolean).join(', ') || 'India';
                         const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered Customer';
@@ -4418,7 +4419,7 @@ export default function AdminPortal({ onNavigate }) {
                                   alt={prop.title || 'Property'}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
-                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                                    e.currentTarget.src = NO_PHOTO_PLACEHOLDER;
                                   }}
                                 />
                               </div>
