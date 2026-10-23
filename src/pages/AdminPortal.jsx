@@ -53,7 +53,12 @@ import {
   UserCheck,
   PhoneCall,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  ArrowUp,
+  ArrowDown,
+  Plus,
+  Star,
+  Tag
 } from 'lucide-react';
 import { mockApi, safeArray } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -440,6 +445,174 @@ export default function AdminPortal({ onNavigate }) {
       } catch (e) { }
       return updated;
     });
+  };
+
+  // ==========================================
+  // PAID PROMOTIONS MANAGEMENT STATE & HANDLERS
+  // ==========================================
+  const [promoSearchQuery, setPromoSearchQuery] = useState('');
+  const [promoTypeFilter, setPromoTypeFilter] = useState('ALL');
+  const [promoStatusFilter, setPromoStatusFilter] = useState('ALL');
+  const [promoToast, setPromoToast] = useState('');
+  const [promoSectionTitle, setPromoSectionTitle] = useState(() => siteConfig?.featuredListings?.sectionTitle || 'Featured & Recent Verified Properties');
+  const [promoBadgeText, setPromoBadgeText] = useState(() => siteConfig?.featuredListings?.badgeText || 'VERIFIED LISTINGS');
+  const [promoDisplayCount, setPromoDisplayCount] = useState(() => siteConfig?.featuredListings?.displayCount || 6);
+
+  useEffect(() => {
+    if (siteConfig?.featuredListings) {
+      if (siteConfig.featuredListings.sectionTitle) setPromoSectionTitle(siteConfig.featuredListings.sectionTitle);
+      if (siteConfig.featuredListings.badgeText) setPromoBadgeText(siteConfig.featuredListings.badgeText);
+      if (siteConfig.featuredListings.displayCount) setPromoDisplayCount(siteConfig.featuredListings.displayCount);
+    }
+  }, [siteConfig?.featuredListings]);
+
+  const promotedPropertyIds = React.useMemo(() => {
+    return safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
+  }, [siteConfig?.featuredListings?.featuredPropertyIds]);
+
+  const promotedPropertiesList = React.useMemo(() => {
+    return promotedPropertyIds.map((id, index) => {
+      const match = allProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
+      if (match) return match;
+      return {
+        id: id,
+        propertyId: id,
+        referenceId: id,
+        title: 'Property #' + (index + 1) + ' (ID: ' + id + ')',
+        location: { city: 'Location loading' },
+        price: 0,
+        photos: [],
+        owner: { name: 'Customer / Owner', phone: 'Contact in Records', email: '' }
+      };
+    });
+  }, [promotedPropertyIds, allProperties]);
+
+  const candidatePropertiesForPromotion = React.useMemo(() => {
+    const query = promoSearchQuery.trim().toLowerCase();
+    return allProperties.filter(prop => {
+      if (!prop || isPropertyDeleted(prop)) return false;
+
+      if (promoStatusFilter === 'VERIFIED_ONLY') {
+        const isVer = prop.verificationStatus === 'APPROVED' || prop.verificationStatus === 'VERIFIED' || prop.verified === true;
+        if (!isVer) return false;
+      }
+
+      if (promoTypeFilter !== 'ALL') {
+        const cat = String(prop.propertyType || prop.category || prop.purpose || '').toUpperCase();
+        if (!cat.includes(promoTypeFilter.toUpperCase())) return false;
+      }
+
+      if (!query) return true;
+
+      const title = String(prop.title || '').toLowerCase();
+      const city = String(prop.city || prop.location?.city || prop.locality || prop.location?.locality || '').toLowerCase();
+      const propId = String(prop.id || prop.propertyId || prop.referenceId || '').toLowerCase();
+      const oName = String(prop.owner?.name || prop.ownerPublicName || '').toLowerCase();
+      const oPhone = String(prop.owner?.phone || prop.ownerPublicPhone || '').toLowerCase();
+      const oEmail = String(prop.owner?.email || prop.ownerPublicEmail || '').toLowerCase();
+
+      return title.includes(query) || city.includes(query) || propId.includes(query) || oName.includes(query) || oPhone.includes(query) || oEmail.includes(query);
+    });
+  }, [allProperties, promoSearchQuery, promoTypeFilter, promoStatusFilter]);
+
+  const savePromotionsConfig = async (updatedFeaturedListings, successMessage) => {
+    const currentFeatured = siteConfig?.featuredListings || {};
+    const mergedFeatured = {
+      ...currentFeatured,
+      ...updatedFeaturedListings,
+      showOnlyFeatured: true
+    };
+    const updatedConfig = {
+      ...siteConfig,
+      featuredListings: mergedFeatured
+    };
+
+    setSiteConfig(updatedConfig);
+    const apiUpdated = mockApi.updateSiteConfig(updatedConfig);
+    if (apiUpdated) setSiteConfig({ ...apiUpdated });
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('easeland_site_config', JSON.stringify(updatedConfig));
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: updatedConfig }));
+    }
+
+    try {
+      const adminUid = user?.uid || 'admin_auditor';
+      await updateSiteModuleAdmin('featuredListings', mergedFeatured, adminUid);
+    } catch (err) {
+      console.warn('Could not sync featuredListings to Firestore:', err);
+    }
+
+    if (successMessage) {
+      setPromoToast(successMessage);
+      setTimeout(() => setPromoToast(''), 4000);
+    }
+  };
+
+  const handleAddPaidPromotion = (propertyId) => {
+    if (!propertyId) return;
+    const pIdStr = String(propertyId);
+    if (promotedPropertyIds.includes(pIdStr)) {
+      setPromoToast('This property is already in the Paid Promotions list.');
+      setTimeout(() => setPromoToast(''), 3000);
+      return;
+    }
+    const nextIds = [...promotedPropertyIds, pIdStr];
+    savePromotionsConfig({ featuredPropertyIds: nextIds }, 'Property added to Paid Promotions! It is now live on the Home Page.');
+    logAdminActivity('added property ' + pIdStr + ' to Paid Promotions showcase.');
+  };
+
+  const handleRemovePaidPromotion = (propertyId) => {
+    if (!propertyId) return;
+    const pIdStr = String(propertyId);
+    const nextIds = promotedPropertyIds.filter(id => id !== pIdStr);
+    const msg = nextIds.length === 0
+      ? 'Property removed. Paid Promotions is now empty and completely hidden from the website.'
+      : 'Property removed from Paid Promotions.';
+    savePromotionsConfig({ featuredPropertyIds: nextIds }, msg);
+    logAdminActivity('removed property ' + pIdStr + ' from Paid Promotions.');
+  };
+
+  const handleTogglePaidPromotion = (propertyId) => {
+    if (!propertyId) return;
+    const pIdStr = String(propertyId);
+    if (promotedPropertyIds.includes(pIdStr)) {
+      handleRemovePaidPromotion(pIdStr);
+    } else {
+      handleAddPaidPromotion(pIdStr);
+    }
+  };
+
+  const handleMovePaidPromotion = (propertyId, direction) => {
+    const pIdStr = String(propertyId);
+    const index = promotedPropertyIds.indexOf(pIdStr);
+    if (index === -1) return;
+    const nextIds = [...promotedPropertyIds];
+    if (direction === 'UP' && index > 0) {
+      const temp = nextIds[index - 1];
+      nextIds[index - 1] = nextIds[index];
+      nextIds[index] = temp;
+      savePromotionsConfig({ featuredPropertyIds: nextIds }, 'Promotion display priority updated to Slot #' + index + '.');
+      logAdminActivity('moved property ' + pIdStr + ' up to Slot #' + index + ' in Paid Promotions.');
+    } else if (direction === 'DOWN' && index < nextIds.length - 1) {
+      const temp = nextIds[index + 1];
+      nextIds[index + 1] = nextIds[index];
+      nextIds[index] = temp;
+      savePromotionsConfig({ featuredPropertyIds: nextIds }, 'Promotion display priority updated to Slot #' + (index + 2) + '.');
+      logAdminActivity('moved property ' + pIdStr + ' down to Slot #' + (index + 2) + ' in Paid Promotions.');
+    }
+  };
+
+  const handleSavePromotionSettings = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    savePromotionsConfig({
+      sectionTitle: promoSectionTitle || 'Featured & Recent Verified Properties',
+      badgeText: promoBadgeText || 'VERIFIED LISTINGS',
+      displayCount: Math.max(1, Math.min(24, Number(promoDisplayCount) || 6))
+    }, 'Paid Promotions showcase headline and settings saved!');
+    logAdminActivity('saved Paid Promotions showcase title & display settings.');
   };
 
   // Deal Dossier Modal State
@@ -2921,11 +3094,12 @@ export default function AdminPortal({ onNavigate }) {
               </div>
 
               {[
-                { id: 'all-properties', label: `All Properties (${allProperties.length})`, icon: Building2, badge: 0 },
-                { id: 'verification', label: `Verification Queue (${verificationQueue.length})`, icon: Clock, badge: verificationQueue.length },
+                { id: 'promotions', label: 'Paid Promotions (' + promotedPropertyIds.length + ')', icon: Sparkles, badge: promotedPropertyIds.length },
+                { id: 'all-properties', label: 'All Properties (' + allProperties.length + ')', icon: Building2, badge: 0 },
+                { id: 'verification', label: 'Verification Queue (' + verificationQueue.length + ')', icon: Clock, badge: verificationQueue.length },
                 { id: 'workspace', label: 'Verification Workspace', icon: ShieldCheck },
                 { id: 'users', label: 'User Governance', icon: Users },
-                { id: 'visitors', label: `Visitors Details (${visitorLeads.length})`, icon: UserCheck, badge: visitorLeads.filter(v => v.status === 'NEW').length },
+                { id: 'visitors', label: 'Visitors Details (' + visitorLeads.length + ')', icon: UserCheck, badge: visitorLeads.filter(v => v.status === 'NEW').length },
                 { id: 'reports', label: 'Reports & Logs', icon: History },
                 { id: 'profile-settings', label: 'Admin Profile & Security', icon: User }
               ].map((item) => {
@@ -3098,6 +3272,28 @@ export default function AdminPortal({ onNavigate }) {
                         value={siteConfig.homepage?.heroBackgroundImage || ''}
                         onChange={(val) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
                       />
+
+                      <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
+                        <div>
+                          <span className="block text-xs font-black text-amber-900 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-600 fill-amber-500/30" />
+                            Paid Promotions Showcase Section
+                          </span>
+                          <span className="block text-[11px] text-amber-800 font-medium">
+                            {promotedPropertyIds.length === 0
+                              ? 'Section is currently completely HIDDEN on Home Page (0 customer properties added).'
+                              : 'Section is LIVE on Home Page displaying ' + promotedPropertyIds.length + ' customer properties.'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('promotions')}
+                          className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow shrink-0 transition-all"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-brand-yellow" />
+                          <span>Open Paid Promotions Manager ({promotedPropertyIds.length})</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3842,6 +4038,440 @@ export default function AdminPortal({ onNavigate }) {
               </div>
             )}
 
+            {/* TAB: PAID PROMOTIONS MANAGEMENT */}
+            {activeTab === 'promotions' && (
+              <div className="space-y-6">
+
+                {/* Toast feedback */}
+                {promoToast && (
+                  <div className="bg-brand-charcoal text-white px-5 py-3.5 rounded-2xl shadow-xl border border-brand-yellow/50 flex items-center justify-between text-xs font-bold animate-fadeIn">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-brand-yellow" />
+                      <span>{promoToast}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPromoToast('')}
+                      className="text-gray-400 hover:text-white ml-4 p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Primary Overview Banner */}
+                <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-brand-charcoal shadow-md shrink-0">
+                      <Sparkles className="w-6 h-6 text-brand-charcoal" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-xl font-black text-brand-charcoal">Paid Promotions Showcase</h2>
+                        <span className="bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-amber-300">
+                          Admin Controlled
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 font-medium mt-1">
+                        Select, reorder, and showcase properties of customers who paid for premium promotion on EaseLand.
+                        When this section has 0 properties, it is completely hidden and empty across the website.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Realtime Visibility Status */}
+                  <div className="shrink-0 flex items-center gap-2">
+                    {promotedPropertyIds.length === 0 ? (
+                      <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-100 text-gray-700 border border-gray-300 text-xs font-black shadow-sm">
+                        <EyeOff className="w-4 h-4 text-gray-500" />
+                        <span>SECTION HIDDEN ACROSS SITE (0 Properties)</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-black shadow-sm">
+                        <Eye className="w-4 h-4 text-emerald-600" />
+                        <span>LIVE ON HOMEPAGE ({promotedPropertyIds.length} Properties Displayed)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Showcase Headline & Display Settings */}
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-brand-charcoal" />
+                      <h3 className="text-sm font-black text-brand-charcoal uppercase tracking-wider">Showcase Headline & Display Settings</h3>
+                    </div>
+                    <span className="text-[11px] text-gray-400 font-medium">Auto-saves to cloud & public website</span>
+                  </div>
+
+                  <form onSubmit={handleSavePromotionSettings} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Section Headline Title</label>
+                      <input
+                        type="text"
+                        value={promoSectionTitle}
+                        onChange={(e) => setPromoSectionTitle(e.target.value)}
+                        placeholder="Featured & Recent Verified Properties"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Badge Pill Text</label>
+                      <input
+                        type="text"
+                        value={promoBadgeText}
+                        onChange={(e) => setPromoBadgeText(e.target.value)}
+                        placeholder="VERIFIED LISTINGS"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Max Display Slots</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={24}
+                          value={promoDisplayCount}
+                          onChange={(e) => setPromoDisplayCount(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-brand-charcoal hover:bg-slate-800 text-white font-black text-xs px-4 py-2 rounded-xl shadow transition-all shrink-0 flex items-center gap-1.5"
+                        >
+                          <Save className="w-3.5 h-3.5 text-brand-yellow" />
+                          <span>Save</span>
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Section 1: Active Promoted Properties List */}
+                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/70">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
+                        <h3 className="text-sm font-black text-brand-charcoal uppercase tracking-wider">
+                          Active Promoted Customer Properties ({promotedPropertyIds.length})
+                        </h3>
+                      </div>
+                      <p className="text-xs text-gray-500 font-medium mt-0.5">
+                        These customer properties will be presented on the Homepage in the exact slot order below.
+                      </p>
+                    </div>
+
+                    {promotedPropertyIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to clear all paid promotions? The showcase will immediately become hidden across the website.')) {
+                            savePromotionsConfig({ featuredPropertyIds: [] }, 'All paid promotions removed. Showcase is now completely hidden.');
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all self-start sm:self-auto flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear All Promotions</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {promotedPropertiesList.length === 0 ? (
+                    <div className="p-10 text-center space-y-3 bg-amber-50/40">
+                      <div className="w-14 h-14 bg-amber-100 border border-amber-200 rounded-3xl flex items-center justify-center mx-auto text-amber-600 shadow-sm">
+                        <Sparkles className="w-7 h-7" />
+                      </div>
+                      <h4 className="font-black text-base text-brand-charcoal">
+                        No Customer Properties in Paid Promotion
+                      </h4>
+                      <p className="text-xs text-gray-600 font-medium max-w-lg mx-auto">
+                        The Paid Promotions section on the Home Page is currently <strong>100% empty and hidden across the website</strong>.
+                        When a customer pays to promote their listing, use the catalog below to add their property.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {promotedPropertiesList.map((prop, idx) => {
+                        const pId = String(prop.id || prop.propertyId || prop.referenceId || '');
+                        const imgUrl = prop.photos?.[0] || (Array.isArray(prop.media) && prop.media[0] ? (typeof prop.media[0] === 'string' ? prop.media[0] : prop.media[0].url) : '') || siteConfig?.media?.fallbackPropertyImageUrl || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                        const pPrice = prop.price ? formatInr(prop.price) : (prop.priceLabel || 'Price on Request');
+                        const pLoc = [prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || 'Andhra Pradesh';
+                        const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered Customer';
+                        const ownerPhone = prop.owner?.phone || prop.ownerPublicPhone || 'Number in Records';
+                        const ownerEmail = prop.owner?.email || prop.ownerPublicEmail || '';
+
+                        return (
+                          <div key={pId + '-' + idx} className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-gray-50/80 transition-colors">
+                            <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
+                              {/* Order & Rank Controls */}
+                              <div className="flex flex-col items-center justify-center gap-1 shrink-0 bg-gray-100 p-2 rounded-2xl border border-gray-200">
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => handleMovePaidPromotion(pId, 'UP')}
+                                  className={'p-1 rounded-lg transition-all ' + (idx === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-white hover:text-brand-charcoal hover:shadow-sm')}
+                                  title="Move Up in Showcase Order"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                </button>
+                                <span className="text-xs font-black text-brand-charcoal px-1.5 py-0.5 rounded-md bg-white border border-gray-200 shadow-xs">
+                                  #{idx + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={idx === promotedPropertiesList.length - 1}
+                                  onClick={() => handleMovePaidPromotion(pId, 'DOWN')}
+                                  className={'p-1 rounded-lg transition-all ' + (idx === promotedPropertiesList.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-white hover:text-brand-charcoal hover:shadow-sm')}
+                                  title="Move Down in Showcase Order"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* Thumbnail */}
+                              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 relative">
+                                <img
+                                  src={imgUrl}
+                                  alt={prop.title || 'Property'}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                                  }}
+                                />
+                                <span className="absolute top-1 left-1 bg-brand-charcoal/80 backdrop-blur-xs text-amber-300 font-extrabold text-[9px] px-1.5 py-0.5 rounded">
+                                  PROMOTED
+                                </span>
+                              </div>
+
+                              {/* Property Title, Price, Location */}
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-black text-sm text-brand-charcoal line-clamp-1">{prop.title}</h4>
+                                  <span className="text-[10px] font-extrabold text-brand-charcoal bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                                    {prop.propertyType || prop.category || 'Open Plot'}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-gray-400">ID: {pId}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs flex-wrap">
+                                  <span className="font-extrabold text-emerald-700">{pPrice}</span>
+                                  {prop.area && (
+                                    <span className="text-gray-500 font-medium">{prop.area} sq ft</span>
+                                  )}
+                                  <span className="text-gray-500 flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-gray-400" />
+                                    {pLoc}
+                                  </span>
+                                </div>
+
+                                {/* Customer Paid Ownership Card */}
+                                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 max-w-lg flex items-center gap-3 text-[11px]">
+                                  <div className="w-7 h-7 rounded-lg bg-brand-charcoal text-brand-yellow flex items-center justify-center shrink-0 font-bold">
+                                    <User className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-brand-charcoal line-clamp-1">{ownerName}</span>
+                                      <span className="text-[9px] font-bold text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded">PAID CUSTOMER</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-gray-600 mt-0.5 flex-wrap">
+                                      <span className="flex items-center gap-1 font-semibold text-slate-900">
+                                        <Phone className="w-2.5 h-2.5 text-gray-400" />
+                                        {ownerPhone}
+                                      </span>
+                                      {ownerEmail && (
+                                        <span className="flex items-center gap-1 text-gray-500">
+                                          <Mail className="w-2.5 h-2.5 text-gray-400" />
+                                          {ownerEmail}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => window.open('/property/' + pId, '_blank')}
+                                className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                                title="Open Live Property Detail Page"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-brand-yellow" />
+                                <span>View Live</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePaidPromotion(pId)}
+                                className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-extrabold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all"
+                                title="Remove property from Paid Promotions"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Add Customer Properties to Paid Promotions */}
+                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-emerald-600" />
+                        <h3 className="text-sm font-black text-brand-charcoal uppercase tracking-wider">
+                          Add Customer Properties to Paid Promotions
+                        </h3>
+                      </div>
+                      <p className="text-xs text-gray-500 font-medium mt-0.5">
+                        Filter candidate customer properties, confirm promotion payment, and add to the homepage showcase with 1 click.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
+                      {candidatePropertiesForPromotion.length} Properties Available
+                    </span>
+                  </div>
+
+                  {/* Search and Filters */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-6 relative">
+                      <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={promoSearchQuery}
+                        onChange={(e) => setPromoSearchQuery(e.target.value)}
+                        placeholder="Search by title, property ID, customer owner name, phone, or city..."
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                      />
+                      {promoSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setPromoSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <select
+                        value={promoTypeFilter}
+                        onChange={(e) => setPromoTypeFilter(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700"
+                      >
+                        <option value="ALL">All Categories & Types</option>
+                        <option value="PLOT">Open Plots & Lands</option>
+                        <option value="COMMERCIAL">Commercial Properties</option>
+                        <option value="HOUSE">Houses & Villas</option>
+                        <option value="AGRICULTURE">Agricultural Lands</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <select
+                        value={promoStatusFilter}
+                        onChange={(e) => setPromoStatusFilter(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700"
+                      >
+                        <option value="ALL">All Active Listings</option>
+                        <option value="VERIFIED_ONLY">Platform Verified Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Candidate List */}
+                  <div className="border border-gray-200 rounded-2xl overflow-hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                    {candidatePropertiesForPromotion.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-gray-500 font-semibold">
+                        No properties found matching your filter criteria. Try adjusting the search query.
+                      </div>
+                    ) : (
+                      candidatePropertiesForPromotion.map((prop) => {
+                        const pId = String(prop.id || prop.propertyId || prop.referenceId || '');
+                        const isAlreadyPromoted = promotedPropertyIds.includes(pId);
+                        const promoIndex = promotedPropertyIds.indexOf(pId);
+                        const imgUrl = prop.photos?.[0] || (Array.isArray(prop.media) && prop.media[0] ? (typeof prop.media[0] === 'string' ? prop.media[0] : prop.media[0].url) : '') || siteConfig?.media?.fallbackPropertyImageUrl || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                        const pPrice = prop.price ? formatInr(prop.price) : (prop.priceLabel || 'Price on Request');
+                        const pLoc = [prop.location?.locality || prop.locality, prop.location?.city || prop.city].filter(Boolean).join(', ') || 'India';
+                        const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered Customer';
+                        const ownerPhone = prop.owner?.phone || prop.ownerPublicPhone || 'Contact in Records';
+
+                        return (
+                          <div key={pId} className="p-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                                <img
+                                  src={imgUrl}
+                                  alt={prop.title || 'Property'}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400';
+                                  }}
+                                />
+                              </div>
+
+                              <div className="min-w-0 flex-1 space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-extrabold text-xs text-brand-charcoal line-clamp-1">{prop.title}</span>
+                                  <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
+                                    {prop.propertyType || prop.category || 'Plot'}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-gray-400">ID: {pId}</span>
+                                </div>
+                                <div className="flex items-center gap-2.5 text-[11px] text-gray-500 flex-wrap">
+                                  <span className="font-extrabold text-emerald-700">{pPrice}</span>
+                                  <span>{pLoc}</span>
+                                  <span className="font-bold text-slate-800">Owner: {ownerName} ({ownerPhone})</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0">
+                              {isAlreadyPromoted ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePaidPromotion(pId)}
+                                  className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
+                                  title="Click to remove from Paid Promotions"
+                                >
+                                  <Sparkles className="w-3 h-3 text-amber-600 fill-amber-500" />
+                                  <span>Slot #{promoIndex + 1} (Remove)</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPaidPromotion(pId)}
+                                  className="bg-brand-charcoal hover:bg-emerald-700 text-white font-extrabold text-[11px] px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
+                                  title="Add customer property to Paid Promotions showcase"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-brand-yellow" />
+                                  <span>Add to Promotions</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
             {/* TAB: ALL PROPERTIES MASTER DIRECTORY */}
             {activeTab === 'all-properties' && (
               <div className="space-y-6">
@@ -4003,7 +4633,29 @@ export default function AdminPortal({ onNavigate }) {
                               {isLive ? 'PLATFORM VERIFIED' : isPending ? 'PENDING AUDIT' : isChanges ? 'CHANGES REQD' : isRejected ? 'REJECTED' : 'DRAFT'}
                             </span>
 
-                            <div className="flex items-center gap-1.5 mt-1">
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap justify-end">
+                              {promotedPropertyIds.includes(String(prop.id || prop.propertyId)) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePaidPromotion(prop.id || prop.propertyId)}
+                                  className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 shadow-xs transition-all"
+                                  title="Property is active in Paid Promotions. Click to remove."
+                                >
+                                  <Sparkles className="w-3 h-3 text-amber-600 fill-amber-500" />
+                                  <span>Promoted</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPaidPromotion(prop.id || prop.propertyId)}
+                                  className="bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 transition-all"
+                                  title="Add customer property to Paid Promotions"
+                                >
+                                  <Sparkles className="w-3 h-3 text-gray-400" />
+                                  <span>Promote</span>
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => window.open('/property/' + (prop.propertyId || prop.id), '_blank')}
                                 className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1.5"

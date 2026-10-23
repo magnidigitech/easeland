@@ -328,9 +328,9 @@ export const DEFAULT_SITE_CONFIG = {
   featuredListings: {
     badgeText: 'VERIFIED LISTINGS',
     sectionTitle: 'Featured & Recent Verified Properties',
-    displayCount: 3,
+    displayCount: 6,
     featuredPropertyIds: [],
-    showOnlyFeatured: false
+    showOnlyFeatured: true
   },
   publish: {
     autoPublish: false,
@@ -431,6 +431,14 @@ export const sanitizeSiteConfig = (cfg) => {
     sanitized.seo.keywords = DEFAULT_SITE_CONFIG.seo.keywords;
   }
 
+  // 8. Enforce paid promotions only
+  if (sanitized.featuredListings) {
+    sanitized.featuredListings.showOnlyFeatured = true;
+    if (!Array.isArray(sanitized.featuredListings.featuredPropertyIds)) {
+      sanitized.featuredListings.featuredPropertyIds = [];
+    }
+  }
+
   return sanitized;
 };
 
@@ -439,7 +447,11 @@ export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
   const merged = {
     overview: { ...DEFAULT_SITE_CONFIG.overview, ...(userConfig.overview || {}) },
     homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(userConfig.homepage || {}) },
-    featuredListings: { ...DEFAULT_SITE_CONFIG.featuredListings, ...(userConfig.featuredListings || {}) },
+    featuredListings: {
+      ...DEFAULT_SITE_CONFIG.featuredListings,
+      ...(userConfig.featuredListings || {}),
+      showOnlyFeatured: true
+    },
     navbar: { ...DEFAULT_SITE_CONFIG.navbar, ...(userConfig.navbar || {}) },
     footer: { ...DEFAULT_SITE_CONFIG.footer, ...(userConfig.footer || {}) },
     buyPage: { ...DEFAULT_SITE_CONFIG.buyPage, ...(userConfig.buyPage || {}) },

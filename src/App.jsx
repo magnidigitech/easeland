@@ -31,7 +31,7 @@ import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wi
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
 import { trackPageView } from './utils/metaPixel.js';
 import { parseRouteFromUrl } from './utils/routeUtils.js';
-import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User } from 'lucide-react';
+import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles } from 'lucide-react';
 
 export const getInitialPageState = parseRouteFromUrl;
 
@@ -790,43 +790,59 @@ export default function App() {
             
             <PropertyCategoryCards onSelectCategory={handleCategorySelect} />
 
-            {/* FEATURED / RECENT VERIFIED PROPERTIES */}
+            {/* PAID PROMOTIONS / FEATURED VERIFIED SHOWCASE */}
             {(() => {
               const featuredConfig = siteConfig?.featuredListings || {};
-              const featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String);
-              const displayCount = Number(featuredConfig.displayCount) || 3;
+              const featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
+              const displayCount = Number(featuredConfig.displayCount) || 6;
+
+              // CRITICAL: Strictly for Paid Promotions. If admin has not added any properties, keep section completely hidden/empty across the website!
+              if (featuredIds.length === 0) return null;
 
               // Filter candidate properties
               const candidateProps = properties.length > 0 ? properties : [];
 
-              // Explicitly featured properties matching IDs
+              // Explicitly featured properties matching IDs or referenceId
               const explicitlyFeatured = candidateProps.filter(p => {
-                const id1 = String(p.id || '');
-                const id2 = String(p.propertyId || '');
-                return featuredIds.includes(id1) || featuredIds.includes(id2);
+                if (!p) return false;
+                const id1 = String(p.id || '').trim();
+                const id2 = String(p.propertyId || '').trim();
+                const ref = String(p.referenceId || '').trim();
+                return (id1 && featuredIds.includes(id1)) || (id2 && featuredIds.includes(id2)) || (ref && featuredIds.includes(ref));
               });
 
               // Sort explicitly featured by Admin selected order
               explicitlyFeatured.sort((a, b) => {
-                const idA = String(a.id || a.propertyId);
-                const idB = String(b.id || b.propertyId);
-                return featuredIds.indexOf(idA) - featuredIds.indexOf(idB);
+                const idA1 = String(a.id || '').trim();
+                const idA2 = String(a.propertyId || '').trim();
+                const idARef = String(a.referenceId || '').trim();
+                const posA1 = idA1 ? featuredIds.indexOf(idA1) : -1;
+                const posA2 = idA2 ? featuredIds.indexOf(idA2) : -1;
+                const posARef = idARef ? featuredIds.indexOf(idARef) : -1;
+                const idxA = Math.min(
+                  posA1 !== -1 ? posA1 : 9999,
+                  posA2 !== -1 ? posA2 : 9999,
+                  posARef !== -1 ? posARef : 9999
+                );
+
+                const idB1 = String(b.id || '').trim();
+                const idB2 = String(b.propertyId || '').trim();
+                const idBRef = String(b.referenceId || '').trim();
+                const posB1 = idB1 ? featuredIds.indexOf(idB1) : -1;
+                const posB2 = idB2 ? featuredIds.indexOf(idB2) : -1;
+                const posBRef = idBRef ? featuredIds.indexOf(idBRef) : -1;
+                const idxB = Math.min(
+                  posB1 !== -1 ? posB1 : 9999,
+                  posB2 !== -1 ? posB2 : 9999,
+                  posBRef !== -1 ? posBRef : 9999
+                );
+
+                return idxA - idxB;
               });
 
-              // Other verified properties
-              const nonFeatured = candidateProps.filter(p => {
-                const id1 = String(p.id || '');
-                const id2 = String(p.propertyId || '');
-                return !featuredIds.includes(id1) && !featuredIds.includes(id2);
-              });
+              const homepageProperties = explicitlyFeatured.slice(0, displayCount);
 
-              let homepageProperties = [];
-              if (featuredConfig.showOnlyFeatured && explicitlyFeatured.length > 0) {
-                homepageProperties = explicitlyFeatured.slice(0, displayCount);
-              } else {
-                homepageProperties = [...explicitlyFeatured, ...nonFeatured].slice(0, displayCount);
-              }
-
+              // Keep completely hidden across the website until admin adds properties to paid promotions
               if (homepageProperties.length === 0) return null;
 
               return (
@@ -878,16 +894,10 @@ export default function App() {
                               }}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
-                            {isFeatured ? (
-                              <div className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
-                                <span>★ FEATURED VERIFIED</span>
-                              </div>
-                            ) : (
-                              <div className="absolute top-3 left-3 bg-brand-charcoal text-brand-yellow text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-brand-yellow/30">
-                                <ShieldCheck className="w-3 h-3 text-brand-yellow" />
-                                <span>{prop.verificationStatus || 'PLATFORM VERIFIED'}</span>
-                              </div>
-                            )}
+                            <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
+                              <Sparkles className="w-3 h-3 text-brand-yellow fill-brand-yellow" />
+                              <span>FEATURED PROMOTION</span>
+                            </div>
                           </div>
 
                           <div className="p-5 flex-1 flex flex-col justify-between">
