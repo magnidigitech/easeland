@@ -289,7 +289,23 @@ export default function AdminPortal({ onNavigate }) {
   const [deals, setDeals] = useState([]);
   const [followUps, setFollowUps] = useState([]);
   const [enquiries, setEnquiries] = useState([]);
-  const [allProperties, setAllProperties] = useState([]);
+  const [allProperties, setAllProperties] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('easeland_admin_cached_properties');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+        const raw = localStorage.getItem('easeland_properties');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
   const [allPropSearchQuery, setAllPropSearchQuery] = useState('');
   const [allPropStatusFilter, setAllPropStatusFilter] = useState('ALL');
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -298,8 +314,20 @@ export default function AdminPortal({ onNavigate }) {
   const [auditRemovedItemKeys, setAuditRemovedItemKeys] = useState(new Set());
 
   // 1-Minute Site Visitor Leads (PostgreSQL /api/visitors)
-  const [visitorLeads, setVisitorLeads] = useState([]);
+  const [visitorLeads, setVisitorLeads] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('easeland_visitors');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
   const [visitorLoading, setVisitorLoading] = useState(false);
+  const isDataLoadingRef = React.useRef(false);
   const [visitorSearchQuery, setVisitorSearchQuery] = useState('');
   const [visitorStatusFilter, setVisitorStatusFilter] = useState('ALL');
   const [visitorToast, setVisitorToast] = useState('');
@@ -624,23 +652,27 @@ export default function AdminPortal({ onNavigate }) {
   };
 
   const loadData = async () => {
-    // 1. Verification Queue (Retrieved directly from Cloud Firestore, Postgres & local storage)
-    let queue = [];
-    let allMergedProps = [];
+    if (isDataLoadingRef.current) return;
+    isDataLoadingRef.current = true;
     try {
-      const vRes = await getVerificationQueue();
-      let firebaseProps = (vRes.success && Array.isArray(vRes.properties)) ? vRes.properties : [];
+      // 1. Parallel fetch: Properties and Verification Queue
+      let queue = [];
+      let allMergedProps = [];
+
+      const [pgPropsSettled, vResSettled] = await Promise.allSettled([
+        fetch('/api/properties').then(r => r.ok ? r.json() : null).catch(() => null),
+        getVerificationQueue().catch(() => ({ success: false, properties: [] }))
+      ]);
 
       let postgresProps = [];
-      try {
-        const pgRes = await fetch('/api/properties');
-        if (pgRes.ok) {
-          const pgData = await pgRes.json();
-          if (pgData.success && Array.isArray(pgData.properties)) {
-            postgresProps = pgData.properties;
-          }
-        }
-      } catch (pgErr) { }
+      if (pgPropsSettled.status === 'fulfilled' && pgPropsSettled.value && pgPropsSettled.value.success && Array.isArray(pgPropsSettled.value.properties)) {
+        postgresProps = pgPropsSettled.value.properties;
+      }
+
+      let firebaseProps = [];
+      if (vResSettled.status === 'fulfilled' && vResSettled.value && vResSettled.value.success && Array.isArray(vResSettled.value.properties)) {
+        firebaseProps = vResSettled.value.properties;
+      }
 
       let localProps = [];
       try {
@@ -819,293 +851,306 @@ export default function AdminPortal({ onNavigate }) {
 
         return isPendingAudit || (submittedIds.includes(pId) && !isDraft && !isChangesRequired && !isClosed && !isLive);
       });
-    } catch (e1) {
-      console.warn('Error loading verification queue:', e1);
-    }
 
-    // 2. Users (Combines Firebase Auth + PostgreSQL /api/admin/firebase-users + Firestore + Local Storage)
-    let deletedUsers = [];
-    try {
-      if (typeof window !== 'undefined') {
-        const rawDel = localStorage.getItem('easeland_deleted_users');
-        if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
-      }
-    } catch (e) { }
-
-    const isUserExplicitlyDeleted = (uid, email, status, accountStatus) => {
-      const uId = String(uid || '').toLowerCase().trim();
-      const uEm = String(email || '').toLowerCase().trim();
-      const rawSt = String(status || accountStatus || '').toUpperCase();
-      if (rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED') return true;
-      if (uId && deletedUsers.includes(uId)) return true;
-      if (uEm && deletedUsers.includes(uEm)) return true;
-      return false;
-    };
-
-    let pgServerUsers = [];
-    try {
-      const res = await fetch('/api/admin/firebase-users');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.users)) {
-          pgServerUsers = json.users.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+      // PROGRESSIVE STEP 1: Immediately render properties and verification queue without waiting for users or config!
+      setAllProperties(allMergedProps);
+      setVerificationQueue(queue);
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('easeland_admin_cached_properties', JSON.stringify(allMergedProps));
         }
-      }
-    } catch (ePg) {
-      console.warn('Error fetching users from PostgreSQL server:', ePg);
-    }
+      } catch (eCache) {}
 
-    let firestoreUsers = [];
-    try {
-      const usersRes = await getAllUsersAdmin();
-      firestoreUsers = (usersRes.success && Array.isArray(usersRes.users)) ? usersRes.users.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)) : [];
-    } catch (e2) {
-      console.warn('Error loading users from Firestore:', e2);
-    }
-
-    let localRegisteredUsers = [];
-    let localProfileUsers = [];
-    try {
-      if (typeof window !== 'undefined') {
-        const rawReg = localStorage.getItem('easeland_registered_users');
-        if (rawReg) {
-          const parsed = JSON.parse(rawReg);
-          if (Array.isArray(parsed)) {
-            localRegisteredUsers = parsed.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+      if (queue.length > 0) {
+        setSelectedProperty(prev => {
+          if (prev) {
+            const prevId = String(prev.id || prev.propertyId || prev.referenceId || '');
+            const match = queue.find(q => String(q.id || q.propertyId || q.referenceId || '') === prevId);
+            if (match) return match;
           }
+          return queue[0];
+        });
+      } else {
+        setSelectedProperty(null);
+      }
+
+      // Concurrently load visitor leads
+      loadVisitorLeads();
+
+      // 2. Parallel fetch: Users, Enquiries, Reports, and Site Config
+      let deletedUsers = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const rawDel = localStorage.getItem('easeland_deleted_users');
+          if (rawDel) deletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
         }
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith('easeland_user_profile_')) {
-            const rawProf = localStorage.getItem(k);
-            if (rawProf) {
-              const profObj = JSON.parse(rawProf);
-              if (profObj && (profObj.uid || profObj.id || profObj.email)) {
-                if (!isUserExplicitlyDeleted(profObj.uid || profObj.id, profObj.email, profObj.status, profObj.accountStatus)) {
-                  localProfileUsers.push(profObj);
+      } catch (e) { }
+
+      const isUserExplicitlyDeleted = (uid, email, status, accountStatus) => {
+        const uId = String(uid || '').toLowerCase().trim();
+        const uEm = String(email || '').toLowerCase().trim();
+        const rawSt = String(status || accountStatus || '').toUpperCase();
+        if (rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED') return true;
+        if (uId && deletedUsers.includes(uId)) return true;
+        if (uEm && deletedUsers.includes(uEm)) return true;
+        return false;
+      };
+
+      const [pgUsersSettled, firestoreUsersSettled, enqsSettled, reportsSettled, cfgSettled] = await Promise.allSettled([
+        fetch('/api/admin/firebase-users').then(r => r.ok ? r.json() : null).catch(() => null),
+        getAllUsersAdmin().catch(() => ({ success: false, users: [] })),
+        getAllEnquiriesAdmin().catch(() => ({ success: false, enquiries: [] })),
+        getAllReportsAdmin().catch(() => ({ success: false, reports: [] })),
+        getSiteConfigAdmin().catch(() => ({ success: false, config: null }))
+      ]);
+
+      let pgServerUsers = [];
+      if (pgUsersSettled.status === 'fulfilled' && pgUsersSettled.value && pgUsersSettled.value.success && Array.isArray(pgUsersSettled.value.users)) {
+        pgServerUsers = pgUsersSettled.value.users.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+      }
+
+      let firestoreUsers = [];
+      if (firestoreUsersSettled.status === 'fulfilled' && firestoreUsersSettled.value && firestoreUsersSettled.value.success && Array.isArray(firestoreUsersSettled.value.users)) {
+        firestoreUsers = firestoreUsersSettled.value.users.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+      }
+
+      let localRegisteredUsers = [];
+      let localProfileUsers = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const rawReg = localStorage.getItem('easeland_registered_users');
+          if (rawReg) {
+            const parsed = JSON.parse(rawReg);
+            if (Array.isArray(parsed)) {
+              localRegisteredUsers = parsed.filter(u => u && !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+            }
+          }
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('easeland_user_profile_')) {
+              const rawProf = localStorage.getItem(k);
+              if (rawProf) {
+                const profObj = JSON.parse(rawProf);
+                if (profObj && (profObj.uid || profObj.id || profObj.email)) {
+                  if (!isUserExplicitlyDeleted(profObj.uid || profObj.id, profObj.email, profObj.status, profObj.accountStatus)) {
+                    localProfileUsers.push(profObj);
+                  }
                 }
               }
             }
           }
         }
-      }
-    } catch (lErr) {}
+      } catch (lErr) {}
 
-    let propertyOwnerUsers = [];
-    allMergedProps.forEach(p => {
-      if (!p) return;
-      const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').trim();
-      const oName = (p.ownerPublicName || p.owner?.name || 'Property Owner').trim();
-      const oPhone = (p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || p.phone || '').trim();
-      const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy;
-      if (isUserExplicitlyDeleted(oId, oEmail)) return;
-      if (oEmail || oPhone || oId) {
-        propertyOwnerUsers.push({
-          uid: oId || `owner-${oEmail || oPhone}`,
-          id: oId || `owner-${oEmail || oPhone}`,
-          displayName: oName,
-          name: oName,
-          email: oEmail,
-          phone: oPhone,
-          phoneNumber: oPhone,
-          role: 'VERIFIED PROPERTY OWNER & BUYER',
-          accountStatus: 'ACTIVE',
-          authProvider: oEmail.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'
-        });
-      }
-    });
-
-    const userMap = new Map();
-    [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
-      if (!u || isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)) return;
-      const emailKey = (u.email || '').toLowerCase().trim();
-      const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
-      if (!emailKey && !uidKey) return;
-
-      const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
-      const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
-      const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
-      const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
-
-      const mergedUser = {
-        ...existing,
-        ...u,
-        uid: u.uid || u.id || existing.uid || existing.id,
-        id: u.id || u.uid || existing.id || existing.uid,
-        email: u.email || existing.email || '',
-        name: cleanName,
-        displayName: cleanName,
-        status: u.status || u.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
-        role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER')
-      };
-
-      if (emailKey) userMap.set(emailKey, mergedUser);
-      if (uidKey) userMap.set(uidKey, mergedUser);
-    });
-
-    let users = Array.from(new Set(userMap.values())).filter(u => !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
-
-    // Enrich verification queue properties with matching registered user account details
-    queue = queue.map(p => {
-      const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy;
-      const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
-
-      let matchedUser = users.find(u => {
-        if (!u) return false;
-        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-        const uEmail = (u.email || '').toLowerCase().trim();
-        const matchesId = oId && uUid && (uUid === String(oId).toLowerCase().trim());
-        const matchesEmail = oEmail && uEmail && (uEmail === oEmail);
-        return matchesId || matchesEmail;
+      let propertyOwnerUsers = [];
+      allMergedProps.forEach(p => {
+        if (!p) return;
+        const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').trim();
+        const oName = (p.ownerPublicName || p.owner?.name || 'Property Owner').trim();
+        const oPhone = (p.ownerPrivatePhone || p.ownerPublicPhone || p.owner?.phone || p.phone || '').trim();
+        const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy;
+        if (isUserExplicitlyDeleted(oId, oEmail)) return;
+        if (oEmail || oPhone || oId) {
+          propertyOwnerUsers.push({
+            uid: oId || ('owner-' + (oEmail || oPhone)),
+            id: oId || ('owner-' + (oEmail || oPhone)),
+            displayName: oName,
+            name: oName,
+            email: oEmail,
+            phone: oPhone,
+            phoneNumber: oPhone,
+            role: 'VERIFIED PROPERTY OWNER & BUYER',
+            accountStatus: 'ACTIVE',
+            authProvider: oEmail.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password'
+          });
+        }
       });
 
-      // Local storage fallback for user profile if not found in Firestore users array
-      let localUserProfile = null;
-      if (!matchedUser && typeof window !== 'undefined') {
-        try {
-          if (oId) {
-            const rawStored = localStorage.getItem('easeland_user_profile_' + oId);
-            if (rawStored) localUserProfile = JSON.parse(rawStored);
-          }
-          if (!localUserProfile && oEmail) {
-            const rawReg = localStorage.getItem('easeland_registered_users');
-            if (rawReg) {
-              const regArr = JSON.parse(rawReg);
-              if (Array.isArray(regArr)) {
-                localUserProfile = regArr.find(u => u && u.email && u.email.toLowerCase().trim() === oEmail);
+      const userMap = new Map();
+      [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
+        if (!u || isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)) return;
+        const emailKey = (u.email || '').toLowerCase().trim();
+        const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
+        if (!emailKey && !uidKey) return;
+
+        const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
+        const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
+        const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
+        const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
+
+        const mergedUser = {
+          ...existing,
+          ...u,
+          uid: u.uid || u.id || existing.uid || existing.id,
+          id: u.id || u.uid || existing.id || existing.uid,
+          email: u.email || existing.email || '',
+          name: cleanName,
+          displayName: cleanName,
+          status: u.status || u.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
+          role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER')
+        };
+
+        if (emailKey) userMap.set(emailKey, mergedUser);
+        if (uidKey) userMap.set(uidKey, mergedUser);
+      });
+
+      let users = Array.from(new Set(userMap.values())).filter(u => !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+
+      // Enrich verification queue properties with matching registered user account details
+      const enrichedQueue = queue.map(p => {
+        const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy;
+        const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
+
+        let matchedUser = users.find(u => {
+          if (!u) return false;
+          const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+          const uEmail = (u.email || '').toLowerCase().trim();
+          const matchesId = oId && uUid && (uUid === String(oId).toLowerCase().trim());
+          const matchesEmail = oEmail && uEmail && (uEmail === oEmail);
+          return matchesId || matchesEmail;
+        });
+
+        // Local storage fallback for user profile if not found in Firestore users array
+        let localUserProfile = null;
+        if (!matchedUser && typeof window !== 'undefined') {
+          try {
+            if (oId) {
+              const rawStored = localStorage.getItem('easeland_user_profile_' + oId);
+              if (rawStored) localUserProfile = JSON.parse(rawStored);
+            }
+            if (!localUserProfile && oEmail) {
+              const rawReg = localStorage.getItem('easeland_registered_users');
+              if (rawReg) {
+                const regArr = JSON.parse(rawReg);
+                if (Array.isArray(regArr)) {
+                  localUserProfile = regArr.find(u => u && u.email && u.email.toLowerCase().trim() === oEmail);
+                }
               }
             }
-          }
-        } catch (e) { }
-      }
-
-      const effectiveUser = matchedUser || localUserProfile;
-
-      // Check if owner matches currently authenticated session user
-      const isCurrentSessionUser = user && (
-        (oId && (String(user.uid || user.id) === String(oId))) ||
-        (oEmail && user.email && user.email.toLowerCase().trim() === oEmail)
-      );
-
-      let resolvedName = '';
-      if (effectiveUser?.displayName || effectiveUser?.name || effectiveUser?.fullName) {
-        resolvedName = effectiveUser.displayName || effectiveUser.name || effectiveUser.fullName;
-      } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name || profile?.displayName)) {
-        resolvedName = user.displayName || user.name || profile?.name || profile?.displayName;
-      } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
-        resolvedName = p.ownerPublicName.trim();
-      } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
-        resolvedName = p.owner.name.trim();
-      } else if (effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
-        resolvedName = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
-      } else {
-        resolvedName = 'Registered Account Owner';
-      }
-
-      const rawPhone =
-        effectiveUser?.phone ||
-        effectiveUser?.phoneNumber ||
-        effectiveUser?.mobile ||
-        effectiveUser?.contactNumber ||
-        effectiveUser?.contactPhone ||
-        effectiveUser?.phoneNo ||
-        effectiveUser?.contact ||
-        effectiveUser?.telePhone ||
-        effectiveUser?.profile?.phone ||
-        effectiveUser?.profile?.phoneNumber ||
-        (isCurrentSessionUser && (profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phoneNumber || user?.phone)) ||
-        p.ownerPrivatePhone ||
-        p.ownerPublicPhone ||
-        p.owner?.phone ||
-        p.owner?.phoneNumber ||
-        p.ownerContact ||
-        p.contactNumber ||
-        p.contactPhone ||
-        p.phone ||
-        p.mobile;
-
-      const cleanedPhone = rawPhone ? String(rawPhone).trim() : '';
-      const isPlaceholder = !cleanedPhone ||
-        cleanedPhone === '+91 98765 43210' ||
-        (cleanedPhone === '9876543210' && !effectiveUser && !isCurrentSessionUser) ||
-        cleanedPhone === '+91 N/A' ||
-        cleanedPhone === 'N/A' ||
-        cleanedPhone === 'undefined' ||
-        cleanedPhone === 'null';
-
-      const resolvedPhone = !isPlaceholder ? cleanedPhone : 'Number Not Updated';
-      const resolvedEmail = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || '';
-
-      return {
-        ...p,
-        owner: {
-          ...(p.owner || {}),
-          name: resolvedName,
-          phone: resolvedPhone,
-          email: resolvedEmail
+          } catch (e) { }
         }
-      };
-    });
 
-    // 3. Enquiries
-    let enqs = [];
-    try {
-      const enqsRes = await getAllEnquiriesAdmin();
-      enqs = (enqsRes.success && Array.isArray(enqsRes.enquiries)) ? enqsRes.enquiries : [];
-    } catch (e3) {
-      console.warn('Error loading enquiries:', e3);
-    }
+        const effectiveUser = matchedUser || localUserProfile;
 
-    // 4. Reports
-    let reports = [];
-    try {
-      const reportsRes = await getAllReportsAdmin();
-      reports = (reportsRes.success && Array.isArray(reportsRes.reports)) ? reportsRes.reports : [];
-    } catch (e4) {
-      console.warn('Error loading reports:', e4);
-    }
+        // Check if owner matches currently authenticated session user
+        const isCurrentSessionUser = user && (
+          (oId && (String(user.uid || user.id) === String(oId))) ||
+          (oEmail && user.email && user.email.toLowerCase().trim() === oEmail)
+        );
 
-    // 5. Site Config
-    let cfg = mockApi.getSiteConfig();
-    try {
-      const cfgRes = await getSiteConfigAdmin();
-      if (cfgRes.success && cfgRes.config && Object.keys(cfgRes.config).length > 0) {
-        cfg = mockApi.mergeSiteConfigWithDefaults(cfgRes.config);
+        let resolvedName = '';
+        if (effectiveUser?.displayName || effectiveUser?.name || effectiveUser?.fullName) {
+          resolvedName = effectiveUser.displayName || effectiveUser.name || effectiveUser.fullName;
+        } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name || profile?.displayName)) {
+          resolvedName = user.displayName || user.name || profile?.name || profile?.displayName;
+        } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
+          resolvedName = p.ownerPublicName.trim();
+        } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
+          resolvedName = p.owner.name.trim();
+        } else if (effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
+          resolvedName = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
+        } else {
+          resolvedName = 'Registered Account Owner';
+        }
+
+        const rawPhone =
+          effectiveUser?.phone ||
+          effectiveUser?.phoneNumber ||
+          effectiveUser?.mobile ||
+          effectiveUser?.contactNumber ||
+          effectiveUser?.contactPhone ||
+          effectiveUser?.phoneNo ||
+          effectiveUser?.contact ||
+          effectiveUser?.telePhone ||
+          effectiveUser?.profile?.phone ||
+          effectiveUser?.profile?.phoneNumber ||
+          (isCurrentSessionUser && (profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phoneNumber || user?.phone)) ||
+          p.ownerPrivatePhone ||
+          p.ownerPublicPhone ||
+          p.owner?.phone ||
+          p.owner?.phoneNumber ||
+          p.ownerContact ||
+          p.contactNumber ||
+          p.contactPhone ||
+          p.phone ||
+          p.mobile;
+
+        const cleanedPhone = rawPhone ? String(rawPhone).trim() : '';
+        const isPlaceholder = !cleanedPhone ||
+          cleanedPhone === '+91 98765 43210' ||
+          (cleanedPhone === '9876543210' && !effectiveUser && !isCurrentSessionUser) ||
+          cleanedPhone === '+91 N/A' ||
+          cleanedPhone === 'N/A' ||
+          cleanedPhone === 'undefined' ||
+          cleanedPhone === 'null';
+
+        const resolvedPhone = !isPlaceholder ? cleanedPhone : 'Number Not Updated';
+        const resolvedEmail = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || '';
+
+        return {
+          ...p,
+          owner: {
+            ...(p.owner || {}),
+            name: resolvedName,
+            phone: resolvedPhone,
+            email: resolvedEmail
+          }
+        };
+      });
+
+      setVerificationQueue(enrichedQueue);
+
+      // Enquiries
+      let enqs = [];
+      if (enqsSettled.status === 'fulfilled' && enqsSettled.value && enqsSettled.value.success && Array.isArray(enqsSettled.value.enquiries)) {
+        enqs = enqsSettled.value.enquiries;
+      }
+      setEnquiries(enqs);
+
+      // Reports
+      let reports = [];
+      if (reportsSettled.status === 'fulfilled' && reportsSettled.value && reportsSettled.value.success && Array.isArray(reportsSettled.value.reports)) {
+        reports = reportsSettled.value.reports;
+      }
+
+      // Site Config
+      let cfg = mockApi.getSiteConfig();
+      if (cfgSettled.status === 'fulfilled' && cfgSettled.value && cfgSettled.value.success && cfgSettled.value.config && Object.keys(cfgSettled.value.config).length > 0) {
+        cfg = mockApi.mergeSiteConfigWithDefaults(cfgSettled.value.config);
         mockApi.updateSiteConfig(cfg);
       }
-    } catch (e5) {
-      console.warn('Error loading site config:', e5);
+      setSiteConfig(cfg);
+
+      // Synchronize live users
+      enrichAndSyncLiveUsers(users, allMergedProps);
+    } catch (err) {
+      console.warn('Error in loadData:', err);
+    } finally {
+      isDataLoadingRef.current = false;
     }
-
-    setSiteConfig(cfg);
-
-    setVerificationQueue(queue);
-    setEnquiries(enqs);
-    setAllProperties(allMergedProps);
-
-    enrichAndSyncLiveUsers(users, allMergedProps);
-    setSiteConfig(cfg);
-
-    if (queue.length > 0) {
-      setSelectedProperty(prev => {
-        if (prev) {
-          const prevId = String(prev.id || prev.propertyId || prev.referenceId || '');
-          const match = queue.find(q => String(q.id || q.propertyId || q.referenceId || '') === prevId);
-          if (match) return match;
-        }
-        return queue[0];
-      });
-    } else {
-      setSelectedProperty(null);
-    }
-
-    // Load Site Visitor Leads (PostgreSQL /api/visitors)
-    loadVisitorLeads();
   };
 
   useEffect(() => {
     loadData();
-    const handleRefresh = () => loadData();
+    loadVisitorLeads();
+
+    // Auto-sync Cloud & DB on mount in background
+    syncSiteConfigAndUsers().then((syncRes) => {
+      if (syncRes && syncRes.config && Object.keys(syncRes.config).length > 0) {
+        const merged = mockApi.mergeSiteConfigWithDefaults(syncRes.config);
+        mockApi.updateSiteConfig(merged);
+        setSiteConfig(merged);
+      }
+      if (!isDataLoadingRef.current) {
+        loadData();
+      }
+    }).catch((err) => {
+      console.warn('Auto background sync note:', err);
+    });
+
+    const handleRefresh = () => {
+      if (!isDataLoadingRef.current) loadData();
+    };
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
     const handleVisitorRefresh = () => loadVisitorLeads();
 
@@ -1129,8 +1174,11 @@ export default function AdminPortal({ onNavigate }) {
     window.addEventListener('easeland-visitor-lead-deleted', handleVisitorRefresh);
     window.addEventListener('storage', handleRefresh);
     const pollTimer = setInterval(() => {
-      loadData();
-    }, 6000);
+      if (!isDataLoadingRef.current) {
+        loadData();
+        loadVisitorLeads();
+      }
+    }, 20000);
 
     return () => {
       clearInterval(pollTimer);
@@ -1381,12 +1429,14 @@ export default function AdminPortal({ onNavigate }) {
         mockApi.updateSiteConfig(merged);
         setSiteConfig(merged);
       }
-      await loadData();
+      isDataLoadingRef.current = false;
+      await Promise.allSettled([loadData(), loadVisitorLeads()]);
       setPublishSuccessMessage('CMS Modules and User Accounts successfully synchronized across Firestore, PostgreSQL, and Admin Portal!');
       setTimeout(() => setPublishSuccessMessage(''), 5000);
     } catch (err) {
       console.warn('Sync error:', err);
-      await loadData();
+      isDataLoadingRef.current = false;
+      await Promise.allSettled([loadData(), loadVisitorLeads()]);
       setPublishSuccessMessage('Admin Portal refreshed from active database.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {

@@ -2513,9 +2513,23 @@ app.delete('/api/visitors/:id', async (req, res) => {
   }
 });
 
+// In-memory cache for Firebase Auth + PG unified users to guarantee instant Admin Portal loads
+let cachedAdminUsersData = null;
+let cachedAdminUsersExpiry = 0;
+const ADMIN_USERS_CACHE_TTL = 15000; // 15s TTL
+
+function invalidateAdminUsersCache() {
+  cachedAdminUsersData = null;
+  cachedAdminUsersExpiry = 0;
+}
+
 // Registered Users API Endpoints (Firebase Auth + PostgreSQL User Governance)
 app.get('/api/admin/firebase-users', async (req, res) => {
   try {
+    const forceRefresh = req.query.refresh === 'true';
+    if (!forceRefresh && cachedAdminUsersData && Date.now() < cachedAdminUsersExpiry) {
+      return res.json(cachedAdminUsersData);
+    }
     let authUsers = [];
     try {
       const adminApps = getApps();
@@ -2615,7 +2629,10 @@ app.get('/api/admin/firebase-users', async (req, res) => {
       return !deletedUsersSet.has(uUid) && (!uEm || !deletedUsersSet.has(uEm));
     });
 
-    return res.json({ success: true, count: allUsers.length, users: allUsers });
+    const payload = { success: true, count: allUsers.length, users: allUsers };
+    cachedAdminUsersData = payload;
+    cachedAdminUsersExpiry = Date.now() + ADMIN_USERS_CACHE_TTL;
+    return res.json(payload);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -2624,6 +2641,7 @@ app.get('/api/admin/firebase-users', async (req, res) => {
 // Authoritative 3-Way Synchronization Endpoint for Admin Portal
 app.post('/api/admin/sync-users-and-config', async (req, res) => {
   try {
+    invalidateAdminUsersCache();
     console.log('[EaseLand Sync] Running 3-way synchronization across Firestore, PostgreSQL, and Local...');
     const adminDb = getAdminDb();
 
@@ -2911,6 +2929,7 @@ app.get('/api/users', async (req, res) => {
 
 app.post('/api/users', async (req, res) => {
   try {
+    invalidateAdminUsersCache();
     const userData = req.body || {};
     const uUid = userData.uid || userData.id || `user-${Date.now()}`;
     const nowIso = new Date().toISOString();
@@ -2986,6 +3005,7 @@ app.post('/api/users', async (req, res) => {
 
 app.delete('/api/users/:uid', async (req, res) => {
   try {
+    invalidateAdminUsersCache();
     const uUid = String(req.params.uid || '').trim();
     if (!uUid) {
       return res.status(400).json({ success: false, error: 'User ID is required.' });
