@@ -56,8 +56,23 @@ export async function getSiteConfigAdmin() {
           });
         }
       } else {
-        const existing = mergedConfig[docSnap.id] || {};
-        mergedConfig[docSnap.id] = { ...existing, ...docSnap.data() };
+        const existing = mergedConfig[docSnap.id];
+        if (!existing) {
+          mergedConfig[docSnap.id] = docSnap.data();
+        } else {
+          const fsData = docSnap.data() || {};
+          // Preserve PostgreSQL active promotions if Firestore has an empty array
+          if (docSnap.id === 'featuredListings' && Array.isArray(existing.featuredPropertyIds) && existing.featuredPropertyIds.length > 0) {
+            const fsIds = Array.isArray(fsData.featuredPropertyIds) ? fsData.featuredPropertyIds : [];
+            if (fsIds.length === 0) {
+              fsData.featuredPropertyIds = existing.featuredPropertyIds;
+              if (Array.isArray(existing.promotedProperties) && existing.promotedProperties.length > 0) {
+                fsData.promotedProperties = existing.promotedProperties;
+              }
+            }
+          }
+          mergedConfig[docSnap.id] = { ...existing, ...fsData };
+        }
       }
     });
   } catch (error) {

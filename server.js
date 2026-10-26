@@ -2070,6 +2070,22 @@ app.post('/api/site-config', async (req, res) => {
       await Promise.all(promises);
     } catch (pgErr) {}
 
+    // Authoritative Firebase Admin SDK Sync: Keeps Firestore siteManagement in lockstep with PostgreSQL
+    try {
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        const fsPromises = Object.keys(fullConfig).map(async (modId) => {
+          const modData = fullConfig[modId];
+          const payload = typeof modData === 'object' && modData !== null ? modData : { value: modData };
+          await adminDb.collection('siteManagement').doc(modId).set(payload, { merge: true });
+          await adminDb.collection('siteManagement').doc('master_draft').set({ [modId]: payload }, { merge: true });
+        });
+        await Promise.all(fsPromises);
+      }
+    } catch (fsErr) {
+      console.warn('Server sync to Firestore siteManagement note:', fsErr.message);
+    }
+
     return res.json({ success: true, message: 'Site configuration saved to PostgreSQL.', config: fullConfig });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
