@@ -580,16 +580,21 @@ export default function UserDashboard({
         return;
       }
 
-      const isPending = (pSt === 'PENDING_VERIFICATION' || pLst === 'PENDING_VERIFICATION' || pSt === 'UNDER_REVIEW' || pLst === 'UNDER_REVIEW');
-
-      const isLive = !isPending && Boolean(
-        p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
-        p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
+      const isLive = Boolean(
+        p.listingStatus === 'LIVE' || p.status === 'LIVE' || p.listing_status === 'LIVE' ||
+        existing.listingStatus === 'LIVE' || existing.status === 'LIVE' || existing.listing_status === 'LIVE' ||
+        p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
+        p.isPlatformVerified === true || p.isPublished === true ||
+        p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' ||
+        p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
       );
-      const statusResolved = isPending
-        ? 'PENDING_VERIFICATION'
-        : isLive
+
+      const isPending = !isLive && (pSt === 'PENDING_VERIFICATION' || pLst === 'PENDING_VERIFICATION' || pSt === 'UNDER_REVIEW' || pLst === 'UNDER_REVIEW');
+
+      const statusResolved = isLive
         ? 'LIVE'
+        : isPending
+        ? 'PENDING_VERIFICATION'
         : (p.listingStatus === 'REJECTED' || p.status === 'REJECTED')
         ? 'REJECTED'
         : (p.listingStatus === 'CHANGES_REQUIRED' || p.status === 'CHANGES_REQUIRED')
@@ -646,19 +651,26 @@ export default function UserDashboard({
       p.listingStatus === 'DELETED_BY_ADMIN'
     );
 
-    const isPendingAudit = !isAdminDeleted && (propSt === 'PENDING_VERIFICATION' || propLst === 'PENDING_VERIFICATION' || propSt === 'UNDER_REVIEW' || propLst === 'UNDER_REVIEW');
+    const isLiveProp = !isAdminDeleted && Boolean(
+      p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.listing_status === 'LIVE' ||
+      p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
+      p.isPlatformVerified === true || p.isPublished === true ||
+      p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' ||
+      p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
+    );
 
-    const isLiveProp = !isAdminDeleted && !isPendingAudit && Boolean(
-      p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
-      p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' || p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
+    const isPendingAudit = !isAdminDeleted && !isLiveProp && (
+      propSt === 'PENDING_VERIFICATION' || propLst === 'PENDING_VERIFICATION' ||
+      propSt === 'UNDER_REVIEW' || propLst === 'UNDER_REVIEW' ||
+      propSt === 'PENDING' || propLst === 'PENDING'
     );
 
     const statusVal = isAdminDeleted
       ? 'DELETED_BY_ADMIN'
-      : isPendingAudit
-      ? 'PENDING_VERIFICATION'
       : isLiveProp
       ? 'LIVE'
+      : isPendingAudit
+      ? 'PENDING_VERIFICATION'
       : (p.status === 'REJECTED' || p.listingStatus === 'REJECTED')
       ? 'REJECTED'
       : (p.status === 'CHANGES_REQUIRED' || p.listingStatus === 'CHANGES_REQUIRED')
