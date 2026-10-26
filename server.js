@@ -2994,37 +2994,6 @@ app.post('/api/users', async (req, res) => {
     removeLocalDeletedUser(uUid);
     if (fullPayload.email) removeLocalDeletedUser(fullPayload.email);
 
-    // Ensure clean slate: Wipe any old residual properties or enquiries from PostgreSQL and local cache
-    try {
-      const clP1 = String.fromCharCode(36) + '1';
-      const clP2 = String.fromCharCode(36) + '2';
-      const uEmailLow = (fullPayload.email || '').toLowerCase().trim();
-      await pgPool.query(
-        "DELETE FROM properties WHERE LOWER(owner_id) = LOWER(" + clP1 + ") " +
-        "   OR LOWER(COALESCE(raw_data->>'ownerId', '')) = LOWER(" + clP1 + ") " +
-        "   OR LOWER(COALESCE(raw_data->>'userId', '')) = LOWER(" + clP1 + ") " +
-        "   OR (" + clP2 + " <> '' AND (" +
-        "       LOWER(COALESCE(raw_data->>'ownerEmail', '')) = LOWER(" + clP2 + ") OR " +
-        "       LOWER(COALESCE(raw_data->>'ownerPrivateEmail', '')) = LOWER(" + clP2 + ")" +
-        "   ));",
-        [uUid, uEmailLow]
-      );
-      await pgPool.query(
-        "DELETE FROM enquiries WHERE LOWER(owner_id) = LOWER(" + clP1 + ") " +
-        "   OR LOWER(COALESCE(customer_id, '')) = LOWER(" + clP1 + ") " +
-        "   OR LOWER(COALESCE(buyer_id, '')) = LOWER(" + clP1 + ") " +
-        "   OR (" + clP2 + " <> '' AND (LOWER(COALESCE(owner_email, '')) = LOWER(" + clP2 + ") OR LOWER(COALESCE(customer_email, '')) = LOWER(" + clP2 + ") OR LOWER(COALESCE(buyer_email, '')) = LOWER(" + clP2 + ")));",
-        [uUid, uEmailLow]
-      );
-    } catch (eCleanProps) {}
-
-    for (const [k, p] of localPropsMap.entries()) {
-      const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
-      const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
-      if (pOwner === uUid.toLowerCase() || (fullPayload.email && pEmail === (fullPayload.email || '').toLowerCase().trim())) {
-        localPropsMap.delete(k);
-      }
-    }
 
     try {
       const p1 = String.fromCharCode(36) + '1';

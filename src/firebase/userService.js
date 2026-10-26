@@ -91,24 +91,6 @@ export async function createUserProfile(uid, data) {
         localStorage.removeItem('easeland_owner_verification_' + uid);
         localStorage.removeItem('easeland_user_enquiries_' + uid);
 
-        // Clean any old properties from all local property caches
-        const propKeys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties', 'easeland_all_properties'];
-        propKeys.forEach(pk => {
-          const rawProps = localStorage.getItem(pk);
-          if (rawProps) {
-            try {
-              const parsed = JSON.parse(rawProps);
-              if (Array.isArray(parsed)) {
-                const cleaned = parsed.filter(p => {
-                  const pOwner = String(p.ownerId || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
-                  const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || p.email || '').toLowerCase().trim();
-                  return pOwner !== uIdLow && (!emLow || pEmail !== emLow);
-                });
-                localStorage.setItem(pk, JSON.stringify(cleaned));
-              }
-            } catch (ePk) {}
-          }
-        });
 
         // Clean any old enquiries
         const rawEnqs = localStorage.getItem('easeland_enquiries');
