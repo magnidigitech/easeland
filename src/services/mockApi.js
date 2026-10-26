@@ -69,36 +69,59 @@ export const applySiteTheme = (themeConfig) => {
 
 const FAKE_PROP_IDS = new Set([
   'prop-101', 'prop-102', 'prop-103', 'prop-104', 'prop-105', 'prop-106', 'prop-107', 'prop-108',
-  'EL-PROP-1001', 'EL-PROP-1002', 'EL-PROP-1003', 'EL-PROP-1004', 'EL-PROP-1005', 'EL-PROP-1006'
+  'el-prop-101', 'el-prop-102', 'el-prop-103', 'el-prop-104', 'el-prop-105', 'el-prop-106',
+  'el-prop-1001', 'el-prop-1002', 'el-prop-1003', 'el-prop-1004', 'el-prop-1005', 'el-prop-1006',
+  'el-showcase-101', 'el-showcase-102', 'el-showcase-103', 'el-showcase-104', 'el-showcase-105', 'el-showcase-106'
 ]);
 
 const FAKE_TITLES_LOWER = [
   'corner open plot near inner ring road',
   'spacious 2 bhk rental apartment in indiranagar',
+  'east facing residential plot with dtcp & rera approvals',
+  'luxury 4 bhk independent duplex villa with landscaping',
+  'high-rise 3 bhk luxury flat in gated community',
+  'prime main road commercial land plot with wide frontage',
+  'fertile agricultural farm land with sweet water borewell',
+  'premium corner lps commercial plot in amaravathi capital',
   'east facing residential land plot',
   'luxury 4 bhk independent villa',
   '3 bhk modern apartment in whitefield',
   'prime gachibowli open plot for villa',
   'demo property',
-  'sample property'
+  'sample property',
+  'featured customer property'
 ];
 
 export const isFakeProperty = (p) => {
   if (!p) return true;
-  const pId = String(p.id || p.propertyId || '').toLowerCase().trim();
-  if (FAKE_PROP_IDS.has(pId) || pId.startsWith('prop-10') || pId.startsWith('el-prop-100') || pId.startsWith('mock-')) {
+  const pId = String(p.id || p.propertyId || p.referenceId || '').toLowerCase().trim();
+  if (
+    FAKE_PROP_IDS.has(pId) ||
+    pId.startsWith('prop-10') ||
+    pId.startsWith('el-prop-10') ||
+    pId.startsWith('el-showcase') ||
+    pId.startsWith('mock-')
+  ) {
     return true;
   }
   const title = String(p.title || '').toLowerCase().trim();
-  if (FAKE_TITLES_LOWER.some(t => title.includes(t))) {
+  if (FAKE_TITLES_LOWER.some(t => title.includes(t)) || title.startsWith('featured customer property #') || title.startsWith('property #')) {
     return true;
   }
   const ownerEmail = String(p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || '').toLowerCase().trim();
-  if (ownerEmail === 'testowner@easeland.in') {
+  if (ownerEmail === 'testowner@easeland.in' || ownerEmail.includes('@example.com')) {
     return true;
   }
   const ownerName = String(p.ownerPublicName || p.owner?.name || '').toLowerCase().trim();
-  if (ownerName === 'demo owner') {
+  if (
+    ownerName === 'demo owner' ||
+    ownerName === 'ramesh varma' ||
+    ownerName === 'venkata rao' ||
+    ownerName === 'priya sharma' ||
+    ownerName === 'narayana murthy' ||
+    ownerName === 'subba reddy' ||
+    ownerName === 'k. srinivasa rao'
+  ) {
     return true;
   }
   return false;
@@ -186,23 +209,51 @@ let properties = deduplicateProperties(rawProperties).map(p => {
 
 setStoredData('easeland_properties', properties);
 
-// Scrub all local storage keys containing property arrays
+// Scrub all local storage keys containing property arrays and remove fake properties
 if (typeof window !== 'undefined') {
   try {
-    const keysToClean = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+    const keysToClean = [
+      'easeland_properties',
+      'easeland_user_properties',
+      'easeland_owner_properties',
+      'easeland_submitted_properties',
+      'easeland_admin_cached_properties',
+      'easeland_promoted_properties',
+      'easeland_public_properties'
+    ];
     keysToClean.forEach(key => {
       const stored = localStorage.getItem(key);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
           const cleaned = parsed.filter(item => {
-            if (typeof item === 'string') return !FAKE_PROP_IDS.has(item) && !item.startsWith('prop-10') && !item.startsWith('EL-PROP-100');
+            if (typeof item === 'string') {
+              const lower = item.toLowerCase();
+              return !FAKE_PROP_IDS.has(lower) && !lower.startsWith('prop-10') && !lower.startsWith('el-prop-10') && !lower.startsWith('el-showcase');
+            }
             return !isFakeProperty(item);
           });
           localStorage.setItem(key, JSON.stringify(cleaned));
         }
       }
     });
+
+    const configRaw = localStorage.getItem('easeland_site_config');
+    if (configRaw) {
+      const parsedConfig = JSON.parse(configRaw);
+      if (parsedConfig?.featuredListings) {
+        if (Array.isArray(parsedConfig.featuredListings.featuredPropertyIds)) {
+          parsedConfig.featuredListings.featuredPropertyIds = parsedConfig.featuredListings.featuredPropertyIds.filter(id => {
+            const lower = String(id).toLowerCase();
+            return !FAKE_PROP_IDS.has(lower) && !lower.startsWith('el-showcase') && !lower.startsWith('prop-10') && !lower.startsWith('el-prop-10');
+          });
+        }
+        if (Array.isArray(parsedConfig.featuredListings.promotedProperties)) {
+          parsedConfig.featuredListings.promotedProperties = parsedConfig.featuredListings.promotedProperties.filter(p => !isFakeProperty(p));
+        }
+        localStorage.setItem('easeland_site_config', JSON.stringify(parsedConfig));
+      }
+    }
   } catch (e) {}
 }
 
@@ -578,7 +629,7 @@ export const mockApi = {
     const combined = [...INITIAL_PROPERTIES, ...baseList, ...localProps];
     const candidateMap = new Map();
     combined.forEach(p => {
-      if (!p || isDeletedProp(p)) return;
+      if (!p || isDeletedProp(p) || isFakeProperty(p)) return;
       const pId = String(p.id || p.propertyId || p.referenceId || '');
       if (pId) {
         const existing = candidateMap.get(pId);

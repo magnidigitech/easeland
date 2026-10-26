@@ -7,7 +7,7 @@ import {
   ShieldCheck, Heart, ChevronRight, ChevronLeft, X, Building, Layers, MapPin, Compass,
   Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink, Video
 } from 'lucide-react';
-import { deduplicateProperties, mockApi } from '../services/mockApi';
+import { deduplicateProperties, mockApi, isFakeProperty } from '../services/mockApi';
 import { extractCoordinates, extractBoundaryPolygon, fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider';
 import {
   getCategoryBadgeLabel,
@@ -108,7 +108,7 @@ export default function UniversalMapEngine({
   // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas, filtered by active search filters
   const displayProperties = useMemo(() => {
     const raw = deduplicateProperties(properties);
-    const filtered = raw.filter(p => !isPropertyDeleted(p) && isPropertyPubliclyVisible(p) && matchesSearchFilters(p, filters));
+    const filtered = raw.filter(p => !isPropertyDeleted(p) && !isFakeProperty(p) && isPropertyPubliclyVisible(p) && matchesSearchFilters(p, filters));
     const hasDistanceSearch = filters?.radiusKm != null || filters?.referenceLat != null || filters?.nearbyPlace;
     if (hasDistanceSearch) {
       filtered.sort((a, b) => {

@@ -61,7 +61,7 @@ import {
   Tag,
   Loader2
 } from 'lucide-react';
-import { mockApi, safeArray } from '../services/mockApi';
+import { mockApi, safeArray, isFakeProperty } from '../services/mockApi';
 import { DEFAULT_SHOWCASE_PROPERTIES } from '../services/showcaseProperties.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -479,29 +479,15 @@ export default function AdminPortal({ onNavigate }) {
 
   const candidateSourceProperties = React.useMemo(() => {
     const list = Array.isArray(allProperties) && allProperties.length > 0 ? allProperties : [];
-    const pool = [...list];
-    DEFAULT_SHOWCASE_PROPERTIES.forEach(dp => {
-      const dpId = String(dp.id || dp.propertyId);
-      if (!pool.some(p => String(p.id || p.propertyId || p.referenceId) === dpId)) {
-        pool.push(dp);
-      }
-    });
-    return pool;
+    return list.filter(p => p && !isPropertyDeleted(p) && !isFakeProperty(p));
   }, [allProperties]);
 
   const promotedPropertiesList = React.useMemo(() => {
-    return promotedPropertyIds.map((id, index) => {
+    return promotedPropertyIds.map((id) => {
       const match = candidateSourceProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
-      if (match) return match;
-      const fallbackItem = DEFAULT_SHOWCASE_PROPERTIES[index % DEFAULT_SHOWCASE_PROPERTIES.length];
-      return {
-        ...fallbackItem,
-        id: id,
-        propertyId: id,
-        referenceId: id,
-        title: 'Property #' + (index + 1) + ' (ID: ' + id + ')'
-      };
-    });
+      if (match && !isFakeProperty(match)) return match;
+      return null;
+    }).filter(Boolean);
   }, [promotedPropertyIds, candidateSourceProperties]);
 
   const candidatePropertiesForPromotion = React.useMemo(() => {
@@ -540,21 +526,15 @@ export default function AdminPortal({ onNavigate }) {
       showOnlyFeatured: true
     };
     const targetIds = safeArray(mergedFeatured.featuredPropertyIds).map(String).filter(Boolean);
-    const activePromotedList = targetIds.map((id, index) => {
+    const activePromotedList = targetIds.map((id) => {
       const match = candidateSourceProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
-      if (match) return match;
+      if (match && !isFakeProperty(match)) return match;
       if (Array.isArray(currentFeatured.promotedProperties)) {
         const prevMatch = currentFeatured.promotedProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
-        if (prevMatch) return prevMatch;
+        if (prevMatch && !isFakeProperty(prevMatch)) return prevMatch;
       }
-      const fallbackItem = DEFAULT_SHOWCASE_PROPERTIES[index % DEFAULT_SHOWCASE_PROPERTIES.length];
-      return {
-        ...fallbackItem,
-        id: id,
-        propertyId: id,
-        referenceId: id
-      };
-    });
+      return null;
+    }).filter(Boolean);
 
     mergedFeatured.promotedProperties = activePromotedList;
 
@@ -1006,7 +986,7 @@ export default function AdminPortal({ onNavigate }) {
       const FAKE_DEMO_IDS = ['prop-102', 'prop-104', 'prop-105'];
       allMergedProps = Array.from(queueMap.values()).filter(p => {
         if (!p) return false;
-        if (isPropertyDeleted(p)) return false;
+        if (isPropertyDeleted(p) || isFakeProperty(p)) return false;
         const st = String(p.status || p.listingStatus || '').toUpperCase();
         const lst = String(p.listingStatus || '').toUpperCase();
         if (st === 'DELETED_BY_ADMIN' || lst === 'DELETED_BY_ADMIN' || p.deletedByAdmin === true || p.isDeleted === true) return false;

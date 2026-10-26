@@ -4,7 +4,7 @@ import PropertyCard from '../components/PropertyCard';
 import UniversalMapEngine from '../components/UniversalMapEngine';
 import DynamicFilterPanel from '../components/DynamicFilterPanel';
 import HeroSearch from '../components/HeroSearch';
-import { mockApi, deduplicateProperties } from '../services/mockApi';
+import { mockApi, deduplicateProperties, isFakeProperty } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext';
 import { searchPublicProperties, validateSortCompatibility } from '../firebase/searchService.js';
 import { searchStateToUrlParams, urlParamsToSearchState, createDefaultFilterState } from '../firebase/searchUrl.js';
@@ -128,7 +128,7 @@ export default function PropertiesSearchPage({
       const localData = mockApi.getPublicProperties(stateToUse) || [];
 
       // 3. Merge PostgreSQL + Firestore + LocalStorage properties and apply matchesSearchFilters
-      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p) && isPropertyPubliclyVisible(p));
+      const allCandidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p) && !isFakeProperty(p) && isPropertyPubliclyVisible(p));
       setCandidateProperties(allCandidateProps);
 
       // Dynamically compute MIN and MAX price bounds from all candidate properties matching non-price filters

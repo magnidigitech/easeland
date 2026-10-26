@@ -22,7 +22,7 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import OfflineIndicator from './components/OfflineIndicator';
 import PwaUpdatePrompt from './components/PwaUpdatePrompt';
-import { mockApi, applySiteTheme, safeArray, deduplicateProperties } from './services/mockApi';
+import { mockApi, applySiteTheme, safeArray, deduplicateProperties, isFakeProperty } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams, createDefaultFilterState } from './firebase/searchUrl.js';
 import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
@@ -251,7 +251,7 @@ export default function App() {
 
     const localData = mockApi.getPublicProperties(filters) || [];
 
-    const candidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p) && isPropertyPubliclyVisible(p));
+    const candidateProps = [...pgProperties, ...fsProperties, ...localData].filter(p => !isPropertyDeleted(p) && !isFakeProperty(p) && isPropertyPubliclyVisible(p));
     const hasActiveFilters = filters && Object.values(filters).some(v => v !== '' && v !== null && v !== undefined && v !== 'All' && v !== 'ALL');
     const filteredCandidates = hasActiveFilters ? candidateProps.filter(p => matchesSearchFilters(p, filters)) : candidateProps;
 
@@ -823,7 +823,7 @@ export default function App() {
               const addToPool = (items) => {
                 if (!Array.isArray(items)) return;
                 items.forEach((p) => {
-                  if (!p || isPropertyDeleted(p)) return;
+                  if (!p || isPropertyDeleted(p) || isFakeProperty(p)) return;
                   const k1 = String(p.id || '').trim().toLowerCase();
                   const k2 = String(p.propertyId || '').trim().toLowerCase();
                   const k3 = String(p.referenceId || '').trim().toLowerCase();
@@ -858,8 +858,7 @@ export default function App() {
                   addToPool(mockApi.getProperties());
                 }
               } catch (e) {}
-              // Always guarantee reliable candidate pool
-              addToPool(DEFAULT_SHOWCASE_PROPERTIES);
+
 
               // Explicitly match properties in exact slot order defined by Admin
               const explicitlyFeatured = [];
@@ -872,21 +871,11 @@ export default function App() {
                   const ref = String(p.referenceId || '').trim().toLowerCase();
                   return id1 === target || id2 === target || ref === target;
                 });
-                if (matched) {
+                if (matched && !isFakeProperty(matched)) {
                   const mKey = String(matched.id || matched.propertyId || matched.referenceId || '').trim().toLowerCase();
                   if (!explicitlyFeatured.some((ef) => String(ef.id || ef.propertyId || ef.referenceId || '').trim().toLowerCase() === mKey)) {
                     explicitlyFeatured.push(matched);
                   }
-                } else {
-                  // Fallback synthesis so promoted slots never vanish during async loading
-                  const fallbackItem = DEFAULT_SHOWCASE_PROPERTIES[slotIdx % DEFAULT_SHOWCASE_PROPERTIES.length];
-                  explicitlyFeatured.push({
-                    ...fallbackItem,
-                    id: fId,
-                    propertyId: fId,
-                    referenceId: fId,
-                    title: 'Featured Customer Property #' + (slotIdx + 1)
-                  });
                 }
               });
 
