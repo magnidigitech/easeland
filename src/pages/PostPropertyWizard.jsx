@@ -64,7 +64,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
     const missing = [];
     const uid = user?.uid || user?.id;
     const stored = uid && typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('easeland_user_profile_' + uid) || '{}') : {};
-    const adminPhone = typeof window !== 'undefined' ? localStorage.getItem('easeland_admin_phone') : '';
+    const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
     const sessionUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('easeland_session_user') || '{}') : {};
 
     const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || stored?.name || stored?.displayName || sessionUser?.name || sessionUser?.displayName || '').trim();
@@ -75,7 +76,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
       adminPhone ||
       sessionUser?.phone || sessionUser?.phoneNumber || ''
     );
-    const city = (user?.city || user?.location || profile?.city || profile?.location || stored?.city || stored?.location || sessionUser?.city || sessionUser?.location || '').trim();
+    const city = (user?.city || user?.location || profile?.city || profile?.location || stored?.city || stored?.location || adminCity || sessionUser?.city || sessionUser?.location || '').trim();
 
     if (!name) missing.push('Full Name');
     if (!email) missing.push('Email Address');

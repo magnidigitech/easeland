@@ -275,9 +275,9 @@ export default function App() {
       } catch (e) {}
     }
     const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
-    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
+    const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || (isAdminSession ? 'Guntur, Andhra Pradesh' : '')) : (isAdminSession ? 'Guntur, Andhra Pradesh' : '');
 
-    const name = (u?.name || u?.displayName || p?.name || p?.displayName || localStored.displayName || localStored.name || '').trim();
+    const name = (u?.name || u?.displayName || p?.name || p?.displayName || localStored.displayName || localStored.name || (isAdminSession ? 'EaseLand Admin' : '')).trim();
     const email = (u?.email || p?.email || localStored.email || '').trim();
     const phone = sanitizePhone(
       u?.phone || u?.phoneNumber ||
@@ -424,7 +424,7 @@ export default function App() {
         setActivePage('home');
         return;
       }
-      if (currentUser) {
+      if (currentUser && !authLoading) {
         const missing = checkProfileComplete(currentUser, authProfile);
         if (missing.length > 0) {
           setIncompleteProfileFields(missing);
@@ -433,6 +433,8 @@ export default function App() {
           try {
             window.history.replaceState(null, '', '/dashboard?tab=account');
           } catch (e) {}
+        } else {
+          setIsProfileWarningOpen(false);
         }
       }
     }

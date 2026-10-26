@@ -133,11 +133,19 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     }
 
     let cleanPhone = (profileData.phone || '').trim().replace(/\D/g, '');
-    if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) {
+    if (cleanPhone.length > 10 && cleanPhone.startsWith('91')) {
       cleanPhone = cleanPhone.slice(2);
+    }
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('0')) {
+      cleanPhone = cleanPhone.slice(1);
     }
     if (cleanPhone && cleanPhone.length !== 10) {
       setError('Mobile number must be exactly 10 digits.');
+      return;
+    }
+
+    if (!profileData.city || profileData.city.trim().length < 2) {
+      setError('Please enter your City / Location.');
       return;
     }
 

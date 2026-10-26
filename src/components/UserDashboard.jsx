@@ -57,7 +57,7 @@ export default function UserDashboard({
   initialTab = 'overview',
   tabKey = 0
 }) {
-  const { updateProfileData, deleteOwnAccount } = useAuth();
+  const { profile, updateProfileData, deleteOwnAccount } = useAuth();
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [isDeletingOwnAccount, setIsDeletingOwnAccount] = useState(false);
 
@@ -305,10 +305,10 @@ export default function UserDashboard({
     const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
 
     setProfileForm(prev => {
-      const ph = sanitizePhone(user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone) || prev.phone || '';
-      const ct = (user?.city || user?.location || localStored.city || localStored.location || adminCity || prev.city || '').trim();
-      const nm = user?.name || user?.displayName || localStored.displayName || localStored.name || prev.name || '';
-      const em = user?.email || localStored.email || prev.email || '';
+      const ph = sanitizePhone(user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone) || prev.phone || '';
+      const ct = (user?.city || user?.location || profile?.city || profile?.location || localStored.city || localStored.location || adminCity || prev.city || '').trim();
+      const nm = user?.name || user?.displayName || profile?.displayName || profile?.name || localStored.displayName || localStored.name || prev.name || '';
+      const em = user?.email || profile?.email || localStored.email || prev.email || '';
       return {
         ...prev,
         name: nm,
@@ -317,7 +317,21 @@ export default function UserDashboard({
         city: ct
       };
     });
-  }, [user?.uid, user?.id, user?.email, user?.name, user?.displayName, user?.phone, user?.city]);
+  }, [
+    user?.uid,
+    user?.id,
+    user?.email,
+    user?.name,
+    user?.displayName,
+    user?.phone,
+    user?.city,
+    profile?.phone,
+    profile?.phoneNumber,
+    profile?.city,
+    profile?.location,
+    profile?.displayName,
+    profile?.name
+  ]);
 
   useEffect(() => {
     if (activeTab === 'account') {

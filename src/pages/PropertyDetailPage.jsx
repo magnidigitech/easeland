@@ -860,7 +860,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                 <h3 className="text-lg font-extrabold text-brand-charcoal mb-4">Amenities & Features</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {property.amenities.map((amenityItem, idx) => {
-                    const matched = CANONICAL_AMENITIES.find(c => c.id === amenityItem || c.label === amenityItem);
+                    const canonicalList = Array.isArray(CANONICAL_AMENITIES) ? CANONICAL_AMENITIES : [];
+                    const matched = canonicalList.find(c => c && (c.id === amenityItem || c.label === amenityItem));
                     const displayLabel = matched ? matched.label : amenityItem;
                     return (
                       <div key={idx} className="flex items-center gap-2.5 text-xs font-bold text-gray-800 p-3 bg-gray-50 rounded-xl border border-gray-100">

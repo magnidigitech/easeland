@@ -18,6 +18,7 @@ import {
   getPropertyVideosList
 } from '../utils/categoryUtils';
 import { matchesSearchFilters, isPropertyDeleted, isPropertyPubliclyVisible } from '../utils/filterMatchingUtils.js';
+import { CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
 
 // Helper: Create custom EaseLand circular cluster badge with property count
 function createEaseLandClusterIcon(cluster) {
@@ -1021,8 +1022,9 @@ export default function UniversalMapEngine({
       ? raw
       : (raw && typeof raw === 'object' ? Object.keys(raw).filter(k => raw[k]) : []);
 
+    const canonicalList = Array.isArray(CANONICAL_AMENITIES) ? CANONICAL_AMENITIES : [];
     return list.map(item => {
-      const match = CANONICAL_AMENITIES.find(a => a.id === item || a.label.toLowerCase() === String(item).toLowerCase());
+      const match = canonicalList.find(a => a && (a.id === item || a.label?.toLowerCase() === String(item).toLowerCase()));
       return match ? match.label : String(item).replace(/_/g, ' ');
     });
   }, [selectedPropertyPreview]);

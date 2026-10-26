@@ -276,10 +276,20 @@ export function AuthProvider({ children }) {
                   return;
                 }
 
+                const resolvedPhone = fsData.phone || fsData.phoneNumber || fsData.mobile || fsData.contactNumber || '';
+                const resolvedCity = fsData.city || fsData.location || '';
+                const resolvedName = fsData.displayName || fsData.name || '';
+
                 setUser(prev => {
                   if (!prev) return prev;
                   return {
                     ...prev,
+                    name: resolvedName || prev.name,
+                    displayName: resolvedName || prev.displayName,
+                    phone: resolvedPhone || prev.phone,
+                    phoneNumber: resolvedPhone || prev.phoneNumber,
+                    city: resolvedCity || prev.city,
+                    location: resolvedCity || prev.location,
                     accountStatus: uAccStatus,
                     status: uAccStatus,
                     suspension: fsData.suspension || null
@@ -287,15 +297,62 @@ export function AuthProvider({ children }) {
                 });
 
                 setProfile(prev => {
-                  if (!prev) return { ...fsData, accountStatus: uAccStatus, status: uAccStatus, suspension: fsData.suspension || null };
                   return {
-                    ...prev,
+                    ...(prev || {}),
                     ...fsData,
+                    name: resolvedName || prev?.name,
+                    displayName: resolvedName || prev?.displayName,
+                    phone: resolvedPhone || prev?.phone,
+                    phoneNumber: resolvedPhone || prev?.phoneNumber,
+                    city: resolvedCity || prev?.city,
+                    location: resolvedCity || prev?.location,
                     accountStatus: uAccStatus,
                     status: uAccStatus,
                     suspension: fsData.suspension || null
                   };
                 });
+
+                // Update persistent local caches so page refreshes and route guards are always instantaneous and never stale
+                try {
+                  const uKey = 'easeland_user_profile_' + currentUser.uid;
+                  const curProf = JSON.parse(localStorage.getItem(uKey) || '{}');
+                  localStorage.setItem(uKey, JSON.stringify({
+                    ...curProf,
+                    ...fsData,
+                    name: resolvedName || curProf.name,
+                    displayName: resolvedName || curProf.displayName,
+                    phone: resolvedPhone || curProf.phone,
+                    phoneNumber: resolvedPhone || curProf.phoneNumber,
+                    city: resolvedCity || curProf.city,
+                    location: resolvedCity || curProf.location,
+                    accountStatus: uAccStatus
+                  }));
+
+                  const curSess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+                  localStorage.setItem('easeland_session_user', JSON.stringify({
+                    ...curSess,
+                    name: resolvedName || curSess.name,
+                    displayName: resolvedName || curSess.displayName,
+                    phone: resolvedPhone || curSess.phone,
+                    phoneNumber: resolvedPhone || curSess.phoneNumber,
+                    city: resolvedCity || curSess.city,
+                    location: resolvedCity || curSess.location,
+                    accountStatus: uAccStatus
+                  }));
+                } catch (e) {}
+
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', {
+                    detail: {
+                      uid: currentUser.uid,
+                      name: resolvedName,
+                      displayName: resolvedName,
+                      phone: resolvedPhone,
+                      city: resolvedCity,
+                      accountStatus: uAccStatus
+                    }
+                  }));
+                }
               }
             }, (err) => {
               console.warn('Live user profile snapshot notice:', err.message);
@@ -308,10 +365,40 @@ export function AuthProvider({ children }) {
         // Background asynchronous Firestore profile sync (non-blocking)
         getCurrentUserProfile(currentUser.uid).then(res => {
           if (res.success && res.profile) {
-            setProfile(prev => prev ? { ...prev, ...res.profile } : res.profile);
-            if (res.profile.accountStatus) {
-              setUser(prev => prev ? { ...prev, accountStatus: res.profile.accountStatus, status: res.profile.accountStatus, suspension: res.profile.suspension || null } : prev);
-            }
+            const p = res.profile;
+            const rPhone = p.phone || p.phoneNumber || p.mobile || '';
+            const rCity = p.city || p.location || '';
+            const rName = p.displayName || p.name || '';
+            const accSt = p.accountStatus || 'ACTIVE';
+
+            setProfile(prev => prev ? { ...prev, ...p, phone: rPhone || prev.phone, city: rCity || prev.city } : p);
+            setUser(prev => prev ? {
+              ...prev,
+              name: rName || prev.name,
+              displayName: rName || prev.displayName,
+              phone: rPhone || prev.phone,
+              phoneNumber: rPhone || prev.phoneNumber,
+              city: rCity || prev.city,
+              location: rCity || prev.location,
+              accountStatus: accSt,
+              status: accSt,
+              suspension: p.suspension || null
+            } : prev);
+
+            try {
+              const uKey = 'easeland_user_profile_' + currentUser.uid;
+              const curProf = JSON.parse(localStorage.getItem(uKey) || '{}');
+              localStorage.setItem(uKey, JSON.stringify({
+                ...curProf,
+                ...p,
+                name: rName || curProf.name,
+                displayName: rName || curProf.displayName,
+                phone: rPhone || curProf.phone,
+                phoneNumber: rPhone || curProf.phoneNumber,
+                city: rCity || curProf.city,
+                location: rCity || curProf.location
+              }));
+            } catch (e) {}
           }
         }).catch(e => console.warn('Background profile sync note:', e));
       } else {
@@ -666,8 +753,9 @@ export function AuthProvider({ children }) {
   const updateProfileData = async (updates) => {
     if (!user) return { success: false, error: 'Unauthenticated.' };
 
-    const isAdmin = profile?.role === 'ADMIN' || localStorage.getItem('easeland_admin_authenticated') === 'true';
+    const isAdmin = profile?.role === 'ADMIN' || localStorage.getItem('easeland_admin_authenticated') === 'true' || user?.email === 'admin@easeland.in';
 
+    // If admin mode is active, sync admin dedicated keys as well
     if (isAdmin) {
       if (updates.displayName || updates.name) {
         localStorage.setItem('easeland_admin_name', updates.displayName || updates.name);
@@ -681,44 +769,32 @@ export function AuthProvider({ children }) {
       if (updates.city || updates.location) {
         localStorage.setItem('easeland_admin_city', updates.city || updates.location);
       }
-      const dedicatedAdminEmail = localStorage.getItem('easeland_admin_email') || 'admin@easeland.in';
-      const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
-      const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
-      const dedicatedAdminCity = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
-      const adminObj = {
-        displayName: dedicatedAdminName,
-        name: dedicatedAdminName,
-        email: dedicatedAdminEmail,
-        phone: dedicatedAdminPhone,
-        phoneNumber: dedicatedAdminPhone,
-        city: dedicatedAdminCity,
-        location: dedicatedAdminCity
-      };
-      setUser(prev => ({ ...prev, ...adminObj }));
-      setProfile(prev => ({ ...prev, ...adminObj }));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('easeland-admin-updated', { detail: adminObj }));
-        window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', { detail: adminObj }));
-      }
-      return { success: true };
     }
 
-    // Standard User Profile Local & Cloud Sync
+    // Unified User Profile Local & Cloud Sync (applies to ALL authenticated users, including admin users)
+    const effectivePhone = updates.phone !== undefined ? updates.phone : (updates.phoneNumber !== undefined ? updates.phoneNumber : (user.phone || user.phoneNumber || ''));
+    const effectiveCity = updates.city !== undefined ? updates.city : (updates.location !== undefined ? updates.location : (user.city || user.location || ''));
+    const effectiveName = updates.displayName || updates.name || user.displayName || user.name || '';
+    const effectiveEmail = updates.email || user.email || '';
+
     const updatesToSave = {
       ...updates,
-      displayName: updates.displayName || updates.name || user.displayName || user.name || '',
-      name: updates.displayName || updates.name || user.displayName || user.name || '',
-      email: updates.email || user.email || '',
-      phone: updates.phone !== undefined ? updates.phone : (updates.phoneNumber !== undefined ? updates.phoneNumber : (user.phone || '')),
-      phoneNumber: updates.phone !== undefined ? updates.phone : (updates.phoneNumber !== undefined ? updates.phoneNumber : (user.phone || '')),
-      city: updates.city !== undefined ? updates.city : (updates.location !== undefined ? updates.location : (user.city || user.location || '')),
-      location: updates.city !== undefined ? updates.city : (updates.location !== undefined ? updates.location : (user.city || user.location || ''))
+      displayName: effectiveName,
+      name: effectiveName,
+      email: effectiveEmail,
+      phone: effectivePhone,
+      phoneNumber: effectivePhone,
+      city: effectiveCity,
+      location: effectiveCity
     };
 
-    const userKey = 'easeland_user_profile_' + user.uid;
-    const currentStored = JSON.parse(localStorage.getItem(userKey) || '{}');
-    const updatedStored = { ...currentStored, ...updatesToSave };
-    localStorage.setItem(userKey, JSON.stringify(updatedStored));
+    const targetUid = user.uid || user.id;
+    if (targetUid) {
+      const userKey = 'easeland_user_profile_' + targetUid;
+      const currentStored = JSON.parse(localStorage.getItem(userKey) || '{}');
+      const updatedStored = { ...currentStored, ...updatesToSave };
+      localStorage.setItem(userKey, JSON.stringify(updatedStored));
+    }
 
     const updatedUser = {
       ...user,
@@ -736,29 +812,34 @@ export function AuthProvider({ children }) {
     setUser(updatedUser);
     setProfile(updatedProfile);
 
-    try {
-      syncUserToPostgres({
-        uid: user.uid,
-        id: user.uid,
-        displayName: updatesToSave.displayName,
-        name: updatesToSave.name,
-        email: updatesToSave.email,
-        phone: updatesToSave.phone,
-        city: updatesToSave.city,
-        role: updatedProfile.role || 'USER',
-        accountStatus: 'ACTIVE'
-      });
-    } catch (e) {}
+    if (targetUid) {
+      try {
+        syncUserToPostgres({
+          uid: targetUid,
+          id: targetUid,
+          displayName: updatesToSave.displayName,
+          name: updatesToSave.name,
+          email: updatesToSave.email,
+          phone: updatesToSave.phone,
+          city: updatesToSave.city,
+          role: updatedProfile.role || (isAdmin ? 'ADMIN' : 'USER'),
+          accountStatus: 'ACTIVE'
+        });
+      } catch (e) {}
 
-    try {
-      updateOwnProfile(user.uid, updatesToSave).catch(e => {
-        console.warn('Firestore profile update background note:', e);
-      });
-    } catch (e) {
-      console.warn('Error initiating Firestore profile update:', e);
+      try {
+        updateOwnProfile(targetUid, updatesToSave).catch(e => {
+          console.warn('Firestore profile update background note:', e);
+        });
+      } catch (e) {
+        console.warn('Error initiating Firestore profile update:', e);
+      }
     }
 
     if (typeof window !== 'undefined') {
+      if (isAdmin) {
+        window.dispatchEvent(new CustomEvent('easeland-admin-updated', { detail: updatesToSave }));
+      }
       window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', { detail: updatedUser }));
     }
 
@@ -840,13 +921,20 @@ export function AuthProvider({ children }) {
         return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
       }
 
+      const resolvedPhone = userProfileData?.phone || userProfileData?.phoneNumber || result.user.phoneNumber || '';
+      const resolvedCity = userProfileData?.city || userProfileData?.location || '';
+      const resolvedName = userProfileData?.displayName || userProfileData?.name || result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
+
       const activeUserObj = {
         uid: result.user.uid,
         id: result.user.uid,
-        displayName: result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
-        name: result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+        displayName: resolvedName,
+        name: resolvedName,
         email: result.user.email || '',
-        phone: result.user.phoneNumber || '',
+        phone: resolvedPhone,
+        phoneNumber: resolvedPhone,
+        city: resolvedCity,
+        location: resolvedCity,
         emailVerified: result.user.emailVerified,
         role: userProfileData?.role || 'USER'
       };
