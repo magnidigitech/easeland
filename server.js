@@ -9,12 +9,20 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { fileURLToPath } from 'url';
-import {
-  PAN_INDIA_ADMINISTRATIVE_HIERARCHY,
-  getIndiaStates,
-  getIndiaDistricts,
-  matchStatesAndDistricts
-} from './src/services/indiaLocationHierarchy.js';
+let PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {};
+let getIndiaStates = () => Object.keys(PAN_INDIA_ADMINISTRATIVE_HIERARCHY);
+let getIndiaDistricts = (stateName) => PAN_INDIA_ADMINISTRATIVE_HIERARCHY[stateName] || [];
+let matchStatesAndDistricts = (queryStr) => [];
+
+try {
+  const hierarchyMod = await import('./src/services/indiaLocationHierarchy.js');
+  PAN_INDIA_ADMINISTRATIVE_HIERARCHY = hierarchyMod.PAN_INDIA_ADMINISTRATIVE_HIERARCHY || {};
+  getIndiaStates = hierarchyMod.getIndiaStates || getIndiaStates;
+  getIndiaDistricts = hierarchyMod.getIndiaDistricts || getIndiaDistricts;
+  matchStatesAndDistricts = hierarchyMod.matchStatesAndDistricts || matchStatesAndDistricts;
+} catch (err) {
+  console.warn('Note: indiaLocationHierarchy module load fallback:', err.message);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +95,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Enable CORS
 app.use(cors());
+
+// Health check endpoints for Coolify / Traefik / reverse proxy
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
 
 // Configure Multer Memory Storage
 const storage = multer.memoryStorage();
@@ -4217,5 +4229,5 @@ app.use((req, res) => {
 
 // Listen on configured PORT (3000)
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Easeland Coolify Node Server running smoothly on port ${PORT}`);
+  console.log('Easeland Coolify Node Server running smoothly on port ' + PORT);
 });
