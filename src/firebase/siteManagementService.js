@@ -71,10 +71,8 @@ export async function getSiteConfigAdmin() {
       if (rawStored) {
         const parsed = JSON.parse(rawStored);
         if (parsed && typeof parsed === 'object') {
-          if (parsed.featuredListings && Array.isArray(parsed.featuredListings.featuredPropertyIds) && parsed.featuredListings.featuredPropertyIds.length > 0) {
-            if (!mergedConfig.featuredListings || !Array.isArray(mergedConfig.featuredListings.featuredPropertyIds) || mergedConfig.featuredListings.featuredPropertyIds.length === 0) {
-              mergedConfig.featuredListings = parsed.featuredListings;
-            }
+          if (!mergedConfig.featuredListings && parsed.featuredListings) {
+            mergedConfig.featuredListings = parsed.featuredListings;
           }
           if (Object.keys(mergedConfig).length === 0) {
             Object.assign(mergedConfig, parsed);
