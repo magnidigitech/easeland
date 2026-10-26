@@ -19,13 +19,17 @@ export default function CrmExecutiveReport({ analytics, agents }) {
     ? agents
     : (Array.isArray(analytics.agents) && analytics.agents.length > 0 ? analytics.agents : DEFAULT_CRM_AGENTS);
 
+  const hasFinishedDeals = (analytics.totalFinishedDealsCount || (analytics.wonDealsCount + (analytics.lostDealsCount || 0))) > 0;
+  const hasDeals = (analytics.totalDealsCount || 0) > 0;
+  const hasLeads = (analytics.totalLeadsCount || 0) > 0;
+
   const funnelStages = [
     {
       id: 'leads',
       label: 'Buyer Inquiries',
       count: analytics.totalLeadsCount || 0,
-      sublabel: (analytics.hotLeadsCount || 0) + ' Hot High-Intent',
-      pct: 100,
+      sublabel: hasLeads ? (analytics.hotLeadsCount || 0) + ' Hot High-Intent' : '0 Inquiries Recorded',
+      pct: hasLeads ? 100 : 0,
       barColor: 'bg-blue-500',
       badgeColor: 'bg-blue-100 text-blue-800'
     },
@@ -33,8 +37,8 @@ export default function CrmExecutiveReport({ analytics, agents }) {
       id: 'deals',
       label: 'Deals in Negotiation',
       count: analytics.totalDealsCount || 0,
-      sublabel: (analytics.activeDealsCount || 0) + ' Active in Pipeline',
-      pct: Math.min(100, Math.max(15, Math.round(((analytics.totalDealsCount || 0) / Math.max(1, analytics.totalLeadsCount || 1)) * 100))),
+      sublabel: hasDeals ? (analytics.activeDealsCount || 0) + ' Active in Pipeline' : '0 Deals Initiated',
+      pct: hasLeads ? Math.min(100, Math.round(((analytics.totalDealsCount || 0) / Math.max(1, analytics.totalLeadsCount || 1)) * 100)) : 0,
       barColor: 'bg-amber-500',
       badgeColor: 'bg-amber-100 text-amber-800'
     },
@@ -42,8 +46,8 @@ export default function CrmExecutiveReport({ analytics, agents }) {
       id: 'visits',
       label: 'Site Inspections',
       count: analytics.scheduledVisitsCount || 0,
-      sublabel: 'Physical Field Visits',
-      pct: Math.min(100, Math.max(10, Math.round(((analytics.scheduledVisitsCount || 0) / Math.max(1, analytics.totalDealsCount || 1)) * 100))),
+      sublabel: (analytics.scheduledVisitsCount || 0) > 0 ? 'Physical Field Visits' : '0 Visits Scheduled',
+      pct: hasDeals ? Math.min(100, Math.round(((analytics.scheduledVisitsCount || 0) / Math.max(1, analytics.totalDealsCount || 1)) * 100)) : 0,
       barColor: 'bg-indigo-500',
       badgeColor: 'bg-indigo-100 text-indigo-800'
     },
@@ -51,8 +55,8 @@ export default function CrmExecutiveReport({ analytics, agents }) {
       id: 'won',
       label: 'Closed & Registered',
       count: analytics.wonDealsCount || 0,
-      sublabel: analytics.conversionRate + '% Win Rate',
-      pct: Math.min(100, Math.max(8, Number(analytics.conversionRate) || 0)),
+      sublabel: hasFinishedDeals ? analytics.conversionRate + '% Win Rate' : (hasDeals ? 'Deals in Progress' : '0 Closed Deals'),
+      pct: hasFinishedDeals ? Number(analytics.conversionRate) || 0 : 0,
       barColor: 'bg-emerald-500',
       badgeColor: 'bg-emerald-100 text-emerald-800'
     }
@@ -76,7 +80,7 @@ export default function CrmExecutiveReport({ analytics, agents }) {
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-500">Pipeline Velocity:</span>
             <span className="text-xs font-black bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
-              {analytics.conversionRate}% Overall Conversion
+              {hasFinishedDeals ? analytics.conversionRate + '% Overall Conversion' : (hasDeals ? 'Deals in Progress' : '0% Initial State')}
             </span>
           </div>
         </div>
@@ -157,7 +161,9 @@ export default function CrmExecutiveReport({ analytics, agents }) {
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-slate-500">Conversion Win Rate:</span>
-              <span className="font-black text-blue-600">{analytics.conversionRate}%</span>
+              <span className="font-black text-blue-600">
+                {hasFinishedDeals ? analytics.conversionRate + '%' : (hasDeals ? 'In Progress' : '0% (No Closed Deals)')}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-slate-500">Earned Platform Commission:</span>

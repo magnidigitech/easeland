@@ -21,7 +21,8 @@ import {
   deduplicateLeads,
   deduplicateDeals,
   deduplicateVisits,
-  clearAllCrmData
+  clearAllCrmData,
+  calculateCrmAnalytics
 } from './crmService.js';
 
 test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
@@ -230,5 +231,31 @@ test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
 
     const cleanDeals = deduplicateDeals(rawDeals);
     assert.strictEqual(cleanDeals.length, 2, 'Should deduplicate deals with same phone and property parcel');
+  });
+
+  await t.test('11. Empty pipeline yields strictly 0% conversion rate and mathematically sound win rate calculation', () => {
+    // 0 finished deals must yield 0% (never 100%)
+    const emptyStats = calculateCrmAnalytics([], [], []);
+    assert.strictEqual(emptyStats.conversionRate, 0, 'Conversion rate must be 0% when no deals exist');
+    assert.strictEqual(emptyStats.totalFinishedDealsCount, 0);
+
+    // Active in-progress deals without finished deals must also be 0%
+    const inProgressDeals = [
+      { id: '1', stage: CrmDealStages.NEW, dealValue: 5000000 },
+      { id: '2', stage: CrmDealStages.SITE_VISIT, dealValue: 8000000 }
+    ];
+    const inProgressStats = calculateCrmAnalytics(inProgressDeals, [], []);
+    assert.strictEqual(inProgressStats.conversionRate, 0, 'Conversion rate must be 0% when no deals have concluded');
+    assert.strictEqual(inProgressStats.activeDealsCount, 2);
+    assert.strictEqual(inProgressStats.totalFinishedDealsCount, 0);
+
+    // When deals conclude, accurate win rate must be computed
+    const concludedDeals = [
+      { id: '1', stage: CrmDealStages.CLOSED_WON, dealValue: 5000000 },
+      { id: '2', stage: CrmDealStages.CLOSED_LOST, dealValue: 8000000 }
+    ];
+    const concludedStats = calculateCrmAnalytics(concludedDeals, [], []);
+    assert.strictEqual(concludedStats.conversionRate, 50, '1 won of 2 concluded deals must equal 50%');
+    assert.strictEqual(concludedStats.totalFinishedDealsCount, 2);
   });
 });

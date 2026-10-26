@@ -3530,10 +3530,12 @@ app.get('/api/crm/bootstrap', async (req, res) => {
     const activeDeals = deals.filter(d => d.stage !== 'CLOSED_WON' && d.stage !== 'CLOSED_LOST');
     const totalPipelineValue = activeDeals.reduce((acc, d) => acc + (d.dealValue || 0), 0);
     const wonDeals = deals.filter(d => d.stage === 'CLOSED_WON');
+    const lostDeals = deals.filter(d => d.stage === 'CLOSED_LOST');
     const totalClosedValue = wonDeals.reduce((acc, d) => acc + (d.dealValue || 0), 0);
     const totalEarnedCommission = wonDeals.reduce((acc, d) => acc + (d.expectedCommission || 0), 0);
-    const totalFinished = wonDeals.length + deals.filter(d => d.stage === 'CLOSED_LOST').length;
-    const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 100;
+    const totalFinished = wonDeals.length + lostDeals.length;
+    // Strict calculation: If no deals have concluded, win rate is strictly 0%
+    const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 0;
     const scheduledVisits = visits.filter(v => v.status === 'SCHEDULED');
     const quarantinedDeals = deals.filter(d => d.isPropertyQuarantined);
 
@@ -3545,9 +3547,11 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       totalEarnedCommission,
       commissionDisplay: 'Rs. ' + (totalEarnedCommission / 1000).toFixed(0) + 'K',
       conversionRate,
+      totalFinishedDealsCount: totalFinished,
       totalDealsCount: deals.length,
       activeDealsCount: activeDeals.length,
       wonDealsCount: wonDeals.length,
+      lostDealsCount: lostDeals.length,
       totalLeadsCount: leads.length,
       hotLeadsCount: leads.filter(l => l.score === 'HOT').length,
       warmLeadsCount: leads.filter(l => l.score === 'WARM').length,

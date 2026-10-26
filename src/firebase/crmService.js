@@ -293,10 +293,12 @@ export function calculateCrmAnalytics(deals = [], leads = [], visits = []) {
   const activeDeals = safeDeals.filter(d => d && d.stage !== CrmDealStages.CLOSED_WON && d.stage !== CrmDealStages.CLOSED_LOST);
   const totalPipelineValue = activeDeals.reduce((acc, d) => acc + (Number(d.dealValue) || 0), 0);
   const wonDeals = safeDeals.filter(d => d && d.stage === CrmDealStages.CLOSED_WON);
+  const lostDeals = safeDeals.filter(d => d && d.stage === CrmDealStages.CLOSED_LOST);
   const totalClosedValue = wonDeals.reduce((acc, d) => acc + (Number(d.dealValue) || 0), 0);
   const totalEarnedCommission = wonDeals.reduce((acc, d) => acc + (Number(d.expectedCommission) || 0), 0);
-  const totalFinished = wonDeals.length + safeDeals.filter(d => d && d.stage === CrmDealStages.CLOSED_LOST).length;
-  const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 100;
+  const totalFinished = wonDeals.length + lostDeals.length;
+  // Mathematical integrity: When no deals have concluded, win rate is strictly 0% (never 100%)
+  const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 0;
   const scheduledVisits = safeVisits.filter(v => v && v.status === 'SCHEDULED');
 
   return {
@@ -307,9 +309,11 @@ export function calculateCrmAnalytics(deals = [], leads = [], visits = []) {
     totalEarnedCommission,
     commissionDisplay: 'Rs. ' + (totalEarnedCommission / 1000).toFixed(0) + 'K',
     conversionRate,
+    totalFinishedDealsCount: totalFinished,
     totalDealsCount: safeDeals.length,
     activeDealsCount: activeDeals.length,
     wonDealsCount: wonDeals.length,
+    lostDealsCount: lostDeals.length,
     totalLeadsCount: safeLeads.length,
     hotLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.HOT).length,
     warmLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.WARM).length,

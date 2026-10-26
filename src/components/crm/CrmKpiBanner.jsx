@@ -38,8 +38,20 @@ export default function CrmKpiBanner({ analytics }) {
         </div>
         <div className="min-w-0">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block truncate">Lead Conversion</span>
-          <span className="text-lg font-black text-slate-900 block truncate">{analytics.conversionRate}% Win Rate</span>
-          <span className="text-[11px] font-extrabold text-blue-800 block truncate">{analytics.hotLeadsCount} Hot High-Intent Leads</span>
+          <span className="text-lg font-black text-slate-900 block truncate">
+            {(analytics.totalFinishedDealsCount || (analytics.wonDealsCount + (analytics.lostDealsCount || 0))) > 0
+              ? analytics.conversionRate + '% Win Rate'
+              : (analytics.activeDealsCount > 0 ? '0% (In Progress)' : '0% (No Deals)')}
+          </span>
+          <span className="text-[11px] font-extrabold text-blue-800 block truncate">
+            {(analytics.totalFinishedDealsCount || (analytics.wonDealsCount + (analytics.lostDealsCount || 0))) > 0
+              ? analytics.wonDealsCount + ' won of ' + (analytics.totalFinishedDealsCount || (analytics.wonDealsCount + (analytics.lostDealsCount || 0))) + ' closed'
+              : (analytics.activeDealsCount > 0
+                  ? analytics.activeDealsCount + ' active in pipeline'
+                  : (analytics.totalLeadsCount > 0
+                      ? analytics.totalLeadsCount + ' leads awaiting deals'
+                      : 'Pipeline empty'))}
+          </span>
         </div>
       </div>
 
