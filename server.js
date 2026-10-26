@@ -9,6 +9,12 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { fileURLToPath } from 'url';
+import {
+  PAN_INDIA_ADMINISTRATIVE_HIERARCHY,
+  getIndiaStates,
+  getIndiaDistricts,
+  matchStatesAndDistricts
+} from './src/services/indiaLocationHierarchy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -686,6 +692,84 @@ async function initPgDb() {
         email VARCHAR(255),
         reason TEXT DEFAULT 'Account deleted',
         deleted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 9. CRM Leads Table (Authoritative Lead Directory)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS crm_leads (
+        lead_id VARCHAR(100) PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone VARCHAR(50),
+        email VARCHAR(255),
+        source VARCHAR(50) DEFAULT 'WEBSITE_ENQUIRY',
+        score VARCHAR(20) DEFAULT 'HOT',
+        status VARCHAR(50) DEFAULT 'ACTIVE',
+        preferred_location TEXT,
+        preferred_property_type VARCHAR(100),
+        budget_min NUMERIC DEFAULT 0,
+        budget_max NUMERIC DEFAULT 0,
+        budget_display TEXT,
+        assigned_agent TEXT,
+        notes TEXT,
+        tags JSONB DEFAULT '[]'::jsonb,
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 10. CRM Deals Table (Pipeline & Transaction Dossiers)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS crm_deals (
+        deal_id VARCHAR(100) PRIMARY KEY,
+        lead_id VARCHAR(100),
+        property_id VARCHAR(100),
+        property_title TEXT,
+        property_location TEXT,
+        customer_name TEXT NOT NULL,
+        customer_phone VARCHAR(50),
+        customer_email VARCHAR(255),
+        owner_name TEXT,
+        owner_phone VARCHAR(50),
+        stage VARCHAR(50) DEFAULT 'NEW',
+        deal_value NUMERIC DEFAULT 0,
+        deal_value_display TEXT,
+        commission_rate NUMERIC DEFAULT 1.5,
+        expected_commission NUMERIC DEFAULT 0,
+        probability INTEGER DEFAULT 20,
+        expected_closing_date VARCHAR(50),
+        assigned_agent TEXT,
+        legal_audit_status VARCHAR(50) DEFAULT 'PENDING',
+        notes TEXT,
+        payment_milestones JSONB DEFAULT '[]'::jsonb,
+        timeline JSONB DEFAULT '[]'::jsonb,
+        version INTEGER DEFAULT 1,
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 11. CRM Site Visits Table (Field Dispatcher)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS crm_visits (
+        visit_id VARCHAR(100) PRIMARY KEY,
+        deal_id VARCHAR(100),
+        property_id VARCHAR(100),
+        property_title TEXT,
+        property_location TEXT,
+        customer_name TEXT NOT NULL,
+        customer_phone VARCHAR(50),
+        visit_date VARCHAR(50) NOT NULL,
+        visit_time VARCHAR(50) NOT NULL,
+        agent_assigned TEXT,
+        status VARCHAR(50) DEFAULT 'SCHEDULED',
+        customer_notes TEXT,
+        customer_feedback TEXT,
+        raw_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -2092,6 +2176,19 @@ app.post('/api/site-config', async (req, res) => {
   }
 });
 
+// CRM Real-Time Server-Sent Events (SSE) Bus
+const crmSseClients = new Set();
+const broadcastCrmEvent = (type, data) => {
+  const payload = 'data: ' + JSON.stringify({ type, data, timestamp: Date.now() }) + '\n\n';
+  crmSseClients.forEach(clientRes => {
+    try {
+      clientRes.write(payload);
+    } catch (e) {
+      crmSseClients.delete(clientRes);
+    }
+  });
+};
+
 // API Endpoint: Submit / Save Enquiry to PostgreSQL DB & Local Disk Fallback
 app.post('/api/enquiries', async (req, res) => {
   try {
@@ -2150,6 +2247,37 @@ app.post('/api/enquiries', async (req, res) => {
       ]);
     } catch (pgErr) {
       console.warn('PostgreSQL save enquiry note:', pgErr.message);
+    }
+
+    // 3. Auto-ingest enquiry into CRM Leads with HOT score and broadcast
+    try {
+      const leadName = fullPayload.customerName || fullPayload.buyerName || 'Website Prospective Buyer';
+      const leadPhone = fullPayload.customerPhone || fullPayload.buyerPhone || '';
+      const leadEmail = fullPayload.customerEmail || fullPayload.buyerEmail || '';
+      const P = String.fromCharCode(36);
+      const leadId = 'lead-' + eId;
+      const crmLeadSql = 'INSERT INTO crm_leads (' +
+        'lead_id, name, phone, email, source, score, status, preferred_location, ' +
+        'preferred_property_type, budget_min, budget_max, budget_display, assigned_agent, ' +
+        'notes, tags, raw_data, created_at, updated_at' +
+        ') VALUES (' +
+        P + '1, ' + P + '2, ' + P + '3, ' + P + '4, \'WEBSITE_ENQUIRY\', \'HOT\', \'NEW\', ' +
+        P + '5, \'LAND_PARCEL\', 0, 0, \'Website Enquiry\', \'EaseLand Admin\', ' +
+        P + '6, \'["Website Lead", "Direct Inquiry"]\'::jsonb, ' + P + '7, NOW(), NOW()' +
+        ') ON CONFLICT (lead_id) DO UPDATE SET updated_at = NOW();';
+
+      await pgPool.query(crmLeadSql, [
+        leadId,
+        leadName,
+        leadPhone,
+        leadEmail,
+        fullPayload.propertyLocation || 'Amaravati / Guntur',
+        'Inquiry on ' + (fullPayload.propertyTitle || 'Property') + ': ' + (fullPayload.message || ''),
+        JSON.stringify(fullPayload)
+      ]);
+      broadcastCrmEvent('LEAD_CREATED', { leadId, name: leadName, phone: leadPhone, email: leadEmail });
+    } catch (crmErr) {
+      console.warn('CRM leads auto-ingest note:', crmErr.message);
     }
 
     return res.json({ success: true, enquiryId: eId, enquiry: fullPayload });
@@ -3278,7 +3406,808 @@ app.delete('/api/users/:uid', async (req, res) => {
   }
 });
 
+// ============================================================================
+// EASELAND CRM ENTERPRISE REST API ENDPOINTS (PURE POSTGRESQL - ZERO FALLBACK)
+// ============================================================================
+
+// Helper for SQL parameter placeholder without dollar sign literal in source code
+const sqlParam = (index) => String.fromCharCode(36) + index;
+
+// 1. CRM LIVE STREAM: Real-Time Server-Sent Events (SSE) Bus
+app.get('/api/crm/live-stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  res.write('data: {"type":"CONNECTED","timestamp":' + Date.now() + '}\n\n');
+  crmSseClients.add(res);
+
+  req.on('close', () => {
+    crmSseClients.delete(res);
+  });
+});
+
+// 2. CRM BOOTSTRAP: Retrieve all Leads, Deals, Site Visits, Quarantines & Analytics
+app.get('/api/crm/bootstrap', async (req, res) => {
+  try {
+    const P = String.fromCharCode(36);
+    let bannedPropertyIds = [];
+    try {
+      const bannedRes = await pgPool.query('SELECT property_id, reference_id FROM admin_deleted_properties;');
+      bannedPropertyIds = bannedRes.rows.flatMap(r => [r.property_id, r.reference_id].filter(Boolean));
+    } catch (eBanned) {}
+
+    const [leadsRes, dealsRes, visitsRes] = await Promise.all([
+      pgPool.query('SELECT * FROM crm_leads ORDER BY updated_at DESC;'),
+      pgPool.query('SELECT * FROM crm_deals ORDER BY updated_at DESC;'),
+      pgPool.query('SELECT * FROM crm_visits ORDER BY updated_at DESC;')
+    ]);
+
+    const leads = leadsRes.rows.map(r => ({
+      id: r.lead_id,
+      leadId: r.lead_id,
+      name: r.name,
+      phone: r.phone,
+      email: r.email,
+      source: r.source,
+      score: r.score,
+      status: r.status,
+      preferredLocation: r.preferred_location,
+      preferredPropertyType: r.preferred_property_type,
+      budgetMin: Number(r.budget_min) || 0,
+      budgetMax: Number(r.budget_max) || 0,
+      budgetDisplay: r.budget_display,
+      assignedAgent: r.assigned_agent,
+      notes: r.notes,
+      tags: r.tags || [],
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    }));
+
+    const deals = dealsRes.rows.map(r => ({
+      id: r.deal_id,
+      dealId: r.deal_id,
+      leadId: r.lead_id,
+      propertyId: r.property_id,
+      isPropertyQuarantined: Boolean(r.property_id && bannedPropertyIds.includes(r.property_id)),
+      propertyTitle: r.property_title,
+      propertyLocation: r.property_location,
+      customerName: r.customer_name,
+      customerPhone: r.customer_phone,
+      customerEmail: r.customer_email,
+      ownerName: r.owner_name,
+      ownerPhone: r.owner_phone,
+      stage: r.stage,
+      dealValue: Number(r.deal_value) || 0,
+      dealValueDisplay: r.deal_value_display,
+      commissionRate: Number(r.commission_rate) || 1.5,
+      expectedCommission: Number(r.expected_commission) || 0,
+      probability: Number(r.probability) || 20,
+      expectedClosingDate: r.expected_closing_date,
+      assignedAgent: r.assigned_agent,
+      legalAuditStatus: r.legal_audit_status,
+      notes: r.notes,
+      paymentMilestones: r.payment_milestones || [],
+      timeline: r.timeline || [],
+      version: Number(r.version) || 1,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    }));
+
+    const visits = visitsRes.rows.map(r => ({
+      id: r.visit_id,
+      visitId: r.visit_id,
+      dealId: r.deal_id,
+      propertyId: r.property_id,
+      propertyTitle: r.property_title,
+      propertyLocation: r.property_location,
+      customerName: r.customer_name,
+      customerPhone: r.customer_phone,
+      visitDate: r.visit_date,
+      visitTime: r.visit_time,
+      agentAssigned: r.agent_assigned,
+      status: r.status,
+      customerNotes: r.customer_notes,
+      customerFeedback: r.customer_feedback,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    }));
+
+    // Calculate Authoritative Analytics
+    const activeDeals = deals.filter(d => d.stage !== 'CLOSED_WON' && d.stage !== 'CLOSED_LOST');
+    const totalPipelineValue = activeDeals.reduce((acc, d) => acc + (d.dealValue || 0), 0);
+    const wonDeals = deals.filter(d => d.stage === 'CLOSED_WON');
+    const totalClosedValue = wonDeals.reduce((acc, d) => acc + (d.dealValue || 0), 0);
+    const totalEarnedCommission = wonDeals.reduce((acc, d) => acc + (d.expectedCommission || 0), 0);
+    const totalFinished = wonDeals.length + deals.filter(d => d.stage === 'CLOSED_LOST').length;
+    const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 100;
+    const scheduledVisits = visits.filter(v => v.status === 'SCHEDULED');
+    const quarantinedDeals = deals.filter(d => d.isPropertyQuarantined);
+
+    const analytics = {
+      totalPipelineValue,
+      pipelineValueDisplay: 'Rs. ' + (totalPipelineValue / 100000).toFixed(1) + ' Lakhs',
+      totalClosedValue,
+      closedValueDisplay: 'Rs. ' + (totalClosedValue / 100000).toFixed(1) + ' Lakhs',
+      totalEarnedCommission,
+      commissionDisplay: 'Rs. ' + (totalEarnedCommission / 1000).toFixed(0) + 'K',
+      conversionRate,
+      totalDealsCount: deals.length,
+      activeDealsCount: activeDeals.length,
+      wonDealsCount: wonDeals.length,
+      totalLeadsCount: leads.length,
+      hotLeadsCount: leads.filter(l => l.score === 'HOT').length,
+      warmLeadsCount: leads.filter(l => l.score === 'WARM').length,
+      coldLeadsCount: leads.filter(l => l.score === 'COLD').length,
+      scheduledVisitsCount: scheduledVisits.length,
+      quarantinedDealsCount: quarantinedDeals.length
+    };
+
+    // Fetch Dynamic Licensed Agents & Staff from users table
+    let agents = [];
+    try {
+      const usersRes = await pgPool.query(
+        "SELECT uid, email, display_name, role, phone_number, raw_data FROM users " +
+        "WHERE role IN ('admin', 'staff', 'broker', 'agent', 'FIELD_EXECUTIVE') " +
+        "OR raw_data->>'role' IN ('admin', 'staff', 'broker', 'agent', 'FIELD_EXECUTIVE');"
+      );
+      agents = usersRes.rows.map(u => {
+        const raw = u.raw_data || {};
+        const uRole = u.role || raw.role || 'broker';
+        return {
+          id: u.uid,
+          name: u.display_name || raw.name || raw.fullName || (u.email ? u.email.split('@')[0] : 'Broker Executive'),
+          role: uRole === 'admin' ? 'Principal Broker / Administrator' : (uRole === 'FIELD_EXECUTIVE' ? 'Field Broker' : 'Sales Partner'),
+          email: u.email || raw.email || '',
+          phone: u.phone_number || raw.phone || ''
+        };
+      });
+    } catch (uErr) {}
+
+    if (agents.length === 0) {
+      agents = [
+        { id: 'agent-1', name: 'EaseLand Admin', role: 'Principal Broker / Administrator', email: 'admin@easeland.in', phone: '+91 98765 00000' }
+      ];
+    }
+
+    // Fetch Dynamic Locations from active property listings
+    let dynamicLocations = [];
+    try {
+      const locRes = await pgPool.query(
+        "SELECT DISTINCT location_name, city, district FROM properties WHERE is_published = true AND listing_status = 'AVAILABLE' LIMIT 150;"
+      );
+      dynamicLocations = Array.from(new Set(
+        locRes.rows.flatMap(r => [r.location_name, r.city, r.district]).filter(Boolean)
+      ));
+    } catch (locErr) {}
+
+    return res.json({
+      success: true,
+      leads,
+      deals,
+      visits,
+      agents,
+      dynamicLocations,
+      analytics,
+      bannedPropertyIds
+    });
+  } catch (err) {
+    console.error('CRM Bootstrap error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// PAN-INDIA DYNAMIC LOCATION AUTOCOMPLETE & GEOSPATIAL INTELLIGENCE API
+// Resolves All 28 States, 8 UTs, 788+ Districts, 7,000+ Mandals/Tehsils,
+// 600,000+ Villages, Cities, Localities, and Landmarks across India
+// ============================================================================
+const serverLocationCache = new Map();
+const MAX_SERVER_LOC_CACHE = 500;
+const SERVER_LOC_CACHE_TTL_MS = 15 * 60 * 1000;
+
+app.get('/api/locations/autocomplete', async (req, res) => {
+  try {
+    const queryStr = String(req.query.q || '').trim();
+    if (!queryStr || queryStr.length < 2) {
+      return res.json({ success: true, query: queryStr, count: 0, results: [] });
+    }
+
+    const stateFilter = String(req.query.state || '').trim();
+    const districtFilter = String(req.query.district || '').trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
+    const cacheKey = (queryStr + '_' + stateFilter + '_' + districtFilter + '_' + limit).toLowerCase();
+
+    const cached = serverLocationCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < SERVER_LOC_CACHE_TTL_MS)) {
+      return res.json({ success: true, query: queryStr, count: cached.results.length, results: cached.results });
+    }
+
+    const results = [];
+    const seenKeys = new Set();
+
+    const addResult = (item) => {
+      if (!item || !item.title) return;
+      const dedupeKey = (item.title + '|' + (item.district || '') + '|' + (item.state || '')).toLowerCase().trim();
+      if (seenKeys.has(dedupeKey)) return;
+      seenKeys.add(dedupeKey);
+      results.push(item);
+    };
+
+    // 1. Search active EaseLand verified properties and ventures in PostgreSQL
+    try {
+      const qWildcard = '%' + queryStr + '%';
+      const P = String.fromCharCode(36);
+      const propSql = 'SELECT id, property_id, title, location_name, city, district, price, price_display ' +
+        'FROM properties ' +
+        'WHERE (location_name ILIKE ' + P + '1 OR city ILIKE ' + P + '1 OR district ILIKE ' + P + '1 OR title ILIKE ' + P + '1) ' +
+        'AND is_published = true AND listing_status = \'AVAILABLE\' LIMIT 5;';
+      const propRes = await pgPool.query(propSql, [qWildcard]);
+      propRes.rows.forEach(p => {
+        addResult({
+          id: 'prop_' + (p.property_id || p.id),
+          title: p.title || p.location_name,
+          subtitle: (p.location_name ? p.location_name + ', ' : '') + (p.city || p.district || 'Andhra Pradesh') + ' • Platform Verified Venture',
+          fullAddress: (p.location_name ? p.location_name + ', ' : '') + (p.city ? p.city + ', ' : '') + (p.district ? p.district + ' Dist, ' : '') + 'Andhra Pradesh',
+          type: 'LISTED_VENTURE',
+          village: '',
+          mandal: '',
+          city: p.city || p.location_name,
+          district: p.district || '',
+          state: 'Andhra Pradesh',
+          country: 'India',
+          isPlatformListing: true,
+          propertyId: p.property_id || p.id
+        });
+      });
+    } catch (eProp) {}
+
+    // 2. Match Pan-India Administrative States & Districts
+    const adminMatches = matchStatesAndDistricts(queryStr);
+    adminMatches.forEach(addResult);
+
+    // 3. Query OpenStreetMap Photon Live Geospatial Engine for all Indian Villages, Mandals, Cities, Areas & Landmarks
+    try {
+      const photonUrl = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(queryStr) +
+        '&limit=15&lat=20.5937&lon=78.9629';
+      const pRes = await fetch(photonUrl);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const indiaFeatures = (pData.features || []).filter(f => {
+          const cc = f.properties?.countrycode || f.properties?.country || '';
+          return String(cc).toUpperCase() === 'IN' || String(cc).toLowerCase() === 'india';
+        });
+
+        indiaFeatures.forEach(f => {
+          const props = f.properties || {};
+          const coords = f.geometry?.coordinates || [];
+          const osmKey = props.osm_key;
+          const osmVal = props.osm_value;
+
+          let locType = 'LOCALITY';
+          if (osmVal === 'village' || osmVal === 'hamlet') {
+            locType = 'VILLAGE';
+          } else if (osmVal === 'subdistrict' || (props.county && /mandal|tehsil|taluk/i.test(props.county))) {
+            locType = 'MANDAL';
+          } else if (osmVal === 'city' || osmVal === 'town') {
+            locType = 'CITY';
+          } else if (osmVal === 'district' || osmVal === 'county') {
+            locType = 'DISTRICT';
+          } else if (osmVal === 'state') {
+            locType = 'STATE';
+          } else if (
+            ['university', 'college', 'hospital', 'school', 'aeroway', 'station', 'place_of_worship', 'viewpoint', 'stadium', 'building'].includes(osmVal) ||
+            osmKey === 'amenity' || osmKey === 'historic' || osmKey === 'tourism'
+          ) {
+            locType = 'LANDMARK';
+          } else if (osmVal === 'suburb' || osmVal === 'neighbourhood') {
+            locType = 'AREA';
+          }
+
+          const village = (locType === 'VILLAGE' ? props.name : '') || '';
+          const mandal = (props.county && /mandal|tehsil|taluk/i.test(props.county))
+            ? props.county
+            : (locType === 'MANDAL' ? props.name : '');
+          const district = props.district || ((props.county && !/mandal|tehsil|taluk/i.test(props.county)) ? props.county : '');
+          const city = props.city || (locType === 'CITY' ? props.name : '');
+          const state = props.state || '';
+
+          const subParts = [];
+          if (mandal && mandal !== props.name) subParts.push(mandal);
+          if (city && city !== props.name && city !== mandal) subParts.push(city);
+          if (district && district !== props.name && district !== city) subParts.push(district + ' Dist');
+          if (state && state !== props.name) subParts.push(state);
+
+          addResult({
+            id: 'loc_' + (props.osm_id || Math.random().toString(36).slice(2, 7)),
+            title: props.name,
+            subtitle: subParts.join(', ') || state || 'India',
+            fullAddress: [props.name, ...subParts].join(', ') + ', India',
+            type: locType,
+            village,
+            mandal,
+            city,
+            district,
+            state,
+            country: 'India',
+            lat: coords[1] || null,
+            lng: coords[0] || null,
+            isPlatformListing: false
+          });
+        });
+      }
+    } catch (ePhoton) {}
+
+    const finalResults = results.slice(0, limit);
+
+    // Save in cache
+    if (serverLocationCache.size >= MAX_SERVER_LOC_CACHE) {
+      const oldestKey = serverLocationCache.keys().next().value;
+      serverLocationCache.delete(oldestKey);
+    }
+    serverLocationCache.set(cacheKey, { timestamp: Date.now(), results: finalResults });
+
+    return res.json({
+      success: true,
+      query: queryStr,
+      count: finalResults.length,
+      results: finalResults
+    });
+  } catch (err) {
+    console.error('Location autocomplete error:', err.message);
+    return res.status(500).json({ success: false, error: err.message, results: [] });
+  }
+});
+
+// PAN-INDIA ADMINISTRATIVE HIERARCHY API
+app.get('/api/locations/hierarchy', (req, res) => {
+  try {
+    const stateName = req.query.state ? String(req.query.state).trim() : null;
+    if (!stateName) {
+      return res.json({
+        success: true,
+        states: getIndiaStates(),
+        totalStatesAndUTs: Object.keys(PAN_INDIA_ADMINISTRATIVE_HIERARCHY).length
+      });
+    }
+
+    const districts = getIndiaDistricts(stateName);
+    return res.json({
+      success: true,
+      state: stateName,
+      districts,
+      totalDistricts: districts.length
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. CRM LEADS: Create Lead
+app.post('/api/crm/leads', async (req, res) => {
+  try {
+    const data = req.body || {};
+    const leadId = data.id || ('lead-' + Date.now().toString().slice(-6));
+    const P = String.fromCharCode(36);
+
+    const sql = 'INSERT INTO crm_leads (' +
+      'lead_id, name, phone, email, source, score, status, preferred_location, ' +
+      'preferred_property_type, budget_min, budget_max, budget_display, assigned_agent, notes, tags, raw_data, created_at, updated_at' +
+      ') VALUES (' +
+      P + '1, ' + P + '2, ' + P + '3, ' + P + '4, ' + P + '5, ' + P + '6, ' + P + '7, ' + P + '8, ' +
+      P + '9, ' + P + '10, ' + P + '11, ' + P + '12, ' + P + '13, ' + P + '14, ' + P + '15, ' + P + '16, NOW(), NOW()' +
+      ') RETURNING *;';
+
+    const values = [
+      leadId,
+      data.name || 'Prospective Buyer',
+      data.phone || '',
+      data.email || '',
+      data.source || 'WEBSITE_ENQUIRY',
+      data.score || 'HOT',
+      data.status || 'ACTIVE',
+      data.preferredLocation || 'Amaravati / Guntur Region',
+      data.preferredPropertyType || 'Open Plot Ventures',
+      Number(data.budgetMin) || 0,
+      Number(data.budgetMax) || 0,
+      data.budgetDisplay || (data.budgetMax ? 'Up to Rs. ' + (Number(data.budgetMax) / 100000).toFixed(1) + ' Lakhs' : 'Flexible'),
+      data.assignedAgent || 'EaseLand Admin',
+      data.notes || '',
+      JSON.stringify(data.tags || ['New Lead']),
+      JSON.stringify(data)
+    ];
+
+    const result = await pgPool.query(sql, values);
+    const row = result.rows[0];
+
+    broadcastCrmEvent('LEAD_CREATED', {
+      id: row.lead_id,
+      leadId: row.lead_id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      score: row.score
+    });
+
+    return res.status(201).json({
+      success: true,
+      lead: {
+        id: row.lead_id,
+        leadId: row.lead_id,
+        name: row.name,
+        phone: row.phone,
+        email: row.email,
+        source: row.source,
+        score: row.score,
+        status: row.status,
+        preferredLocation: row.preferred_location,
+        preferredPropertyType: row.preferred_property_type,
+        budgetMin: Number(row.budget_min),
+        budgetMax: Number(row.budget_max),
+        budgetDisplay: row.budget_display,
+        assignedAgent: row.assigned_agent,
+        notes: row.notes,
+        tags: row.tags || [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    console.error('Create CRM lead error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. CRM LEADS: Delete Lead
+app.delete('/api/crm/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const P = String.fromCharCode(36);
+    await pgPool.query('DELETE FROM crm_leads WHERE lead_id = ' + P + '1;', [id]);
+    broadcastCrmEvent('LEAD_DELETED', { id });
+    return res.json({ success: true, message: 'Lead deleted.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. CRM DEALS: Create Deal
+app.post('/api/crm/deals', async (req, res) => {
+  try {
+    const data = req.body || {};
+    const dealId = data.id || ('deal-' + Date.now().toString().slice(-6));
+    const valNum = Number(data.dealValue) || 0;
+    const commRate = Number(data.commissionRate) || 1.5;
+    const expComm = Math.round(valNum * (commRate / 100));
+    const nowIso = new Date().toISOString();
+    const P = String.fromCharCode(36);
+
+    const initialTimeline = [
+      { date: nowIso.split('T')[0], event: 'Deal created in CRM', user: data.assignedAgent || 'System Admin' }
+    ];
+
+    const sql = 'INSERT INTO crm_deals (' +
+      'deal_id, lead_id, property_id, property_title, property_location, customer_name, customer_phone, ' +
+      'customer_email, owner_name, owner_phone, stage, deal_value, deal_value_display, commission_rate, ' +
+      'expected_commission, probability, expected_closing_date, assigned_agent, legal_audit_status, notes, ' +
+      'payment_milestones, timeline, version, raw_data, created_at, updated_at' +
+      ') VALUES (' +
+      P + '1, ' + P + '2, ' + P + '3, ' + P + '4, ' + P + '5, ' + P + '6, ' + P + '7, ' + P + '8, ' +
+      P + '9, ' + P + '10, ' + P + '11, ' + P + '12, ' + P + '13, ' + P + '14, ' + P + '15, ' + P + '16, ' +
+      P + '17, ' + P + '18, ' + P + '19, ' + P + '20, ' + P + '21, ' + P + '22, 1, ' + P + '23, NOW(), NOW()' +
+      ') RETURNING *;';
+
+    const values = [
+      dealId,
+      data.leadId || null,
+      data.propertyId || 'prop-custom',
+      data.propertyTitle || 'Property Listing',
+      data.propertyLocation || 'Amaravati / Guntur Region',
+      data.customerName || 'Prospective Buyer',
+      data.customerPhone || '',
+      data.customerEmail || '',
+      data.ownerName || 'Property Owner',
+      data.ownerPhone || '',
+      data.stage || 'NEW',
+      valNum,
+      data.dealValueDisplay || ('Rs. ' + (valNum / 100000).toFixed(1) + ' Lakhs'),
+      commRate,
+      expComm,
+      Number(data.probability) || 20,
+      data.expectedClosingDate || '',
+      data.assignedAgent || 'EaseLand Admin',
+      data.legalAuditStatus || 'PENDING',
+      data.notes || '',
+      JSON.stringify(data.paymentMilestones || []),
+      JSON.stringify(initialTimeline),
+      JSON.stringify(data)
+    ];
+
+    const result = await pgPool.query(sql, values);
+    const row = result.rows[0];
+
+    broadcastCrmEvent('DEAL_CREATED', {
+      id: row.deal_id,
+      dealId: row.deal_id,
+      customerName: row.customer_name,
+      propertyTitle: row.property_title,
+      dealValue: Number(row.deal_value),
+      stage: row.stage
+    });
+
+    return res.status(201).json({
+      success: true,
+      deal: {
+        id: row.deal_id,
+        dealId: row.deal_id,
+        leadId: row.lead_id,
+        propertyId: row.property_id,
+        propertyTitle: row.property_title,
+        propertyLocation: row.property_location,
+        customerName: row.customer_name,
+        customerPhone: row.customer_phone,
+        customerEmail: row.customer_email,
+        ownerName: row.owner_name,
+        ownerPhone: row.owner_phone,
+        stage: row.stage,
+        dealValue: Number(row.deal_value),
+        dealValueDisplay: row.deal_value_display,
+        commissionRate: Number(row.commission_rate),
+        expectedCommission: Number(row.expected_commission),
+        probability: Number(row.probability),
+        expectedClosingDate: row.expected_closing_date,
+        assignedAgent: row.assigned_agent,
+        legalAuditStatus: row.legal_audit_status,
+        notes: row.notes,
+        paymentMilestones: row.payment_milestones || [],
+        timeline: row.timeline || [],
+        version: row.version || 1,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    console.error('Create CRM deal error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. CRM DEALS: Update Stage with Concurrency, Compliance Check & Cascade
+app.patch('/api/crm/deals/:id/stage', async (req, res) => {
+  const client = await pgPool.connect();
+  try {
+    const { id } = req.params;
+    const { newStage, noteText } = req.body;
+    const P = String.fromCharCode(36);
+
+    let newProbability = 50;
+    if (newStage === 'NEW') newProbability = 20;
+    else if (newStage === 'CONTACTED') newProbability = 35;
+    else if (newStage === 'SITE_VISIT') newProbability = 50;
+    else if (newStage === 'DOCUMENT_AUDIT') newProbability = 70;
+    else if (newStage === 'PRICE_NEGOTIATION') newProbability = 80;
+    else if (newStage === 'TOKEN_ADVANCE') newProbability = 90;
+    else if (newStage === 'REGISTRATION_PENDING') newProbability = 95;
+    else if (newStage === 'CLOSED_WON') newProbability = 100;
+    else if (newStage === 'CLOSED_LOST') newProbability = 0;
+
+    await client.query('BEGIN');
+
+    // Fetch existing deal
+    const curRes = await client.query('SELECT * FROM crm_deals WHERE deal_id = ' + P + '1 FOR UPDATE;', [id]);
+    if (curRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'Deal not found.' });
+    }
+    const current = curRes.rows[0];
+
+    // Compliance Quarantine Check: Freeze transactions on banned/deleted properties
+    if (current.property_id && newStage !== 'CLOSED_LOST') {
+      try {
+        const bannedCheck = await client.query(
+          'SELECT property_id FROM admin_deleted_properties WHERE property_id = ' + P + '1 OR reference_id = ' + P + '1;',
+          [current.property_id]
+        );
+        if (bannedCheck.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(403).json({
+            success: false,
+            error: 'Transaction frozen: Referenced property has been quarantined or removed by Admin Compliance.'
+          });
+        }
+      } catch (eBanned) {}
+    }
+
+    const nowIso = new Date().toISOString();
+    const timelineEntry = {
+      date: nowIso.split('T')[0],
+      event: 'Stage changed to ' + newStage,
+      user: 'EaseLand Admin' + (noteText ? ' (' + noteText + ')' : '')
+    };
+    const updatedTimeline = [...(current.timeline || []), timelineEntry];
+
+    // If deal closed won, atomically mark linked property as SOLD in properties table
+    if (newStage === 'CLOSED_WON' && current.property_id) {
+      try {
+        await client.query(
+          "UPDATE properties SET listing_status = 'SOLD', is_published = false, updated_at = NOW() WHERE property_id = " + P + '1;',
+          [current.property_id]
+        );
+      } catch (propErr) {
+        console.warn('Property sold cascade note:', propErr.message);
+      }
+    }
+
+    const updateSql = 'UPDATE crm_deals SET ' +
+      'stage = ' + P + '1, ' +
+      'probability = ' + P + '2, ' +
+      'timeline = ' + P + '3, ' +
+      'version = version + 1, ' +
+      'updated_at = NOW() ' +
+      'WHERE deal_id = ' + P + '4 RETURNING *;';
+
+    const updRes = await client.query(updateSql, [
+      newStage,
+      newProbability,
+      JSON.stringify(updatedTimeline),
+      id
+    ]);
+
+    await client.query('COMMIT');
+    const row = updRes.rows[0];
+
+    broadcastCrmEvent('DEAL_STAGE_UPDATED', {
+      id: row.deal_id,
+      dealId: row.deal_id,
+      stage: row.stage,
+      probability: row.probability
+    });
+
+    return res.json({
+      success: true,
+      deal: {
+        id: row.deal_id,
+        dealId: row.deal_id,
+        stage: row.stage,
+        probability: row.probability,
+        timeline: row.timeline,
+        version: row.version,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Update deal stage error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 6. CRM DEALS: Delete Deal
+app.delete('/api/crm/deals/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const P = String.fromCharCode(36);
+    await pgPool.query('DELETE FROM crm_deals WHERE deal_id = ' + P + '1;', [id]);
+    broadcastCrmEvent('DEAL_DELETED', { id });
+    return res.json({ success: true, message: 'Deal deleted.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. CRM VISITS: Schedule Site Visit
+app.post('/api/crm/visits', async (req, res) => {
+  try {
+    const data = req.body || {};
+    const visitId = data.id || ('visit-' + Date.now().toString().slice(-6));
+    const P = String.fromCharCode(36);
+
+    const sql = 'INSERT INTO crm_visits (' +
+      'visit_id, deal_id, property_id, property_title, property_location, customer_name, customer_phone, ' +
+      'visit_date, visit_time, agent_assigned, status, customer_notes, raw_data, created_at, updated_at' +
+      ') VALUES (' +
+      P + '1, ' + P + '2, ' + P + '3, ' + P + '4, ' + P + '5, ' + P + '6, ' + P + '7, ' +
+      P + '8, ' + P + '9, ' + P + '10, ' + P + '11, ' + P + '12, ' + P + '13, NOW(), NOW()' +
+      ') RETURNING *;';
+
+    const values = [
+      visitId,
+      data.dealId || null,
+      data.propertyId || '',
+      data.propertyTitle || 'Property Inspection',
+      data.propertyLocation || 'Amaravati / Guntur Region',
+      data.customerName || 'Prospective Buyer',
+      data.customerPhone || '',
+      data.visitDate || new Date().toISOString().split('T')[0],
+      data.visitTime || '11:00 AM',
+      data.agentAssigned || 'EaseLand Admin',
+      'SCHEDULED',
+      data.customerNotes || '',
+      JSON.stringify(data)
+    ];
+
+    const result = await pgPool.query(sql, values);
+    const row = result.rows[0];
+
+    // If tied to deal, advance deal stage to SITE_VISIT
+    if (data.dealId) {
+      try {
+        await pgPool.query(
+          "UPDATE crm_deals SET stage = 'SITE_VISIT', probability = 50, updated_at = NOW() WHERE deal_id = " + P + "1 AND stage IN ('NEW', 'CONTACTED');",
+          [data.dealId]
+        );
+      } catch (dErr) {}
+    }
+
+    broadcastCrmEvent('VISIT_SCHEDULED', {
+      id: row.visit_id,
+      visitId: row.visit_id,
+      customerName: row.customer_name,
+      visitDate: row.visit_date
+    });
+
+    return res.status(201).json({
+      success: true,
+      visit: {
+        id: row.visit_id,
+        visitId: row.visit_id,
+        dealId: row.deal_id,
+        propertyTitle: row.property_title,
+        propertyLocation: row.property_location,
+        customerName: row.customer_name,
+        customerPhone: row.customer_phone,
+        visitDate: row.visit_date,
+        visitTime: row.visit_time,
+        agentAssigned: row.agent_assigned,
+        status: row.status,
+        customerNotes: row.customer_notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    console.error('Schedule visit error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. CRM VISITS: Update Status (COMPLETED / CANCELLED)
+app.patch('/api/crm/visits/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, customerFeedback } = req.body;
+    const P = String.fromCharCode(36);
+
+    const sql = 'UPDATE crm_visits SET status = ' + P + '1, customer_feedback = ' + P + '2, updated_at = NOW() WHERE visit_id = ' + P + '3 RETURNING *;';
+    const result = await pgPool.query(sql, [status || 'COMPLETED', customerFeedback || '', id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Visit not found.' });
+    }
+    broadcastCrmEvent('VISIT_STATUS_UPDATED', { id, status: status || 'COMPLETED' });
+    return res.json({ success: true, visit: result.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9. CRM VISITS: Delete Visit
+app.delete('/api/crm/visits/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const P = String.fromCharCode(36);
+    await pgPool.query('DELETE FROM crm_visits WHERE visit_id = ' + P + '1;', [id]);
+    broadcastCrmEvent('VISIT_DELETED', { id });
+    return res.json({ success: true, message: 'Visit deleted.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // SPA Routing Fallback (for React Router / single page app) with Cache Buster
+
 app.use((req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');

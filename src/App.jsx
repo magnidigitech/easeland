@@ -1266,8 +1266,11 @@ export default function App() {
         {/* EASELAND CRM STUDIO & ENTERPRISE SUITE */}
         {activePage === 'crm' && (
           <EaseLandCRM
+            currentUser={currentUser}
             onReturnToAdmin={() => changeActivePage('admin')}
             onNavigateToMarketplace={() => changeActivePage('home')}
+            onNavigateToDashboard={() => changeActivePage('dashboard')}
+            onNavigateToLogin={() => setIsAuthModalOpen(true)}
           />
         )}
 
@@ -1379,8 +1382,8 @@ export default function App() {
         initialIntent={authIntent}
       />
 
-      {/* FOOTER (Hidden on Map & Admin Portal for clean full height canvas) */}
-      {activePage !== 'map' && activePage !== 'admin' && (
+      {/* FOOTER (Hidden on Map, Admin Portal & CRM Studio for clean full height canvas) */}
+      {activePage !== 'map' && activePage !== 'admin' && activePage !== 'crm' && (
         <footer className="bg-brand-charcoal text-white pt-12 pb-8 border-t border-white/10 mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/10 text-xs">

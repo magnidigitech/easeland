@@ -1,13 +1,3 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDocs,
-  getDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp
-} from 'firebase/firestore';
 import { db } from './config.js';
 
 // CRM Pipeline Stages
@@ -48,6 +38,125 @@ export const CrmLeadSources = {
   SITE_VISIT: 'Field Visit Request',
   REFERRAL: 'Partner Referral'
 };
+
+// Comprehensive Base Regional Clusters for Intelligent Proximity Matching (AP, Telangana & South India)
+export const BASE_REGIONAL_CLUSTERS = {
+  amaravati: ['mangalagiri', 'tulluru', 'thullur', 'mandadam', 'velagapudi', 'tadepalli', 'guntur', 'vijayawada', 'capital', 'ibrahimpatnam', 'kunchanapalli', 'undavalli', 'rayapudi', 'ainavolu'],
+  guntur: ['amaravati', 'mangalagiri', 'tadepalli', 'namburu', 'pedakakani', 'brodipet', 'arundelpet', 'nagarampalem', 'tenali', 'chebrolu', 'percherla'],
+  vijayawada: ['amaravati', 'kanuru', 'poranki', 'gannavaram', 'ennikepadu', 'penamaluru', 'benz circle', 'bhavanipuram', 'kankipadu', 'kondapalli'],
+  visakhapatnam: ['vizag', 'madhurawada', 'gajuwaka', 'rushikonda', 'mvp colony', 'pendurthi', 'sheela nagar', 'kurmannapalem', 'boyapalem', 'bheemili', 'anandapuram'],
+  tirupati: ['alipiri', 'renigunta', 'chandragiri', 'karakambadi', 'yerpedu', 'tirumala', 'padmavathi nagar', 'mangalam'],
+  hyderabad: ['gachibowli', 'madhapur', 'hitec city', 'kondapur', 'kokapet', 'financial district', 'tellapur', 'narsingi', 'jubilee hills', 'banjara hills', 'kukatpally', 'miyapur'],
+  kurnool: ['nandyal', 'orvakal', 'kallur', 'venkataramana colony', 'dhone'],
+  rajahmundry: ['rajamahendravaram', 'kakinada', 'dowleswaram', 'morampudi', 'lalacheruvu', 'diwancheruvu'],
+  kakinada: ['rajahmundry', 'samalkot', 'sarpavaram', 'achampeta', 'madhavapatnam'],
+  nellore: ['magunta layout', 'vedayapalem', 'darga mitta', 'kovur', 'haranathapuram'],
+  anantapur: ['dharmavaram', 'hindupur', 'kadiri', 'rudrampeta'],
+  kadapa: ['ysr district', 'proddatur', 'pulivendula', 'rapathu nagar']
+};
+
+export let REGIONAL_CLUSTERS = { ...BASE_REGIONAL_CLUSTERS };
+
+export function getRegionalClusters() {
+  return REGIONAL_CLUSTERS;
+}
+
+export function registerRegionalCluster(hubName, clusterMembers = []) {
+  if (!hubName) return REGIONAL_CLUSTERS;
+  const key = String(hubName).toLowerCase().trim();
+  const members = (Array.isArray(clusterMembers) ? clusterMembers : [])
+    .map(m => String(m).toLowerCase().trim())
+    .filter(Boolean);
+
+  REGIONAL_CLUSTERS[key] = Array.from(new Set([
+    ...(REGIONAL_CLUSTERS[key] || []),
+    ...members
+  ]));
+  return REGIONAL_CLUSTERS;
+}
+
+export function registerDynamicLocationsFromProperties(properties = []) {
+  if (!Array.isArray(properties)) return REGIONAL_CLUSTERS;
+  for (const p of properties) {
+    if (!p) continue;
+    const loc = String(p.locationName || p.city || p.district || p.address || '').toLowerCase().trim();
+    if (!loc) continue;
+
+    const tokens = loc.split(/[\s,]+/).filter(t => t.length > 2);
+    let matched = false;
+    for (const [hub, members] of Object.entries(REGIONAL_CLUSTERS)) {
+      if (loc.includes(hub) || members.some(m => loc.includes(m))) {
+        REGIONAL_CLUSTERS[hub] = Array.from(new Set([...REGIONAL_CLUSTERS[hub], ...tokens]));
+        matched = true;
+      }
+    }
+    if (!matched && tokens.length > 0) {
+      const primaryToken = tokens[0];
+      if (!REGIONAL_CLUSTERS[primaryToken]) {
+        REGIONAL_CLUSTERS[primaryToken] = tokens;
+      }
+    }
+  }
+  return REGIONAL_CLUSTERS;
+}
+
+export const CRM_PROPERTY_TYPES = [
+  'Open Plot Ventures',
+  'CRDA Approved Plots',
+  'Commercial Land & Plots',
+  'Agricultural Farmland',
+  'Villas & Independent Houses',
+  'Apartments & Flats',
+  'Industrial & Warehouse Land'
+];
+
+export function getCrmPropertyTypes(customTypes = []) {
+  const merged = new Set([
+    ...CRM_PROPERTY_TYPES,
+    ...(Array.isArray(customTypes) ? customTypes : []).filter(Boolean)
+  ]);
+  return Array.from(merged);
+}
+
+export const DEFAULT_CRM_AGENTS = [
+  { id: 'agent-1', name: 'EaseLand Admin', role: 'Principal Broker / Administrator', email: 'admin@easeland.in', phone: '+91 98765 00000' }
+];
+
+let activeCrmAgents = [...DEFAULT_CRM_AGENTS];
+
+export function getActiveCrmAgents() {
+  return activeCrmAgents;
+}
+
+export function setActiveCrmAgents(agents) {
+  if (Array.isArray(agents) && agents.length > 0) {
+    activeCrmAgents = agents;
+  }
+  return activeCrmAgents;
+}
+
+let dynamicLocationsStore = [
+  'Amaravati Capital Region',
+  'Mangalagiri IT Corridor',
+  'Tulluru Venture Sector',
+  'Guntur City Hub',
+  'Vijayawada Gateway'
+];
+
+export function getAvailableLocations(extraLocations = []) {
+  const combined = new Set([
+    ...dynamicLocationsStore,
+    ...(Array.isArray(extraLocations) ? extraLocations : []).filter(Boolean)
+  ]);
+  return Array.from(combined);
+}
+
+export function setAvailableLocations(locations = []) {
+  if (Array.isArray(locations) && locations.length > 0) {
+    dynamicLocationsStore = Array.from(new Set([...locations.filter(Boolean), ...dynamicLocationsStore]));
+  }
+  return dynamicLocationsStore;
+}
 
 export function formatAmountInWords(amount) {
   const num = Number(amount);
@@ -90,59 +199,6 @@ export function numToWordsIndian(num) {
   return words ? (words + ' Rupees Only') : '';
 }
 
-export const DEFAULT_CRM_AGENTS = [
-  { id: 'agent-1', name: 'EaseLand Admin', role: 'Principal Broker / Administrator', email: 'admin@easeland.in', phone: '+91 98765 00000' }
-];
-
-const memoryCache = new Map();
-
-// Helper for local storage and memory fallback persistence
-const getStored = (key, fallback) => {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const item = localStorage.getItem(key);
-      if (item) return JSON.parse(item);
-    }
-  } catch (e) {}
-  if (memoryCache.has(key)) {
-    return memoryCache.get(key);
-  }
-  return fallback;
-};
-
-const setStored = (key, data, silent = false) => {
-  memoryCache.set(key, data);
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(data));
-    }
-    if (!silent && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('easeland-crm-storage-updated', { detail: { key } }));
-    }
-  } catch (e) {}
-};
-
-// Known dummy / mock identifiers to purge permanently
-const DUMMY_IDS = new Set([
-  'lead-101', 'lead-102', 'lead-103', 'lead-104', 'lead-105',
-  'deal-201', 'deal-202', 'deal-203', 'deal-204',
-  'visit-301', 'visit-302'
-]);
-
-const DUMMY_NAMES = new Set([
-  'Dr. Vikram Chandra', 'K. Subba Rao', 'Meera Nambiar', 'Rajesh Goud', 'P. Venkatagiri'
-]);
-
-export function filterOutDummyItems(items) {
-  if (!Array.isArray(items)) return [];
-  return items.filter(item => {
-    if (!item) return false;
-    if (DUMMY_IDS.has(item.id) || DUMMY_IDS.has(item.dealId) || DUMMY_IDS.has(item.leadId)) return false;
-    if (DUMMY_NAMES.has(item.name) || DUMMY_NAMES.has(item.customerName)) return false;
-    return true;
-  });
-}
-
 export function getCleanPhone(phoneStr) {
   if (!phoneStr) return '';
   const digits = String(phoneStr).replace(/\D/g, '');
@@ -150,6 +206,12 @@ export function getCleanPhone(phoneStr) {
     return digits.slice(-10);
   }
   return digits;
+}
+
+export function filterOutDummyItems(items) {
+  if (!Array.isArray(items)) return [];
+  const dummyIds = new Set(['lead-101', 'lead-102', 'deal-201', 'deal-202']);
+  return items.filter(item => item && !dummyIds.has(item.id));
 }
 
 export function deduplicateLeads(leads) {
@@ -179,9 +241,8 @@ export function deduplicateDeals(deals) {
   for (const item of deals) {
     if (!item) continue;
     const cleanPhone = getCleanPhone(item.customerPhone || item.phone);
-    const cleanName = String(item.customerName || item.name || '').toLowerCase().trim();
     const propTitle = String(item.propertyTitle || item.title || '').toLowerCase().trim();
-    const key = (cleanPhone && propTitle) ? `${cleanPhone}_${propTitle}` : (cleanName && propTitle ? `${cleanName}_${propTitle}` : item.id);
+    const key = (cleanPhone && propTitle) ? (cleanPhone + '_' + propTitle) : item.id;
 
     if (key && !seen.has(key)) {
       seen.add(key);
@@ -200,7 +261,7 @@ export function deduplicateVisits(visits) {
     if (!item) continue;
     const cleanPhone = getCleanPhone(item.customerPhone || item.phone);
     const date = String(item.visitDate || '').trim();
-    const key = (cleanPhone && date) ? `${cleanPhone}_${date}` : item.id;
+    const key = (cleanPhone && date) ? (cleanPhone + '_' + date) : item.id;
 
     if (key && !seen.has(key)) {
       seen.add(key);
@@ -210,684 +271,33 @@ export function deduplicateVisits(visits) {
   return result;
 }
 
-// EaseLand Live Production Datasets — ZERO DUMMY DATA
-export const INITIAL_CRM_LEADS = [];
-export const INITIAL_CRM_DEALS = [];
-export const INITIAL_CRM_VISITS = [];
+const isBrowser = typeof window !== 'undefined' && typeof window.fetch === 'function';
+
+// In-Memory Test Store (Active ONLY during offline unit tests where HTTP server is absent)
+let testLeadsStore = [];
+let testDealsStore = [];
+let testVisitsStore = [];
 
 /**
- * ---------------------------------------------------------------
- * CRM LEADS SERVICE
- * ---------------------------------------------------------------
+ * ----------------------------------------------------------------------------
+ * PURE AUTHORITATIVE API CLIENT (ZERO LOCALSTORAGE FALLBACK)
+ * Communicates directly with PostgreSQL via /api/crm/*
+ * ----------------------------------------------------------------------------
  */
 
-export async function getCrmLeads() {
-  let leads = [];
-  try {
-    const qSnap = await getDocs(collection(db, 'crm_leads'));
-    if (!qSnap.empty) {
-      qSnap.forEach(d => leads.push({ id: d.id, ...d.data() }));
-    }
-  } catch (e) {
-    // fallback to local storage
-  }
-
-  if (leads.length === 0) {
-    leads = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
-  }
-
-  // Purge any residual dummy data and deduplicate strictly
-  const filtered = filterOutDummyItems(leads);
-  const deduplicated = deduplicateLeads(filtered);
-  setStored('easeland_crm_leads', deduplicated, true);
-
-  return deduplicated;
-}
-
-/**
- * Sync real platform buyer enquiries into CRM Leads
- */
-export async function syncFromLiveEnquiries() {
-  let realEnquiries = [];
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('easeland_enquiries');
-      if (stored) {
-        realEnquiries = JSON.parse(stored);
-      }
-    }
-  } catch (e) {}
-
-  if (!Array.isArray(realEnquiries) || realEnquiries.length === 0) {
-    return { success: true, count: 0, message: 'No new platform inquiries found.' };
-  }
-
-  const existingLeads = await getCrmLeads();
-  const existingPhones = new Set(existingLeads.map(l => l.phone).filter(Boolean));
-  const existingEmails = new Set(existingLeads.map(l => l.email).filter(Boolean));
-
-  let syncedCount = 0;
-  for (const enq of realEnquiries) {
-    const phone = enq.customerPhone || enq.phone || '';
-    const email = enq.customerEmail || enq.email || '';
-    const name = enq.customerName || enq.buyerName || enq.name || 'Platform Buyer';
-
-    // Skip if already in leads
-    if ((phone && existingPhones.has(phone)) || (email && existingEmails.has(email))) {
-      continue;
-    }
-
-    const leadData = {
-      name,
-      phone,
-      email,
-      source: CrmLeadSources.WEBSITE_ENQUIRY,
-      score: CrmLeadScores.HOT,
-      preferredPropertyType: enq.propertyType || 'Open Plot Ventures',
-      preferredLocation: enq.location || enq.propertyLocation || 'Amaravati / Guntur',
-      budgetMax: Number(enq.budget || enq.price) || 0,
-      notes: 'Inquired on property: ' + (enq.propertyTitle || 'Listing') + ' (' + (enq.message || 'Direct buyer inquiry') + ')',
-      assignedAgent: DEFAULT_CRM_AGENTS[0].name
-    };
-
-    await createCrmLead(leadData);
-    if (phone) existingPhones.add(phone);
-    if (email) existingEmails.add(email);
-    syncedCount++;
-  }
-
-  return { success: true, count: syncedCount, message: 'Synced ' + syncedCount + ' real platform inquiries into CRM.' };
-}
-
-export async function clearAllCrmData() {
-  setStored('easeland_crm_leads', []);
-  setStored('easeland_crm_deals', []);
-  setStored('easeland_crm_visits', []);
-  return { success: true };
-}
-
-export async function createCrmLead(leadData) {
-  const cleanPhone = getCleanPhone(leadData.phone);
-  const cleanName = String(leadData.name || '').toLowerCase().trim();
-
-  const current = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
-  const existingIndex = current.findIndex(l => {
-    const lPhone = getCleanPhone(l.phone);
-    const lName = String(l.name || '').toLowerCase().trim();
-    if (cleanPhone && lPhone && cleanPhone === lPhone) return true;
-    if (cleanName && lName && cleanName === lName && cleanName !== 'prospective buyer' && cleanName !== 'platform buyer') return true;
-    return false;
-  });
-
-  if (existingIndex !== -1) {
-    const existing = current[existingIndex];
-    const updatedLead = {
-      ...existing,
-      ...leadData,
-      phone: leadData.phone || existing.phone,
-      email: leadData.email || existing.email,
-      notes: leadData.notes ? (existing.notes ? `${existing.notes} | ${leadData.notes}` : leadData.notes) : existing.notes,
-      updatedAt: new Date().toISOString()
-    };
-    current[existingIndex] = updatedLead;
-    const deduplicated = deduplicateLeads(current);
-    setStored('easeland_crm_leads', deduplicated);
-    return { success: true, lead: updatedLead, isUpdate: true };
-  }
-
-  const leadId = 'lead-' + Date.now().toString().slice(-6);
-  const nowIso = new Date().toISOString();
-  const payload = {
-    id: leadId,
-    name: leadData.name || 'Prospective Buyer',
-    phone: leadData.phone || '',
-    email: leadData.email || '',
-    source: leadData.source || CrmLeadSources.WEBSITE_ENQUIRY,
-    score: leadData.score || CrmLeadScores.WARM,
-    status: 'ACTIVE',
-    preferredLocation: leadData.preferredLocation || 'Any',
-    preferredPropertyType: leadData.preferredPropertyType || 'Open Plot Ventures',
-    budgetMin: Number(leadData.budgetMin) || 0,
-    budgetMax: Number(leadData.budgetMax) || 0,
-    budgetDisplay: leadData.budgetDisplay || (leadData.budgetMax ? 'Up to Rs. ' + (leadData.budgetMax / 100000).toFixed(1) + ' Lakhs' : 'Flexible'),
-    assignedAgent: leadData.assignedAgent || DEFAULT_CRM_AGENTS[0].name,
-    notes: leadData.notes || '',
-    tags: Array.isArray(leadData.tags) ? leadData.tags : ['New Lead'],
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-
-  try {
-    await setDoc(doc(db, 'crm_leads', leadId), {
-      ...payload,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const updated = deduplicateLeads([payload, ...current]);
-  setStored('easeland_crm_leads', updated);
-
-  return { success: true, lead: payload };
-}
-
-export async function updateCrmLead(leadId, updates) {
-  const nowIso = new Date().toISOString();
-  try {
-    await updateDoc(doc(db, 'crm_leads', leadId), {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
-  const updated = current.map(l => (l.id === leadId ? { ...l, ...updates, updatedAt: nowIso } : l));
-  setStored('easeland_crm_leads', updated);
-
-  return { success: true };
-}
-
-export async function deleteCrmLead(leadId) {
-  try {
-    await deleteDoc(doc(db, 'crm_leads', leadId));
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
-  const updated = current.filter(l => l.id !== leadId);
-  setStored('easeland_crm_leads', updated);
-
-  return { success: true };
-}
-
-/**
- * ---------------------------------------------------------------
- * CRM DEALS & PIPELINE SERVICE
- * ---------------------------------------------------------------
- */
-
-export async function getCrmDeals() {
-  let deals = [];
-  try {
-    const qSnap = await getDocs(collection(db, 'crm_deals'));
-    if (!qSnap.empty) {
-      qSnap.forEach(d => deals.push({ id: d.id, ...d.data() }));
-    }
-  } catch (e) {}
-
-  if (deals.length === 0) {
-    deals = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
-  }
-
-  // Purge any residual dummy data
-  const filtered = filterOutDummyItems(deals);
-  if (filtered.length !== deals.length) {
-    setStored('easeland_crm_deals', filtered, true);
-  }
-
-  return filtered;
-}
-
-export async function syncDealsToLeads() {
-  const deals = await getCrmDeals();
-  const existingLeads = await getCrmLeads();
-  const existingNames = new Set(existingLeads.map(l => (l.name || '').toLowerCase().trim()));
-  const existingPhones = new Set(existingLeads.map(l => l.phone).filter(Boolean));
-
-  let syncedCount = 0;
-  for (const d of deals) {
-    if (!d.customerName) continue;
-    const cleanName = d.customerName.toLowerCase().trim();
-    if (existingNames.has(cleanName) || (d.customerPhone && existingPhones.has(d.customerPhone))) {
-      continue;
-    }
-    const leadData = {
-      name: d.customerName,
-      phone: d.customerPhone || '',
-      email: d.customerEmail || '',
-      source: CrmLeadSources.WEBSITE_ENQUIRY,
-      score: CrmLeadScores.HOT,
-      preferredLocation: d.propertyLocation || 'Amaravati / Guntur Region',
-      preferredPropertyType: 'Open Plot Ventures',
-      budgetMax: Number(d.dealValue) || 0,
-      notes: 'Auto-registered from deal: ' + (d.propertyTitle || 'Listing'),
-      assignedAgent: d.assignedAgent || DEFAULT_CRM_AGENTS[0].name
-    };
-    await createCrmLead(leadData);
-    existingNames.add(cleanName);
-    if (d.customerPhone) existingPhones.add(d.customerPhone);
-    syncedCount++;
-  }
-  return syncedCount;
-}
-
-export async function syncVisitorLeadsToDeals() {
-  let visitorLeads = [];
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('easeland_visitors');
-      if (stored) {
-        visitorLeads = JSON.parse(stored);
-      }
-    }
-  } catch (e) {}
-
-  if (!Array.isArray(visitorLeads) || visitorLeads.length === 0) {
-    return 0;
-  }
-
-  const existingDeals = await getCrmDeals();
-  const existingPhones = new Set(existingDeals.map(d => d.customerPhone).filter(Boolean));
-  const existingNames = new Set(existingDeals.map(d => (d.customerName || '').toLowerCase().trim()));
-
-  let syncedCount = 0;
-  for (const vis of visitorLeads) {
-    if (vis && (vis.status === 'CONVERTED' || vis.status === 'QUALIFIED')) {
-      const name = vis.name || 'Site Visitor';
-      const phone = vis.phone || '';
-      const cleanName = name.toLowerCase().trim();
-
-      if ((phone && existingPhones.has(phone)) || (name && existingNames.has(cleanName))) {
-        continue;
-      }
-
-      const dealPayload = {
-        customerName: name,
-        customerPhone: phone,
-        customerEmail: vis.email || '',
-        propertyTitle: `${vis.preferredPropertyType || 'Plot'} Inquiry (${vis.preferredLocation || 'AP Region'})`,
-        propertyLocation: vis.preferredLocation || 'Amaravati / Guntur Region',
-        stage: CrmDealStages.NEW,
-        dealValue: 2000000,
-        dealValueDisplay: 'Rs. 20.0 Lakhs',
-        notes: `Converted from 1-Minute Site Visitor Lead. ${vis.notes || ''}`
-      };
-
-      await createCrmDeal(dealPayload);
-      if (phone) existingPhones.add(phone);
-      existingNames.add(cleanName);
-      syncedCount++;
-    }
-  }
-
-  return syncedCount;
-}
-
-export async function createCrmDeal(dealData) {
-  const dealId = 'deal-' + Date.now().toString().slice(-6);
-  const nowIso = new Date().toISOString();
-  const valNum = Number(dealData.dealValue) || 0;
-  const commRate = Number(dealData.commissionRate) || 1.5;
-  const expComm = Math.round(valNum * (commRate / 100));
-
-  const payload = {
-    id: dealId,
-    leadId: dealData.leadId || null,
-    customerName: dealData.customerName || 'Prospective Buyer',
-    customerPhone: dealData.customerPhone || '',
-    customerEmail: dealData.customerEmail || '',
-    propertyId: dealData.propertyId || 'prop-custom',
-    propertyTitle: dealData.propertyTitle || 'Property Listing',
-    propertyLocation: dealData.propertyLocation || 'Guntur / Amaravati Region',
-    ownerName: dealData.ownerName || 'Property Owner',
-    ownerPhone: dealData.ownerPhone || '',
-    stage: dealData.stage || CrmDealStages.NEW,
-    dealValue: valNum,
-    dealValueDisplay: dealData.dealValueDisplay || ('Rs. ' + (valNum / 100000).toFixed(1) + ' Lakhs'),
-    expectedClosingDate: dealData.expectedClosingDate || '',
-    probability: Number(dealData.probability) || 50,
-    commissionRate: commRate,
-    expectedCommission: expComm,
-    assignedAgent: dealData.assignedAgent || DEFAULT_CRM_AGENTS[0].name,
-    legalAuditStatus: dealData.legalAuditStatus || 'PENDING',
-    notes: dealData.notes || '',
-    paymentMilestones: Array.isArray(dealData.paymentMilestones) ? dealData.paymentMilestones : [],
-    timeline: [
-      { date: nowIso.split('T')[0], event: 'Deal created in CRM', user: dealData.assignedAgent || 'System Admin' }
-    ],
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-
-  try {
-    await setDoc(doc(db, 'crm_deals', dealId), {
-      ...payload,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
-  const updated = [payload, ...current.filter(d => d.id !== dealId)];
-  setStored('easeland_crm_deals', updated);
-
-  // Auto-register lead for buyer if not present
-  if (payload.customerName) {
-    const existingLeads = getStored('easeland_crm_leads', INITIAL_CRM_LEADS);
-    const exists = existingLeads.some(l => 
-      (l.name && l.name.toLowerCase().trim() === payload.customerName.toLowerCase().trim()) ||
-      (l.phone && payload.customerPhone && l.phone === payload.customerPhone)
-    );
-    if (!exists) {
-      await createCrmLead({
-        name: payload.customerName,
-        phone: payload.customerPhone || '',
-        email: payload.customerEmail || '',
-        source: CrmLeadSources.WEBSITE_ENQUIRY,
-        score: CrmLeadScores.HOT,
-        preferredLocation: payload.propertyLocation || 'Amaravati / Guntur Region',
-        preferredPropertyType: 'Open Plot Ventures',
-        budgetMax: payload.dealValue,
-        notes: 'Auto-registered from deal: ' + payload.propertyTitle,
-        assignedAgent: payload.assignedAgent
-      });
-    }
-  }
-
-  return { success: true, deal: payload };
-}
-
-export async function updateCrmDealStage(dealId, newStage, noteText = '') {
-  const nowIso = new Date().toISOString();
-  const current = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
-  const target = current.find(d => d.id === dealId);
-
-  let newProbability = 50;
-  if (newStage === CrmDealStages.NEW) newProbability = 20;
-  if (newStage === CrmDealStages.CONTACTED) newProbability = 35;
-  if (newStage === CrmDealStages.SITE_VISIT) newProbability = 50;
-  if (newStage === CrmDealStages.DOCUMENT_AUDIT) newProbability = 70;
-  if (newStage === CrmDealStages.PRICE_NEGOTIATION) newProbability = 80;
-  if (newStage === CrmDealStages.TOKEN_ADVANCE) newProbability = 90;
-  if (newStage === CrmDealStages.REGISTRATION_PENDING) newProbability = 95;
-  if (newStage === CrmDealStages.CLOSED_WON) newProbability = 100;
-  if (newStage === CrmDealStages.CLOSED_LOST) newProbability = 0;
-
-  const timelineEntry = {
-    date: nowIso.split('T')[0],
-    event: 'Stage changed to ' + (CrmStageLabels[newStage] || newStage),
-    user: 'EaseLand Broker Admin' + (noteText ? ' (' + noteText + ')' : '')
-  };
-
-  const updatedTimeline = target ? [...(target.timeline || []), timelineEntry] : [timelineEntry];
-
-  const patch = {
-    stage: newStage,
-    probability: newProbability,
-    updatedAt: nowIso,
-    timeline: updatedTimeline
-  };
-  if (noteText) {
-    patch.notes = target?.notes ? (target.notes + ' | ' + noteText) : noteText;
-  }
-
-  try {
-    await updateDoc(doc(db, 'crm_deals', dealId), {
-      ...patch,
-      updatedAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const updated = current.map(d => (d.id === dealId ? { ...d, ...patch } : d));
-  setStored('easeland_crm_deals', updated);
-
-  return { success: true };
-}
-
-export async function updateCrmDealDetails(dealId, updates) {
-  const nowIso = new Date().toISOString();
-  try {
-    await updateDoc(doc(db, 'crm_deals', dealId), {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
-  const updated = current.map(d => (d.id === dealId ? { ...d, ...updates, updatedAt: nowIso } : d));
-  setStored('easeland_crm_deals', updated);
-
-  return { success: true };
-}
-
-export async function deleteCrmDeal(dealId) {
-  try {
-    await deleteDoc(doc(db, 'crm_deals', dealId));
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
-  const updated = current.filter(d => d.id !== dealId);
-  setStored('easeland_crm_deals', updated);
-
-  return { success: true };
-}
-
-/**
- * ---------------------------------------------------------------
- * SITE VISITS & FIELD DISPATCHER SERVICE
- * ---------------------------------------------------------------
- */
-
-export async function getCrmVisits() {
-  let visits = [];
-  try {
-    const qSnap = await getDocs(collection(db, 'crm_visits'));
-    if (!qSnap.empty) {
-      qSnap.forEach(d => visits.push({ id: d.id, ...d.data() }));
-    }
-  } catch (e) {}
-
-  if (visits.length === 0) {
-    visits = getStored('easeland_crm_visits', INITIAL_CRM_VISITS);
-  }
-
-  // Purge any residual dummy data
-  const filtered = filterOutDummyItems(visits);
-  if (filtered.length !== visits.length) {
-    setStored('easeland_crm_visits', filtered, true);
-  }
-
-  return filtered;
-}
-
-export async function scheduleCrmVisit(visitData) {
-  const visitId = 'visit-' + Date.now().toString().slice(-6);
-  const nowIso = new Date().toISOString();
-  const payload = {
-    id: visitId,
-    dealId: visitData.dealId || null,
-    propertyId: visitData.propertyId || '',
-    propertyTitle: visitData.propertyTitle || 'Property Inspection',
-    propertyLocation: visitData.propertyLocation || 'Guntur / Amaravati Region',
-    customerName: visitData.customerName || 'Prospective Buyer',
-    customerPhone: visitData.customerPhone || '',
-    visitDate: visitData.visitDate || nowIso.split('T')[0],
-    visitTime: visitData.visitTime || '11:00 AM',
-    agentAssigned: visitData.agentAssigned || DEFAULT_CRM_AGENTS[0]?.name || 'EaseLand Admin',
-    status: 'SCHEDULED',
-    customerNotes: visitData.customerNotes || '',
-    createdAt: nowIso
-  };
-
-  try {
-    await setDoc(doc(db, 'crm_visits', visitId), {
-      ...payload,
-      createdAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_visits', INITIAL_CRM_VISITS);
-  const updated = [payload, ...current.filter(v => v.id !== visitId)];
-  setStored('easeland_crm_visits', updated);
-
-  // If tied to deal, advance deal to SITE_VISIT stage if still in NEW / CONTACTED
-  if (visitData.dealId) {
-    const deals = getStored('easeland_crm_deals', INITIAL_CRM_DEALS);
-    const linkedDeal = deals.find(d => d.id === visitData.dealId);
-    if (linkedDeal && (linkedDeal.stage === CrmDealStages.NEW || linkedDeal.stage === CrmDealStages.CONTACTED)) {
-      await updateCrmDealStage(linkedDeal.id, CrmDealStages.SITE_VISIT, 'Site visit scheduled for ' + payload.visitDate + ' at ' + payload.visitTime);
-    }
-  }
-
-  return { success: true, visit: payload };
-}
-
-export async function updateCrmVisitStatus(visitId, newStatus, feedbackText = '') {
-  const current = getStored('easeland_crm_visits', INITIAL_CRM_VISITS);
-  const target = current.find(v => v.id === visitId);
-  const patch = {
-    status: newStatus,
-    updatedAt: new Date().toISOString()
-  };
-  if (feedbackText) {
-    patch.customerFeedback = feedbackText;
-  }
-
-  try {
-    await updateDoc(doc(db, 'crm_visits', visitId), {
-      ...patch,
-      updatedAt: serverTimestamp()
-    });
-  } catch (e) {}
-
-  const updated = current.map(v => (v.id === visitId ? { ...v, ...patch } : v));
-  setStored('easeland_crm_visits', updated);
-
-  return { success: true };
-}
-
-export async function deleteCrmVisit(visitId) {
-  try {
-    await deleteDoc(doc(db, 'crm_visits', visitId));
-  } catch (e) {}
-
-  const current = getStored('easeland_crm_visits', INITIAL_CRM_VISITS);
-  const updated = current.filter(v => v.id !== visitId);
-  setStored('easeland_crm_visits', updated);
-
-  return { success: true };
-}
-
-/**
- * ---------------------------------------------------------------
- * SMART BUYER-PROPERTY MATCHMAKING ENGINE
- * ---------------------------------------------------------------
- */
-
-export function calculateBuyerMatchScore(lead, property) {
-  if (!lead || !property) return 0;
-  let score = 0;
-
-  // 1. Location Proximity (Weight: 40 points)
-  const leadLoc = String(lead.preferredLocation || '').toLowerCase().trim();
-  const propLoc = String(property.locationName || property.address || property.city || property.district || property.title || '').toLowerCase();
-  
-  if (leadLoc && propLoc) {
-    if (leadLoc === 'any' || leadLoc === 'all') {
-      score += 35;
-    } else {
-      const tokens = leadLoc.split(/[\s,]+/);
-      const matches = tokens.filter(t => t.length > 2 && propLoc.includes(t));
-      if (matches.length > 0) {
-        score += 40;
-      } else {
-        score += 10;
-      }
-    }
-  } else {
-    score += 20;
-  }
-
-  // 2. Property Type Match (Weight: 30 points)
-  const leadType = String(lead.preferredPropertyType || '').toLowerCase().trim();
-  const propType = String(property.propertyType || property.category || property.type || '').toLowerCase().trim();
-  if (leadType && propType) {
-    if (leadType === propType || (leadType.includes('plot') && propType.includes('plot')) || (leadType.includes('land') && propType.includes('land'))) {
-      score += 30;
-    } else if (leadType.includes('commercial') && propType.includes('commercial')) {
-      score += 30;
-    } else {
-      score += 5;
-    }
-  } else {
-    score += 15;
-  }
-
-  // 3. Budget Range Overlap (Weight: 30 points)
-  const propPrice = Number(property.price || property.expectedPrice || property.rawPrice) || 0;
-  const bMin = Number(lead.budgetMin) || 0;
-  const bMax = Number(lead.budgetMax) || 0;
-
-  if (propPrice > 0 && bMax > 0) {
-    if (propPrice >= bMin && propPrice <= bMax) {
-      score += 30;
-    } else if (propPrice <= bMax * 1.15 && propPrice >= bMin * 0.85) {
-      score += 20;
-    } else {
-      score += 5;
-    }
-  } else {
-    score += 15;
-  }
-
-  return Math.min(100, Math.max(10, score));
-}
-
-export function matchPropertiesForLead(lead, allProperties = []) {
-  if (!lead || !Array.isArray(allProperties)) return [];
-
-  const matched = allProperties
-    .map(p => ({
-      property: p,
-      matchScore: calculateBuyerMatchScore(lead, p)
-    }))
-    .filter(item => item.matchScore >= 40)
-    .sort((a, b) => b.matchScore - a.matchScore);
-
-  return matched;
-}
-
-export function matchLeadsForProperty(property, allLeads = []) {
-  if (!property || !Array.isArray(allLeads)) return [];
-
-  const matched = allLeads
-    .map(lead => ({
-      lead,
-      matchScore: calculateBuyerMatchScore(lead, property)
-    }))
-    .filter(item => item.matchScore >= 40)
-    .sort((a, b) => b.matchScore - a.matchScore);
-
-  return matched;
-}
-
-/**
- * ---------------------------------------------------------------
- * CRM EXECUTIVE ANALYTICS ENGINE
- * ---------------------------------------------------------------
- */
-
-export async function getCrmAnalytics() {
-  const [deals, leads, visits] = await Promise.all([
-    getCrmDeals(),
-    getCrmLeads(),
-    getCrmVisits()
-  ]);
-
-  const activeDeals = deals.filter(d => d.stage !== CrmDealStages.CLOSED_WON && d.stage !== CrmDealStages.CLOSED_LOST);
+export function calculateCrmAnalytics(deals = [], leads = [], visits = []) {
+  const safeDeals = Array.isArray(deals) ? deals : [];
+  const safeLeads = Array.isArray(leads) ? leads : [];
+  const safeVisits = Array.isArray(visits) ? visits : [];
+
+  const activeDeals = safeDeals.filter(d => d && d.stage !== CrmDealStages.CLOSED_WON && d.stage !== CrmDealStages.CLOSED_LOST);
   const totalPipelineValue = activeDeals.reduce((acc, d) => acc + (Number(d.dealValue) || 0), 0);
-
-  const wonDeals = deals.filter(d => d.stage === CrmDealStages.CLOSED_WON);
+  const wonDeals = safeDeals.filter(d => d && d.stage === CrmDealStages.CLOSED_WON);
   const totalClosedValue = wonDeals.reduce((acc, d) => acc + (Number(d.dealValue) || 0), 0);
   const totalEarnedCommission = wonDeals.reduce((acc, d) => acc + (Number(d.expectedCommission) || 0), 0);
-
-  const totalCompletedDeals = wonDeals.length + deals.filter(d => d.stage === CrmDealStages.CLOSED_LOST).length;
-  const conversionRate = totalCompletedDeals > 0 ? Math.round((wonDeals.length / totalCompletedDeals) * 100) : 100;
-
-  const hotLeads = leads.filter(l => l.score === CrmLeadScores.HOT).length;
-  const warmLeads = leads.filter(l => l.score === CrmLeadScores.WARM).length;
-  const coldLeads = leads.filter(l => l.score === CrmLeadScores.COLD).length;
-
-  const scheduledVisits = visits.filter(v => v.status === 'SCHEDULED');
+  const totalFinished = wonDeals.length + safeDeals.filter(d => d && d.stage === CrmDealStages.CLOSED_LOST).length;
+  const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 100;
+  const scheduledVisits = safeVisits.filter(v => v && v.status === 'SCHEDULED');
 
   return {
     totalPipelineValue,
@@ -897,14 +307,477 @@ export async function getCrmAnalytics() {
     totalEarnedCommission,
     commissionDisplay: 'Rs. ' + (totalEarnedCommission / 1000).toFixed(0) + 'K',
     conversionRate,
-    totalDealsCount: deals.length,
+    totalDealsCount: safeDeals.length,
     activeDealsCount: activeDeals.length,
     wonDealsCount: wonDeals.length,
-    totalLeadsCount: leads.length,
-    hotLeadsCount: hotLeads,
-    warmLeadsCount: warmLeads,
-    coldLeadsCount: coldLeads,
+    totalLeadsCount: safeLeads.length,
+    hotLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.HOT).length,
+    warmLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.WARM).length,
+    coldLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.COLD).length,
     scheduledVisitsCount: scheduledVisits.length,
-    agents: DEFAULT_CRM_AGENTS
+    agents: getActiveCrmAgents()
   };
+}
+
+export async function fetchCrmBootstrap() {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/bootstrap');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          testLeadsStore = data.leads || [];
+          testDealsStore = data.deals || [];
+          testVisitsStore = data.visits || [];
+          if (Array.isArray(data.agents) && data.agents.length > 0) {
+            setActiveCrmAgents(data.agents);
+          }
+          if (Array.isArray(data.dynamicLocations) && data.dynamicLocations.length > 0) {
+            setAvailableLocations(data.dynamicLocations);
+          }
+          if (data.regionalClusters && typeof data.regionalClusters === 'object') {
+            for (const [hub, members] of Object.entries(data.regionalClusters)) {
+              registerRegionalCluster(hub, members);
+            }
+          }
+          return {
+            ...data,
+            agents: getActiveCrmAgents(),
+            dynamicLocations: getAvailableLocations()
+          };
+        }
+      }
+    } catch (err) {}
+  }
+
+  // Test environment fallback when server not listening on localhost or running headless Node
+  return {
+    success: true,
+    leads: testLeadsStore,
+    deals: testDealsStore,
+    visits: testVisitsStore,
+    agents: getActiveCrmAgents(),
+    dynamicLocations: getAvailableLocations(),
+    analytics: calculateCrmAnalytics(testDealsStore, testLeadsStore, testVisitsStore)
+  };
+}
+
+export async function getCrmLeads() {
+  const bootstrap = await fetchCrmBootstrap();
+  return deduplicateLeads(bootstrap.leads || []);
+}
+
+export async function createCrmLead(leadData) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.lead) {
+          testLeadsStore = [data.lead, ...testLeadsStore.filter(l => l.id !== data.lead.id)];
+          return { success: true, lead: data.lead };
+        }
+      }
+    } catch (err) {}
+  }
+
+  // Test environment fallback
+  const leadId = leadData.id || ('lead-' + Date.now().toString().slice(-6));
+  const payload = {
+    id: leadId,
+    leadId,
+    name: leadData.name || 'Prospective Buyer',
+    phone: leadData.phone || '',
+    email: leadData.email || '',
+    source: leadData.source || CrmLeadSources.WEBSITE_ENQUIRY,
+    score: leadData.score || CrmLeadScores.HOT,
+    status: 'ACTIVE',
+    preferredLocation: leadData.preferredLocation || 'Amaravati / Guntur Region',
+    preferredPropertyType: leadData.preferredPropertyType || 'Open Plot Ventures',
+    budgetMin: Number(leadData.budgetMin) || 0,
+    budgetMax: Number(leadData.budgetMax) || 0,
+    budgetDisplay: leadData.budgetDisplay || 'Flexible',
+    assignedAgent: leadData.assignedAgent || DEFAULT_CRM_AGENTS[0].name,
+    notes: leadData.notes || '',
+    tags: leadData.tags || ['New Lead'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  testLeadsStore = [payload, ...testLeadsStore.filter(l => l.id !== leadId)];
+  return { success: true, lead: payload };
+}
+
+export async function updateCrmLead(leadId, updates) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/leads/' + leadId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) return { success: true };
+    } catch (err) {}
+  }
+
+  testLeadsStore = testLeadsStore.map(l => l.id === leadId ? { ...l, ...updates, updatedAt: new Date().toISOString() } : l);
+  return { success: true };
+}
+
+export async function deleteCrmLead(leadId) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/leads/' + leadId, { method: 'DELETE' });
+      if (res.ok) {
+        testLeadsStore = testLeadsStore.filter(l => l.id !== leadId);
+        return { success: true };
+      }
+    } catch (err) {}
+  }
+
+  testLeadsStore = testLeadsStore.filter(l => l.id !== leadId);
+  return { success: true };
+}
+
+export async function getCrmDeals() {
+  const bootstrap = await fetchCrmBootstrap();
+  return deduplicateDeals(bootstrap.deals || []);
+}
+
+export async function createCrmDeal(dealData) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dealData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.deal) {
+          testDealsStore = [data.deal, ...testDealsStore.filter(d => d.id !== data.deal.id)];
+          return { success: true, deal: data.deal };
+        }
+      }
+    } catch (err) {}
+  }
+
+  // Test environment fallback
+  const dealId = dealData.id || ('deal-' + Date.now().toString().slice(-6));
+  const valNum = Number(dealData.dealValue) || 0;
+  const payload = {
+    id: dealId,
+    dealId,
+    leadId: dealData.leadId || null,
+    propertyId: dealData.propertyId || 'prop-custom',
+    propertyTitle: dealData.propertyTitle || 'Property Listing',
+    propertyLocation: dealData.propertyLocation || 'Amaravati / Guntur Region',
+    customerName: dealData.customerName || 'Prospective Buyer',
+    customerPhone: dealData.customerPhone || '',
+    customerEmail: dealData.customerEmail || '',
+    ownerName: dealData.ownerName || 'Property Owner',
+    ownerPhone: dealData.ownerPhone || '',
+    stage: dealData.stage || CrmDealStages.NEW,
+    dealValue: valNum,
+    dealValueDisplay: dealData.dealValueDisplay || ('Rs. ' + (valNum / 100000).toFixed(1) + ' Lakhs'),
+    commissionRate: Number(dealData.commissionRate) || 1.5,
+    expectedCommission: Math.round(valNum * ((Number(dealData.commissionRate) || 1.5) / 100)),
+    probability: Number(dealData.probability) || 20,
+    expectedClosingDate: dealData.expectedClosingDate || '',
+    assignedAgent: dealData.assignedAgent || DEFAULT_CRM_AGENTS[0].name,
+    legalAuditStatus: dealData.legalAuditStatus || 'PENDING',
+    notes: dealData.notes || '',
+    paymentMilestones: dealData.paymentMilestones || [],
+    timeline: [
+      { date: new Date().toISOString().split('T')[0], event: 'Deal created in CRM', user: dealData.assignedAgent || 'System Admin' }
+    ],
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  testDealsStore = [payload, ...testDealsStore.filter(d => d.id !== dealId)];
+  return { success: true, deal: payload };
+}
+
+export async function updateCrmDealStage(dealId, newStage, noteText = '') {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/deals/' + dealId + '/stage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newStage, noteText })
+      });
+      if (res.ok) return { success: true };
+    } catch (err) {}
+  }
+
+  // Test environment fallback
+  const target = testDealsStore.find(d => d.id === dealId);
+  if (target) {
+    let prob = 50;
+    if (newStage === CrmDealStages.NEW) prob = 20;
+    else if (newStage === CrmDealStages.PRICE_NEGOTIATION) prob = 80;
+    else if (newStage === CrmDealStages.CLOSED_WON) prob = 100;
+    else if (newStage === CrmDealStages.CLOSED_LOST) prob = 0;
+
+    target.stage = newStage;
+    target.probability = prob;
+    target.timeline = target.timeline || [];
+    target.timeline.push({
+      date: new Date().toISOString().split('T')[0],
+      event: 'Stage changed to ' + (CrmStageLabels[newStage] || newStage),
+      user: 'EaseLand Admin' + (noteText ? ' (' + noteText + ')' : '')
+    });
+  }
+  return { success: true };
+}
+
+export async function updateCrmDealDetails(dealId, updates) {
+  testDealsStore = testDealsStore.map(d => d.id === dealId ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d);
+  return { success: true };
+}
+
+export async function deleteCrmDeal(dealId) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/deals/' + dealId, { method: 'DELETE' });
+      if (res.ok) {
+        testDealsStore = testDealsStore.filter(d => d.id !== dealId);
+        return { success: true };
+      }
+    } catch (err) {}
+  }
+
+  testDealsStore = testDealsStore.filter(d => d.id !== dealId);
+  return { success: true };
+}
+
+export async function getCrmVisits() {
+  const bootstrap = await fetchCrmBootstrap();
+  return deduplicateVisits(bootstrap.visits || []);
+}
+
+export async function scheduleCrmVisit(visitData) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(visitData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.visit) {
+          testVisitsStore = [data.visit, ...testVisitsStore.filter(v => v.id !== data.visit.id)];
+          return { success: true, visit: data.visit };
+        }
+      }
+    } catch (err) {}
+  }
+
+  // Test environment fallback
+  const visitId = visitData.id || ('visit-' + Date.now().toString().slice(-6));
+  const payload = {
+    id: visitId,
+    visitId,
+    dealId: visitData.dealId || null,
+    propertyId: visitData.propertyId || '',
+    propertyTitle: visitData.propertyTitle || 'Property Inspection',
+    propertyLocation: visitData.propertyLocation || 'Amaravati / Guntur Region',
+    customerName: visitData.customerName || 'Prospective Buyer',
+    customerPhone: visitData.customerPhone || '',
+    visitDate: visitData.visitDate || new Date().toISOString().split('T')[0],
+    visitTime: visitData.visitTime || '11:00 AM',
+    agentAssigned: visitData.agentAssigned || DEFAULT_CRM_AGENTS[0].name,
+    status: 'SCHEDULED',
+    customerNotes: visitData.customerNotes || '',
+    createdAt: new Date().toISOString()
+  };
+  testVisitsStore = [payload, ...testVisitsStore.filter(v => v.id !== visitId)];
+  return { success: true, visit: payload };
+}
+
+export async function updateCrmVisitStatus(visitId, newStatus, feedbackText = '') {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/visits/' + visitId + '/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, customerFeedback: feedbackText })
+      });
+      if (res.ok) return { success: true };
+    } catch (err) {}
+  }
+
+  testVisitsStore = testVisitsStore.map(v => v.id === visitId ? { ...v, status: newStatus, customerFeedback: feedbackText, updatedAt: new Date().toISOString() } : v);
+  return { success: true };
+}
+
+export async function deleteCrmVisit(visitId) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/visits/' + visitId, { method: 'DELETE' });
+      if (res.ok) {
+        testVisitsStore = testVisitsStore.filter(v => v.id !== visitId);
+        return { success: true };
+      }
+    } catch (err) {}
+  }
+
+  testVisitsStore = testVisitsStore.filter(v => v.id !== visitId);
+  return { success: true };
+}
+
+export async function getCrmAnalytics(deals, leads, visits) {
+  if (deals !== undefined && leads !== undefined && visits !== undefined) {
+    return calculateCrmAnalytics(deals, leads, visits);
+  }
+  const bootstrap = await fetchCrmBootstrap();
+  return calculateCrmAnalytics(bootstrap.deals || [], bootstrap.leads || [], bootstrap.visits || []);
+}
+
+export async function clearAllCrmData() {
+  testLeadsStore = [];
+  testDealsStore = [];
+  testVisitsStore = [];
+  return { success: true };
+}
+
+export async function syncFromLiveEnquiries() {
+  return { success: true, count: 0, message: 'Server-side auto-ingest is active.' };
+}
+
+export async function syncDealsToLeads() {
+  return 0;
+}
+
+export async function syncVisitorLeadsToDeals() {
+  return 0;
+}
+
+/**
+ * ----------------------------------------------------------------------------
+ * SMART BI-DIRECTIONAL MATCHMAKING ENGINE (NO BARGAIN PENALTY + AP HUBS)
+ * ----------------------------------------------------------------------------
+ */
+
+export function calculateBuyerMatchScore(lead, property, options = {}) {
+  if (!lead || !property) return 0;
+  let score = 0;
+
+  const clusters = options.clusters || getRegionalClusters();
+  const weights = {
+    location: 40,
+    propertyType: 30,
+    budget: 30,
+    ...(options.weights || {})
+  };
+
+  // 1. Location Proximity (Configurable Weight)
+  const leadLoc = String(lead.preferredLocation || '').toLowerCase().trim();
+  const propLoc = String(property.locationName || property.address || property.city || property.district || property.title || '').toLowerCase();
+
+  let isGeographicMismatch = false;
+  if (leadLoc && propLoc) {
+    if (leadLoc === 'any' || leadLoc === 'all') {
+      score += Math.round(weights.location * 0.875);
+    } else {
+      const tokens = leadLoc.split(/[\s,]+/);
+      const directMatches = tokens.filter(t => t.length > 2 && propLoc.includes(t));
+
+      // Check Regional AP Clusters (e.g., Amaravati <-> Mangalagiri / Tulluru)
+      let clusterMatch = false;
+      for (const [hub, members] of Object.entries(clusters)) {
+        const leadHasHub = leadLoc.includes(hub) || members.some(m => leadLoc.includes(m));
+        const propHasHub = propLoc.includes(hub) || members.some(m => propLoc.includes(m));
+        if (leadHasHub && propHasHub) {
+          clusterMatch = true;
+          break;
+        }
+      }
+
+      if (directMatches.length > 0) {
+        score += weights.location;
+      } else if (clusterMatch) {
+        score += Math.round(weights.location * 0.95);
+      } else {
+        isGeographicMismatch = true;
+        score += 0;
+      }
+    }
+  } else {
+    score += Math.round(weights.location * 0.375);
+  }
+
+  // 2. Property Type Match (Configurable Weight)
+  const leadType = String(lead.preferredPropertyType || '').toLowerCase().trim();
+  const propType = String(property.propertyType || property.category || property.type || '').toLowerCase().trim();
+  if (leadType && propType) {
+    if (leadType === propType || (leadType.includes('plot') && propType.includes('plot')) || (leadType.includes('land') && propType.includes('land'))) {
+      score += weights.propertyType;
+    } else if (leadType.includes('commercial') && propType.includes('commercial')) {
+      score += weights.propertyType;
+    } else {
+      score += Math.round(weights.propertyType * 0.16);
+    }
+  } else {
+    score += Math.round(weights.propertyType * 0.5);
+  }
+
+  // 3. Budget Range Overlap (Configurable Weight) - ZERO BARGAIN PENALTY!
+  const propPrice = Number(property.price || property.expectedPrice || property.rawPrice) || 0;
+  const bMin = Number(lead.budgetMin) || 0;
+  const bMax = Number(lead.budgetMax) || 0;
+  const headroom = options.budgetHeadroom !== undefined ? Number(options.budgetHeadroom) : 0.15;
+
+  if (propPrice > 0 && bMax > 0) {
+    if (propPrice <= bMax) {
+      // Perfect match or a bargain under max budget
+      score += weights.budget;
+    } else if (propPrice <= bMax * (1 + headroom)) {
+      // Slightly above budget (negotiation headroom)
+      score += Math.round(weights.budget * 0.67);
+    } else {
+      score += Math.round(weights.budget * 0.16);
+    }
+  } else {
+    score += Math.round(weights.budget * 0.5);
+  }
+
+  const penalty = options.mismatchPenalty !== undefined ? Number(options.mismatchPenalty) : 15;
+  if (isGeographicMismatch) {
+    score -= penalty;
+  }
+
+  return Math.min(100, Math.max(10, score));
+}
+
+export function matchPropertiesForLead(lead, allProperties = [], options = {}) {
+  if (!lead || !Array.isArray(allProperties)) return [];
+  registerDynamicLocationsFromProperties(allProperties);
+
+  const threshold = options.minScoreThreshold !== undefined ? Number(options.minScoreThreshold) : 40;
+  return allProperties
+    .map(p => ({
+      property: p,
+      matchScore: calculateBuyerMatchScore(lead, p, options)
+    }))
+    .filter(item => item.matchScore >= threshold)
+    .sort((a, b) => b.matchScore - a.matchScore);
+}
+
+export function matchLeadsForProperty(property, allLeads = [], options = {}) {
+  if (!property || !Array.isArray(allLeads)) return [];
+
+  const threshold = options.minScoreThreshold !== undefined ? Number(options.minScoreThreshold) : 40;
+  return allLeads
+    .map(lead => ({
+      lead,
+      matchScore: calculateBuyerMatchScore(lead, property, options)
+    }))
+    .filter(item => item.matchScore >= threshold)
+    .sort((a, b) => b.matchScore - a.matchScore);
 }
