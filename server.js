@@ -2019,6 +2019,15 @@ app.get('/api/site-config', async (req, res) => {
       });
     } catch (pgErr) {}
 
+    // CRITICAL: Unpack master_draft if present so any child modules (e.g., featuredListings) are exposed at the top level
+    if (config.master_draft && typeof config.master_draft === 'object') {
+      Object.keys(config.master_draft).forEach(modKey => {
+        if (!config[modKey] && typeof config.master_draft[modKey] === 'object' && config.master_draft[modKey] !== null) {
+          config[modKey] = config.master_draft[modKey];
+        }
+      });
+    }
+
     return res.json({ success: true, config });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message, config: {} });
@@ -2031,6 +2040,14 @@ app.post('/api/site-config', async (req, res) => {
     const fullConfig = req.body || {};
     Object.keys(fullConfig).forEach(modId => {
       localSiteConfigMap.set(modId, fullConfig[modId]);
+      // Keep master_draft completely synchronized so background sync never reverts changes
+      if (localSiteConfigMap.has('master_draft')) {
+        const md = localSiteConfigMap.get('master_draft');
+        if (md && typeof md === 'object') {
+          md[modId] = fullConfig[modId];
+          localSiteConfigMap.set('master_draft', md);
+        }
+      }
     });
 
     try {
@@ -2840,7 +2857,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
               Object.keys(d).forEach(k => {
                 if (typeof d[k] === 'object' && d[k] !== null) {
                   const existing = cmsMap.get(k) || {};
-                  cmsMap.set(k, { ...existing, ...d[k] });
+                  cmsMap.set(k, { ...d[k], ...existing });
                 }
               });
             }

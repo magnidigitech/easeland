@@ -58,7 +58,8 @@ import {
   ArrowDown,
   Plus,
   Star,
-  Tag
+  Tag,
+  Loader2
 } from 'lucide-react';
 import { mockApi, safeArray } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -457,15 +458,19 @@ export default function AdminPortal({ onNavigate }) {
   const [promoToast, setPromoToast] = useState('');
   const [promoSectionTitle, setPromoSectionTitle] = useState(() => siteConfig?.featuredListings?.sectionTitle || 'Featured & Recent Verified Properties');
   const [promoBadgeText, setPromoBadgeText] = useState(() => siteConfig?.featuredListings?.badgeText || 'VERIFIED LISTINGS');
-  const [promoDisplayCount, setPromoDisplayCount] = useState(() => siteConfig?.featuredListings?.displayCount || 6);
+  const [promoDisplayCount, setPromoDisplayCount] = useState(() => Number(siteConfig?.featuredListings?.displayCount) || 6);
+  const [isSavingPromoSettings, setIsSavingPromoSettings] = useState(false);
+  const [isPromoSettingsSaved, setIsPromoSettingsSaved] = useState(false);
 
   useEffect(() => {
     if (siteConfig?.featuredListings) {
-      if (siteConfig.featuredListings.sectionTitle) setPromoSectionTitle(siteConfig.featuredListings.sectionTitle);
-      if (siteConfig.featuredListings.badgeText) setPromoBadgeText(siteConfig.featuredListings.badgeText);
-      if (siteConfig.featuredListings.displayCount) setPromoDisplayCount(siteConfig.featuredListings.displayCount);
+      if (siteConfig.featuredListings.sectionTitle !== undefined) setPromoSectionTitle(siteConfig.featuredListings.sectionTitle);
+      if (siteConfig.featuredListings.badgeText !== undefined) setPromoBadgeText(siteConfig.featuredListings.badgeText);
+      if (siteConfig.featuredListings.displayCount !== undefined) {
+        setPromoDisplayCount(Number(siteConfig.featuredListings.displayCount) || 6);
+      }
     }
-  }, [siteConfig?.featuredListings]);
+  }, [siteConfig?.featuredListings?.sectionTitle, siteConfig?.featuredListings?.badgeText, siteConfig?.featuredListings?.displayCount]);
 
   const promotedPropertyIds = React.useMemo(() => {
     return safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
@@ -523,6 +528,19 @@ export default function AdminPortal({ onNavigate }) {
       ...updatedFeaturedListings,
       showOnlyFeatured: true
     };
+    const targetIds = safeArray(mergedFeatured.featuredPropertyIds).map(String).filter(Boolean);
+    const activePromotedList = targetIds.map((id) => {
+      const match = allProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
+      if (match) return match;
+      if (Array.isArray(currentFeatured.promotedProperties)) {
+        const prevMatch = currentFeatured.promotedProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
+        if (prevMatch) return prevMatch;
+      }
+      return null;
+    }).filter(Boolean);
+
+    mergedFeatured.promotedProperties = activePromotedList;
+
     const updatedConfig = {
       ...siteConfig,
       featuredListings: mergedFeatured
@@ -535,6 +553,7 @@ export default function AdminPortal({ onNavigate }) {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('easeland_site_config', JSON.stringify(updatedConfig));
+        localStorage.setItem('easeland_promoted_properties', JSON.stringify(activePromotedList));
       } catch (e) {}
       window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: updatedConfig }));
     }
@@ -606,14 +625,29 @@ export default function AdminPortal({ onNavigate }) {
     }
   };
 
-  const handleSavePromotionSettings = (e) => {
+  const handleSavePromotionSettings = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    savePromotionsConfig({
-      sectionTitle: promoSectionTitle || 'Featured & Recent Verified Properties',
-      badgeText: promoBadgeText || 'VERIFIED LISTINGS',
-      displayCount: Math.max(1, Math.min(24, Number(promoDisplayCount) || 6))
-    }, 'Paid Promotions showcase headline and settings saved!');
-    logAdminActivity('saved Paid Promotions showcase title & display settings.');
+    const parsedSlots = parseInt(promoDisplayCount, 10);
+    const validCount = isNaN(parsedSlots) ? 6 : Math.max(1, Math.min(24, parsedSlots));
+    setPromoDisplayCount(validCount);
+    const cleanedTitle = (promoSectionTitle || '').trim() || 'Featured & Recent Verified Properties';
+    const cleanedBadge = (promoBadgeText || '').trim() || 'VERIFIED LISTINGS';
+
+    try {
+      await savePromotionsConfig({
+        sectionTitle: cleanedTitle,
+        badgeText: cleanedBadge,
+        displayCount: validCount
+      }, 'Paid Promotions showcase headline and settings saved!');
+      logAdminActivity('saved Paid Promotions showcase title & display settings (Slots: ' + validCount + ').');
+      setIsPromoSettingsSaved(true);
+      setTimeout(() => setIsPromoSettingsSaved(false), 3000);
+    } catch (err) {
+      console.warn('Error saving promotion settings:', err);
+      setPromoToast('Error saving promotion settings. Please try again.');
+    } finally {
+      setIsSavingPromoSettings(false);
+    }
   };
 
   // Deal Dossier Modal State
@@ -4090,7 +4124,9 @@ export default function AdminPortal({ onNavigate }) {
                     ) : (
                       <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-black shadow-sm">
                         <Eye className="w-4 h-4 text-emerald-600" />
-                        <span>LIVE ON HOMEPAGE ({promotedPropertyIds.length} Properties Displayed)</span>
+                        <span>
+                          LIVE ON HOMEPAGE ({Math.min(promotedPropertyIds.length, Number(promoDisplayCount) || 6)} of {promotedPropertyIds.length} Properties Displayed • Max {promoDisplayCount || 6} Slots)
+                        </span>
                       </div>
                     )}
                   </div>
@@ -4106,47 +4142,116 @@ export default function AdminPortal({ onNavigate }) {
                     <span className="text-[11px] text-gray-400 font-medium">Auto-saves to cloud & public website</span>
                   </div>
 
-                  <form onSubmit={handleSavePromotionSettings} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Section Headline Title</label>
-                      <input
-                        type="text"
-                        value={promoSectionTitle}
-                        onChange={(e) => setPromoSectionTitle(e.target.value)}
-                        placeholder="Featured & Recent Verified Properties"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Badge Pill Text</label>
-                      <input
-                        type="text"
-                        value={promoBadgeText}
-                        onChange={(e) => setPromoBadgeText(e.target.value)}
-                        placeholder="VERIFIED LISTINGS"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Max Display Slots</label>
-                      <div className="flex items-center gap-2">
+                  <form onSubmit={handleSavePromotionSettings} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Section Headline Title</label>
                         <input
-                          type="number"
-                          min={1}
-                          max={24}
-                          value={promoDisplayCount}
-                          onChange={(e) => setPromoDisplayCount(e.target.value)}
+                          type="text"
+                          value={promoSectionTitle}
+                          onChange={(e) => setPromoSectionTitle(e.target.value)}
+                          placeholder="Featured & Recent Verified Properties"
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
-                        <button
-                          type="submit"
-                          className="bg-brand-charcoal hover:bg-slate-800 text-white font-black text-xs px-4 py-2 rounded-xl shadow transition-all shrink-0 flex items-center gap-1.5"
-                        >
-                          <Save className="w-3.5 h-3.5 text-brand-yellow" />
-                          <span>Save</span>
-                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Badge Pill Text</label>
+                        <input
+                          type="text"
+                          value={promoBadgeText}
+                          onChange={(e) => setPromoBadgeText(e.target.value)}
+                          placeholder="VERIFIED LISTINGS"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-gray-700">Max Display Slots</label>
+                          <span className="text-[10px] font-bold text-gray-400">1-24 slots</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={24}
+                            value={promoDisplayCount}
+                            onChange={(e) => setPromoDisplayCount(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isSavingPromoSettings}
+                            className={'font-black text-xs px-4 py-2 rounded-xl shadow transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ' + (
+                              isPromoSettingsSaved
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                : isSavingPromoSettings
+                                ? 'bg-gray-400 text-white cursor-not-allowed'
+                                : 'bg-brand-charcoal hover:bg-slate-800 text-white'
+                            )}
+                          >
+                            {isSavingPromoSettings ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-yellow" />
+                                <span>Saving...</span>
+                              </>
+                            ) : isPromoSettingsSaved ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-white" />
+                                <span>Saved!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-3.5 h-3.5 text-brand-yellow" />
+                                <span>Save</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Preset Slot Selectors & Dynamic Allocation Feedback */}
+                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-gray-500">Quick Slot Presets:</span>
+                        {[1, 2, 3, 4, 6, 8, 12].map((slotVal) => {
+                          const isActive = Number(promoDisplayCount) === slotVal;
+                          return (
+                            <button
+                              key={slotVal}
+                              type="button"
+                              onClick={() => {
+                                setPromoDisplayCount(slotVal);
+                                savePromotionsConfig({
+                                  sectionTitle: promoSectionTitle || 'Featured & Recent Verified Properties',
+                                  badgeText: promoBadgeText || 'VERIFIED LISTINGS',
+                                  displayCount: slotVal
+                                }, 'Showcase set to ' + slotVal + ' Max Display Slots.');
+                              }}
+                              className={'px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ' + (
+                                isActive
+                                  ? 'bg-brand-charcoal text-brand-yellow shadow-xs'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              )}
+                            >
+                              {slotVal} Slots
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-gray-500">Live Dynamic Allocation:</span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 text-[11px] font-black">
+                          {Math.min(promotedPropertyIds.length, Number(promoDisplayCount) || 6)} of {promotedPropertyIds.length} Active On Homepage
+                        </span>
+                        {promotedPropertyIds.length > (Number(promoDisplayCount) || 6) && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold">
+                            +{promotedPropertyIds.length - (Number(promoDisplayCount) || 6)} Overflow on Standby
+                          </span>
+                        )}
                       </div>
                     </div>
                   </form>
@@ -4224,6 +4329,15 @@ export default function AdminPortal({ onNavigate }) {
                                 <span className="text-xs font-black text-brand-charcoal px-1.5 py-0.5 rounded-md bg-white border border-gray-200 shadow-xs">
                                   #{idx + 1}
                                 </span>
+                                {idx < (Number(promoDisplayCount) || 6) ? (
+                                  <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1 py-0.5 rounded">
+                                    LIVE
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.5 rounded" title="This property exceeds Max Display Slots and is on standby">
+                                    STANDBY
+                                  </span>
+                                )}
                                 <button
                                   type="button"
                                   disabled={idx === promotedPropertiesList.length - 1}

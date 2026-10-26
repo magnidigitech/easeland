@@ -13,11 +13,11 @@ import { sanitizeSiteConfig } from '../services/mockApi.js';
 const CMS_MODULE_KEYS = [
   'overview', 'homepage', 'navbar', 'footer', 'buyPage',
   'rentPage', 'sellPage', 'categories', 'faq', 'contact',
-  'branding', 'theme', 'media', 'mapsConfig', 'seo', 'publish'
+  'branding', 'theme', 'media', 'mapsConfig', 'seo', 'featuredListings', 'publish'
 ];
 
 /**
- * Fetch all 16 CMS Site Management modules from PostgreSQL database (/api/site-config).
+ * Fetch all CMS Site Management modules from PostgreSQL database (/api/site-config).
  */
 export async function getSiteConfigAdmin() {
   const mergedConfig = {};
@@ -29,6 +29,13 @@ export async function getSiteConfigAdmin() {
       const json = await res.json();
       if (json.success && json.config && typeof json.config === 'object') {
         Object.assign(mergedConfig, json.config);
+        if (json.config.master_draft && typeof json.config.master_draft === 'object') {
+          Object.keys(json.config.master_draft).forEach((k) => {
+            if (!mergedConfig[k]) {
+              mergedConfig[k] = json.config.master_draft[k];
+            }
+          });
+        }
       }
     }
   } catch (err) {}
@@ -42,7 +49,11 @@ export async function getSiteConfigAdmin() {
       if (docSnap.id === 'master_draft') {
         const draftData = docSnap.data();
         if (draftData && typeof draftData === 'object') {
-          Object.assign(mergedConfig, draftData);
+          Object.keys(draftData).forEach((k) => {
+            if (!mergedConfig[k]) {
+              mergedConfig[k] = draftData[k];
+            }
+          });
         }
       } else {
         const existing = mergedConfig[docSnap.id] || {};
@@ -53,14 +64,21 @@ export async function getSiteConfigAdmin() {
     console.warn('Firestore siteManagement fetch note:', error.message);
   }
 
-  // 3. Fallback: Local storage cache
-  if (Object.keys(mergedConfig).length === 0 && typeof window !== 'undefined') {
+  // 3. Fallback & Local Merge: Local storage cache (preserve admin promotions drafts)
+  if (typeof window !== 'undefined') {
     try {
       const rawStored = localStorage.getItem('easeland_site_config');
       if (rawStored) {
         const parsed = JSON.parse(rawStored);
         if (parsed && typeof parsed === 'object') {
-          Object.assign(mergedConfig, parsed);
+          if (parsed.featuredListings && Array.isArray(parsed.featuredListings.featuredPropertyIds) && parsed.featuredListings.featuredPropertyIds.length > 0) {
+            if (!mergedConfig.featuredListings || !Array.isArray(mergedConfig.featuredListings.featuredPropertyIds) || mergedConfig.featuredListings.featuredPropertyIds.length === 0) {
+              mergedConfig.featuredListings = parsed.featuredListings;
+            }
+          }
+          if (Object.keys(mergedConfig).length === 0) {
+            Object.assign(mergedConfig, parsed);
+          }
         }
       }
     } catch (e) {}
@@ -99,17 +117,32 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         updatedBy: adminUid || 'admin'
       };
       await setDoc(docRef, payload, { merge: true });
+
+      // Keep master_draft synchronized in Firestore so background pulls do not overwrite module
+      try {
+        const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
+        await setDoc(masterDraftRef, { [moduleId]: moduleData }, { merge: true });
+      } catch (mdErr) {}
     } catch (fsErr) {
-      console.warn(`Firestore draft save warning for ${moduleId}:`, fsErr.message);
+      console.warn('Firestore draft save warning for ' + moduleId + ':', fsErr.message);
     }
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: moduleData }));
+      let fullConfig = {};
+      try {
+        const stored = localStorage.getItem('easeland_site_config');
+        if (stored) fullConfig = JSON.parse(stored) || {};
+      } catch (e) {}
+      fullConfig[moduleId] = moduleData;
+      try {
+        localStorage.setItem('easeland_site_config', JSON.stringify(fullConfig));
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: fullConfig }));
     }
 
     return { success: true };
   } catch (error) {
-    console.error(`Error updating site module ${moduleId}:`, error);
+    console.error('Error updating site module ' + moduleId + ':', error);
     return { success: false, error: error.message };
   }
 }

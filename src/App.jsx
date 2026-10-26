@@ -556,10 +556,26 @@ export default function App() {
     }
     const handleApproved = () => loadProperties();
     const handleConfigUpdated = (e) => {
-      const updatedConfig = e.detail || mockApi.getSiteConfig();
-      setSiteConfig(updatedConfig);
-      if (updatedConfig && updatedConfig.theme) {
-        applySiteTheme(updatedConfig.theme);
+      const detail = e.detail || mockApi.getSiteConfig();
+      if (!detail || typeof detail !== 'object') return;
+
+      setSiteConfig((prev) => {
+        let merged = { ...prev };
+        if (detail.featuredPropertyIds && !detail.featuredListings) {
+          merged.featuredListings = {
+            ...(prev?.featuredListings || {}),
+            ...detail,
+            showOnlyFeatured: true
+          };
+        } else {
+          merged = { ...merged, ...detail };
+        }
+        return mockApi.mergeSiteConfigWithDefaults(merged);
+      });
+
+      const themeToApply = detail?.theme || (detail?.branding ? detail : null);
+      if (themeToApply) {
+        applySiteTheme(themeToApply);
       }
     };
 
@@ -794,135 +810,257 @@ export default function App() {
             {(() => {
               const featuredConfig = siteConfig?.featuredListings || {};
               const featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
-              const displayCount = Number(featuredConfig.displayCount) || 6;
+              const parsedDisplay = Number(featuredConfig.displayCount);
+              const displayCount = isNaN(parsedDisplay) ? 6 : Math.max(1, Math.min(24, Math.floor(parsedDisplay)));
 
               // CRITICAL: Strictly for Paid Promotions. If admin has not added any properties, keep section completely hidden/empty across the website!
               if (featuredIds.length === 0) return null;
 
-              // Filter candidate properties
-              const candidateProps = properties.length > 0 ? properties : [];
+              // Build comprehensive candidate pool from all property data sources
+              const candidatePool = [];
+              const seenPoolKeys = new Set();
+              const addToPool = (items) => {
+                if (!Array.isArray(items)) return;
+                items.forEach((p) => {
+                  if (!p || isPropertyDeleted(p)) return;
+                  const k1 = String(p.id || '').trim().toLowerCase();
+                  const k2 = String(p.propertyId || '').trim().toLowerCase();
+                  const k3 = String(p.referenceId || '').trim().toLowerCase();
+                  const primaryKey = k1 || k2 || k3;
+                  if (primaryKey && !seenPoolKeys.has(primaryKey)) {
+                    seenPoolKeys.add(primaryKey);
+                    candidatePool.push(p);
+                  }
+                });
+              };
 
-              // Explicitly featured properties matching IDs or referenceId
-              const explicitlyFeatured = candidateProps.filter(p => {
-                if (!p) return false;
-                const id1 = String(p.id || '').trim();
-                const id2 = String(p.propertyId || '').trim();
-                const ref = String(p.referenceId || '').trim();
-                return (id1 && featuredIds.includes(id1)) || (id2 && featuredIds.includes(id2)) || (ref && featuredIds.includes(ref));
-              });
+              addToPool(properties);
+              if (Array.isArray(featuredConfig.promotedProperties)) {
+                addToPool(featuredConfig.promotedProperties);
+              }
+              if (typeof window !== 'undefined') {
+                try {
+                  const rawPromo = localStorage.getItem('easeland_promoted_properties');
+                  if (rawPromo) addToPool(JSON.parse(rawPromo));
+                } catch (e) {}
+                try {
+                  const rawAdmin = localStorage.getItem('easeland_admin_cached_properties');
+                  if (rawAdmin) addToPool(JSON.parse(rawAdmin));
+                } catch (e) {}
+                try {
+                  const rawProps = localStorage.getItem('easeland_properties');
+                  if (rawProps) addToPool(JSON.parse(rawProps));
+                } catch (e) {}
+              }
+              try {
+                if (typeof mockApi.getProperties === 'function') {
+                  addToPool(mockApi.getProperties());
+                }
+              } catch (e) {}
 
-              // Sort explicitly featured by Admin selected order
-              explicitlyFeatured.sort((a, b) => {
-                const idA1 = String(a.id || '').trim();
-                const idA2 = String(a.propertyId || '').trim();
-                const idARef = String(a.referenceId || '').trim();
-                const posA1 = idA1 ? featuredIds.indexOf(idA1) : -1;
-                const posA2 = idA2 ? featuredIds.indexOf(idA2) : -1;
-                const posARef = idARef ? featuredIds.indexOf(idARef) : -1;
-                const idxA = Math.min(
-                  posA1 !== -1 ? posA1 : 9999,
-                  posA2 !== -1 ? posA2 : 9999,
-                  posARef !== -1 ? posARef : 9999
-                );
-
-                const idB1 = String(b.id || '').trim();
-                const idB2 = String(b.propertyId || '').trim();
-                const idBRef = String(b.referenceId || '').trim();
-                const posB1 = idB1 ? featuredIds.indexOf(idB1) : -1;
-                const posB2 = idB2 ? featuredIds.indexOf(idB2) : -1;
-                const posBRef = idBRef ? featuredIds.indexOf(idBRef) : -1;
-                const idxB = Math.min(
-                  posB1 !== -1 ? posB1 : 9999,
-                  posB2 !== -1 ? posB2 : 9999,
-                  posBRef !== -1 ? posBRef : 9999
-                );
-
-                return idxA - idxB;
+              // Explicitly match properties in exact slot order defined by Admin
+              const explicitlyFeatured = [];
+              featuredIds.forEach((fId) => {
+                const target = String(fId).trim().toLowerCase();
+                const matched = candidatePool.find((p) => {
+                  if (!p) return false;
+                  const id1 = String(p.id || '').trim().toLowerCase();
+                  const id2 = String(p.propertyId || '').trim().toLowerCase();
+                  const ref = String(p.referenceId || '').trim().toLowerCase();
+                  return id1 === target || id2 === target || ref === target;
+                });
+                if (matched) {
+                  const mKey = String(matched.id || matched.propertyId || matched.referenceId || '').trim().toLowerCase();
+                  if (!explicitlyFeatured.some((ef) => String(ef.id || ef.propertyId || ef.referenceId || '').trim().toLowerCase() === mKey)) {
+                    explicitlyFeatured.push(matched);
+                  }
+                }
               });
 
               const homepageProperties = explicitlyFeatured.slice(0, displayCount);
 
+              const count = homepageProperties.length;
+
               // Keep completely hidden across the website until admin adds properties to paid promotions
-              if (homepageProperties.length === 0) return null;
+              if (count === 0) return null;
+
+              // Dynamic container width & vertical padding: shrink or expand based on property count
+              const containerWidthClass =
+                count === 1 ? 'max-w-4xl' :
+                count === 2 ? 'max-w-5xl' :
+                count === 3 ? 'max-w-6xl' :
+                'max-w-7xl';
+
+              const sectionPaddingClass =
+                count === 1 ? 'py-8 sm:py-10' :
+                count === 2 ? 'py-10 sm:py-12' :
+                'py-12 sm:py-16';
+
+              const gridLayoutClass =
+                count === 1 ? 'grid-cols-1' :
+                count === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+                count === 3 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' :
+                count === 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' :
+                (count === 5 || count === 6) ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' :
+                'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
 
               return (
-                <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                  <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
+                <section className={'px-4 sm:px-6 lg:px-8 mx-auto transition-all duration-500 ease-in-out ' + containerWidthClass + ' ' + sectionPaddingClass}>
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 sm:mb-8 transition-all duration-300">
                     <div>
-                      <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-800 bg-emerald-100 px-3 py-1 rounded-md">
-                        {featuredConfig.badgeText || 'VERIFIED LISTINGS'}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-800 bg-emerald-100 px-3 py-1 rounded-md">
+                          {featuredConfig.badgeText || 'VERIFIED LISTINGS'}
+                        </span>
+                        <span className="text-[11px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500 fill-amber-400" />
+                          <span>{count} {count === 1 ? 'Showcase Property' : 'Showcase Properties'}</span>
+                        </span>
+                      </div>
                       <h2 className="text-2xl sm:text-4xl font-extrabold text-brand-charcoal tracking-tight mt-3">
                         {featuredConfig.sectionTitle || 'Featured & Recent Verified Properties'}
                       </h2>
                     </div>
                     <button
                       onClick={() => changeActivePage('map', { clean: true })}
-                      className="mt-3 md:mt-0 text-sm font-bold text-brand-charcoal hover:text-brand-yellowHover flex items-center gap-1 cursor-pointer"
+                      className="text-sm font-bold text-brand-charcoal hover:text-brand-yellowHover flex items-center gap-1 cursor-pointer shrink-0"
                     >
                       <span>Explore All Properties on Map</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className={`grid grid-cols-1 ${
-                    homepageProperties.length === 1 ? 'max-w-md mx-auto' :
-                    homepageProperties.length === 2 ? 'sm:grid-cols-2 max-w-4xl mx-auto' :
-                    homepageProperties.length === 3 ? 'sm:grid-cols-2 lg:grid-cols-3' :
-                    homepageProperties.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' :
-                    'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
-                  } gap-6`}>
-                    {homepageProperties.map((prop) => {
-                      const propId = String(prop.id || prop.propertyId);
-                      const isFeatured = featuredIds.includes(propId);
+                  {count === 1 ? (
+                    <div
+                      onClick={() => handleSelectProperty(homepageProperties[0])}
+                      className="group bg-white rounded-3xl border border-amber-300 ring-2 ring-amber-400/30 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden flex flex-col md:flex-row transform hover:-translate-y-1"
+                    >
+                      <div className="relative md:w-1/2 h-64 md:h-auto min-h-[240px] bg-gray-100 overflow-hidden shrink-0">
+                        <img
+                          src={getFirstUploadedImage(homepageProperties[0])}
+                          alt={homepageProperties[0].title}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = getCategoryFallbackImage(homepageProperties[0]);
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-md border border-amber-300">
+                          <Sparkles className="w-3.5 h-3.5 text-brand-yellow fill-brand-yellow" />
+                          <span>FEATURED SPOTLIGHT PROMOTION</span>
+                        </div>
+                        <div className="absolute bottom-3 left-3 bg-brand-charcoal/80 backdrop-blur-xs text-white text-[11px] font-bold px-2.5 py-1 rounded-md">
+                          {homepageProperties[0].category || 'Open Plot'}
+                        </div>
+                      </div>
 
-                      return (
-                        <div
-                          key={prop.id || prop.propertyId}
-                          onClick={() => handleSelectProperty(prop)}
-                          className={`group bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden flex flex-col transform hover:-translate-y-1 ${
-                            isFeatured ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-brand-bordergray'
-                          }`}
-                        >
-                          <div className="relative h-48 bg-gray-100 overflow-hidden">
-                            <img
-                              src={getFirstUploadedImage(prop)}
-                              alt={prop.title}
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = getCategoryFallbackImage(prop);
-                              }}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                            <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
-                              <Sparkles className="w-3 h-3 text-brand-yellow fill-brand-yellow" />
-                              <span>FEATURED PROMOTION</span>
-                            </div>
+                      <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-xs text-gray-500 font-bold">
+                            <span className="flex items-center gap-1 text-slate-700">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                              {[homepageProperties[0].location?.locality, homepageProperties[0].location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || homepageProperties[0].location?.city || homepageProperties[0].location?.state || 'India'}
+                            </span>
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                              100% VERIFIED
+                            </span>
                           </div>
 
-                          <div className="p-5 flex-1 flex flex-col justify-between">
-                            <div>
-                              <div className="flex items-center justify-between text-xs text-gray-500 font-bold mb-1">
-                                <span>{[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}</span>
-                                <span className="text-brand-charcoal">{prop.category}</span>
-                              </div>
-                              <h3 className="text-base font-bold text-brand-charcoal line-clamp-1 mb-3">
-                                {prop.title}
-                              </h3>
-                            </div>
+                          <h3 className="text-xl md:text-2xl font-black text-brand-charcoal line-clamp-2 leading-tight">
+                            {homepageProperties[0].title}
+                          </h3>
 
-                            <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                              <div>
-                                <span className="text-xs text-gray-400 block font-medium">Listed Price</span>
-                                <span className="text-lg font-extrabold text-emerald-700">{prop.priceDisplay || prop.price}</span>
-                              </div>
-                              <span className="text-xs font-bold text-brand-charcoal">{prop.areaDisplay || prop.area}</span>
-                            </div>
+                          {homepageProperties[0].description && (
+                            <p className="text-xs text-gray-500 line-clamp-2 font-medium leading-relaxed">
+                              {homepageProperties[0].description}
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-3 text-xs font-bold text-gray-600 pt-1">
+                            {homepageProperties[0].area && (
+                              <span className="bg-gray-100 px-2.5 py-1 rounded-md">
+                                {homepageProperties[0].areaDisplay || (homepageProperties[0].area + ' sq ft')}
+                              </span>
+                            )}
+                            {homepageProperties[0].propertyType && (
+                              <span className="bg-gray-100 px-2.5 py-1 rounded-md">
+                                {homepageProperties[0].propertyType}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        <div className="pt-5 mt-4 border-t border-gray-100 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs text-gray-400 block font-semibold uppercase tracking-wider">Listed Price</span>
+                            <span className="text-2xl font-black text-emerald-700">
+                              {homepageProperties[0].priceDisplay || homepageProperties[0].price}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>View Verified Listing</span>
+                            <ChevronRight className="w-4 h-4 text-brand-yellow" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={'grid ' + gridLayoutClass + ' gap-6 transition-all duration-500'}>
+                      {homepageProperties.map((prop) => {
+                        const propId = String(prop.id || prop.propertyId);
+                        const isFeatured = featuredIds.includes(propId);
+
+                        return (
+                          <div
+                            key={prop.id || prop.propertyId}
+                            onClick={() => handleSelectProperty(prop)}
+                            className={'group bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden flex flex-col transform hover:-translate-y-1 ' + (
+                              isFeatured ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-brand-bordergray'
+                            )}
+                          >
+                            <div className="relative h-48 bg-gray-100 overflow-hidden">
+                              <img
+                                src={getFirstUploadedImage(prop)}
+                                alt={prop.title}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getCategoryFallbackImage(prop);
+                                }}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
+                                <Sparkles className="w-3 h-3 text-brand-yellow fill-brand-yellow" />
+                                <span>FEATURED PROMOTION</span>
+                              </div>
+                            </div>
+
+                            <div className="p-5 flex-1 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center justify-between text-xs text-gray-500 font-bold mb-1">
+                                  <span>{[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}</span>
+                                  <span className="text-brand-charcoal">{prop.category}</span>
+                                </div>
+                                <h3 className="text-base font-bold text-brand-charcoal line-clamp-1 mb-3">
+                                  {prop.title}
+                                </h3>
+                              </div>
+
+                              <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                                <div>
+                                  <span className="text-xs text-gray-400 block font-medium">Listed Price</span>
+                                  <span className="text-lg font-extrabold text-emerald-700">{prop.priceDisplay || prop.price}</span>
+                                </div>
+                                <span className="text-xs font-bold text-brand-charcoal">{prop.areaDisplay || prop.area}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
               );
             })()}

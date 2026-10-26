@@ -437,6 +437,10 @@ export const sanitizeSiteConfig = (cfg) => {
     if (!Array.isArray(sanitized.featuredListings.featuredPropertyIds)) {
       sanitized.featuredListings.featuredPropertyIds = [];
     }
+    if (sanitized.featuredListings.displayCount !== undefined) {
+      const num = Number(sanitized.featuredListings.displayCount);
+      sanitized.featuredListings.displayCount = isNaN(num) ? 6 : Math.max(1, Math.min(24, Math.floor(num)));
+    }
   }
 
   return sanitized;
@@ -444,12 +448,18 @@ export const sanitizeSiteConfig = (cfg) => {
 
 export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
   if (!userConfig || typeof userConfig !== 'object') return { ...DEFAULT_SITE_CONFIG };
+  const incomingFeatured = userConfig.featuredListings || userConfig.master_draft?.featuredListings || {};
+  const rawCount = incomingFeatured.displayCount ?? DEFAULT_SITE_CONFIG.featuredListings.displayCount;
+  const parsedCount = Number(rawCount);
+  const safeDisplayCount = isNaN(parsedCount) ? 6 : Math.max(1, Math.min(24, Math.floor(parsedCount)));
+
   const merged = {
     overview: { ...DEFAULT_SITE_CONFIG.overview, ...(userConfig.overview || {}) },
     homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(userConfig.homepage || {}) },
     featuredListings: {
       ...DEFAULT_SITE_CONFIG.featuredListings,
-      ...(userConfig.featuredListings || {}),
+      ...incomingFeatured,
+      displayCount: safeDisplayCount,
       showOnlyFeatured: true
     },
     navbar: { ...DEFAULT_SITE_CONFIG.navbar, ...(userConfig.navbar || {}) },
