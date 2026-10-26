@@ -489,22 +489,8 @@ let registeredUsers = rawUsers.filter(u => u && u.status !== 'DELETED' && u.isCu
 
 setStoredData('easeland_registered_users', registeredUsers);
 
-// Auto-scrub stale zero-agent/zero-commission siteConfig from localStorage
-if (typeof window !== 'undefined') {
-  try {
-    const rawConfig = localStorage.getItem('easeland_site_config');
-    if (rawConfig && (
-      rawConfig.includes('Zero agents') ||
-      rawConfig.includes('Zero commission') ||
-      rawConfig.includes('Zero brokerage') ||
-      rawConfig.includes('zero brokerage') ||
-      rawConfig.includes('zero broker') ||
-      rawConfig.includes('Accurate plot boundaries')
-    )) {
-      localStorage.removeItem('easeland_site_config');
-    }
-  } catch (e) {}
-}
+// Stored site configuration loaded and safely sanitized with default schema
+
 
 let siteConfig = mergeSiteConfigWithDefaults(getStoredData('easeland_site_config', DEFAULT_SITE_CONFIG));
 setStoredData('easeland_site_config', siteConfig);

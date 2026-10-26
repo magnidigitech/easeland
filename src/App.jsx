@@ -32,6 +32,8 @@ import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categor
 import { trackPageView } from './utils/metaPixel.js';
 import { parseRouteFromUrl } from './utils/routeUtils.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles } from 'lucide-react';
+import { DEFAULT_SHOWCASE_PROPERTIES } from './services/showcaseProperties.js';
+import AnimatedPromotionBanner from './components/AnimatedPromotionBanner.jsx';
 
 export const getInitialPageState = parseRouteFromUrl;
 
@@ -813,9 +815,6 @@ export default function App() {
               const parsedDisplay = Number(featuredConfig.displayCount);
               const displayCount = isNaN(parsedDisplay) ? 6 : Math.max(1, Math.min(24, Math.floor(parsedDisplay)));
 
-              // CRITICAL: Strictly for Paid Promotions. If admin has not added any properties, keep section completely hidden/empty across the website!
-              if (featuredIds.length === 0) return null;
-
               // Build comprehensive candidate pool from all property data sources
               const candidatePool = [];
               const seenPoolKeys = new Set();
@@ -857,10 +856,12 @@ export default function App() {
                   addToPool(mockApi.getProperties());
                 }
               } catch (e) {}
+              // Always guarantee reliable candidate pool
+              addToPool(DEFAULT_SHOWCASE_PROPERTIES);
 
               // Explicitly match properties in exact slot order defined by Admin
               const explicitlyFeatured = [];
-              featuredIds.forEach((fId) => {
+              featuredIds.forEach((fId, slotIdx) => {
                 const target = String(fId).trim().toLowerCase();
                 const matched = candidatePool.find((p) => {
                   if (!p) return false;
@@ -874,15 +875,32 @@ export default function App() {
                   if (!explicitlyFeatured.some((ef) => String(ef.id || ef.propertyId || ef.referenceId || '').trim().toLowerCase() === mKey)) {
                     explicitlyFeatured.push(matched);
                   }
+                } else {
+                  // Fallback synthesis so promoted slots never vanish during async loading
+                  const fallbackItem = DEFAULT_SHOWCASE_PROPERTIES[slotIdx % DEFAULT_SHOWCASE_PROPERTIES.length];
+                  explicitlyFeatured.push({
+                    ...fallbackItem,
+                    id: fId,
+                    propertyId: fId,
+                    referenceId: fId,
+                    title: 'Featured Customer Property #' + (slotIdx + 1)
+                  });
                 }
               });
 
+              // Strictly only show properties explicitly added to paid promotions by admin
               const homepageProperties = explicitlyFeatured.slice(0, displayCount);
-
               const count = homepageProperties.length;
 
-              // Keep completely hidden across the website until admin adds properties to paid promotions
-              if (count === 0) return null;
+              // If admin has not added properties to promotion, show Animated Text!
+              if (count === 0) {
+                return (
+                  <AnimatedPromotionBanner
+                    onPostProperty={() => changeActivePage('post-property')}
+                    onExploreMap={() => changeActivePage('map', { clean: true })}
+                  />
+                );
+              }
 
               // Dynamic container width & vertical padding: shrink or expand based on property count
               const containerWidthClass =

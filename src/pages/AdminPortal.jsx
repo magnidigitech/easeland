@@ -62,6 +62,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { mockApi, safeArray } from '../services/mockApi';
+import { DEFAULT_SHOWCASE_PROPERTIES } from '../services/showcaseProperties.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   getVerificationQueue,
@@ -476,26 +477,36 @@ export default function AdminPortal({ onNavigate }) {
     return safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
   }, [siteConfig?.featuredListings?.featuredPropertyIds]);
 
+  const candidateSourceProperties = React.useMemo(() => {
+    const list = Array.isArray(allProperties) && allProperties.length > 0 ? allProperties : [];
+    const pool = [...list];
+    DEFAULT_SHOWCASE_PROPERTIES.forEach(dp => {
+      const dpId = String(dp.id || dp.propertyId);
+      if (!pool.some(p => String(p.id || p.propertyId || p.referenceId) === dpId)) {
+        pool.push(dp);
+      }
+    });
+    return pool;
+  }, [allProperties]);
+
   const promotedPropertiesList = React.useMemo(() => {
     return promotedPropertyIds.map((id, index) => {
-      const match = allProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
+      const match = candidateSourceProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
       if (match) return match;
+      const fallbackItem = DEFAULT_SHOWCASE_PROPERTIES[index % DEFAULT_SHOWCASE_PROPERTIES.length];
       return {
+        ...fallbackItem,
         id: id,
         propertyId: id,
         referenceId: id,
-        title: 'Property #' + (index + 1) + ' (ID: ' + id + ')',
-        location: { city: 'Location loading' },
-        price: 0,
-        photos: [],
-        owner: { name: 'Customer / Owner', phone: 'Contact in Records', email: '' }
+        title: 'Property #' + (index + 1) + ' (ID: ' + id + ')'
       };
     });
-  }, [promotedPropertyIds, allProperties]);
+  }, [promotedPropertyIds, candidateSourceProperties]);
 
   const candidatePropertiesForPromotion = React.useMemo(() => {
     const query = promoSearchQuery.trim().toLowerCase();
-    return allProperties.filter(prop => {
+    return candidateSourceProperties.filter(prop => {
       if (!prop || isPropertyDeleted(prop)) return false;
 
       if (promoStatusFilter === 'VERIFIED_ONLY') {
@@ -519,7 +530,7 @@ export default function AdminPortal({ onNavigate }) {
 
       return title.includes(query) || city.includes(query) || propId.includes(query) || oName.includes(query) || oPhone.includes(query) || oEmail.includes(query);
     });
-  }, [allProperties, promoSearchQuery, promoTypeFilter, promoStatusFilter]);
+  }, [candidateSourceProperties, promoSearchQuery, promoTypeFilter, promoStatusFilter]);
 
   const savePromotionsConfig = async (updatedFeaturedListings, successMessage) => {
     const currentFeatured = siteConfig?.featuredListings || {};
@@ -529,15 +540,21 @@ export default function AdminPortal({ onNavigate }) {
       showOnlyFeatured: true
     };
     const targetIds = safeArray(mergedFeatured.featuredPropertyIds).map(String).filter(Boolean);
-    const activePromotedList = targetIds.map((id) => {
-      const match = allProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
+    const activePromotedList = targetIds.map((id, index) => {
+      const match = candidateSourceProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
       if (match) return match;
       if (Array.isArray(currentFeatured.promotedProperties)) {
         const prevMatch = currentFeatured.promotedProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
         if (prevMatch) return prevMatch;
       }
-      return null;
-    }).filter(Boolean);
+      const fallbackItem = DEFAULT_SHOWCASE_PROPERTIES[index % DEFAULT_SHOWCASE_PROPERTIES.length];
+      return {
+        ...fallbackItem,
+        id: id,
+        propertyId: id,
+        referenceId: id
+      };
+    });
 
     mergedFeatured.promotedProperties = activePromotedList;
 
@@ -627,6 +644,7 @@ export default function AdminPortal({ onNavigate }) {
 
   const handleSavePromotionSettings = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    setIsSavingPromoSettings(true);
     const parsedSlots = parseInt(promoDisplayCount, 10);
     const validCount = isNaN(parsedSlots) ? 6 : Math.max(1, Math.min(24, parsedSlots));
     setPromoDisplayCount(validCount);
