@@ -43,6 +43,7 @@ import DealDossierModal from '../components/crm/modals/DealDossierModal.jsx';
 
 export default function EaseLandCRM({
   currentUser,
+  authLoading = false,
   onReturnToAdmin,
   onNavigateToMarketplace,
   onNavigateToDashboard,
@@ -83,16 +84,17 @@ export default function EaseLandCRM({
   };
 
   // RBAC Authentication & Role Gate
+  const isAdminAuthenticated = typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true';
   const isAuthorized = Boolean(
-    currentUser && (
+    isAdminAuthenticated ||
+    (currentUser && (
       currentUser.role === 'ADMIN' ||
       currentUser.adminRole ||
       currentUser.role === 'BROKER' ||
       currentUser.role === 'AGENT' ||
       currentUser.role === 'FIELD_EXECUTIVE' ||
-      currentUser.capabilities?.includes('ADMIN') ||
-      (typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true')
-    )
+      currentUser.capabilities?.includes('ADMIN')
+    ))
   );
 
   const isFieldExecutive = Boolean(currentUser && currentUser.role === 'FIELD_EXECUTIVE');
@@ -321,6 +323,17 @@ export default function EaseLandCRM({
 
   // Count quarantined deals
   const quarantinedDealsCount = deals.filter(d => d.isPropertyQuarantined).length;
+
+  if (authLoading && !isAuthorized) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+        <div className="flex items-center gap-3 text-amber-400 font-black text-sm">
+          <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+          <span>Authenticating Broker Clearance...</span>
+        </div>
+      </div>
+    );
+  }
 
   // RBAC Access Control Screen for unauthorized public accounts
   if (!isAuthorized) {

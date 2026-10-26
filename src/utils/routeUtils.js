@@ -13,15 +13,21 @@ export function parseRouteFromUrl(customLocation = null) {
   const loc = customLocation || window.location;
   let rawPath = loc.pathname || '/';
 
-  // Support hash routes (e.g. #/properties, #/property/123) if pathname is root
-  if ((!rawPath || rawPath === '/') && loc.hash && loc.hash.startsWith('#/')) {
-    rawPath = loc.hash.replace(/^#/, '');
+  // Support hash routes (e.g. #/properties, #/crm, #crm) if pathname is root
+  if ((!rawPath || rawPath === '/') && loc.hash) {
+    if (loc.hash.startsWith('#/')) {
+      rawPath = loc.hash.replace(/^#/, '');
+    } else if (loc.hash.startsWith('#')) {
+      rawPath = '/' + loc.hash.replace(/^#/, '');
+    }
   }
 
   const cleanPath = rawPath.toLowerCase().replace(/\/$/, '') || '/';
   const search = loc.search || (loc.hash && loc.hash.includes('?') ? '?' + loc.hash.split('?')[1] : '');
   const urlParams = new URLSearchParams(search);
   const modeParam = urlParams.get('mode');
+  const pageParam = urlParams.get('page');
+  const viewParam = urlParams.get('view');
 
   // Clean up any legacy localStorage page persistence so stale pages never linger across closes
   try {
@@ -30,7 +36,7 @@ export function parseRouteFromUrl(customLocation = null) {
     }
   } catch (e) {}
 
-  if (cleanPath === '/admin' || modeParam === 'admin') {
+  if (cleanPath === '/admin' || modeParam === 'admin' || pageParam === 'admin') {
     return { page: 'admin', propId: null, filters: null, tab: 'overview' };
   }
 
@@ -44,7 +50,7 @@ export function parseRouteFromUrl(customLocation = null) {
     return { page: 'map', propId: null, filters: parsedFilters, tab: 'overview' };
   }
 
-  if (cleanPath === '/crm' || modeParam === 'crm' || urlParams.get('view') === 'crm') {
+  if (cleanPath === '/crm' || modeParam === 'crm' || viewParam === 'crm' || pageParam === 'crm') {
     return { page: 'crm', propId: null, filters: null, tab: 'overview' };
   }
 
@@ -68,6 +74,16 @@ export function parseRouteFromUrl(customLocation = null) {
   if (cleanPath === '/wishlist') return { page: 'wishlist', propId: null, filters: null, tab: 'overview' };
   if (cleanPath === '/privacy-policy' || cleanPath === '/privacy') {
     return { page: 'privacy-policy', propId: null, filters: null, tab: 'overview' };
+  }
+
+  // Seamless tab reload persistence: If user refreshes on CRM, preserve page
+  if (!customLocation && typeof window !== 'undefined' && cleanPath === '/') {
+    try {
+      const savedPage = sessionStorage.getItem('easeland_active_page');
+      if (savedPage === 'crm') {
+        return { page: 'crm', propId: null, filters: null, tab: 'overview' };
+      }
+    } catch (e) {}
   }
 
   return { page: 'home', propId: null, filters: null, tab: 'overview' };

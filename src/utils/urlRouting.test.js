@@ -48,6 +48,15 @@ test('getInitialPageState parses informational and transactional pages when past
   assert.strictEqual(dashRes.tab, 'my-properties');
 });
 
+test('getInitialPageState parses crm route and hash variants accurately', () => {
+  assert.strictEqual(getInitialPageState({ pathname: '/crm', search: '', hash: '' }).page, 'crm');
+  assert.strictEqual(getInitialPageState({ pathname: '/', search: '', hash: '#/crm' }).page, 'crm');
+  assert.strictEqual(getInitialPageState({ pathname: '/', search: '', hash: '#crm' }).page, 'crm');
+  assert.strictEqual(getInitialPageState({ pathname: '/', search: '?page=crm', hash: '' }).page, 'crm');
+  assert.strictEqual(getInitialPageState({ pathname: '/', search: '?view=crm', hash: '' }).page, 'crm');
+  assert.strictEqual(getInitialPageState({ pathname: '/', search: '?mode=crm', hash: '' }).page, 'crm');
+});
+
 test('getInitialPageState supports hash routing as seamless fallback', () => {
   const loc = { pathname: '/', search: '', hash: '#/property/prop_hash_999' };
   const res = getInitialPageState(loc);

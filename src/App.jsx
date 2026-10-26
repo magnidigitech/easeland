@@ -338,7 +338,7 @@ export default function App() {
     let resolvedPage = pageName;
     let resolvedPropId = typeof propIdOrFilters === 'string' ? propIdOrFilters : null;
 
-    if (authUser && isProfileIncomplete && (resolvedPage === 'dashboard' || resolvedPage === 'crm' || resolvedPage === 'post-property')) {
+    if (authUser && isProfileIncomplete && (resolvedPage === 'dashboard' || resolvedPage === 'post-property')) {
       return;
     }
 
@@ -382,6 +382,12 @@ export default function App() {
     }
 
     try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('easeland_active_page', resolvedPage);
+      }
+    } catch (e) {}
+
+    try {
       let targetPath = '/';
       if (resolvedPage === 'property-detail' && resolvedPropId) {
         targetPath = `/property/${resolvedPropId}`;
@@ -390,6 +396,8 @@ export default function App() {
         targetPath = targetSearch || '/properties';
       } else if (resolvedPage === 'admin') {
         targetPath = '/admin';
+      } else if (resolvedPage === 'crm') {
+        targetPath = '/crm';
       } else if (resolvedPage === 'buy') {
         targetPath = '/buy';
       } else if (resolvedPage === 'rent') {
@@ -1267,6 +1275,7 @@ export default function App() {
         {activePage === 'crm' && (
           <EaseLandCRM
             currentUser={currentUser}
+            authLoading={authLoading}
             onReturnToAdmin={() => changeActivePage('admin')}
             onNavigateToMarketplace={() => changeActivePage('home')}
             onNavigateToDashboard={() => changeActivePage('dashboard')}
