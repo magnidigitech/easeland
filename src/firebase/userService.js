@@ -65,14 +65,15 @@ export async function createUserProfile(uid, data) {
   try {
     if (!uid) return { success: false, error: 'UID is required' };
 
+    const uIdLow = String(uid || '').toLowerCase().trim();
+    const emLow = String(data.email || '').toLowerCase().trim();
+
     // 1. Unblacklist user from local deleted users list upon new registration or relogin
     if (typeof window !== 'undefined') {
       try {
         const rawDel = localStorage.getItem('easeland_deleted_users');
         if (rawDel) {
           const delArr = JSON.parse(rawDel);
-          const uIdLow = String(uid || '').toLowerCase().trim();
-          const emLow = String(data.email || '').toLowerCase().trim();
           const filtered = delArr.filter(item => {
             const itLow = String(item || '').toLowerCase().trim();
             return itLow !== uIdLow && (!emLow || itLow !== emLow);
@@ -81,47 +82,112 @@ export async function createUserProfile(uid, data) {
         }
       } catch (e) {}
 
-      // 2. Wipe stale profile, draft, and wizard location caches to prevent data leakage
+      // 2. Wipe stale profile, draft, location, KYC, and enquiry caches to ensure zero trace of old data
       try {
         localStorage.removeItem('easeland_user_profile_' + uid);
         localStorage.removeItem('easeland_draft_' + uid);
         localStorage.removeItem('easeland_wizard_location_' + uid);
-        
-        // Clean any old properties from local user properties cache
-        const rawProps = localStorage.getItem('easeland_user_properties');
-        if (rawProps) {
-          const parsed = JSON.parse(rawProps);
-          if (Array.isArray(parsed)) {
-            const uIdLow = String(uid || '').toLowerCase().trim();
-            const emLow = String(data.email || '').toLowerCase().trim();
-            const cleaned = parsed.filter(p => {
-              const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
-              const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
-              return pOwner !== uIdLow && (!emLow || pEmail !== emLow);
-            });
-            localStorage.setItem('easeland_user_properties', JSON.stringify(cleaned));
+        localStorage.removeItem('easeland_kyc_' + uid);
+        localStorage.removeItem('easeland_owner_verification_' + uid);
+        localStorage.removeItem('easeland_user_enquiries_' + uid);
+
+        // Clean any old properties from all local property caches
+        const propKeys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties', 'easeland_all_properties'];
+        propKeys.forEach(pk => {
+          const rawProps = localStorage.getItem(pk);
+          if (rawProps) {
+            try {
+              const parsed = JSON.parse(rawProps);
+              if (Array.isArray(parsed)) {
+                const cleaned = parsed.filter(p => {
+                  const pOwner = String(p.ownerId || p.userId || p.uid || p.createdBy || '').toLowerCase().trim();
+                  const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || p.email || '').toLowerCase().trim();
+                  return pOwner !== uIdLow && (!emLow || pEmail !== emLow);
+                });
+                localStorage.setItem(pk, JSON.stringify(cleaned));
+              }
+            } catch (ePk) {}
           }
+        });
+
+        // Clean any old enquiries
+        const rawEnqs = localStorage.getItem('easeland_enquiries');
+        if (rawEnqs) {
+          try {
+            const parsedEnqs = JSON.parse(rawEnqs);
+            if (Array.isArray(parsedEnqs)) {
+              const cleanedEnqs = parsedEnqs.filter(e => {
+                const cId = String(e.customerId || e.ownerId || e.buyerId || '').toLowerCase().trim();
+                const cEmail = String(e.customerEmail || e.ownerEmail || e.buyerEmail || '').toLowerCase().trim();
+                return cId !== uIdLow && (!emLow || cEmail !== emLow);
+              });
+              localStorage.setItem('easeland_enquiries', JSON.stringify(cleanedEnqs));
+            }
+          } catch (eEnq) {}
         }
-      } catch (e) {}
+
+        // Update registered users cache to reflect ACTIVE with 0 listings
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          try {
+            const parsedReg = JSON.parse(rawReg);
+            if (Array.isArray(parsedReg)) {
+              const updatedReg = parsedReg.filter(u => {
+                const uId = String(u.id || u.uid || '').toLowerCase().trim();
+                const uEm = String(u.email || '').toLowerCase().trim();
+                return uId !== uIdLow && (!emLow || uEm !== emLow);
+              });
+              updatedReg.push({
+                uid,
+                id: uid,
+                displayName: data.displayName || data.name || 'EaseLand User',
+                name: data.displayName || data.name || 'EaseLand User',
+                email: data.email || '',
+                phone: data.phone || data.phoneNumber || '',
+                role: 'USER',
+                status: 'ACTIVE',
+                accountStatus: 'ACTIVE',
+                postedListingsCount: 0,
+                capabilities: ['CUSTOMER', 'OWNER'],
+                ownerVerificationState: 'NOT_VERIFIED'
+              });
+              localStorage.setItem('easeland_registered_users', JSON.stringify(updatedReg));
+            }
+          } catch (eReg) {}
+        }
+      } catch (eWipe) {}
     }
 
     const userRef = doc(db, 'users', uid);
     const profile = {
       uid,
       displayName: data.displayName || data.name || 'EaseLand User',
+      name: data.displayName || data.name || 'EaseLand User',
       email: data.email || '',
-      phone: data.phone || '',
+      phone: data.phone || data.phoneNumber || '',
       role: 'USER',
+      status: 'ACTIVE',
       accountStatus: 'ACTIVE',
       capabilities: ['CUSTOMER', 'OWNER'],
       ownerVerificationState: 'NOT_VERIFIED',
+      postedListingsCount: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
     // Clean overwrite without merge: true to wipe any old removed fields or residual notes
     await setDoc(userRef, profile);
-    syncUserToPostgres({ ...profile, id: uid, uid });
+    syncUserToPostgres({ ...profile, id: uid, uid, status: 'ACTIVE', accountStatus: 'ACTIVE' });
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('easeland-users-updated', { detail: profile }));
+        window.dispatchEvent(new CustomEvent('easeland-user-status-changed', {
+          detail: { userId: uid, email: data.email, status: 'ACTIVE' }
+        }));
+      } catch (eEvt) {}
+    }
+
     return { success: true, user: profile };
   } catch (error) {
     console.error('Error creating user profile:', error);

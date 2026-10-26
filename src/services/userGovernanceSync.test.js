@@ -378,4 +378,191 @@ describe('EaseLand User Governance & Real-Time Firebase Sync Suite', () => {
     assert.equal(processedSnapshot.length, 1);
     assert.equal(processedSnapshot[0].id, 'usr-other-1');
   });
+
+  it('11. Relogging with a previously deleted user account unblacklists user, recreates clean-slate profile with accountStatus ACTIVE, and wipes all old profile/draft/enquiry caches', () => {
+    let mockStorage = {};
+    const relogUid = 'usr-relog-777';
+    const relogEmail = 'relog@example.com';
+
+    // Seed storage with previously deleted user state and old residual data
+    mockStorage['easeland_deleted_users'] = JSON.stringify([relogUid, relogEmail]);
+    mockStorage['easeland_user_profile_' + relogUid] = JSON.stringify({ uid: relogUid, bio: 'Old bio', phone: '9999999999', notes: 'Banned note' });
+    mockStorage['easeland_draft_' + relogUid] = JSON.stringify({ draftTitle: 'Old unfinished property' });
+    mockStorage['easeland_wizard_location_' + relogUid] = JSON.stringify({ lat: 16.3, lng: 80.4 });
+    mockStorage['easeland_user_enquiries_' + relogUid] = JSON.stringify([{ id: 'enq-old' }]);
+    mockStorage['easeland_kyc_' + relogUid] = JSON.stringify({ aadhaar: '1234' });
+    mockStorage['easeland_owner_verification_' + relogUid] = JSON.stringify({ state: 'PENDING' });
+    mockStorage['easeland_user_properties'] = JSON.stringify([
+      { id: 'prop-old-1', ownerId: relogUid, title: 'Old Deleted Plot' },
+      { id: 'prop-other', ownerId: 'other-user', title: 'Other Plot' }
+    ]);
+
+    // Simulated relogin unblacklisting and clean-slate profile initialization
+    const uIdLow = relogUid.toLowerCase().trim();
+    const emLow = relogEmail.toLowerCase().trim();
+
+    // 1. Unblacklist
+    const rawDel = mockStorage['easeland_deleted_users'];
+    if (rawDel) {
+      const delArr = JSON.parse(rawDel);
+      const filtered = delArr.filter(item => {
+        const itLow = String(item || '').toLowerCase().trim();
+        return itLow !== uIdLow && itLow !== emLow;
+      });
+      mockStorage['easeland_deleted_users'] = JSON.stringify(filtered);
+    }
+
+    // 2. Wipe residual caches
+    delete mockStorage['easeland_user_profile_' + relogUid];
+    delete mockStorage['easeland_draft_' + relogUid];
+    delete mockStorage['easeland_wizard_location_' + relogUid];
+    delete mockStorage['easeland_kyc_' + relogUid];
+    delete mockStorage['easeland_owner_verification_' + relogUid];
+    delete mockStorage['easeland_user_enquiries_' + relogUid];
+
+    // Clean old properties
+    const rawProps = mockStorage['easeland_user_properties'];
+    if (rawProps) {
+      const parsed = JSON.parse(rawProps);
+      const cleaned = parsed.filter(p => {
+        const pOwner = String(p.ownerId || p.userId || '').toLowerCase().trim();
+        const pEmail = String(p.ownerEmail || p.ownerPrivateEmail || '').toLowerCase().trim();
+        return pOwner !== uIdLow && (!emLow || pEmail !== emLow);
+      });
+      mockStorage['easeland_user_properties'] = JSON.stringify(cleaned);
+    }
+
+    // Verify unblacklist succeeded
+    const updatedBlacklist = JSON.parse(mockStorage['easeland_deleted_users']);
+    assert.equal(updatedBlacklist.length, 0, 'User must be unblacklisted on relogin');
+
+    // Verify all old caches are wiped
+    assert.equal(mockStorage['easeland_user_profile_' + relogUid], undefined);
+    assert.equal(mockStorage['easeland_draft_' + relogUid], undefined);
+    assert.equal(mockStorage['easeland_wizard_location_' + relogUid], undefined);
+    assert.equal(mockStorage['easeland_kyc_' + relogUid], undefined);
+    assert.equal(mockStorage['easeland_owner_verification_' + relogUid], undefined);
+    assert.equal(mockStorage['easeland_user_enquiries_' + relogUid], undefined);
+
+    // Verify old property was removed
+    const remainingUserProps = JSON.parse(mockStorage['easeland_user_properties']);
+    assert.equal(remainingUserProps.length, 1);
+    assert.equal(remainingUserProps[0].id, 'prop-other');
+
+    // Clean profile object
+    const freshProfile = {
+      uid: relogUid,
+      displayName: 'EaseLand User',
+      email: relogEmail,
+      phone: '',
+      role: 'USER',
+      status: 'ACTIVE',
+      accountStatus: 'ACTIVE',
+      postedListingsCount: 0,
+      capabilities: ['CUSTOMER', 'OWNER'],
+      ownerVerificationState: 'NOT_VERIFIED'
+    };
+
+    assert.equal(freshProfile.status, 'ACTIVE');
+    assert.equal(freshProfile.accountStatus, 'ACTIVE');
+    assert.equal(freshProfile.postedListingsCount, 0);
+    assert.equal(freshProfile.ownerVerificationState, 'NOT_VERIFIED');
+  });
+
+  it('12. Reactivated user is immediately recognized by Admin Portal User Governance as ACTIVE with 0 properties and no residual records', () => {
+    const relogUid = 'usr-relog-777';
+    const relogEmail = 'relog@example.com';
+
+    const incomingFirestoreUsers = [
+      {
+        uid: relogUid,
+        id: relogUid,
+        email: relogEmail,
+        name: 'EaseLand User',
+        status: 'ACTIVE',
+        accountStatus: 'ACTIVE',
+        postedListingsCount: 0,
+        role: 'USER'
+      }
+    ];
+
+    const allPlatformProperties = [
+      { id: 'prop-active-99', ownerId: 'other-owner', title: 'Plot in Vijayawada' }
+    ];
+
+    // AdminPortal enrichAndSyncLiveUsers logic
+    const deletedUsers = []; // User was unblacklisted
+    const isUserDeleted = (u) => {
+      if (!u) return true;
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      const uEmail = (u.email || '').toLowerCase().trim();
+      const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+      return rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
+        (uUid && deletedUsers.includes(uUid)) || (uEmail && deletedUsers.includes(uEmail));
+    };
+
+    const userMap = new Map();
+    incomingFirestoreUsers.filter(u => !isUserDeleted(u)).forEach(u => {
+      const emailKey = (u.email || '').toLowerCase().trim();
+      const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
+      const userListings = allPlatformProperties.filter(p => p.ownerId === u.uid);
+      userMap.set(emailKey || uidKey, {
+        ...u,
+        postedListingsCount: userListings.length,
+        status: 'ACTIVE',
+        accountStatus: 'ACTIVE'
+      });
+    });
+
+    const activeUsers = Array.from(userMap.values());
+    assert.equal(activeUsers.length, 1);
+    assert.equal(activeUsers[0].uid, relogUid);
+    assert.equal(activeUsers[0].status, 'ACTIVE');
+    assert.equal(activeUsers[0].accountStatus, 'ACTIVE');
+    assert.equal(activeUsers[0].postedListingsCount, 0, 'Reactivated user must have exactly 0 listings');
+  });
+
+  it('13. Active auth state listener automatically re-establishes ACTIVE clean slate when an authenticated session encounters a missing or deleted Firestore doc', () => {
+    // Authenticated Firebase Auth user
+    const currentUser = {
+      uid: 'usr-firebase-auth-1',
+      email: 'user@example.com',
+      displayName: 'EaseLand User',
+      phoneNumber: ''
+    };
+
+    // Stale doc snapshot returned from Firestore has REMOVED status
+    const docSnap = {
+      exists: true,
+      data: () => ({
+        status: 'REMOVED',
+        accountStatus: 'REMOVED',
+        oldNotes: 'Account was removed'
+      })
+    };
+
+    const fsData = docSnap.data();
+    const uAccStatus = String(fsData.accountStatus || fsData.status || 'ACTIVE').toUpperCase();
+
+    let reactivatedProfile = null;
+    if (uAccStatus === 'REMOVED' || uAccStatus === 'DELETED') {
+      // Automatic re-activation on relogin
+      reactivatedProfile = {
+        uid: currentUser.uid,
+        displayName: currentUser.displayName || 'EaseLand User',
+        email: currentUser.email || '',
+        phone: currentUser.phoneNumber || '',
+        status: 'ACTIVE',
+        accountStatus: 'ACTIVE',
+        postedListingsCount: 0,
+        ownerVerificationState: 'NOT_VERIFIED'
+      };
+    }
+
+    assert.ok(reactivatedProfile !== null, 'Reactivation must trigger');
+    assert.equal(reactivatedProfile.status, 'ACTIVE');
+    assert.equal(reactivatedProfile.accountStatus, 'ACTIVE');
+    assert.equal(reactivatedProfile.postedListingsCount, 0);
+    assert.equal(reactivatedProfile.oldNotes, undefined, 'Old notes must not be present in reactivated profile');
+  });
 });

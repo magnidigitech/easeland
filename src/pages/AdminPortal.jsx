@@ -1368,6 +1368,7 @@ export default function AdminPortal({ onNavigate }) {
     });
 
     window.addEventListener('easeland-users-updated', handleRefresh);
+    window.addEventListener('easeland-user-status-changed', handleRefresh);
     window.addEventListener('easeland-property-created', handleRefresh);
     window.addEventListener('easeland-property-submitted', handleRefresh);
     window.addEventListener('easeland-property-approved', handleRefresh);
@@ -1390,6 +1391,7 @@ export default function AdminPortal({ onNavigate }) {
       clearInterval(pollTimer);
       unsubFirestoreUsers();
       window.removeEventListener('easeland-users-updated', handleRefresh);
+      window.removeEventListener('easeland-user-status-changed', handleRefresh);
       window.removeEventListener('easeland-property-created', handleRefresh);
       window.removeEventListener('easeland-property-submitted', handleRefresh);
       window.removeEventListener('easeland-property-approved', handleRefresh);

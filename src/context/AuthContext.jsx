@@ -173,6 +173,22 @@ export function AuthProvider({ children }) {
     const unsubscribe = subscribeToAuthState((currentUser) => {
       if (currentUser) {
         if (currentUser && currentUser.uid) {
+          if (typeof window !== 'undefined') {
+            try {
+              const rawDel = localStorage.getItem('easeland_deleted_users');
+              if (rawDel) {
+                const delArr = JSON.parse(rawDel);
+                const uIdLow = String(currentUser.uid || '').toLowerCase().trim();
+                const emLow = String(currentUser.email || '').toLowerCase().trim();
+                const filtered = delArr.filter(item => {
+                  const itLow = String(item || '').toLowerCase().trim();
+                  return itLow !== uIdLow && (!emLow || itLow !== emLow);
+                });
+                localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
+              }
+            } catch (eDel) {}
+          }
+
           syncUserToPostgres({
             uid: currentUser.uid,
             id: currentUser.uid,
@@ -265,16 +281,28 @@ export function AuthProvider({ children }) {
           try {
             const userDocRef = doc(db, 'users', currentUser.uid);
             unsubUserDoc = onSnapshot(userDocRef, (docSnap) => {
-              if (docSnap.exists()) {
-                const fsData = docSnap.data();
-                const uAccStatus = String(fsData.accountStatus || fsData.status || 'ACTIVE').toUpperCase();
+              if (!docSnap.exists()) {
+                // If user document is missing in Firestore, re-establish active clean slate
+                createUserProfile(currentUser.uid, {
+                  displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+                  email: currentUser.email || '',
+                  phone: currentUser.phoneNumber || ''
+                });
+                return;
+              }
 
-                if (uAccStatus === 'REMOVED' || uAccStatus === 'DELETED') {
-                  apiLogoutUser();
-                  setUser(null);
-                  setProfile(null);
-                  return;
-                }
+              const fsData = docSnap.data();
+              const uAccStatus = String(fsData.accountStatus || fsData.status || 'ACTIVE').toUpperCase();
+
+              if (uAccStatus === 'REMOVED' || uAccStatus === 'DELETED') {
+                // Relogged user was previously deleted: reactivate immediately with clean slate without old records
+                createUserProfile(currentUser.uid, {
+                  displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+                  email: currentUser.email || '',
+                  phone: currentUser.phoneNumber || ''
+                });
+                return;
+              }
 
                 const resolvedPhone = fsData.phone || fsData.phoneNumber || fsData.mobile || fsData.contactNumber || '';
                 const resolvedCity = fsData.city || fsData.location || '';
@@ -353,7 +381,6 @@ export function AuthProvider({ children }) {
                     }
                   }));
                 }
-              }
             }, (err) => {
               console.warn('Live user profile snapshot notice:', err.message);
             });
@@ -548,6 +575,24 @@ export function AuthProvider({ children }) {
     let userProfileData = null;
 
     if (result.success && result.user) {
+      if (typeof window !== 'undefined') {
+        try {
+          const rawDel = localStorage.getItem('easeland_deleted_users');
+          if (rawDel) {
+            const delArr = JSON.parse(rawDel);
+            const uIdLow = String(result.user.uid || '').toLowerCase().trim();
+            const filtered = delArr.filter(item => {
+              const itLow = String(item || '').toLowerCase().trim();
+              return itLow !== uIdLow && (!lowerEmail || itLow !== lowerEmail);
+            });
+            localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
+          }
+          localStorage.removeItem('easeland_user_profile_' + result.user.uid);
+          localStorage.removeItem('easeland_draft_' + result.user.uid);
+          localStorage.removeItem('easeland_wizard_location_' + result.user.uid);
+        } catch (e) {}
+      }
+
       loggedInUser = result.user;
       let pRes = await getCurrentUserProfile(result.user.uid);
       if (!pRes.success || !pRes.profile) {
