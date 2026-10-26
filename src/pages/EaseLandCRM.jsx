@@ -437,7 +437,7 @@ export default function EaseLandCRM({
       )}
 
       {/* 3. MAIN CRM WORKSPACE CONTENT */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
         {/* TOP KPI PERFORMANCE CARDS */}
         <CrmKpiBanner analytics={analytics} />

@@ -29,7 +29,7 @@ export default function CrmHeader({
   const agentList = (Array.isArray(agents) && agents.length > 0) ? agents : DEFAULT_CRM_AGENTS;
   return (
     <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 text-white shadow-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between py-3.5 gap-4">
 
           {/* BRAND & STUDIO BADGE */}
