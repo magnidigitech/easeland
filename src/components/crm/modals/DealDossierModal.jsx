@@ -184,6 +184,67 @@ export default function DealDossierModal({
             </p>
           </div>
 
+          {/* STAGE MILESTONE SPECIFICATIONS */}
+          {deal.stageData && Object.keys(deal.stageData).length > 0 && (
+            <div className="space-y-2">
+              <span className="text-xs font-black text-slate-900 block">Stage Milestone Specifications</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Object.entries(deal.stageData).map(([stKey, stVal]) => {
+                  if (!stVal || typeof stVal !== 'object') return null;
+                  return (
+                    <div key={stKey} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                      <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider block">
+                        {CrmStageLabels[stKey] || stKey}
+                      </span>
+                      {stVal.negotiatedPrice && (
+                        <div className="font-bold text-slate-800">
+                          Negotiated: <span className="font-black text-emerald-600">Rs. {Number(stVal.negotiatedPrice).toLocaleString('en-IN')}</span>
+                          {stVal.ratePerSqYd && <span className="text-slate-500 font-medium"> (Rs. {stVal.ratePerSqYd}/sq.yd)</span>}
+                        </div>
+                      )}
+                      {stVal.tokenAmount && (
+                        <div className="font-bold text-slate-800">
+                          Advance: <span className="font-black text-teal-700">Rs. {Number(stVal.tokenAmount).toLocaleString('en-IN')}</span>
+                          <span className="text-slate-500 font-medium"> ({stVal.paymentMode || 'RTGS'})</span>
+                          {stVal.paymentRef && <div className="text-[10px] font-mono text-slate-500">Ref: #{stVal.paymentRef}</div>}
+                        </div>
+                      )}
+                      {stVal.visitDate && (
+                        <div className="font-bold text-slate-800">
+                          Visit: {stVal.visitDate} {stVal.visitTime || ''}
+                          {stVal.meetingPoint && <div className="text-[10px] text-slate-500">📍 {stVal.meetingPoint}</div>}
+                        </div>
+                      )}
+                      {stVal.legalStatus && (
+                        <div className="font-bold text-slate-800">
+                          Legal Opinion: <span className="text-purple-700 font-black">{stVal.legalStatus}</span>
+                          {stVal.ecPeriod && <div className="text-[10px] text-slate-500">EC: {stVal.ecPeriod}</div>}
+                        </div>
+                      )}
+                      {stVal.sroOffice && (
+                        <div className="font-bold text-slate-800">
+                          SRO: {stVal.sroOffice}
+                          {stVal.slotDate && <div className="text-[10px] text-blue-700 font-bold">Slot: {stVal.slotDate} {stVal.slotTime || ''}</div>}
+                          {stVal.challanNumber && <div className="text-[10px] font-mono text-slate-500">Challan: #{stVal.challanNumber}</div>}
+                        </div>
+                      )}
+                      {stVal.deedNumber && (
+                        <div className="font-bold text-slate-800">
+                          Sale Deed: <span className="font-black text-emerald-700">{stVal.deedNumber}</span>
+                        </div>
+                      )}
+                      {stVal.lossReason && (
+                        <div className="font-bold text-rose-700">
+                          Loss Reason: {stVal.lossReason}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* PAYMENT MILESTONES & TOKEN ADVANCE STATUS */}
           <div className="space-y-2">
             <span className="text-xs font-black text-slate-900 block">Payment Milestones & Token Status</span>

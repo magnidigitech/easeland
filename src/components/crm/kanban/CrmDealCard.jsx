@@ -199,6 +199,110 @@ export default function CrmDealCard({
         </div>
       </div>
 
+      {/* CONTEXTUAL STAGE-SPECIFIC MILESTONE DATA HIGHLIGHT */}
+      {(() => {
+        const stData = (deal.stageData && deal.stageData[deal.stage]) || {};
+
+        if (deal.stage === CrmDealStages.PRICE_NEGOTIATION) {
+          const negVal = stData.negotiatedPrice ? ('Rs. ' + (Number(stData.negotiatedPrice) / 100000).toFixed(1) + ' Lakhs') : deal.dealValueDisplay;
+          return (
+            <div className="p-2 rounded-xl bg-orange-50/80 border border-orange-200 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-orange-900 tracking-wide">Negotiation Data:</span>
+                <span className="font-black text-orange-700 text-xs">{negVal}</span>
+              </div>
+              {stData.ratePerSqYd && (
+                <div className="text-[11px] font-bold text-orange-800">
+                  {'Rate: Rs. ' + Number(stData.ratePerSqYd).toLocaleString('en-IN') + ' / sq.yd'}
+                </div>
+              )}
+              {stData.negotiationTerms && (
+                <p className="text-[10px] font-medium text-orange-950 line-clamp-1 italic">
+                  {'"' + stData.negotiationTerms + '"'}
+                </p>
+              )}
+            </div>
+          );
+        }
+
+        if (deal.stage === CrmDealStages.TOKEN_ADVANCE) {
+          const tokAmt = stData.tokenAmount ? ('Rs. ' + Number(stData.tokenAmount).toLocaleString('en-IN')) : 'Token Committed';
+          const balDue = stData.balanceDue ? ('Rs. ' + Number(stData.balanceDue).toLocaleString('en-IN')) : null;
+          return (
+            <div className="p-2 rounded-xl bg-teal-50/80 border border-teal-200 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-teal-900 tracking-wide">Advance Paid:</span>
+                <span className="font-black text-teal-700 text-xs">{tokAmt}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-bold text-teal-800">
+                <span>{stData.paymentMode || 'RTGS / Bank Transfer'}</span>
+                {stData.paymentRef && <span className="font-mono">#{stData.paymentRef}</span>}
+              </div>
+              {balDue && (
+                <div className="text-[10px] font-extrabold text-slate-600 pt-0.5 border-t border-teal-200/60">
+                  {'Balance Due: ' + balDue}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (deal.stage === CrmDealStages.SITE_VISIT) {
+          return (
+            <div className="p-2 rounded-xl bg-amber-50/80 border border-amber-200 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-amber-900 tracking-wide">Scheduled Visit:</span>
+                <span className="font-black text-amber-800 text-xs">
+                  {stData.visitDate ? (stData.visitDate + ' ' + (stData.visitTime || '')) : 'Visit Pending'}
+                </span>
+              </div>
+              {stData.meetingPoint && (
+                <div className="text-[10px] font-bold text-slate-700 truncate">
+                  {'📍 ' + stData.meetingPoint}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (deal.stage === CrmDealStages.DOCUMENT_AUDIT) {
+          return (
+            <div className="p-2 rounded-xl bg-purple-50/80 border border-purple-200 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-purple-900 tracking-wide">Title Audit:</span>
+                <span className="font-black text-purple-700 text-[10px]">
+                  {stData.legalStatus === 'CLEAR_TITLE' ? 'Clear & Marketable' : (stData.legalStatus || 'VERIFIED')}
+                </span>
+              </div>
+              {stData.ecPeriod && (
+                <div className="text-[10px] font-bold text-purple-800 truncate">
+                  {'EC: ' + stData.ecPeriod}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (deal.stage === CrmDealStages.REGISTRATION_PENDING) {
+          return (
+            <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-200 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-blue-900 tracking-wide">SRO Slot:</span>
+                <span className="font-black text-blue-800 text-xs">
+                  {stData.slotDate ? (stData.slotDate + ' ' + (stData.slotTime || '')) : 'Slot Booking'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-bold text-slate-700">
+                <span className="truncate">{stData.sroOffice || 'Sub-Registrar'}</span>
+                {stData.challanNumber && <span className="font-mono text-blue-700 truncate max-w-[100px]">#{stData.challanNumber}</span>}
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
+
       {/* STAGE-SPECIFIC FOLLOW-UP ACTION & TIMING */}
       {deal.stage !== CrmDealStages.CLOSED_WON && deal.stage !== CrmDealStages.CLOSED_LOST ? (
         <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>

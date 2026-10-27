@@ -44,6 +44,7 @@ import NewDealModal from '../components/crm/modals/NewDealModal.jsx';
 import ScheduleVisitModal from '../components/crm/modals/ScheduleVisitModal.jsx';
 import DealDossierModal from '../components/crm/modals/DealDossierModal.jsx';
 import ScheduleFollowUpModal from '../components/crm/modals/ScheduleFollowUpModal.jsx';
+import StageTransitionModal from '../components/crm/modals/StageTransitionModal.jsx';
 
 export default function EaseLandCRM({
   currentUser,
@@ -82,6 +83,7 @@ export default function EaseLandCRM({
   const [selectedDealForDossier, setSelectedDealForDossier] = useState(null);
   const [isScheduleFollowUpModalOpen, setIsScheduleFollowUpModalOpen] = useState(false);
   const [selectedDealForFollowUp, setSelectedDealForFollowUp] = useState(null);
+  const [stageTransitionContext, setStageTransitionContext] = useState(null);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState('');
@@ -283,28 +285,99 @@ export default function EaseLandCRM({
     }
   };
 
-  // Handle 1-Click / Drag Deal Stage Advance
+  // Handle 1-Click / Drag Deal Stage Advance (Opens Stage-Specific Milestone Intake Modal)
   const handleAdvanceDealStage = async (dealId, nextStage, note = '') => {
     const targetDeal = deals.find(d => d.id === dealId);
-    if (targetDeal && targetDeal.isPropertyQuarantined && nextStage !== 'CLOSED_LOST') {
+    if (!targetDeal) return;
+
+    if (targetDeal.isPropertyQuarantined && nextStage !== 'CLOSED_LOST') {
       triggerToast('Action blocked: Referenced property was quarantined by Admin Compliance.');
       return;
     }
 
-    const stageFollowUp = getStageDefaultFollowUp(nextStage);
+    if (nextStage === targetDeal.stage) {
+      return;
+    }
 
-    // Optimistic UI Update with stage-adjusted follow-up action and date
+    // Open contextual stage milestone data intake modal
+    setStageTransitionContext({
+      deal: targetDeal,
+      targetStage: nextStage,
+      defaultNote: note || ''
+    });
+  };
+
+  // Confirm Stage Transition with Contextual Milestone Data
+  const handleConfirmStageTransition = async (dealId, nextStage, stageFormData, followUpData, noteText) => {
+    const targetDeal = deals.find(d => d.id === dealId);
+    if (!targetDeal) return;
+
+    // Recalculate financials if price negotiation
+    let updatedDealValue = Number(targetDeal.dealValue) || 0;
+    let updatedDealValueDisplay = targetDeal.dealValueDisplay;
+    let updatedExpectedCommission = Number(targetDeal.expectedCommission) || 0;
+
+    if (nextStage === CrmDealStages.PRICE_NEGOTIATION && stageFormData && stageFormData.negotiatedPrice) {
+      const negVal = Number(stageFormData.negotiatedPrice);
+      if (negVal > 0) {
+        updatedDealValue = negVal;
+        updatedDealValueDisplay = 'Rs. ' + (negVal / 100000).toFixed(1) + ' Lakhs';
+        updatedExpectedCommission = Math.round(negVal * (Number(targetDeal.commissionRate || 1.5) / 100));
+      }
+    }
+
+    // Recalculate payment milestones if token advance
+    let updatedPaymentMilestones = Array.isArray(targetDeal.paymentMilestones) ? [...targetDeal.paymentMilestones] : [];
+    if (nextStage === CrmDealStages.TOKEN_ADVANCE && stageFormData && stageFormData.tokenAmount) {
+      const tokVal = Number(stageFormData.tokenAmount);
+      if (tokVal > 0) {
+        const mIdx = updatedPaymentMilestones.findIndex(m => m.name && m.name.toLowerCase().includes('token'));
+        const tokenEntry = {
+          name: 'Token Advance / Bayana',
+          amount: tokVal,
+          date: stageFormData.paymentDate || new Date().toISOString().split('T')[0],
+          status: 'PAID',
+          paymentMode: stageFormData.paymentMode || 'RTGS / Bank Transfer',
+          reference: stageFormData.paymentRef || 'Verified',
+          balanceDue: Number(stageFormData.balanceDue) || Math.max(0, updatedDealValue - tokVal)
+        };
+        if (mIdx >= 0) {
+          updatedPaymentMilestones[mIdx] = tokenEntry;
+        } else {
+          updatedPaymentMilestones.unshift(tokenEntry);
+        }
+      }
+    }
+
+    // Optimistic UI Update with stage-adjusted follow-up action, date, and milestone data
     setDeals(prev => prev.map(d => d.id === dealId ? {
       ...d,
       stage: nextStage,
-      nextFollowUpAction: stageFollowUp.action,
-      nextFollowUpDate: stageFollowUp.date,
-      nextFollowUpTime: stageFollowUp.time
+      dealValue: updatedDealValue,
+      dealValueDisplay: updatedDealValueDisplay,
+      expectedCommission: updatedExpectedCommission,
+      paymentMilestones: updatedPaymentMilestones,
+      stageData: {
+        ...(d.stageData || {}),
+        [nextStage]: stageFormData
+      },
+      nextFollowUpAction: followUpData.action,
+      nextFollowUpDate: followUpData.date,
+      nextFollowUpTime: followUpData.time,
+      lastActivityAt: new Date().toISOString()
     } : d));
 
-    const res = await updateCrmDealStage(dealId, nextStage, note, stageFollowUp);
+    const res = await updateCrmDealStage(
+      dealId,
+      nextStage,
+      noteText,
+      followUpData,
+      stageFormData,
+      { dealValue: updatedDealValue, paymentMilestones: updatedPaymentMilestones }
+    );
+
     if (res.success) {
-      triggerToast('Deal moved to ' + (CrmStageLabels[nextStage] || nextStage) + '. Follow-up adjusted: ' + stageFollowUp.milestone);
+      triggerToast('Deal moved to ' + (CrmStageLabels[nextStage] || nextStage) + '. Milestone data & follow-up updated.');
       await loadCrmData(false);
     } else {
       triggerToast(res.error || 'Failed to update stage. Reverting view.');
@@ -715,6 +788,18 @@ export default function EaseLandCRM({
         onSave={handleSaveFollowUp}
         agentName={agents[0]?.name || 'EaseLand Admin'}
       />
+
+      {/* MODAL 6: STAGE TRANSITION & MILESTONE DATA INTAKE */}
+      {stageTransitionContext && (
+        <StageTransitionModal
+          isOpen={Boolean(stageTransitionContext)}
+          onClose={() => setStageTransitionContext(null)}
+          deal={stageTransitionContext.deal}
+          targetStage={stageTransitionContext.targetStage}
+          onConfirm={handleConfirmStageTransition}
+          activeAgents={agents}
+        />
+      )}
 
     </div>
   );

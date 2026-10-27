@@ -759,11 +759,12 @@ async function initPgDb() {
       );
     `);
 
-    // Follow-up columns migration for crm_deals and crm_leads
+    // Follow-up & stage milestone data columns migration for crm_deals and crm_leads
     try {
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
+      await client.query("ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS stage_data JSONB DEFAULT '{}'::jsonb;");
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
@@ -3290,6 +3291,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       notes: r.notes,
       paymentMilestones: r.payment_milestones || [],
       timeline: r.timeline || [],
+      stageData: r.stage_data || (r.raw_data && r.raw_data.stageData) || {},
       version: Number(r.version) || 1,
       createdAt: r.created_at,
       updatedAt: r.updated_at
@@ -3797,7 +3799,16 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
   const client = await pgPool.connect();
   try {
     const { id } = req.params;
-    const { newStage, noteText, nextFollowUpAction, nextFollowUpDate, nextFollowUpTime } = req.body;
+    const {
+      newStage,
+      noteText,
+      nextFollowUpAction,
+      nextFollowUpDate,
+      nextFollowUpTime,
+      stageData,
+      dealValue,
+      paymentMilestones
+    } = req.body || {};
     const P = String.fromCharCode(36);
 
     let newProbability = 50;
@@ -3862,9 +3873,77 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
     }
 
     const nowIso = new Date().toISOString();
+
+    // Stage milestone data management
+    const currentStageData = current.stage_data || (current.raw_data && current.raw_data.stageData) || {};
+    const updatedStageData = stageData ? { ...currentStageData, [newStage]: stageData } : currentStageData;
+
+    // Recalculate financial values if price was negotiated
+    let updatedDealValue = Number(current.deal_value) || 0;
+    let updatedDealValueDisplay = current.deal_value_display;
+    let updatedExpectedCommission = Number(current.expected_commission) || 0;
+
+    if (newStage === 'PRICE_NEGOTIATION' && stageData && stageData.negotiatedPrice) {
+      const negotiatedVal = Number(stageData.negotiatedPrice);
+      if (negotiatedVal > 0) {
+        updatedDealValue = negotiatedVal;
+        updatedDealValueDisplay = 'Rs. ' + (negotiatedVal / 100000).toFixed(1) + ' Lakhs';
+        updatedExpectedCommission = Math.round(negotiatedVal * (Number(current.commission_rate || 1.5) / 100));
+      }
+    } else if (dealValue && Number(dealValue) > 0) {
+      updatedDealValue = Number(dealValue);
+      updatedDealValueDisplay = 'Rs. ' + (updatedDealValue / 100000).toFixed(1) + ' Lakhs';
+      updatedExpectedCommission = Math.round(updatedDealValue * (Number(current.commission_rate || 1.5) / 100));
+    }
+
+    // Payment milestones management for token advance
+    let updatedPaymentMilestones = Array.isArray(current.payment_milestones) ? [...current.payment_milestones] : [];
+    if (newStage === 'TOKEN_ADVANCE' && stageData && stageData.tokenAmount) {
+      const tokenAmt = Number(stageData.tokenAmount);
+      if (tokenAmt > 0) {
+        const mIndex = updatedPaymentMilestones.findIndex(m => m.name && m.name.toLowerCase().includes('token'));
+        const tokenEntry = {
+          name: 'Token Advance / Bayana',
+          amount: tokenAmt,
+          date: stageData.paymentDate || nowIso.split('T')[0],
+          status: 'PAID',
+          paymentMode: stageData.paymentMode || 'RTGS / Bank Transfer',
+          reference: stageData.paymentRef || 'Verified',
+          balanceDue: Number(stageData.balanceDue) || Math.max(0, updatedDealValue - tokenAmt)
+        };
+        if (mIndex >= 0) {
+          updatedPaymentMilestones[mIndex] = tokenEntry;
+        } else {
+          updatedPaymentMilestones.unshift(tokenEntry);
+        }
+      }
+    } else if (Array.isArray(paymentMilestones) && paymentMilestones.length > 0) {
+      updatedPaymentMilestones = paymentMilestones;
+    }
+
+    // Construct tailored audit trail timeline event
+    let stageEventText = 'Stage changed to ' + newStage;
+    if (newStage === 'PRICE_NEGOTIATION' && stageData && stageData.negotiatedPrice) {
+      stageEventText = 'Price Negotiated: ' + updatedDealValueDisplay + (stageData.ratePerSqYd ? ' (Rs. ' + stageData.ratePerSqYd + '/sq.yd)' : '') + (stageData.negotiationTerms ? ' — ' + stageData.negotiationTerms : '');
+    } else if (newStage === 'TOKEN_ADVANCE' && stageData && stageData.tokenAmount) {
+      stageEventText = 'Token Advance Paid: Rs. ' + Number(stageData.tokenAmount).toLocaleString('en-IN') + ' via ' + (stageData.paymentMode || 'RTGS') + (stageData.paymentRef ? ' (Ref: ' + stageData.paymentRef + ')' : '') + ' • Balance: Rs. ' + Number(stageData.balanceDue || (updatedDealValue - Number(stageData.tokenAmount))).toLocaleString('en-IN');
+    } else if (newStage === 'SITE_VISIT' && stageData && stageData.visitDate) {
+      stageEventText = 'Site Visit Scheduled: ' + stageData.visitDate + (stageData.visitTime ? ' at ' + stageData.visitTime : '') + (stageData.assignedAgent ? ' with ' + stageData.assignedAgent : '') + (stageData.meetingPoint ? ' (' + stageData.meetingPoint + ')' : '');
+    } else if (newStage === 'DOCUMENT_AUDIT' && stageData && stageData.legalStatus) {
+      stageEventText = 'Title Deed Audit: Status: ' + stageData.legalStatus + (stageData.ecPeriod ? ' • EC: ' + stageData.ecPeriod : '') + (stageData.advocateName ? ' (' + stageData.advocateName + ')' : '');
+    } else if (newStage === 'REGISTRATION_PENDING' && stageData && stageData.sroOffice) {
+      stageEventText = 'SRO Slot Scheduled: ' + stageData.sroOffice + (stageData.slotDate ? ' on ' + stageData.slotDate : '') + (stageData.challanNumber ? ' • Challan: ' + stageData.challanNumber : '');
+    } else if (newStage === 'CLOSED_WON' && stageData && stageData.deedNumber) {
+      stageEventText = 'Deal Won: Executed Deed No. ' + stageData.deedNumber + ' • Full consideration received';
+    } else if (newStage === 'CLOSED_LOST' && stageData && stageData.lossReason) {
+      stageEventText = 'Deal Lost: Reason: ' + stageData.lossReason + (stageData.lossNotes ? ' (' + stageData.lossNotes + ')' : '');
+    } else {
+      stageEventText = 'Stage changed to ' + newStage + '. Follow-up adjusted: ' + targetFollowUpAction;
+    }
+
     const timelineEntry = {
       date: nowIso.split('T')[0],
-      event: 'Stage changed to ' + newStage + '. Follow-up adjusted: ' + targetFollowUpAction,
+      event: stageEventText,
       user: 'EaseLand Admin' + (noteText ? ' (' + noteText + ')' : '')
     };
     const updatedTimeline = [...(current.timeline || []), timelineEntry];
@@ -3888,9 +3967,14 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
       'next_follow_up_action = ' + P + '4, ' +
       'next_follow_up_date = ' + P + '5, ' +
       'next_follow_up_time = ' + P + '6, ' +
+      'deal_value = ' + P + '7, ' +
+      'deal_value_display = ' + P + '8, ' +
+      'expected_commission = ' + P + '9, ' +
+      'payment_milestones = ' + P + '10, ' +
+      'stage_data = ' + P + '11, ' +
       'version = version + 1, ' +
       'updated_at = NOW() ' +
-      'WHERE deal_id = ' + P + '7 RETURNING *;';
+      'WHERE deal_id = ' + P + '12 RETURNING *;';
 
     const updRes = await client.query(updateSql, [
       newStage,
@@ -3899,6 +3983,11 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
       targetFollowUpAction,
       targetFollowUpDate,
       targetFollowUpTime,
+      updatedDealValue,
+      updatedDealValueDisplay,
+      updatedExpectedCommission,
+      JSON.stringify(updatedPaymentMilestones),
+      JSON.stringify(updatedStageData),
       id
     ]);
 
@@ -3910,6 +3999,11 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
       dealId: row.deal_id,
       stage: row.stage,
       probability: row.probability,
+      dealValue: Number(row.deal_value),
+      dealValueDisplay: row.deal_value_display,
+      expectedCommission: Number(row.expected_commission),
+      paymentMilestones: row.payment_milestones,
+      stageData: row.stage_data || {},
       nextFollowUpAction: row.next_follow_up_action,
       nextFollowUpDate: row.next_follow_up_date,
       nextFollowUpTime: row.next_follow_up_time
@@ -3922,6 +4016,11 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
         dealId: row.deal_id,
         stage: row.stage,
         probability: row.probability,
+        dealValue: Number(row.deal_value),
+        dealValueDisplay: row.deal_value_display,
+        expectedCommission: Number(row.expected_commission),
+        paymentMilestones: row.payment_milestones,
+        stageData: row.stage_data || {},
         nextFollowUpAction: row.next_follow_up_action,
         nextFollowUpDate: row.next_follow_up_date,
         nextFollowUpTime: row.next_follow_up_time,

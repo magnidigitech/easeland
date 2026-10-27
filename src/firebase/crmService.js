@@ -620,7 +620,7 @@ export async function createCrmDeal(dealData) {
   return { success: true, deal: payload };
 }
 
-export async function updateCrmDealStage(dealId, newStage, noteText = '', followUpData = null) {
+export async function updateCrmDealStage(dealId, newStage, noteText = '', followUpData = null, stageData = null, extraData = {}) {
   const stageFollowUp = followUpData || getStageDefaultFollowUp(newStage);
 
   if (isBrowser) {
@@ -633,7 +633,10 @@ export async function updateCrmDealStage(dealId, newStage, noteText = '', follow
           noteText,
           nextFollowUpAction: stageFollowUp.action,
           nextFollowUpDate: stageFollowUp.date,
-          nextFollowUpTime: stageFollowUp.time
+          nextFollowUpTime: stageFollowUp.time,
+          stageData,
+          dealValue: extraData.dealValue,
+          paymentMilestones: extraData.paymentMilestones
         })
       });
       if (res.ok) return { success: true };
@@ -659,6 +662,17 @@ export async function updateCrmDealStage(dealId, newStage, noteText = '', follow
     target.nextFollowUpAction = stageFollowUp.action;
     target.nextFollowUpDate = stageFollowUp.date;
     target.nextFollowUpTime = stageFollowUp.time;
+    if (stageData) {
+      target.stageData = { ...(target.stageData || {}), [newStage]: stageData };
+    }
+    if (newStage === CrmDealStages.PRICE_NEGOTIATION && stageData && stageData.negotiatedPrice) {
+      const negVal = Number(stageData.negotiatedPrice);
+      if (negVal > 0) {
+        target.dealValue = negVal;
+        target.dealValueDisplay = 'Rs. ' + (negVal / 100000).toFixed(1) + ' Lakhs';
+        target.expectedCommission = Math.round(negVal * (Number(target.commissionRate || 1.5) / 100));
+      }
+    }
     target.timeline = target.timeline || [];
     target.timeline.push({
       date: new Date().toISOString().split('T')[0],
