@@ -11,7 +11,8 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Clock
 } from 'lucide-react';
 import { CrmStageLabels, CrmDealStages } from '../../../firebase/crmService.js';
 import CrmDealCard from './CrmDealCard.jsx';
@@ -131,13 +132,36 @@ export default function CrmKanbanBoard({
   onDeleteDeal,
   onTriggerWhatsApp,
   onOpenNewDeal,
+  onOpenFollowUp,
   isFieldExecutive = false
 }) {
   const [selectedStageFilters, setSelectedStageFilters] = useState([]);
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false);
+  const [onlyDueToday, setOnlyDueToday] = useState(false);
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'ledger'
   const [draggedDealId, setDraggedDealId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
+
+  const todayIso = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const dueTodayCount = useMemo(() => {
+    return deals.filter(d =>
+      d.stage !== CrmDealStages.CLOSED_WON &&
+      d.stage !== CrmDealStages.CLOSED_LOST &&
+      d.nextFollowUpDate &&
+      d.nextFollowUpDate <= todayIso
+    ).length;
+  }, [deals, todayIso]);
+
+  const displayedDeals = useMemo(() => {
+    if (!onlyDueToday) return deals;
+    return deals.filter(d =>
+      d.stage !== CrmDealStages.CLOSED_WON &&
+      d.stage !== CrmDealStages.CLOSED_LOST &&
+      d.nextFollowUpDate &&
+      d.nextFollowUpDate <= todayIso
+    );
+  }, [deals, onlyDueToday, todayIso]);
 
   // Scroll Container Ref & Nav State
   const scrollContainerRef = useRef(null);
@@ -362,6 +386,29 @@ export default function CrmKanbanBoard({
             )}
           </div>
 
+          {/* QUICK TOGGLE: DUE TODAY / OVERDUE */}
+          <button
+            type="button"
+            onClick={() => setOnlyDueToday(!onlyDueToday)}
+            className={'px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 border ' +
+              (onlyDueToday
+                ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-xs'
+                : 'bg-slate-50 border-slate-300 text-slate-700 hover:border-amber-400 hover:bg-white'
+              )
+            }
+            title={onlyDueToday ? 'Show all pipeline deals' : 'Filter deals with follow-ups due today or overdue'}
+          >
+            <Clock className={'w-3.5 h-3.5 ' + (onlyDueToday ? 'text-slate-950' : 'text-amber-500')} />
+            <span>Due Today</span>
+            {dueTodayCount > 0 && (
+              <span className={'px-1.5 py-0.2 rounded-full text-[10px] font-black ' +
+                (onlyDueToday ? 'bg-slate-950 text-amber-400' : 'bg-amber-100 text-amber-900')
+              }>
+                {dueTodayCount}
+              </span>
+            )}
+          </button>
+
         </div>
 
         {/* VIEW MODE TOGGLE, STAGE ARROWS & NEW DEAL BUTTON */}
@@ -534,7 +581,7 @@ export default function CrmKanbanBoard({
             className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100dvh-340px)] custom-scrollbar scroll-smooth px-1"
           >
             {visibleStages.map((stage, sIdx) => {
-              const stageDeals = deals.filter(d => d.stage === stage);
+              const stageDeals = displayedDeals.filter(d => d.stage === stage);
               const stageTotal = stageDeals.reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0);
               const stageFormattedTotal = stageTotal >= 10000000
                 ? 'Rs. ' + (stageTotal / 10000000).toFixed(2) + ' Cr'
@@ -640,6 +687,7 @@ export default function CrmKanbanBoard({
                           onAdvanceStage={onAdvanceStage}
                           onDeleteDeal={onDeleteDeal}
                           onTriggerWhatsApp={onTriggerWhatsApp}
+                          onOpenFollowUp={onOpenFollowUp}
                           isBeingDragged={draggedDealId === deal.id}
                           isFieldExecutive={isFieldExecutive}
                           onDragStart={(e) => {
@@ -683,14 +731,14 @@ export default function CrmKanbanBoard({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                {deals.length === 0 ? (
+                {displayedDeals.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                       No deals found matching the search and stage criteria.
                     </td>
                   </tr>
                 ) : (
-                  deals.map((deal) => (
+                  displayedDeals.map((deal) => (
                     <tr
                       key={deal.id}
                       onClick={() => onSelectDeal(deal)}

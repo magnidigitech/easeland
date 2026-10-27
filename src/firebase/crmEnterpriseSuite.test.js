@@ -9,6 +9,7 @@ import {
   deleteCrmLead,
   createCrmDeal,
   updateCrmDealStage,
+  updateCrmDealFollowUp,
   deleteCrmDeal,
   scheduleCrmVisit,
   updateCrmVisitStatus,
@@ -257,5 +258,69 @@ test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
     const concludedStats = calculateCrmAnalytics(concludedDeals, [], []);
     assert.strictEqual(concludedStats.conversionRate, 50, '1 won of 2 concluded deals must equal 50%');
     assert.strictEqual(concludedStats.totalFinishedDealsCount, 2);
+  });
+
+  await t.test('12. Deal creation preserves follow-up schedule and updateCrmDealFollowUp records call activity', async () => {
+    const todayIso = new Date().toISOString().split('T')[0];
+    const dealRes = await createCrmDeal({
+      customerName: 'Y. V. Subba Reddy',
+      customerPhone: '+91 99887 66554',
+      propertyTitle: 'Amaravati Highway Commercial Venture',
+      dealValue: 15000000,
+      nextFollowUpDate: todayIso,
+      nextFollowUpTime: '02:30 PM',
+      nextFollowUpAction: 'Send audited revenue sketch to buyer'
+    });
+
+    assert.ok(dealRes.success);
+    assert.strictEqual(dealRes.deal.nextFollowUpDate, todayIso);
+    assert.strictEqual(dealRes.deal.nextFollowUpTime, '02:30 PM');
+    assert.strictEqual(dealRes.deal.nextFollowUpAction, 'Send audited revenue sketch to buyer');
+
+    // Reschedule and log completed activity
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowIso = tomorrow.toISOString().split('T')[0];
+
+    const updateRes = await updateCrmDealFollowUp(dealRes.deal.id, {
+      followUpDate: tomorrowIso,
+      followUpTime: '11:00 AM',
+      followUpAction: 'Confirm token advance bank transfer',
+      logNote: 'Call Logged: Connected & Interested - Buyer agreed to sign MOU tomorrow morning',
+      agentName: 'EaseLand Senior Broker'
+    });
+
+    assert.ok(updateRes.success);
+    assert.strictEqual(updateRes.deal.nextFollowUpDate, tomorrowIso);
+    assert.strictEqual(updateRes.deal.nextFollowUpTime, '11:00 AM');
+    assert.strictEqual(updateRes.deal.nextFollowUpAction, 'Confirm token advance bank transfer');
+
+    const timeline = updateRes.deal.timeline || [];
+    assert.ok(timeline.some(e => e.event.includes('Connected & Interested')));
+    assert.ok(timeline.some(e => e.event.includes('Confirm token advance bank transfer')));
+  });
+
+  await t.test('13. calculateCrmAnalytics accurately calculates followUpsDueTodayCount including overdue items', () => {
+    const today = new Date();
+    const todayIso = today.toISOString().split('T')[0];
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayIso = yesterday.toISOString().split('T')[0];
+
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const nextWeekIso = nextWeek.toISOString().split('T')[0];
+
+    const testDeals = [
+      { id: 'd1', stage: CrmDealStages.NEW, nextFollowUpDate: yesterdayIso, dealValue: 1000000 }, // Overdue (counts)
+      { id: 'd2', stage: CrmDealStages.CONTACTED, nextFollowUpDate: todayIso, dealValue: 2000000 }, // Today (counts)
+      { id: 'd3', stage: CrmDealStages.PRICE_NEGOTIATION, nextFollowUpDate: nextWeekIso, dealValue: 3000000 }, // Future (does not count)
+      { id: 'd4', stage: CrmDealStages.CLOSED_WON, nextFollowUpDate: todayIso, dealValue: 4000000 }, // Won/Closed (does not count)
+      { id: 'd5', stage: CrmDealStages.CLOSED_LOST, nextFollowUpDate: yesterdayIso, dealValue: 5000000 } // Lost/Closed (does not count)
+    ];
+
+    const stats = calculateCrmAnalytics(testDeals, [], []);
+    assert.strictEqual(stats.followUpsDueTodayCount, 2, 'Should count 1 overdue and 1 due today, ignoring future and closed deals');
   });
 });

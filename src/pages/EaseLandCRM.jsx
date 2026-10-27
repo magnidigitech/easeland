@@ -20,6 +20,7 @@ import {
   deleteCrmLead,
   createCrmDeal,
   updateCrmDealStage,
+  updateCrmDealFollowUp,
   deleteCrmDeal,
   scheduleCrmVisit,
   updateCrmVisitStatus,
@@ -40,6 +41,7 @@ import NewLeadModal from '../components/crm/modals/NewLeadModal.jsx';
 import NewDealModal from '../components/crm/modals/NewDealModal.jsx';
 import ScheduleVisitModal from '../components/crm/modals/ScheduleVisitModal.jsx';
 import DealDossierModal from '../components/crm/modals/DealDossierModal.jsx';
+import ScheduleFollowUpModal from '../components/crm/modals/ScheduleFollowUpModal.jsx';
 
 export default function EaseLandCRM({
   currentUser,
@@ -72,9 +74,12 @@ export default function EaseLandCRM({
   // Modals State
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
   const [isNewDealModalOpen, setIsNewDealModalOpen] = useState(false);
+  const [newDealInitialData, setNewDealInitialData] = useState(null);
   const [isScheduleVisitModalOpen, setIsScheduleVisitModalOpen] = useState(false);
   const [scheduleVisitInitialData, setScheduleVisitInitialData] = useState(null);
   const [selectedDealForDossier, setSelectedDealForDossier] = useState(null);
+  const [isScheduleFollowUpModalOpen, setIsScheduleFollowUpModalOpen] = useState(false);
+  const [selectedDealForFollowUp, setSelectedDealForFollowUp] = useState(null);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState('');
@@ -187,7 +192,81 @@ export default function EaseLandCRM({
     if (res.success) {
       triggerToast('Deal for ' + dealFormData.customerName + ' successfully initiated.');
       setIsNewDealModalOpen(false);
+      setNewDealInitialData(null);
       await loadCrmData(false);
+    }
+  };
+
+  // 1-Click Convert Lead to Deal Handler
+  const handleConvertLeadToDeal = (lead) => {
+    if (!lead) return;
+    setNewDealInitialData({
+      customerName: lead.name || '',
+      customerPhone: lead.phone || '',
+      customerEmail: lead.email || '',
+      propertyLocation: lead.preferredLocation || 'Amaravati / Guntur',
+      propertyTitle: lead.preferredPropertyType || 'Open Plot Venture',
+      dealValue: lead.budgetMax || '',
+      assignedAgent: lead.assignedAgent || (agents[0]?.name || 'EaseLand Admin'),
+      nextFollowUpDate: new Date().toISOString().split('T')[0],
+      nextFollowUpAction: 'Initial conversion qualification call'
+    });
+    setIsNewDealModalOpen(true);
+  };
+
+  // Handle Open Follow-up Modal
+  const handleOpenFollowUp = (deal) => {
+    setSelectedDealForFollowUp(deal);
+    setIsScheduleFollowUpModalOpen(true);
+  };
+
+  // Handle Save Follow-up
+  const handleSaveFollowUp = async (dealId, followUpData) => {
+    try {
+      const res = await updateCrmDealFollowUp(dealId, followUpData);
+      if (res.success) {
+        setDeals(prev => prev.map(d => {
+          if (d.id === dealId || d.dealId === dealId) {
+            const updatedTimeline = Array.isArray(d.timeline) ? [...d.timeline] : [];
+            if (followUpData.logNote) {
+              updatedTimeline.push({
+                date: new Date().toISOString().split('T')[0],
+                event: followUpData.logNote,
+                user: followUpData.agentName || 'EaseLand Admin'
+              });
+            }
+            if (followUpData.followUpAction) {
+              updatedTimeline.push({
+                date: new Date().toISOString().split('T')[0],
+                event: 'Follow-up scheduled for ' + (followUpData.followUpDate || 'Due') + ' at ' + (followUpData.followUpTime || '11:00 AM') + ': ' + followUpData.followUpAction,
+                user: followUpData.agentName || 'EaseLand Admin'
+              });
+            }
+            return {
+              ...d,
+              nextFollowUpDate: followUpData.followUpDate !== undefined ? followUpData.followUpDate : d.nextFollowUpDate,
+              nextFollowUpTime: followUpData.followUpTime || d.nextFollowUpTime,
+              nextFollowUpAction: followUpData.followUpAction !== undefined ? followUpData.followUpAction : d.nextFollowUpAction,
+              timeline: updatedTimeline,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return d;
+        }));
+        if (selectedDealForDossier && (selectedDealForDossier.id === dealId || selectedDealForDossier.dealId === dealId)) {
+          setSelectedDealForDossier(prev => prev ? {
+            ...prev,
+            nextFollowUpDate: followUpData.followUpDate !== undefined ? followUpData.followUpDate : prev.nextFollowUpDate,
+            nextFollowUpTime: followUpData.followUpTime || prev.nextFollowUpTime,
+            nextFollowUpAction: followUpData.followUpAction !== undefined ? followUpData.followUpAction : prev.nextFollowUpAction
+          } : prev);
+        }
+        triggerToast('Follow-up scheduled successfully.');
+        await loadCrmData(false);
+      }
+    } catch (err) {
+      console.error('Failed to schedule follow-up:', err);
+      triggerToast('Error saving follow-up.');
     }
   };
 
@@ -423,6 +502,8 @@ export default function EaseLandCRM({
         onRefresh={() => loadCrmData(true)}
         loading={loading}
         isLiveConnected={isLiveConnected}
+        followUpsDueTodayCount={analytics?.followUpsDueTodayCount || 0}
+        onQuickFilterFollowUps={() => setActiveTab('pipeline')}
       />
 
       {/* 2. TOAST BANNER */}
@@ -505,7 +586,11 @@ export default function EaseLandCRM({
             onAdvanceStage={handleAdvanceDealStage}
             onDeleteDeal={handleDeleteDeal}
             onTriggerWhatsApp={handleTriggerWhatsApp}
-            onOpenNewDeal={() => setIsNewDealModalOpen(true)}
+            onOpenFollowUp={handleOpenFollowUp}
+            onOpenNewDeal={() => {
+              setNewDealInitialData(null);
+              setIsNewDealModalOpen(true);
+            }}
             isFieldExecutive={isFieldExecutive}
           />
         )}
@@ -522,6 +607,7 @@ export default function EaseLandCRM({
             onOpenNewLead={() => setIsNewLeadModalOpen(true)}
             onDeleteLead={handleDeleteLead}
             onTriggerWhatsApp={handleTriggerWhatsApp}
+            onConvertToDeal={handleConvertLeadToDeal}
             isFieldExecutive={isFieldExecutive}
           />
         )}
@@ -570,11 +656,15 @@ export default function EaseLandCRM({
       {/* MODAL 2: INITIATE TRANSACTION DEAL */}
       <NewDealModal
         isOpen={isNewDealModalOpen}
-        onClose={() => setIsNewDealModalOpen(false)}
+        onClose={() => {
+          setIsNewDealModalOpen(false);
+          setNewDealInitialData(null);
+        }}
         onSubmit={handleCreateDeal}
         kanbanStages={kanbanStages}
         agents={agents}
         availableLocations={combinedLocations}
+        initialData={newDealInitialData}
       />
 
       {/* MODAL 3: SCHEDULE SITE INSPECTION */}
@@ -597,8 +687,21 @@ export default function EaseLandCRM({
         onTriggerWhatsApp={handleTriggerWhatsApp}
         onDeleteDeal={handleDeleteDeal}
         onAdvanceStage={handleAdvanceDealStage}
+        onOpenFollowUp={handleOpenFollowUp}
         kanbanStages={kanbanStages}
         isFieldExecutive={isFieldExecutive}
+      />
+
+      {/* MODAL 5: SCHEDULE CLIENT FOLLOW-UP */}
+      <ScheduleFollowUpModal
+        isOpen={isScheduleFollowUpModalOpen}
+        onClose={() => {
+          setIsScheduleFollowUpModalOpen(false);
+          setSelectedDealForFollowUp(null);
+        }}
+        deal={selectedDealForFollowUp}
+        onSave={handleSaveFollowUp}
+        agentName={agents[0]?.name || 'EaseLand Admin'}
       />
 
     </div>

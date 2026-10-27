@@ -17,7 +17,8 @@ export default function NewDealModal({
   onSubmit,
   kanbanStages,
   agents = [],
-  availableLocations = []
+  availableLocations = [],
+  initialData = null
 }) {
   const agentList = (Array.isArray(agents) && agents.length > 0) ? agents : getActiveCrmAgents();
   const locationList = (Array.isArray(availableLocations) && availableLocations.length > 0) ? availableLocations : getAvailableLocations();
@@ -35,18 +36,35 @@ export default function NewDealModal({
     stage: CrmDealStages.NEW,
     expectedClosingDate: '',
     assignedAgent: agentList[0]?.name || 'EaseLand Admin',
+    nextFollowUpDate: '',
+    nextFollowUpTime: '11:00 AM',
+    nextFollowUpAction: 'Initial buyer outreach',
     notes: ''
   });
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(prev => ({
-        ...prev,
-        propertyLocation: prev.propertyLocation || locationList[0] || 'Andhra Pradesh',
-        assignedAgent: prev.assignedAgent || agentList[0]?.name || 'EaseLand Admin'
-      }));
+      const todayIso = new Date().toISOString().split('T')[0];
+      setFormData({
+        customerName: initialData?.customerName || initialData?.name || '',
+        customerPhone: initialData?.customerPhone || initialData?.phone || '',
+        customerEmail: initialData?.customerEmail || initialData?.email || '',
+        propertyTitle: initialData?.propertyTitle || initialData?.preferredPropertyType || '',
+        propertyLocation: initialData?.propertyLocation || initialData?.preferredLocation || locationList[0] || 'Andhra Pradesh',
+        ownerName: initialData?.ownerName || '',
+        ownerPhone: initialData?.ownerPhone || '',
+        dealValue: initialData?.dealValue || initialData?.budgetMax || '',
+        commissionRate: 1.5,
+        stage: initialData?.stage || CrmDealStages.NEW,
+        expectedClosingDate: initialData?.expectedClosingDate || '',
+        assignedAgent: initialData?.assignedAgent || agentList[0]?.name || 'EaseLand Admin',
+        nextFollowUpDate: initialData?.nextFollowUpDate || todayIso,
+        nextFollowUpTime: initialData?.nextFollowUpTime || '11:00 AM',
+        nextFollowUpAction: initialData?.nextFollowUpAction || 'Initial buyer qualification call',
+        notes: initialData?.notes || ''
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -227,6 +245,28 @@ export default function NewDealModal({
                   <option key={ag.id} value={ag.name}>{ag.name}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">First Follow-up Date</label>
+              <input
+                type="date"
+                value={formData.nextFollowUpDate}
+                onChange={(e) => setFormData({ ...formData, nextFollowUpDate: e.target.value })}
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Follow-up Action Goal</label>
+              <input
+                type="text"
+                placeholder="e.g. Call buyer to confirm site visit"
+                value={formData.nextFollowUpAction}
+                onChange={(e) => setFormData({ ...formData, nextFollowUpAction: e.target.value })}
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+              />
             </div>
           </div>
 

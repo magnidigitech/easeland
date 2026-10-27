@@ -1,11 +1,11 @@
 import React from 'react';
-import { Briefcase, Award, Users, Calendar } from 'lucide-react';
+import { Briefcase, Award, Users, Calendar, Clock } from 'lucide-react';
 
 export default function CrmKpiBanner({ analytics }) {
   if (!analytics) return null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
 
       {/* ACTIVE PIPELINE */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md">
@@ -64,6 +64,24 @@ export default function CrmKpiBanner({ analytics }) {
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block truncate">Field Inspections</span>
           <span className="text-lg font-black text-slate-900 block truncate">{analytics.scheduledVisitsCount} Scheduled</span>
           <span className="text-[11px] font-extrabold text-indigo-800 block truncate">Active physical site visits</span>
+        </div>
+      </div>
+
+      {/* FOLLOW-UPS DUE TODAY */}
+      <div className={'p-4 rounded-2xl border shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md ' +
+        ((analytics.followUpsDueTodayCount || 0) > 0 ? 'bg-amber-50/50 border-amber-300' : 'bg-white border-slate-200/90')
+      }>
+        <div className={'w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ' +
+          ((analytics.followUpsDueTodayCount || 0) > 0 ? 'bg-amber-100 border border-amber-300' : 'bg-slate-100 border border-slate-200')
+        }>
+          <Clock className={'w-6 h-6 stroke-[2.2] ' + ((analytics.followUpsDueTodayCount || 0) > 0 ? 'text-amber-700' : 'text-slate-500')} />
+        </div>
+        <div className="min-w-0">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block truncate">Follow-ups Due</span>
+          <span className="text-lg font-black text-slate-900 block truncate">{analytics.followUpsDueTodayCount || 0} Today</span>
+          <span className={'text-[11px] font-extrabold block truncate ' + ((analytics.followUpsDueTodayCount || 0) > 0 ? 'text-amber-800' : 'text-slate-500')}>
+            {(analytics.followUpsDueTodayCount || 0) > 0 ? 'Client callbacks pending' : 'All clear for today'}
+          </span>
         </div>
       </div>
 

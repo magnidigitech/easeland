@@ -9,7 +9,8 @@ import {
   ShieldCheck,
   Calendar,
   AlertTriangle,
-  Lock
+  Lock,
+  Clock
 } from 'lucide-react';
 import { CrmStageLabels } from '../../../firebase/crmService.js';
 
@@ -19,6 +20,7 @@ export default function DealDossierModal({
   onTriggerWhatsApp,
   onDeleteDeal,
   onAdvanceStage,
+  onOpenFollowUp,
   kanbanStages = [],
   isFieldExecutive = false
 }) {
@@ -103,6 +105,43 @@ export default function DealDossierModal({
               <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Legal Audit</span>
               <span className="font-black text-blue-600 text-sm block truncate">{deal.legalAuditStatus || 'VERIFIED'}</span>
             </div>
+          </div>
+
+          {/* CLIENT FOLLOW-UP STATUS & SCHEDULER BANNER */}
+          <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-xs font-black">
+                <Clock className="w-5 h-5 text-slate-950 stroke-[2.5]" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-amber-900 tracking-wider block">
+                  Next Scheduled Client Follow-up
+                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-black text-sm text-slate-900">
+                    {deal.nextFollowUpDate
+                      ? deal.nextFollowUpDate + (deal.nextFollowUpTime ? ' at ' + deal.nextFollowUpTime : '')
+                      : 'No follow-up scheduled'}
+                  </span>
+                  {deal.nextFollowUpAction && (
+                    <span className="text-xs font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
+                      {deal.nextFollowUpAction}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {onOpenFollowUp && (
+              <button
+                type="button"
+                onClick={() => onOpenFollowUp(deal)}
+                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs rounded-xl shadow-xs transition-colors cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{deal.nextFollowUpDate ? 'Update Follow-up' : 'Schedule Follow-up'}</span>
+              </button>
+            )}
           </div>
 
           {/* PARTIES INVOLVED */}

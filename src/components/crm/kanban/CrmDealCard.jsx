@@ -7,7 +7,9 @@ import {
   ChevronDown,
   Trash2,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { CrmStageLabels, CrmDealStages } from '../../../firebase/crmService.js';
 
@@ -18,6 +20,7 @@ export default function CrmDealCard({
   onAdvanceStage,
   onDeleteDeal,
   onTriggerWhatsApp,
+  onOpenFollowUp,
   isBeingDragged,
   onDragStart,
   onDragEnd,
@@ -115,6 +118,50 @@ export default function CrmDealCard({
           <span className="truncate">{deal.propertyLocation || 'Verified Location'}</span>
         </div>
       </div>
+
+      {/* FOLLOW-UP STATUS BADGE */}
+      {deal.stage !== CrmDealStages.CLOSED_WON && deal.stage !== CrmDealStages.CLOSED_LOST && (
+        <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+          {(() => {
+            const todayIso = new Date().toISOString().split('T')[0];
+            const hasFollowUp = Boolean(deal.nextFollowUpDate);
+            const isOverdue = hasFollowUp && deal.nextFollowUpDate < todayIso;
+            const isDueToday = hasFollowUp && deal.nextFollowUpDate === todayIso;
+
+            return (
+              <button
+                type="button"
+                onClick={() => onOpenFollowUp && onOpenFollowUp(deal)}
+                className={'w-full py-1 px-2 rounded-lg text-[10px] font-black flex items-center justify-between transition-all cursor-pointer border ' +
+                  (isOverdue
+                    ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                    : isDueToday
+                      ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100 animate-pulse'
+                      : hasFollowUp
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                        : 'bg-slate-50 border-dashed border-slate-300 text-slate-500 hover:border-amber-400 hover:text-slate-800'
+                  )
+                }
+                title={hasFollowUp ? 'Click to reschedule or log activity' : 'Click to schedule client follow-up'}
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <Clock className={'w-3 h-3 shrink-0 ' + (isOverdue ? 'text-rose-600' : isDueToday ? 'text-amber-600' : hasFollowUp ? 'text-emerald-600' : 'text-slate-400')} />
+                  <span className="truncate">
+                    {isOverdue
+                      ? 'Overdue (' + deal.nextFollowUpDate + ')'
+                      : isDueToday
+                        ? 'Due Today ' + (deal.nextFollowUpTime ? '• ' + deal.nextFollowUpTime : '')
+                        : hasFollowUp
+                          ? 'Follow-up: ' + deal.nextFollowUpDate
+                          : '+ Schedule Follow-up'}
+                  </span>
+                </div>
+                <Calendar className="w-3 h-3 opacity-60 shrink-0" />
+              </button>
+            );
+          })()}
+        </div>
+      )}
 
       {/* FINANCIAL BADGES */}
       <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">

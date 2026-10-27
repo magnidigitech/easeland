@@ -8,7 +8,8 @@ import {
   Users,
   MapPin,
   TrendingUp,
-  Lock
+  Lock,
+  Briefcase
 } from 'lucide-react';
 import { CrmLeadScores } from '../../../firebase/crmService.js';
 
@@ -22,6 +23,7 @@ export default function CrmLeadDirectory({
   onOpenNewLead,
   onDeleteLead,
   onTriggerWhatsApp,
+  onConvertToDeal,
   isFieldExecutive = false
 }) {
   const maskPhone = (ph) => {
@@ -199,6 +201,17 @@ export default function CrmLeadDirectory({
 
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {onConvertToDeal && (
+                          <button
+                            type="button"
+                            onClick={() => onConvertToDeal(lead)}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-black text-[11px]"
+                            title="1-Click: Convert buyer to active pipeline deal"
+                          >
+                            <Briefcase className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Convert</span>
+                          </button>
+                        )}
                         {lead.phone && (
                           <button
                             type="button"
@@ -295,6 +308,17 @@ export default function CrmLeadDirectory({
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                  {onConvertToDeal && (
+                    <button
+                      type="button"
+                      onClick={() => onConvertToDeal(lead)}
+                      className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                      title="Convert buyer to pipeline deal"
+                    >
+                      <Briefcase className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Convert</span>
+                    </button>
+                  )}
                   {lead.phone && (
                     <button
                       type="button"

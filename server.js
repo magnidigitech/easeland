@@ -752,6 +752,9 @@ async function initPgDb() {
         probability INTEGER DEFAULT 20,
         expected_closing_date VARCHAR(50),
         assigned_agent TEXT,
+        next_follow_up_date VARCHAR(50),
+        next_follow_up_time VARCHAR(50),
+        next_follow_up_action TEXT,
         legal_audit_status VARCHAR(50) DEFAULT 'PENDING',
         notes TEXT,
         payment_milestones JSONB DEFAULT '[]'::jsonb,
@@ -785,6 +788,17 @@ async function initPgDb() {
       );
     `);
 
+    // Follow-up columns migration for crm_deals and crm_leads
+    try {
+      await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
+      await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
+      await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
+      await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
+      await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
+      await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
+    } catch (migErr) {
+      console.warn('CRM schema migration note:', migErr.message);
+    }
 
     try {
       const allPg = await client.query('SELECT property_id, reference_id, title, owner_id, listing_status, raw_data FROM properties;');
@@ -2261,7 +2275,7 @@ app.post('/api/enquiries', async (req, res) => {
       console.warn('PostgreSQL save enquiry note:', pgErr.message);
     }
 
-    // 3. Auto-ingest enquiry into CRM Leads with HOT score and broadcast
+    // 3. Auto-ingest enquiry into CRM Leads & Deals with HOT score and broadcast
     try {
       const leadName = fullPayload.customerName || fullPayload.buyerName || 'Website Prospective Buyer';
       const leadPhone = fullPayload.customerPhone || fullPayload.buyerPhone || '';
@@ -2288,8 +2302,51 @@ app.post('/api/enquiries', async (req, res) => {
         JSON.stringify(fullPayload)
       ]);
       broadcastCrmEvent('LEAD_CREATED', { leadId, name: leadName, phone: leadPhone, email: leadEmail });
+
+      // Auto-create pipeline deal so inquiry appears immediately on Kanban board
+      const dealId = 'deal-' + eId;
+      const todayIso = new Date().toISOString().split('T')[0];
+      const initialDealTimeline = [
+        { date: todayIso, event: 'Deal auto-created from website inquiry on ' + (fullPayload.propertyTitle || 'Listing'), user: 'EaseLand Ingestion Engine' }
+      ];
+      const crmDealSql = 'INSERT INTO crm_deals (' +
+        'deal_id, lead_id, property_id, property_title, property_location, customer_name, customer_phone, ' +
+        'customer_email, owner_name, owner_phone, stage, deal_value, deal_value_display, commission_rate, ' +
+        'expected_commission, probability, expected_closing_date, assigned_agent, next_follow_up_date, ' +
+        'next_follow_up_time, next_follow_up_action, legal_audit_status, notes, payment_milestones, timeline, version, raw_data, created_at, updated_at' +
+        ') VALUES (' +
+        P + '1, ' + P + '2, ' + P + '3, ' + P + '4, ' + P + '5, ' + P + '6, ' + P + '7, ' + P + '8, ' +
+        P + '9, ' + P + '10, \'NEW\', 0, \'Pending Assessment\', 1.5, 0, 20, \'\', \'EaseLand Admin\', ' +
+        P + '11, \'11:00 AM\', \'Follow up with website inquiry\', \'PENDING\', ' + P + '12, \'[]\'::jsonb, ' +
+        P + '13, 1, ' + P + '14, NOW(), NOW()' +
+        ') ON CONFLICT (deal_id) DO NOTHING;';
+
+      await pgPool.query(crmDealSql, [
+        dealId,
+        leadId,
+        fullPayload.propertyId || 'prop-custom',
+        fullPayload.propertyTitle || 'Property Inquiry',
+        fullPayload.propertyLocation || 'Amaravati / Guntur',
+        leadName,
+        leadPhone,
+        leadEmail,
+        fullPayload.ownerName || '',
+        fullPayload.ownerPhone || '',
+        todayIso,
+        fullPayload.message || 'Direct inquiry from website property details page.',
+        JSON.stringify(initialDealTimeline),
+        JSON.stringify(fullPayload)
+      ]);
+      broadcastCrmEvent('DEAL_CREATED', {
+        id: dealId,
+        dealId,
+        customerName: leadName,
+        propertyTitle: fullPayload.propertyTitle || 'Property Inquiry',
+        dealValue: 0,
+        stage: 'NEW'
+      });
     } catch (crmErr) {
-      console.warn('CRM leads auto-ingest note:', crmErr.message);
+      console.warn('CRM leads/deals auto-ingest note:', crmErr.message);
     }
 
     return res.json({ success: true, enquiryId: eId, enquiry: fullPayload });
@@ -2589,6 +2646,35 @@ app.post('/api/visitors', async (req, res) => {
       ]);
     } catch (pgErr) {
       console.warn('PostgreSQL save visitor note:', pgErr.message);
+    }
+
+    // Auto-ingest visitor into CRM Leads
+    try {
+      const P = String.fromCharCode(36);
+      const leadId = 'lead-' + vId;
+      const crmLeadSql = 'INSERT INTO crm_leads (' +
+        'lead_id, name, phone, email, source, score, status, preferred_location, ' +
+        'preferred_property_type, budget_min, budget_max, budget_display, assigned_agent, ' +
+        'notes, tags, raw_data, created_at, updated_at' +
+        ') VALUES (' +
+        P + '1, ' + P + '2, ' + P + '3, ' + P + '4, \'SITE_ENGAGEMENT_POPUP\', \'WARM\', \'NEW\', ' +
+        P + '5, ' + P + '6, 0, 0, \'Visitor Engagement\', \'EaseLand Admin\', ' +
+        P + '7, \'["Site Visitor", "Popup Lead"]\'::jsonb, ' + P + '8, NOW(), NOW()' +
+        ') ON CONFLICT (lead_id) DO UPDATE SET updated_at = NOW();';
+
+      await pgPool.query(crmLeadSql, [
+        leadId,
+        fullPayload.name || 'Site Visitor',
+        fullPayload.phone || '',
+        fullPayload.email || '',
+        fullPayload.preferredLocation || 'Amaravati / Guntur',
+        fullPayload.preferredPropertyType || 'Open Plot Ventures',
+        fullPayload.notes || 'Captured via 1-minute site engagement popup.',
+        JSON.stringify(fullPayload)
+      ]);
+      broadcastCrmEvent('LEAD_CREATED', { leadId, name: fullPayload.name, phone: fullPayload.phone, email: fullPayload.email });
+    } catch (crmLeadErr) {
+      console.warn('CRM visitor auto-ingest note:', crmLeadErr.message);
     }
 
     return res.json({ success: true, visitorId: vId, visitor: fullPayload });
@@ -3498,6 +3584,9 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       probability: Number(r.probability) || 20,
       expectedClosingDate: r.expected_closing_date,
       assignedAgent: r.assigned_agent,
+      nextFollowUpDate: r.next_follow_up_date || '',
+      nextFollowUpTime: r.next_follow_up_time || '',
+      nextFollowUpAction: r.next_follow_up_action || '',
       legalAuditStatus: r.legal_audit_status,
       notes: r.notes,
       paymentMilestones: r.payment_milestones || [],
@@ -3539,6 +3628,12 @@ app.get('/api/crm/bootstrap', async (req, res) => {
     const scheduledVisits = visits.filter(v => v.status === 'SCHEDULED');
     const quarantinedDeals = deals.filter(d => d.isPropertyQuarantined);
 
+    const todayIso = new Date().toISOString().split('T')[0];
+    const followUpsDueTodayCount = deals.filter(d =>
+      d.stage !== 'CLOSED_WON' && d.stage !== 'CLOSED_LOST' &&
+      d.nextFollowUpDate && d.nextFollowUpDate <= todayIso
+    ).length;
+
     const analytics = {
       totalPipelineValue,
       pipelineValueDisplay: 'Rs. ' + (totalPipelineValue / 100000).toFixed(1) + ' Lakhs',
@@ -3557,7 +3652,8 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       warmLeadsCount: leads.filter(l => l.score === 'WARM').length,
       coldLeadsCount: leads.filter(l => l.score === 'COLD').length,
       scheduledVisitsCount: scheduledVisits.length,
-      quarantinedDealsCount: quarantinedDeals.length
+      quarantinedDealsCount: quarantinedDeals.length,
+      followUpsDueTodayCount
     };
 
     // Fetch Dynamic Licensed Agents & Staff from users table
@@ -3906,12 +4002,14 @@ app.post('/api/crm/deals', async (req, res) => {
     const sql = 'INSERT INTO crm_deals (' +
       'deal_id, lead_id, property_id, property_title, property_location, customer_name, customer_phone, ' +
       'customer_email, owner_name, owner_phone, stage, deal_value, deal_value_display, commission_rate, ' +
-      'expected_commission, probability, expected_closing_date, assigned_agent, legal_audit_status, notes, ' +
+      'expected_commission, probability, expected_closing_date, assigned_agent, next_follow_up_date, ' +
+      'next_follow_up_time, next_follow_up_action, legal_audit_status, notes, ' +
       'payment_milestones, timeline, version, raw_data, created_at, updated_at' +
       ') VALUES (' +
       P + '1, ' + P + '2, ' + P + '3, ' + P + '4, ' + P + '5, ' + P + '6, ' + P + '7, ' + P + '8, ' +
       P + '9, ' + P + '10, ' + P + '11, ' + P + '12, ' + P + '13, ' + P + '14, ' + P + '15, ' + P + '16, ' +
-      P + '17, ' + P + '18, ' + P + '19, ' + P + '20, ' + P + '21, ' + P + '22, 1, ' + P + '23, NOW(), NOW()' +
+      P + '17, ' + P + '18, ' + P + '19, ' + P + '20, ' + P + '21, ' + P + '22, ' + P + '23, ' + P + '24, ' +
+      P + '25, 1, ' + P + '26, NOW(), NOW()' +
       ') RETURNING *;';
 
     const values = [
@@ -3933,6 +4031,9 @@ app.post('/api/crm/deals', async (req, res) => {
       Number(data.probability) || 20,
       data.expectedClosingDate || '',
       data.assignedAgent || 'EaseLand Admin',
+      data.nextFollowUpDate || null,
+      data.nextFollowUpTime || '11:00 AM',
+      data.nextFollowUpAction || '',
       data.legalAuditStatus || 'PENDING',
       data.notes || '',
       JSON.stringify(data.paymentMilestones || []),
@@ -3974,6 +4075,9 @@ app.post('/api/crm/deals', async (req, res) => {
         probability: Number(row.probability),
         expectedClosingDate: row.expected_closing_date,
         assignedAgent: row.assigned_agent,
+        nextFollowUpDate: row.next_follow_up_date || '',
+        nextFollowUpTime: row.next_follow_up_time || '',
+        nextFollowUpAction: row.next_follow_up_action || '',
         legalAuditStatus: row.legal_audit_status,
         notes: row.notes,
         paymentMilestones: row.payment_milestones || [],
@@ -4095,6 +4199,90 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Update deal stage error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 5B. CRM DEALS: Update Follow-up Schedule & Activity Logger
+app.patch('/api/crm/deals/:id/followup', async (req, res) => {
+  const client = await pgPool.connect();
+  try {
+    const { id } = req.params;
+    const { followUpDate, followUpTime, followUpAction, logNote, agentName } = req.body || {};
+    const P = String.fromCharCode(36);
+    const nowIso = new Date().toISOString();
+
+    await client.query('BEGIN');
+    const curRes = await client.query('SELECT * FROM crm_deals WHERE deal_id = ' + P + '1 FOR UPDATE;', [id]);
+    if (curRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'Deal not found.' });
+    }
+    const current = curRes.rows[0];
+    const timeline = Array.isArray(current.timeline) ? [...current.timeline] : [];
+
+    if (logNote && String(logNote).trim()) {
+      timeline.push({
+        date: nowIso.split('T')[0],
+        event: String(logNote).trim(),
+        user: agentName || 'EaseLand Admin'
+      });
+    }
+
+    if (followUpAction && String(followUpAction).trim()) {
+      timeline.push({
+        date: nowIso.split('T')[0],
+        event: 'Follow-up scheduled for ' + (followUpDate || 'Due') + ' at ' + (followUpTime || '11:00 AM') + ': ' + String(followUpAction).trim(),
+        user: agentName || 'EaseLand Admin'
+      });
+    }
+
+    const updateSql = 'UPDATE crm_deals SET ' +
+      'next_follow_up_date = ' + P + '1, ' +
+      'next_follow_up_time = ' + P + '2, ' +
+      'next_follow_up_action = ' + P + '3, ' +
+      'timeline = ' + P + '4, ' +
+      'version = version + 1, ' +
+      'updated_at = NOW() ' +
+      'WHERE deal_id = ' + P + '5 RETURNING *;';
+
+    const updRes = await client.query(updateSql, [
+      followUpDate || null,
+      followUpTime || null,
+      followUpAction || null,
+      JSON.stringify(timeline),
+      id
+    ]);
+
+    await client.query('COMMIT');
+    const row = updRes.rows[0];
+
+    broadcastCrmEvent('DEAL_UPDATED', {
+      id: row.deal_id,
+      dealId: row.deal_id,
+      nextFollowUpDate: row.next_follow_up_date,
+      nextFollowUpTime: row.next_follow_up_time,
+      nextFollowUpAction: row.next_follow_up_action
+    });
+
+    return res.json({
+      success: true,
+      deal: {
+        id: row.deal_id,
+        dealId: row.deal_id,
+        nextFollowUpDate: row.next_follow_up_date,
+        nextFollowUpTime: row.next_follow_up_time,
+        nextFollowUpAction: row.next_follow_up_action,
+        timeline: row.timeline,
+        version: row.version,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Update deal follow-up error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   } finally {
     client.release();

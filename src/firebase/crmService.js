@@ -301,6 +301,12 @@ export function calculateCrmAnalytics(deals = [], leads = [], visits = []) {
   const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 0;
   const scheduledVisits = safeVisits.filter(v => v && v.status === 'SCHEDULED');
 
+  const todayIso = new Date().toISOString().split('T')[0];
+  const followUpsDueTodayCount = safeDeals.filter(d =>
+    d && d.stage !== CrmDealStages.CLOSED_WON && d.stage !== CrmDealStages.CLOSED_LOST &&
+    d.nextFollowUpDate && d.nextFollowUpDate <= todayIso
+  ).length;
+
   return {
     totalPipelineValue,
     pipelineValueDisplay: 'Rs. ' + (totalPipelineValue / 100000).toFixed(1) + ' Lakhs',
@@ -319,6 +325,7 @@ export function calculateCrmAnalytics(deals = [], leads = [], visits = []) {
     warmLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.WARM).length,
     coldLeadsCount: safeLeads.filter(l => l && l.score === CrmLeadScores.COLD).length,
     scheduledVisitsCount: scheduledVisits.length,
+    followUpsDueTodayCount,
     agents: getActiveCrmAgents()
   };
 }
@@ -492,6 +499,9 @@ export async function createCrmDeal(dealData) {
     probability: Number(dealData.probability) || 20,
     expectedClosingDate: dealData.expectedClosingDate || '',
     assignedAgent: dealData.assignedAgent || DEFAULT_CRM_AGENTS[0].name,
+    nextFollowUpDate: dealData.nextFollowUpDate || '',
+    nextFollowUpTime: dealData.nextFollowUpTime || '11:00 AM',
+    nextFollowUpAction: dealData.nextFollowUpAction || '',
     legalAuditStatus: dealData.legalAuditStatus || 'PENDING',
     notes: dealData.notes || '',
     paymentMilestones: dealData.paymentMilestones || [],
@@ -537,6 +547,47 @@ export async function updateCrmDealStage(dealId, newStage, noteText = '') {
     });
   }
   return { success: true };
+}
+
+export async function updateCrmDealFollowUp(dealId, followUpData = {}) {
+  if (isBrowser) {
+    try {
+      const res = await window.fetch('/api/crm/deals/' + dealId + '/followup', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(followUpData)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return { success: true, deal: json.deal };
+      }
+    } catch (err) {}
+  }
+
+  // Test environment fallback
+  const target = testDealsStore.find(d => d.id === dealId || d.dealId === dealId);
+  if (target) {
+    target.nextFollowUpDate = followUpData.followUpDate !== undefined ? followUpData.followUpDate : (target.nextFollowUpDate || '');
+    target.nextFollowUpTime = followUpData.followUpTime || target.nextFollowUpTime || '11:00 AM';
+    target.nextFollowUpAction = followUpData.followUpAction !== undefined ? followUpData.followUpAction : (target.nextFollowUpAction || '');
+    target.updatedAt = new Date().toISOString();
+    target.timeline = target.timeline || [];
+    if (followUpData.logNote) {
+      target.timeline.push({
+        date: new Date().toISOString().split('T')[0],
+        event: followUpData.logNote,
+        user: followUpData.agentName || 'EaseLand Admin'
+      });
+    }
+    if (followUpData.followUpAction) {
+      target.timeline.push({
+        date: new Date().toISOString().split('T')[0],
+        event: 'Follow-up scheduled for ' + (followUpData.followUpDate || 'Due') + ' at ' + (followUpData.followUpTime || '11:00 AM') + ': ' + followUpData.followUpAction,
+        user: followUpData.agentName || 'EaseLand Admin'
+      });
+    }
+  }
+  return { success: true, deal: target };
 }
 
 export async function updateCrmDealDetails(dealId, updates) {

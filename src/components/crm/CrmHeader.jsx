@@ -8,7 +8,8 @@ import {
   ExternalLink,
   ChevronDown,
   Check,
-  RefreshCw
+  RefreshCw,
+  Clock
 } from 'lucide-react';
 import { DEFAULT_CRM_AGENTS } from '../../firebase/crmService.js';
 
@@ -24,7 +25,9 @@ export default function CrmHeader({
   onNavigateToMarketplace,
   onRefresh,
   loading,
-  isLiveConnected = true
+  isLiveConnected = true,
+  followUpsDueTodayCount = 0,
+  onQuickFilterFollowUps
 }) {
   const agentList = (Array.isArray(agents) && agents.length > 0) ? agents : DEFAULT_CRM_AGENTS;
   return (
@@ -69,6 +72,22 @@ export default function CrmHeader({
             >
               <RefreshCw className={'w-3.5 h-3.5 ' + (loading ? 'animate-spin text-amber-400' : '')} />
             </button>
+
+            {/* QUICK TODAY'S FOLLOW-UPS PILL */}
+            {followUpsDueTodayCount > 0 && (
+              <button
+                type="button"
+                onClick={onQuickFilterFollowUps}
+                className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer animate-pulse"
+                title="Click to view deals with follow-ups due today"
+              >
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Due Today:</span>
+                <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
+                  {followUpsDueTodayCount}
+                </span>
+              </button>
+            )}
 
             {/* AGENT FILTER SELECTOR */}
             <div className="relative">
