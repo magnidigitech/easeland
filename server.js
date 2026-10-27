@@ -3797,7 +3797,7 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
   const client = await pgPool.connect();
   try {
     const { id } = req.params;
-    const { newStage, noteText } = req.body;
+    const { newStage, noteText, nextFollowUpAction, nextFollowUpDate, nextFollowUpTime } = req.body;
     const P = String.fromCharCode(36);
 
     let newProbability = 50;
@@ -3810,6 +3810,29 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
     else if (newStage === 'REGISTRATION_PENDING') newProbability = 95;
     else if (newStage === 'CLOSED_WON') newProbability = 100;
     else if (newStage === 'CLOSED_LOST') newProbability = 0;
+
+    // Stage-Specific Default Follow-up Action Goals & Timelines
+    const STAGE_DEFAULT_FOLLOWUPS = {
+      NEW: { action: 'Initial qualification & requirement gathering call', leadDays: 1 },
+      CONTACTED: { action: 'Send verified property layout & schedule pitch call', leadDays: 1 },
+      SITE_VISIT: { action: 'Coordinate physical plot inspection & boundary landmark check', leadDays: 2 },
+      DOCUMENT_AUDIT: { action: 'Verify 30-year Link Documents, Encumbrance Certificate & Revenue clearance', leadDays: 3 },
+      PRICE_NEGOTIATION: { action: 'Buyer-Seller commercial meeting & final price per sq.yd agreement', leadDays: 2 },
+      TOKEN_ADVANCE: { action: 'Verify token advance transfer & execute bilingual Sale Agreement', leadDays: 2 },
+      REGISTRATION_PENDING: { action: 'Book Sub-Registrar slot, deposit stamp duty challan & witness prep', leadDays: 3 },
+      CLOSED_WON: { action: 'Sale deed executed, physical possession & mutation handover complete', leadDays: 0 },
+      CLOSED_LOST: { action: 'Document loss reason, buyer feedback & archive deal dossier', leadDays: 0 }
+    };
+
+    const stDef = STAGE_DEFAULT_FOLLOWUPS[newStage] || STAGE_DEFAULT_FOLLOWUPS.NEW;
+    const targetFollowUpAction = nextFollowUpAction || stDef.action;
+    let targetFollowUpDate = nextFollowUpDate;
+    if (!targetFollowUpDate) {
+      const d = new Date();
+      if (stDef.leadDays > 0) d.setDate(d.getDate() + stDef.leadDays);
+      targetFollowUpDate = d.toISOString().split('T')[0];
+    }
+    const targetFollowUpTime = nextFollowUpTime || '11:00 AM';
 
     await client.query('BEGIN');
 
@@ -3841,7 +3864,7 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
     const nowIso = new Date().toISOString();
     const timelineEntry = {
       date: nowIso.split('T')[0],
-      event: 'Stage changed to ' + newStage,
+      event: 'Stage changed to ' + newStage + '. Follow-up adjusted: ' + targetFollowUpAction,
       user: 'EaseLand Admin' + (noteText ? ' (' + noteText + ')' : '')
     };
     const updatedTimeline = [...(current.timeline || []), timelineEntry];
@@ -3862,14 +3885,20 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
       'stage = ' + P + '1, ' +
       'probability = ' + P + '2, ' +
       'timeline = ' + P + '3, ' +
+      'next_follow_up_action = ' + P + '4, ' +
+      'next_follow_up_date = ' + P + '5, ' +
+      'next_follow_up_time = ' + P + '6, ' +
       'version = version + 1, ' +
       'updated_at = NOW() ' +
-      'WHERE deal_id = ' + P + '4 RETURNING *;';
+      'WHERE deal_id = ' + P + '7 RETURNING *;';
 
     const updRes = await client.query(updateSql, [
       newStage,
       newProbability,
       JSON.stringify(updatedTimeline),
+      targetFollowUpAction,
+      targetFollowUpDate,
+      targetFollowUpTime,
       id
     ]);
 
@@ -3880,7 +3909,10 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
       id: row.deal_id,
       dealId: row.deal_id,
       stage: row.stage,
-      probability: row.probability
+      probability: row.probability,
+      nextFollowUpAction: row.next_follow_up_action,
+      nextFollowUpDate: row.next_follow_up_date,
+      nextFollowUpTime: row.next_follow_up_time
     });
 
     return res.json({
@@ -3890,11 +3922,15 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
         dealId: row.deal_id,
         stage: row.stage,
         probability: row.probability,
+        nextFollowUpAction: row.next_follow_up_action,
+        nextFollowUpDate: row.next_follow_up_date,
+        nextFollowUpTime: row.next_follow_up_time,
         timeline: row.timeline,
         version: row.version,
         updatedAt: row.updated_at
       }
     });
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Update deal stage error:', err.message);

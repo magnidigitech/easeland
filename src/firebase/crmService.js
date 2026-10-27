@@ -25,6 +25,110 @@ export const CrmStageLabels = {
   [CrmDealStages.CLOSED_LOST]: 'Closed / Lost'
 };
 
+// Stage-Specific Metadata: Milestones, Action Goals, Checklists, and Default Follow-up Windows
+export const CRM_STAGE_METADATA = {
+  [CrmDealStages.NEW]: {
+    step: 1,
+    tagline: 'Initial buyer inquiries',
+    milestone: 'Buyer Outreach',
+    defaultAction: 'Initial qualification & requirement gathering call',
+    leadDays: 1,
+    badgeColor: 'sky',
+    checklist: ['Verify buyer budget', 'Preferred zone', 'Immediate / Long-term intent']
+  },
+  [CrmDealStages.CONTACTED]: {
+    step: 2,
+    tagline: 'Discovery & qualifications',
+    milestone: 'Shortlist Shared',
+    defaultAction: 'Send verified property layout & schedule pitch call',
+    leadDays: 1,
+    badgeColor: 'indigo',
+    checklist: ['Send layout plan', 'Facing preference confirmed', 'Plot size shortlisted']
+  },
+  [CrmDealStages.SITE_VISIT]: {
+    step: 3,
+    tagline: 'Physical plot inspections',
+    milestone: 'Field Inspection',
+    defaultAction: 'Coordinate physical plot inspection & boundary landmark check',
+    leadDays: 2,
+    badgeColor: 'amber',
+    checklist: ['GPS coordinates pin', 'Boundary stones checked', 'Road width & approach verified']
+  },
+  [CrmDealStages.DOCUMENT_AUDIT]: {
+    step: 4,
+    tagline: 'Legal & title clearance',
+    milestone: 'Title & EC Audit',
+    defaultAction: 'Verify 30-year Link Documents, Encumbrance Certificate & Revenue clearance',
+    leadDays: 3,
+    badgeColor: 'purple',
+    checklist: ['30-yr link deed trace', 'Nil-encumbrance EC', 'Pattadar passbook check']
+  },
+  [CrmDealStages.PRICE_NEGOTIATION]: {
+    step: 5,
+    tagline: 'Price & terms structuring',
+    milestone: 'Price Structuring',
+    defaultAction: 'Buyer-Seller commercial meeting & final price per sq.yd agreement',
+    leadDays: 2,
+    badgeColor: 'orange',
+    checklist: ['Asking vs Offer gap', 'Payment schedule structure', 'TDS & tax terms']
+  },
+  [CrmDealStages.TOKEN_ADVANCE]: {
+    step: 6,
+    tagline: 'Advance committed',
+    milestone: 'Token / Bayana',
+    defaultAction: 'Verify token advance transfer & execute bilingual Sale Agreement',
+    leadDays: 2,
+    badgeColor: 'teal',
+    checklist: ['Token receipt issued', '90-day execution clause', 'Boundary schedule marked']
+  },
+  [CrmDealStages.REGISTRATION_PENDING]: {
+    step: 7,
+    tagline: 'Sub-registrar filing',
+    milestone: 'SRO Registration',
+    defaultAction: 'Book Sub-Registrar slot, deposit stamp duty challan & witness prep',
+    leadDays: 3,
+    badgeColor: 'blue',
+    checklist: ['Sub-Registrar slot booked', 'Stamp duty & cess paid', '2 witness IDs collected']
+  },
+  [CrmDealStages.CLOSED_WON]: {
+    step: 8,
+    tagline: 'Executed & registered',
+    milestone: 'Registration Complete',
+    defaultAction: 'Sale deed executed, physical possession & mutation handover complete',
+    leadDays: 0,
+    badgeColor: 'emerald',
+    checklist: ['Registered deed received', 'Physical plot possession', 'Commission settled']
+  },
+  [CrmDealStages.CLOSED_LOST]: {
+    step: 0,
+    tagline: 'Deal closed / cancelled',
+    milestone: 'Deal Lost',
+    defaultAction: 'Document loss reason, buyer feedback & archive deal dossier',
+    leadDays: 0,
+    badgeColor: 'slate',
+    checklist: ['Loss reason recorded', 'Buyer re-engagement date']
+  }
+};
+
+export function getStageDefaultFollowUp(stage) {
+  const meta = CRM_STAGE_METADATA[stage] || CRM_STAGE_METADATA[CrmDealStages.NEW];
+  const targetDate = new Date();
+  if (meta.leadDays > 0) {
+    targetDate.setDate(targetDate.getDate() + meta.leadDays);
+  }
+  return {
+    action: meta.defaultAction,
+    date: targetDate.toISOString().split('T')[0],
+    time: '11:00 AM',
+    milestone: meta.milestone,
+    tagline: meta.tagline,
+    step: meta.step,
+    badgeColor: meta.badgeColor,
+    checklist: meta.checklist
+  };
+}
+
+
 export const CrmLeadScores = {
   HOT: 'HOT',
   WARM: 'WARM',
@@ -516,13 +620,21 @@ export async function createCrmDeal(dealData) {
   return { success: true, deal: payload };
 }
 
-export async function updateCrmDealStage(dealId, newStage, noteText = '') {
+export async function updateCrmDealStage(dealId, newStage, noteText = '', followUpData = null) {
+  const stageFollowUp = followUpData || getStageDefaultFollowUp(newStage);
+
   if (isBrowser) {
     try {
       const res = await window.fetch('/api/crm/deals/' + dealId + '/stage', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newStage, noteText })
+        body: JSON.stringify({
+          newStage,
+          noteText,
+          nextFollowUpAction: stageFollowUp.action,
+          nextFollowUpDate: stageFollowUp.date,
+          nextFollowUpTime: stageFollowUp.time
+        })
       });
       if (res.ok) return { success: true };
     } catch (err) {}
@@ -533,21 +645,30 @@ export async function updateCrmDealStage(dealId, newStage, noteText = '') {
   if (target) {
     let prob = 50;
     if (newStage === CrmDealStages.NEW) prob = 20;
+    else if (newStage === CrmDealStages.CONTACTED) prob = 35;
+    else if (newStage === CrmDealStages.SITE_VISIT) prob = 50;
+    else if (newStage === CrmDealStages.DOCUMENT_AUDIT) prob = 70;
     else if (newStage === CrmDealStages.PRICE_NEGOTIATION) prob = 80;
+    else if (newStage === CrmDealStages.TOKEN_ADVANCE) prob = 90;
+    else if (newStage === CrmDealStages.REGISTRATION_PENDING) prob = 95;
     else if (newStage === CrmDealStages.CLOSED_WON) prob = 100;
     else if (newStage === CrmDealStages.CLOSED_LOST) prob = 0;
 
     target.stage = newStage;
     target.probability = prob;
+    target.nextFollowUpAction = stageFollowUp.action;
+    target.nextFollowUpDate = stageFollowUp.date;
+    target.nextFollowUpTime = stageFollowUp.time;
     target.timeline = target.timeline || [];
     target.timeline.push({
       date: new Date().toISOString().split('T')[0],
-      event: 'Stage changed to ' + (CrmStageLabels[newStage] || newStage),
+      event: 'Stage changed to ' + (CrmStageLabels[newStage] || newStage) + '. Next Follow-up: ' + stageFollowUp.action,
       user: 'EaseLand Admin' + (noteText ? ' (' + noteText + ')' : '')
     });
   }
   return { success: true };
 }
+
 
 export async function updateCrmDealFollowUp(dealId, followUpData = {}) {
   if (isBrowser) {

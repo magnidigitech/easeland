@@ -25,8 +25,10 @@ import {
   scheduleCrmVisit,
   updateCrmVisitStatus,
   deleteCrmVisit,
-  matchPropertiesForLead
+  matchPropertiesForLead,
+  getStageDefaultFollowUp
 } from '../firebase/crmService.js';
+
 import { mockApi } from '../services/mockApi.js';
 
 import CrmHeader from '../components/crm/CrmHeader.jsx';
@@ -289,17 +291,27 @@ export default function EaseLandCRM({
       return;
     }
 
-    // Optimistic UI Update
-    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage: nextStage } : d));
-    const res = await updateCrmDealStage(dealId, nextStage, note);
+    const stageFollowUp = getStageDefaultFollowUp(nextStage);
+
+    // Optimistic UI Update with stage-adjusted follow-up action and date
+    setDeals(prev => prev.map(d => d.id === dealId ? {
+      ...d,
+      stage: nextStage,
+      nextFollowUpAction: stageFollowUp.action,
+      nextFollowUpDate: stageFollowUp.date,
+      nextFollowUpTime: stageFollowUp.time
+    } : d));
+
+    const res = await updateCrmDealStage(dealId, nextStage, note, stageFollowUp);
     if (res.success) {
-      triggerToast('Deal moved to ' + (CrmStageLabels[nextStage] || nextStage) + '.');
+      triggerToast('Deal moved to ' + (CrmStageLabels[nextStage] || nextStage) + '. Follow-up adjusted: ' + stageFollowUp.milestone);
       await loadCrmData(false);
     } else {
       triggerToast(res.error || 'Failed to update stage. Reverting view.');
       await loadCrmData(false);
     }
   };
+
 
   // Handle Delete Deal
   const handleDeleteDeal = async (e, dealId, customerName = '') => {

@@ -7,8 +7,10 @@ import {
   getActiveCrmAgents,
   getAvailableLocations,
   formatAmountInWords,
-  numToWordsIndian
+  numToWordsIndian,
+  getStageDefaultFollowUp
 } from '../../../firebase/crmService.js';
+
 import DynamicLocationAutofill from '../../common/DynamicLocationAutofill.jsx';
 
 export default function NewDealModal({
@@ -45,6 +47,8 @@ export default function NewDealModal({
   useEffect(() => {
     if (isOpen) {
       const todayIso = new Date().toISOString().split('T')[0];
+      const defaultStage = initialData?.stage || CrmDealStages.NEW;
+      const stageDefaults = getStageDefaultFollowUp(defaultStage);
       setFormData({
         customerName: initialData?.customerName || initialData?.name || '',
         customerPhone: initialData?.customerPhone || initialData?.phone || '',
@@ -55,12 +59,12 @@ export default function NewDealModal({
         ownerPhone: initialData?.ownerPhone || '',
         dealValue: initialData?.dealValue || initialData?.budgetMax || '',
         commissionRate: 1.5,
-        stage: initialData?.stage || CrmDealStages.NEW,
+        stage: defaultStage,
         expectedClosingDate: initialData?.expectedClosingDate || '',
         assignedAgent: initialData?.assignedAgent || agentList[0]?.name || 'EaseLand Admin',
-        nextFollowUpDate: initialData?.nextFollowUpDate || todayIso,
-        nextFollowUpTime: initialData?.nextFollowUpTime || '11:00 AM',
-        nextFollowUpAction: initialData?.nextFollowUpAction || 'Initial buyer qualification call',
+        nextFollowUpDate: initialData?.nextFollowUpDate || stageDefaults.date,
+        nextFollowUpTime: initialData?.nextFollowUpTime || stageDefaults.time,
+        nextFollowUpAction: initialData?.nextFollowUpAction || stageDefaults.action,
         notes: initialData?.notes || ''
       });
     }
@@ -204,7 +208,17 @@ export default function NewDealModal({
               <label className="block text-xs font-bold text-slate-700 mb-1">Initial Stage</label>
               <select
                 value={formData.stage}
-                onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
+                onChange={(e) => {
+                  const newSt = e.target.value;
+                  const defaults = getStageDefaultFollowUp(newSt);
+                  setFormData({
+                    ...formData,
+                    stage: newSt,
+                    nextFollowUpAction: defaults.action,
+                    nextFollowUpDate: defaults.date,
+                    nextFollowUpTime: defaults.time
+                  });
+                }}
                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none cursor-pointer"
               >
                 {kanbanStages.map(st => (
