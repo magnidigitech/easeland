@@ -235,8 +235,26 @@ export default function App() {
         if (json.success && Array.isArray(json.properties)) {
           pgProperties = json.properties;
         }
+      } else {
+        const fallbackRes = await fetch('/api/properties');
+        if (fallbackRes.ok) {
+          const fallbackJson = await fallbackRes.json();
+          if (fallbackJson.success && Array.isArray(fallbackJson.properties)) {
+            pgProperties = fallbackJson.properties.filter(p => isPropertyPubliclyVisible(p));
+          }
+        }
       }
-    } catch (pgErr) {}
+    } catch (pgErr) {
+      try {
+        const fallbackRes = await fetch('/api/properties');
+        if (fallbackRes.ok) {
+          const fallbackJson = await fallbackRes.json();
+          if (fallbackJson.success && Array.isArray(fallbackJson.properties)) {
+            pgProperties = fallbackJson.properties.filter(p => isPropertyPubliclyVisible(p));
+          }
+        }
+      } catch (fbErr) {}
+    }
 
     let fsProperties = [];
     try {

@@ -1283,7 +1283,7 @@ app.get('/api/properties', async (req, res) => {
       return res.status(503).json({ success: false, error: 'Database unavailable: ' + pgErr.message });
     }
 
-    const properties = pgProperties;
+    let properties = pgProperties;
 
     if (isPublicOnly) {
       const ledger = getAdminDeletedLedger();
