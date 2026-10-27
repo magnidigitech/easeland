@@ -590,21 +590,6 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
       const num2 = pId2.replace(/^(el-prop-|prop-)/i, '');
       const num3 = pId3.replace(/^(el-prop-|prop-)/i, '');
 
-      const isKnownLivePlatformProp = Boolean(
-        normTitle === 'farm house for rental purpose' ||
-        normTitle.includes('25 acer') ||
-        pId1 === 'prop_1792136601222' ||
-        pId1 === 'prop_1791870637821' ||
-        pId2 === 'prop_1792136601222' ||
-        pId2 === 'prop_1791870637821' ||
-        num1 === '97416' ||
-        num1 === '94034' ||
-        num2 === '97416' ||
-        num2 === '94034' ||
-        pId3 === 'el-prop-97416' ||
-        pId3 === 'el-prop-94034'
-      );
-
       const isRecordedAdminDeleted = Boolean(
         p.deletedByAdmin === true ||
         p.deletionType === 'ADMIN_DELETED' ||
@@ -631,29 +616,7 @@ export async function getOwnerProperties(ownerId, pageSize = 50, lastDoc = null)
         })
       );
 
-      // If a property in Firestore claims to be LIVE/published/verified, but is not in PostgreSQL and is not one of the verified platform live properties, it was deleted by Admin!
-      const isServerVerifiedLive = allServerProperties.some(sp => {
-        if (!sp) return false;
-        const spId1 = String(sp.id || '').toLowerCase().trim();
-        const spId2 = String(sp.propertyId || '').toLowerCase().trim();
-        const spRef = String(sp.referenceId || '').toLowerCase().trim();
-        const spTitle = String(sp.title || '').toLowerCase().trim();
-        const spStatus = String(sp.status || sp.listingStatus || '').toUpperCase();
-        const isSpLive = spStatus === 'LIVE' || spStatus === 'APPROVED' || sp.isPublished === true;
-        return isSpLive && (
-          (spId1 && (spId1 === pId1 || spId1 === pId2)) ||
-          (spId2 && (spId2 === pId1 || spId2 === pId2)) ||
-          (spRef && spRef === pId3) ||
-          (spTitle && normTitle && spTitle === normTitle)
-        );
-      });
-
-      const isUnverifiedZombie = !isKnownLivePlatformProp && !isServerVerifiedLive && (
-        pStatus === 'LIVE' || pLst === 'LIVE' || p.isPublished === true || p.isPlatformVerified === true ||
-        pStatus === 'APPROVED' || pLst === 'APPROVED' || p.verificationStatus === 'Platform Verified'
-      );
-
-      const isAdminDeleted = isRecordedAdminDeleted || isUnverifiedZombie;
+      const isAdminDeleted = isRecordedAdminDeleted;
 
       const isUserDeleted = !isAdminDeleted && (
         p.isDeleted === true ||

@@ -820,12 +820,48 @@ export default function App() {
 
             {/* PAID PROMOTIONS / FEATURED VERIFIED SHOWCASE */}
             {(() => {
-              const featuredConfig = siteConfig?.featuredListings || {};
-              const featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
+              // 1. Resolve active featured configuration dynamically from siteConfig and local storage
+              let featuredConfig = siteConfig?.featuredListings || {};
+              if (typeof window !== 'undefined') {
+                try {
+                  const storedConfigRaw = localStorage.getItem('easeland_site_config');
+                  if (storedConfigRaw) {
+                    const parsedStoredConfig = JSON.parse(storedConfigRaw);
+                    const localFeatured = parsedStoredConfig?.featuredListings;
+                    if (localFeatured) {
+                      const localIds = safeArray(localFeatured.featuredPropertyIds).map(String).filter(Boolean);
+                      featuredConfig = {
+                        ...featuredConfig,
+                        ...localFeatured,
+                        featuredPropertyIds: localIds.length > 0 ? localIds : safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean),
+                        promotedProperties: (Array.isArray(localFeatured.promotedProperties) && localFeatured.promotedProperties.length > 0)
+                          ? localFeatured.promotedProperties
+                          : (featuredConfig.promotedProperties || [])
+                      };
+                    }
+                  }
+                } catch (e) {}
+              }
+
+              let featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
+              
+              // Fallback: If featuredIds is still empty, check easeland_promoted_properties directly
+              if (featuredIds.length === 0 && typeof window !== 'undefined') {
+                try {
+                  const rawPromo = localStorage.getItem('easeland_promoted_properties');
+                  if (rawPromo) {
+                    const parsedPromo = JSON.parse(rawPromo);
+                    if (Array.isArray(parsedPromo) && parsedPromo.length > 0) {
+                      featuredIds = parsedPromo.map(p => String(p.id || p.propertyId || p.referenceId || '')).filter(Boolean);
+                    }
+                  }
+                } catch (e) {}
+              }
+
               const parsedDisplay = Number(featuredConfig.displayCount);
               const displayCount = isNaN(parsedDisplay) ? 6 : Math.max(1, Math.min(24, Math.floor(parsedDisplay)));
 
-              // Build comprehensive candidate pool from all property data sources
+              // 2. Build comprehensive candidate pool from all property data sources
               const candidatePool = [];
               const seenPoolKeys = new Set();
               const addToPool = (items) => {
@@ -860,26 +896,47 @@ export default function App() {
                   const rawProps = localStorage.getItem('easeland_properties');
                   if (rawProps) addToPool(JSON.parse(rawProps));
                 } catch (e) {}
+                try {
+                  const rawUserProps = localStorage.getItem('easeland_user_properties');
+                  if (rawUserProps) addToPool(JSON.parse(rawUserProps));
+                } catch (e) {}
+                try {
+                  const rawOwnerProps = localStorage.getItem('easeland_owner_properties');
+                  if (rawOwnerProps) addToPool(JSON.parse(rawOwnerProps));
+                } catch (e) {}
+                try {
+                  const rawSubProps = localStorage.getItem('easeland_submitted_properties');
+                  if (rawSubProps) addToPool(JSON.parse(rawSubProps));
+                } catch (e) {}
               }
               try {
-                if (typeof mockApi.getProperties === 'function') {
+                if (typeof mockApi.getAllPropertiesAdmin === 'function') {
+                  addToPool(mockApi.getAllPropertiesAdmin());
+                } else if (typeof mockApi.getProperties === 'function') {
                   addToPool(mockApi.getProperties());
                 }
               } catch (e) {}
 
-
-              // Explicitly match properties in exact slot order defined by Admin
+              // 3. Match properties in exact slot order defined by Admin
               const explicitlyFeatured = [];
-              featuredIds.forEach((fId, slotIdx) => {
+              featuredIds.forEach((fId) => {
                 const target = String(fId).trim().toLowerCase();
-                const matched = candidatePool.find((p) => {
+                let matched = candidatePool.find((p) => {
                   if (!p) return false;
                   const id1 = String(p.id || '').trim().toLowerCase();
                   const id2 = String(p.propertyId || '').trim().toLowerCase();
                   const ref = String(p.referenceId || '').trim().toLowerCase();
                   return id1 === target || id2 === target || ref === target;
                 });
-                if (matched && !isFakeProperty(matched)) {
+
+                // Robust fallback to getPropertyById across all platform data stores
+                if (!matched) {
+                  try {
+                    matched = mockApi.getPropertyById(fId);
+                  } catch (e) {}
+                }
+
+                if (matched && !isPropertyDeleted(matched) && !isFakeProperty(matched)) {
                   const mKey = String(matched.id || matched.propertyId || matched.referenceId || '').trim().toLowerCase();
                   if (!explicitlyFeatured.some((ef) => String(ef.id || ef.propertyId || ef.referenceId || '').trim().toLowerCase() === mKey)) {
                     explicitlyFeatured.push(matched);
@@ -887,7 +944,7 @@ export default function App() {
                 }
               });
 
-              // Strictly only show properties explicitly added to paid promotions by admin
+              // Strictly only show properties explicitly added to paid promotions by admin, capped by displayCount
               const homepageProperties = explicitlyFeatured.slice(0, displayCount);
               const count = homepageProperties.length;
 

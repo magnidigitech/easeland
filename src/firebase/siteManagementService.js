@@ -86,11 +86,35 @@ export async function getSiteConfigAdmin() {
       if (rawStored) {
         const parsed = JSON.parse(rawStored);
         if (parsed && typeof parsed === 'object') {
-          if (!mergedConfig.featuredListings && parsed.featuredListings) {
-            mergedConfig.featuredListings = parsed.featuredListings;
-          }
-          if (Object.keys(mergedConfig).length === 0) {
-            Object.assign(mergedConfig, parsed);
+          Object.keys(parsed).forEach((k) => {
+            if (!mergedConfig[k]) {
+              mergedConfig[k] = parsed[k];
+            }
+          });
+
+          // Specially protect featuredListings:
+          // Never let an outdated/empty remote array overwrite an active admin promotion configuration!
+          const localFeatured = parsed.featuredListings;
+          if (localFeatured && typeof localFeatured === 'object') {
+            const remoteFeatured = mergedConfig.featuredListings || {};
+            const localIds = (Array.isArray(localFeatured.featuredPropertyIds) ? localFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
+            const remoteIds = (Array.isArray(remoteFeatured.featuredPropertyIds) ? remoteFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
+
+            const chosenIds = (localIds.length > 0) ? localIds : remoteIds;
+            const chosenPromoted = (Array.isArray(localFeatured.promotedProperties) && localFeatured.promotedProperties.length > 0)
+              ? localFeatured.promotedProperties
+              : (remoteFeatured.promotedProperties || []);
+
+            mergedConfig.featuredListings = {
+              ...remoteFeatured,
+              ...localFeatured,
+              featuredPropertyIds: chosenIds,
+              promotedProperties: chosenPromoted,
+              displayCount: localFeatured.displayCount ?? remoteFeatured.displayCount ?? 6,
+              sectionTitle: localFeatured.sectionTitle || remoteFeatured.sectionTitle || 'Featured & Recent Verified Properties',
+              badgeText: localFeatured.badgeText || remoteFeatured.badgeText || 'VERIFIED LISTINGS',
+              showOnlyFeatured: true
+            };
           }
         }
       }
@@ -114,18 +138,21 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
   try {
     if (!moduleId) throw new Error('Module ID is required');
 
+    // Clean payload for JSON and Firestore (strip all undefined values to prevent Firestore rejection)
+    const cleanModuleData = JSON.parse(JSON.stringify(moduleData, (k, v) => (v === undefined ? null : v)));
+
     try {
       await fetch('/api/site-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [moduleId]: moduleData })
+        body: JSON.stringify({ [moduleId]: cleanModuleData })
       });
     } catch (e) {}
 
     try {
       const docRef = doc(db, 'siteManagement', moduleId);
       const payload = {
-        ...(typeof moduleData === 'object' && moduleData !== null ? moduleData : { value: moduleData }),
+        ...(typeof cleanModuleData === 'object' && cleanModuleData !== null ? cleanModuleData : { value: cleanModuleData }),
         updatedAt: serverTimestamp(),
         updatedBy: adminUid || 'admin'
       };
@@ -134,7 +161,7 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
       // Keep master_draft synchronized in Firestore so background pulls do not overwrite module
       try {
         const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
-        await setDoc(masterDraftRef, { [moduleId]: moduleData }, { merge: true });
+        await setDoc(masterDraftRef, { [moduleId]: cleanModuleData }, { merge: true });
       } catch (mdErr) {}
     } catch (fsErr) {
       console.warn('Firestore draft save warning for ' + moduleId + ':', fsErr.message);

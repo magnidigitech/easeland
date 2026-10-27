@@ -937,11 +937,18 @@ export const mockApi = {
 
   getPropertyById: (id) => {
     if (!id) return null;
-    const targetIdStr = String(id);
+    const targetLower = String(id).trim().toLowerCase();
     let localProps = [];
     try {
       if (typeof window !== 'undefined') {
-        const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties', 'easeland_submitted_properties'];
+        const keys = [
+          'easeland_properties',
+          'easeland_user_properties',
+          'easeland_owner_properties',
+          'easeland_submitted_properties',
+          'easeland_admin_cached_properties',
+          'easeland_promoted_properties'
+        ];
         keys.forEach(k => {
           const raw = localStorage.getItem(k);
           if (raw) {
@@ -950,9 +957,22 @@ export const mockApi = {
             else if (parsed && typeof parsed === 'object') localProps.push(parsed);
           }
         });
+        const siteConfigRaw = localStorage.getItem('easeland_site_config');
+        if (siteConfigRaw) {
+          const parsedConfig = JSON.parse(siteConfigRaw);
+          if (Array.isArray(parsedConfig?.featuredListings?.promotedProperties)) {
+            localProps.push(...parsedConfig.featuredListings.promotedProperties);
+          }
+        }
       }
     } catch (e) {}
-    return [...properties, ...localProps].filter(p => !isFakeProperty(p)).find(p => p && (String(p.id) === targetIdStr || String(p.propertyId) === targetIdStr || String(p.referenceId) === targetIdStr)) || null;
+    return [...properties, ...localProps].filter(p => !isFakeProperty(p)).find(p => {
+      if (!p) return false;
+      const id1 = String(p.id || '').trim().toLowerCase();
+      const id2 = String(p.propertyId || '').trim().toLowerCase();
+      const ref = String(p.referenceId || '').trim().toLowerCase();
+      return id1 === targetLower || id2 === targetLower || ref === targetLower;
+    }) || null;
   },
 
   // -------------------------------------------------------------

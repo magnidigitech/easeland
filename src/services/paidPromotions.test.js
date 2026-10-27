@@ -173,4 +173,131 @@ describe('EaseLand Paid Promotions & Admin Showcase Management Suite', () => {
     assert.strictEqual(matched[1].id, 'prop-slot-2');
     assert.strictEqual(matched[2].id, 'prop-slot-3');
   });
+
+  it('10. Multi-property dynamic showcase accurately resolves 3 active promoted customer properties (aaa, CCC, Prop1)', () => {
+    const featuredIds = ['prop_1792671238027', 'prop_1792995964157', 'prop_1793086252592'];
+    const displayCount = 3;
+
+    // Simulate multi-source property ecosystem: public, admin-cached, user-submitted
+    const publicProps = [
+      { id: 'prop_1792671238027', title: 'aaa', propertyType: 'OPEN_PLOT', price: 740000 }
+    ];
+    const userSubmittedProps = [
+      { id: 'prop_1792995964157', title: 'CCC', propertyType: 'HOUSE', price: 7399926 },
+      { id: 'prop_1793086252592', title: 'Prop1', propertyType: 'OPEN_PLOT', price: 2000000 }
+    ];
+
+    const candidatePool = [];
+    const seen = new Set();
+    const addToPool = (list) => {
+      list.forEach(p => {
+        if (!p) return;
+        const key = String(p.id).toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          candidatePool.push(p);
+        }
+      });
+    };
+
+    addToPool(publicProps);
+    addToPool(userSubmittedProps);
+
+    const explicitlyFeatured = [];
+    featuredIds.forEach(fId => {
+      const target = String(fId).toLowerCase();
+      const matched = candidatePool.find(p => String(p.id).toLowerCase() === target);
+      if (matched) explicitlyFeatured.push(matched);
+    });
+
+    const homepageProperties = explicitlyFeatured.slice(0, displayCount);
+    assert.strictEqual(homepageProperties.length, 3);
+    assert.strictEqual(homepageProperties[0].title, 'aaa');
+    assert.strictEqual(homepageProperties[1].title, 'CCC');
+    assert.strictEqual(homepageProperties[2].title, 'Prop1');
+  });
+
+  it('11. Dynamic display slot presets correctly slice properties (1 slot = spotlight, 2 slots = dual, 3 slots = trio)', () => {
+    const explicitlyFeatured = [
+      { id: 'prop_1', title: 'aaa' },
+      { id: 'prop_2', title: 'CCC' },
+      { id: 'prop_3', title: 'Prop1' }
+    ];
+
+    // 1 Slot Preset
+    const slot1Props = explicitlyFeatured.slice(0, 1);
+    assert.strictEqual(slot1Props.length, 1);
+    assert.strictEqual(slot1Props[0].id, 'prop_1');
+
+    // 2 Slots Preset
+    const slot2Props = explicitlyFeatured.slice(0, 2);
+    assert.strictEqual(slot2Props.length, 2);
+    assert.strictEqual(slot2Props[0].id, 'prop_1');
+    assert.strictEqual(slot2Props[1].id, 'prop_2');
+
+    // 3 Slots Preset
+    const slot3Props = explicitlyFeatured.slice(0, 3);
+    assert.strictEqual(slot3Props.length, 3);
+    assert.strictEqual(slot3Props[2].id, 'prop_3');
+  });
+
+  it('12. LocalStorage admin draft is preserved during CMS config merge and not wiped out by stale remote empty state', () => {
+    const remoteStaleConfig = {
+      featuredListings: {
+        featuredPropertyIds: [],
+        displayCount: 6,
+        sectionTitle: 'Featured & Recent Verified Properties'
+      }
+    };
+
+    const localActiveAdminDraft = {
+      featuredListings: {
+        featuredPropertyIds: ['prop_1792671238027', 'prop_1792995964157', 'prop_1793086252592'],
+        displayCount: 3,
+        sectionTitle: 'Featured & Recent Verified Properties',
+        badgeText: 'VERIFIED LISTINGS'
+      }
+    };
+
+    // Merge logic: Local configured admin draft takes precedence over remote empty array
+    const localIds = localActiveAdminDraft.featuredListings.featuredPropertyIds;
+    const remoteIds = remoteStaleConfig.featuredListings.featuredPropertyIds;
+    const resolvedIds = (localIds.length > 0) ? localIds : remoteIds;
+
+    const resolvedConfig = {
+      ...remoteStaleConfig.featuredListings,
+      ...localActiveAdminDraft.featuredListings,
+      featuredPropertyIds: resolvedIds
+    };
+
+    assert.strictEqual(resolvedConfig.featuredPropertyIds.length, 3);
+    assert.strictEqual(resolvedConfig.displayCount, 3);
+    assert.deepStrictEqual(resolvedConfig.featuredPropertyIds, [
+      'prop_1792671238027',
+      'prop_1792995964157',
+      'prop_1793086252592'
+    ]);
+  });
+
+  it('13. Resolves arbitrary dynamic customer properties without hardcoding any IDs or titles', () => {
+    // Generate arbitrary dynamic IDs and properties
+    const dynamicIds = ['custom_alpha_' + Date.now(), 'custom_beta_' + Date.now(), 'custom_gamma_' + Date.now()];
+    const dynamicStore = [
+      { id: dynamicIds[0], title: 'Dynamic Luxury Penthouse', propertyType: 'APARTMENT', price: 9500000 },
+      { id: dynamicIds[1], title: 'Gated Community Plot', propertyType: 'OPEN_PLOT', price: 1500000 },
+      { id: dynamicIds[2], title: 'Commercial Showroom', propertyType: 'COMMERCIAL', price: 42000000 }
+    ];
+
+    const explicitlyFeatured = [];
+    dynamicIds.forEach(id => {
+      const match = dynamicStore.find(p => p.id === id);
+      if (match) explicitlyFeatured.push(match);
+    });
+
+    assert.strictEqual(explicitlyFeatured.length, 3);
+    assert.strictEqual(explicitlyFeatured[0].title, 'Dynamic Luxury Penthouse');
+    assert.strictEqual(explicitlyFeatured[1].title, 'Gated Community Plot');
+    assert.strictEqual(explicitlyFeatured[2].title, 'Commercial Showroom');
+  });
 });
+

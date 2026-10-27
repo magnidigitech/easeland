@@ -466,21 +466,6 @@ export default function UserDashboard({
     const pSt = String(p.status || p.listingStatus || '').toUpperCase();
     const pLst = String(p.listingStatus || '').toUpperCase();
 
-    const isKnownLivePlatformProp = Boolean(
-      normTitle === 'farm house for rental purpose' ||
-      normTitle.includes('25 acer') ||
-      pId1 === 'prop_1792136601222' ||
-      pId1 === 'prop_1791870637821' ||
-      pId2 === 'prop_1792136601222' ||
-      pId2 === 'prop_1791870637821' ||
-      num1 === '97416' ||
-      num1 === '94034' ||
-      num2 === '97416' ||
-      num2 === '94034' ||
-      pId3 === 'el-prop-97416' ||
-      pId3 === 'el-prop-94034'
-    );
-
     // Check if property was deleted by Admin
     const isRecordedAdminDeleted = Boolean(
       p.deletedByAdmin === true ||
@@ -516,28 +501,7 @@ export default function UserDashboard({
       )
     );
 
-    const isPgVerifiedLive = myPropertiesList.some(pgP => {
-      if (!pgP) return false;
-      const pgId1 = String(pgP.id || '').toLowerCase().trim();
-      const pgId2 = String(pgP.propertyId || '').toLowerCase().trim();
-      const pgRef = String(pgP.referenceId || '').toLowerCase().trim();
-      const pgTitle = String(pgP.title || '').toLowerCase().trim();
-      const pgStatus = String(pgP.status || pgP.listingStatus || '').toUpperCase();
-      const isPgLive = pgStatus === 'LIVE' || pgStatus === 'APPROVED' || pgP.isPublished === true;
-      return isPgLive && (
-        (pgId1 && (pgId1 === pId1 || pgId1 === pId2)) ||
-        (pgId2 && (pgId2 === pId1 || pgId2 === pId2)) ||
-        (pgRef && pgRef === pId3) ||
-        (pgTitle && normTitle && pgTitle === normTitle)
-      );
-    });
-
-    const isUnverifiedZombie = !isKnownLivePlatformProp && !isPgVerifiedLive && (
-      pSt === 'LIVE' || pLst === 'LIVE' || p.isPublished === true || p.isPlatformVerified === true ||
-      pSt === 'APPROVED' || pLst === 'APPROVED' || p.verificationStatus === 'Platform Verified'
-    );
-
-    const isAdminDeleted = isRecordedAdminDeleted || isUnverifiedZombie;
+    const isAdminDeleted = isRecordedAdminDeleted;
 
     if (pId || normTitle) {
       let existingKey = pId;

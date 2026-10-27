@@ -223,60 +223,10 @@ app.use(express.static(path.join(__dirname, 'dist'), {
   }
 }));
 
-// Health check endpoint for Coolify / load balancers
-app.get('/health', (req, res) => {
-  res.status(200).send('healthy');
-});
-
-// Local Persistent Disk & Memory Store Setup for Property Records (100% Availability Fallback)
-const propertiesStoreFile = path.join(uploadsDir, 'properties_store.json');
+// In-Memory Fast Lookup Cache for Active Property Records & Admin Deleted Ledger
 const localPropsMap = new Map();
-
-// Initialize local properties map from properties_store.json disk file
-try {
-  if (fs.existsSync(propertiesStoreFile)) {
-    const rawDisk = fs.readFileSync(propertiesStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (Array.isArray(parsedDisk)) {
-      parsedDisk.forEach(p => {
-        if (p && (p.propertyId || p.id)) {
-          localPropsMap.set(p.propertyId || p.id, p);
-        }
-      });
-    }
-  }
-} catch (e) {
-  console.warn('Local properties store initialization note:', e.message);
-}
-
-// Local Persistent Disk & Memory Store for Authoritative Admin Deleted Properties Ledger
-const adminDeletedStoreFile = path.join(uploadsDir, 'admin_deleted_store.json');
 const localAdminDeletedMap = new Map();
 
-// Empty seed ledger to ensure clean platform state
-const SEED_ADMIN_DELETED_PROPERTIES = [];
-
-
-try {
-  if (fs.existsSync(adminDeletedStoreFile)) {
-    const rawDisk = fs.readFileSync(adminDeletedStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (Array.isArray(parsedDisk)) {
-      parsedDisk.forEach(p => {
-        if (p) {
-          const k1 = String(p.propertyId || p.id || '').toLowerCase().trim();
-          const k2 = String(p.referenceId || '').toLowerCase().trim();
-          const k3 = String(p.title || '').toLowerCase().trim();
-          if (k1) localAdminDeletedMap.set(k1, p);
-          if (k2) localAdminDeletedMap.set(k2, p);
-          if (k3) localAdminDeletedMap.set(k3, p);
-        }
-      });
-    }
-  }
-} catch (e) {
-  console.warn('Local admin deleted store initialization note:', e.message);
-}
 
 function getAdminDeletedLedger() {
   const seen = new Set();
@@ -362,13 +312,9 @@ function recordAdminDeletedItem(item) {
     localAdminDeletedMap.set('prop-' + cleanNum, entry);
   }
 
-  try {
-    fs.writeFileSync(adminDeletedStoreFile, JSON.stringify(getAdminDeletedLedger(), null, 2), 'utf8');
-  } catch (err) {
-    console.warn('Failed to write admin deleted store file:', err.message);
-  }
   return entry;
 }
+
 
 
 function saveLocalProperty(p, existingOverride = null) {
@@ -563,12 +509,6 @@ function saveLocalProperty(p, existingOverride = null) {
 
   localPropsMap.set(pId, updated);
 
-  try {
-    const arrayToStore = Array.from(localPropsMap.values());
-    fs.writeFileSync(propertiesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('Local properties disk write note:', err.message);
-  }
   return updated;
 }
 
@@ -582,7 +522,7 @@ function getLocalProperties() {
 
 // PostgreSQL Connection Pool Setup
 const { Pool } = pg;
-const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || process.env.POSTGRES_URL || 'postgres://postgres:g7YivfxcSdNUC9rXFg0y5iSGT00er3NhXqVVc1SI20Y9o4nN7XFTEvAmmTQCT7su@of36x8wuw0wn4j0x2y6c8eso:5432/postgres';
+const dbUrl = process.env.DATABASE_URL || process.env.VITE_POSTGRES_URL || process.env.POSTGRES_URL || 'postgres://postgres:g7YivfxcSdNUC9rXFg0y5iSGT00er3NhXqVVc1SI20Y9o4nN7XFTEvAmmTQCT7su@187.127.159.200:5432/postgres';
 
 const pgPool = new Pool({
   connectionString: dbUrl,
@@ -895,27 +835,11 @@ async function initPgDb() {
   }
 }
 
-// Local Persistent Disk & Memory Store for Registered Users (100% Availability Fallback)
-const usersStoreFile = path.join(uploadsDir, 'users_store.json');
+// In-Memory Fast Lookup Caches (Authoritative state lives in PostgreSQL)
 const localUsersMap = new Map();
-
-try {
-  if (fs.existsSync(usersStoreFile)) {
-    const rawDisk = fs.readFileSync(usersStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (Array.isArray(parsedDisk)) {
-      parsedDisk.forEach(u => {
-        if (u && (u.uid || u.id || u.email)) {
-          const key = u.uid || u.id || u.email;
-          const existing = localUsersMap.get(key) || {};
-          localUsersMap.set(key, { ...existing, ...u });
-        }
-      });
-    }
-  }
-} catch (e) {
-  console.warn('Local users store initialization note:', e.message);
-}
+const localDeletedUsersSet = new Set();
+const localVisitorsMap = new Map();
+const localEnquiriesMap = new Map();
 
 function saveLocalUser(u) {
   if (!u || (!u.uid && !u.id && !u.email)) return;
@@ -928,12 +852,6 @@ function saveLocalUser(u) {
     updatedAt: new Date().toISOString()
   };
   localUsersMap.set(key, updated);
-  try {
-    const arrayToStore = Array.from(localUsersMap.values());
-    fs.writeFileSync(usersStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('Local users disk write note:', err.message);
-  }
   return updated;
 }
 
@@ -941,58 +859,14 @@ function getLocalUsers() {
   return Array.from(localUsersMap.values());
 }
 
-// Local Persistent Disk & Memory Store for Deleted Users
-const deletedUsersStoreFile = path.join(uploadsDir, 'deleted_users_store.json');
-const localDeletedUsersSet = new Set();
-
-try {
-  if (fs.existsSync(deletedUsersStoreFile)) {
-    const rawDisk = fs.readFileSync(deletedUsersStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (Array.isArray(parsedDisk)) {
-      parsedDisk.forEach(item => {
-        if (item) localDeletedUsersSet.add(String(item).toLowerCase().trim());
-      });
-    }
-  }
-} catch (e) {
-  console.warn('Local deleted users store initialization note:', e.message);
-}
-
 function addLocalDeletedUser(uidOrEmail) {
   if (!uidOrEmail) return;
   localDeletedUsersSet.add(String(uidOrEmail).toLowerCase().trim());
-  try {
-    fs.writeFileSync(deletedUsersStoreFile, JSON.stringify(Array.from(localDeletedUsersSet)), 'utf8');
-  } catch (e) {}
 }
 
 function removeLocalDeletedUser(uidOrEmail) {
   if (!uidOrEmail) return;
   localDeletedUsersSet.delete(String(uidOrEmail).toLowerCase().trim());
-  try {
-    fs.writeFileSync(deletedUsersStoreFile, JSON.stringify(Array.from(localDeletedUsersSet)), 'utf8');
-  } catch (e) {}
-}
-
-// Local Persistent Disk & Memory Store for Site Visitors (100% Availability Fallback)
-const visitorsStoreFile = path.join(uploadsDir, 'visitors_store.json');
-const localVisitorsMap = new Map();
-
-try {
-  if (fs.existsSync(visitorsStoreFile)) {
-    const rawDisk = fs.readFileSync(visitorsStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (Array.isArray(parsedDisk)) {
-      parsedDisk.forEach(v => {
-        if (v && (v.visitorId || v.id)) {
-          localVisitorsMap.set(v.visitorId || v.id, v);
-        }
-      });
-    }
-  }
-} catch (e) {
-  console.warn('Local visitors store initialization note:', e.message);
 }
 
 function saveLocalVisitor(visitor) {
@@ -1007,12 +881,6 @@ function saveLocalVisitor(visitor) {
     updatedAt: new Date().toISOString()
   };
   localVisitorsMap.set(vId, updated);
-  try {
-    const arrayToStore = Array.from(localVisitorsMap.values());
-    fs.writeFileSync(visitorsStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('Local visitors disk write note:', err.message);
-  }
   return updated;
 }
 
@@ -1022,27 +890,6 @@ function getLocalVisitors() {
     const tB = new Date(b.createdAt || b.updatedAt || 0).getTime();
     return tB - tA;
   });
-}
-
-
-// Local Persistent Disk & Memory Store for Enquiries (100% Availability Fallback)
-const enquiriesStoreFile = path.join(uploadsDir, 'enquiries_store.json');
-const localEnquiriesMap = new Map();
-
-try {
-  if (fs.existsSync(enquiriesStoreFile)) {
-    const rawDisk = fs.readFileSync(enquiriesStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (Array.isArray(parsedDisk)) {
-      parsedDisk.forEach(e => {
-        if (e && (e.enquiryId || e.id)) {
-          localEnquiriesMap.set(e.enquiryId || e.id, e);
-        }
-      });
-    }
-  }
-} catch (e) {
-  console.warn('Local enquiries store initialization note:', e.message);
 }
 
 function saveLocalEnquiry(enq) {
@@ -1057,13 +904,6 @@ function saveLocalEnquiry(enq) {
     updatedAt: new Date().toISOString()
   };
   localEnquiriesMap.set(eId, updated);
-
-  try {
-    const arrayToStore = Array.from(localEnquiriesMap.values());
-    fs.writeFileSync(enquiriesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('Local enquiries disk write note:', err.message);
-  }
   return updated;
 }
 
@@ -1074,6 +914,7 @@ function getLocalEnquiries() {
     return tB - tA;
   });
 }
+
 
 // Trigger DB init asynchronously so server startup is 100% instant
 setImmediate(() => {
@@ -1110,15 +951,17 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const host = req.headers.host || 'easeland.in';
     const publicUrl = `${protocol}://${host}${relativePath}`;
 
-    // 2. Try background sync to PostgreSQL (Non-blocking catch)
+    // 2. Authoritative PostgreSQL media binary storage
     try {
-      const insertQuery = `
-        INSERT INTO media_files (
-          media_id, property_id, owner_id, file_name, content_type, file_size, media_type, is_document, file_data
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (media_id) DO NOTHING;
-      `;
-      pgPool.query(insertQuery, [
+      const P = String.fromCharCode(36);
+      const phs = [];
+      for (let i = 1; i <= 9; i++) { phs.push(P + i); }
+      const insertQuery =
+        'INSERT INTO media_files (' +
+        '  media_id, property_id, owner_id, file_name, content_type, file_size, media_type, is_document, file_data' +
+        ') VALUES (' + phs.join(', ') + ') ' +
+        'ON CONFLICT (media_id) DO NOTHING;';
+      await pgPool.query(insertQuery, [
         mediaId,
         propertyId,
         ownerId,
@@ -1128,8 +971,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         mediaType,
         isDocument,
         req.file.buffer
-      ]).catch(pgErr => console.warn('PostgreSQL background media insert note:', pgErr.message));
-    } catch (e) {}
+      ]);
+    } catch (pgErr) {
+      console.warn('PostgreSQL media insert note:', pgErr.message);
+    }
 
     // 3. Immediately attach uploaded file to property record in local store
     try {
@@ -1183,11 +1028,16 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
         // Sync directly to PostgreSQL properties table raw_data so getPropertyById has it immediately
         try {
-          pgPool.query(
-            "UPDATE properties SET raw_data = $1, updated_at = NOW() WHERE property_id = $2 OR reference_id = $2 OR raw_data->>'id' = $2 OR raw_data->>'propertyId' = $2;",
+          const P = String.fromCharCode(36);
+          const p1 = P + '1';
+          const p2 = P + '2';
+          await pgPool.query(
+            "UPDATE properties SET raw_data = " + p1 + ", updated_at = NOW() WHERE property_id = " + p2 + " OR reference_id = " + p2 + " OR raw_data->>'id' = " + p2 + " OR raw_data->>'propertyId' = " + p2 + ";",
             [JSON.stringify(existingProp), propertyId]
-          ).catch(pgSyncErr => console.warn('PostgreSQL property doc/media update note:', pgSyncErr.message));
-        } catch (e) {}
+          );
+        } catch (pgSyncErr) {
+          console.warn('PostgreSQL property doc/media update note:', pgSyncErr.message);
+        }
       }
     } catch (attachErr) {
       console.warn('Local property attach note:', attachErr.message);
@@ -1208,12 +1058,13 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// API Endpoint: Serve Media / Document binary directly from PostgreSQL (with disk fallback)
+// API Endpoint: Serve Media / Document binary directly from PostgreSQL
 app.get('/api/media/:mediaId', async (req, res) => {
   try {
     const { mediaId } = req.params;
+    const P = String.fromCharCode(36);
     const result = await pgPool.query(
-      'SELECT content_type, file_name, file_data FROM media_files WHERE media_id = $1;',
+      'SELECT content_type, file_name, file_data FROM media_files WHERE media_id = ' + P + '1;',
       [mediaId]
     );
 
@@ -1351,14 +1202,15 @@ const handlePropertyUpsert = async (req, res) => {
       ];
 
       await pgPool.query(queryText, values);
+      localPropsMap.set(canonicalPropertyId, savedLocal);
+      return res.json({ success: true, message: 'Property saved successfully.', property: savedLocal });
     } catch (pgErr) {
-      console.warn('PostgreSQL property save note (Saved to local disk store fallback):', pgErr.message);
+      console.error('CRITICAL: PostgreSQL property save failed:', pgErr.message);
+      return res.status(500).json({ success: false, error: 'Database save failed: ' + pgErr.message });
     }
-
-    return res.json({ success: true, message: 'Property saved successfully.', property: savedLocal });
   } catch (err) {
-    console.error('Property save handler note:', err.message);
-    return res.json({ success: true, message: 'Property saved locally.' });
+    console.error('Property save handler error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
 
@@ -1377,18 +1229,16 @@ app.patch('/api/properties/:id', (req, res) => {
   return handlePropertyUpsert(req, res);
 });
 
-// API Endpoint: Get all property records (PostgreSQL Primary Authoritative Source + Local Disk Store Fallback)
+// API Endpoint: Get all property records (PostgreSQL Primary Authoritative Source - Zero Silent Fallback)
 app.get('/api/properties', async (req, res) => {
   try {
     const isPublicOnly = req.query.publicOnly === 'true' || req.query.public === 'true';
     let pgProperties = [];
-    let pgConnected = false;
 
     try {
       const result = await pgPool.query(
         'SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data, updated_at FROM properties ORDER BY updated_at DESC;'
       );
-      pgConnected = true;
       pgProperties = result.rows.map(row => {
         const raw = row.raw_data || {};
         const listingStatus = row.listing_status || raw.listing_status || raw.listingStatus || 'DRAFT';
@@ -1421,23 +1271,18 @@ app.get('/api/properties', async (req, res) => {
         };
       }).filter(Boolean);
 
-      // Keep localPropsMap synchronized with PostgreSQL records
+      // Keep in-memory cache synchronized with PostgreSQL records
       pgProperties.forEach(p => {
         if (p && (p.propertyId || p.id)) {
           localPropsMap.set(p.propertyId || p.id, p);
         }
       });
     } catch (pgErr) {
-      console.warn('PostgreSQL fetch note (Serving local disk store fallback):', pgErr.message);
+      console.error('CRITICAL: PostgreSQL fetch properties failed:', pgErr.message);
+      return res.status(503).json({ success: false, error: 'Database unavailable: ' + pgErr.message });
     }
 
-    let properties = [];
-    if (pgConnected) {
-      // PostgreSQL is Authoritative Primary Source
-      properties = pgProperties;
-    } else {
-      properties = getLocalProperties();
-    }
+    const properties = pgProperties;
 
     if (isPublicOnly) {
       const ledger = getAdminDeletedLedger();
@@ -1474,7 +1319,8 @@ app.get('/api/properties', async (req, res) => {
 
     return res.json({ success: true, properties, adminDeletedLedger: getAdminDeletedLedger() });
   } catch (err) {
-    return res.json({ success: true, properties: getLocalProperties(), adminDeletedLedger: getAdminDeletedLedger() });
+    console.error('CRITICAL: GET /api/properties failed:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1600,23 +1446,11 @@ app.get('/api/properties/:id', async (req, res) => {
         localPropsMap.set(property.propertyId, property);
         return res.json({ success: true, property });
       }
+      return res.status(404).json({ success: false, error: 'Property not found.' });
     } catch (pgErr) {
-      console.warn('PostgreSQL single property fetch note:', pgErr.message);
+      console.error('CRITICAL: PostgreSQL single property query failed:', pgErr.message);
+      return res.status(503).json({ success: false, error: 'Database unavailable: ' + pgErr.message });
     }
-
-    // 2. Check Local Store
-    const allAliases = new Set([tLower, cleanNum, refWithPrefix, propWithPrefix].filter(Boolean));
-    for (const [k, v] of localPropsMap.entries()) {
-      const kLow = String(k).toLowerCase().trim();
-      const vId = String(v.id || '').toLowerCase().trim();
-      const vPropId = String(v.propertyId || '').toLowerCase().trim();
-      const vRefId = String(v.referenceId || '').toLowerCase().trim();
-      if (allAliases.has(kLow) || allAliases.has(vId) || allAliases.has(vPropId) || allAliases.has(vRefId)) {
-        return res.json({ success: true, property: v });
-      }
-    }
-
-    return res.status(404).json({ success: false, error: 'Property not found' });
   } catch (err) {
     console.error('Get single property error:', err);
     return res.status(500).json({ success: false, error: err.message });
@@ -1724,7 +1558,8 @@ app.delete('/api/properties/:id', async (req, res) => {
         );
       }
     } catch (pgErr) {
-      console.warn('PostgreSQL property delete note:', pgErr.message);
+      console.error('CRITICAL: PostgreSQL property delete failed:', pgErr.message);
+      return res.status(500).json({ success: false, error: 'Database delete failed: ' + pgErr.message });
     }
 
     // 2. Authoritative Cloud Firestore Cascade Deletion (Firebase Admin SDK)
@@ -1838,12 +1673,6 @@ app.delete('/api/properties/:id', async (req, res) => {
       }
     });
 
-    try {
-      const arrayToStore = Array.from(localPropsMap.values());
-      fs.writeFileSync(propertiesStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-    } catch (err) {
-      console.warn('Local properties disk write note after delete:', err.message);
-    }
 
     return res.json({ success: true, message: 'Property deleted successfully' });
   } catch (err) {
@@ -1937,21 +1766,11 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
       console.warn('Firestore bulk purge note:', fsErr.message);
     }
 
-    // 3. Clear Local Disk Stores & Maps
-    try {
-      localPropsMap.clear();
-      fs.writeFileSync(propertiesStoreFile, JSON.stringify([], null, 2), 'utf8');
-
-      localEnquiriesMap.clear();
-      fs.writeFileSync(enquiriesStoreFile, JSON.stringify([], null, 2), 'utf8');
-
-      localAdminDeletedMap.clear();
-      fs.writeFileSync(adminDeletedStoreFile, JSON.stringify([], null, 2), 'utf8');
-
-      try {
-        localVisitorsMap.clear();
-        fs.writeFileSync(visitorsStoreFile, JSON.stringify([], null, 2), 'utf8');
-      } catch (visErr) {}
+    // 3. Clear In-Memory Caches
+    localPropsMap.clear();
+    localEnquiriesMap.clear();
+    localAdminDeletedMap.clear();
+    localVisitorsMap.clear();
 
       // Clean uploads folders on disk
       try {
@@ -1972,9 +1791,7 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
       } catch (rmErr) {
         console.warn('Uploads directory clean note:', rmErr.message);
       }
-    } catch (diskErr) {
-      console.warn('Disk store purge error:', diskErr.message);
-    }
+
 
     return res.json({
       success: true,
@@ -1986,6 +1803,8 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
     console.error('Purge all properties handler error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
+});
+
 // Database Health & Live Reconnect Verification Endpoint
 app.post('/api/admin/database/reconnect', async (req, res) => {
   const { databaseUrl } = req.body || {};
@@ -2018,80 +1837,6 @@ app.post('/api/admin/database/reconnect', async (req, res) => {
   }
 });
 
-// API Endpoint: Get single property by ID from Local Store / PostgreSQL
-app.get('/api/properties/:id', async (req, res) => {
-  const targetId = req.params.id;
-  if (!targetId) {
-    return res.status(400).json({ success: false, error: 'Property ID is required.' });
-  }
-
-  let localProp = localPropsMap.get(targetId);
-  if (!localProp) {
-    const tLower = targetId.toLowerCase().trim();
-    for (const v of localPropsMap.values()) {
-      if (v) {
-        const id1 = String(v.id || '').toLowerCase().trim();
-        const id2 = String(v.propertyId || '').toLowerCase().trim();
-        const id3 = String(v.referenceId || '').toLowerCase().trim();
-        const tTitle = String(v.title || '').toLowerCase().trim();
-        if (id1 === tLower || id2 === tLower || id3 === tLower || (tTitle && tTitle === tLower)) {
-          localProp = v;
-          break;
-        }
-      }
-    }
-  }
-
-  let pgProp = null;
-  try {
-    const result = await pgPool.query(
-      "SELECT raw_data FROM properties WHERE property_id = $1 OR reference_id = $1 OR raw_data->>'id' = $1 OR raw_data->>'propertyId' = $1 OR raw_data->>'referenceId' = $1;",
-      [targetId]
-    );
-    if (result.rows.length > 0) {
-      pgProp = result.rows[0].raw_data;
-    }
-  } catch (err) {}
-
-  if (!pgProp) {
-    try {
-      const allRes = await pgPool.query('SELECT raw_data FROM properties;');
-      const tLower = targetId.toLowerCase().trim();
-      const found = allRes.rows.map(r => r.raw_data).find(p => {
-        if (!p) return false;
-        const id1 = String(p.id || '').toLowerCase().trim();
-        const id2 = String(p.propertyId || '').toLowerCase().trim();
-        const id3 = String(p.referenceId || '').toLowerCase().trim();
-        const tTitle = String(p.title || '').toLowerCase().trim();
-        return id1 === tLower || id2 === tLower || id3 === tLower || (tTitle && tTitle === tLower);
-      });
-      if (found) {
-        pgProp = found;
-      }
-    } catch (e) {}
-  }
-
-  if (localProp || pgProp) {
-    const mergedDocs = [
-      ...(Array.isArray(localProp?.documents) ? localProp.documents : []),
-      ...(Array.isArray(pgProp?.documents) ? pgProp.documents : [])
-    ];
-    const seenDocKeys = new Set();
-    const finalDocs = [];
-    mergedDocs.forEach(d => {
-      if (!d) return;
-      const key = String(d.docId || d.mediaId || d.id || d.url || d.publicUrl || d.name || d.fileName || '').toLowerCase().trim();
-      if (!key || seenDocKeys.has(key)) return;
-      seenDocKeys.add(key);
-      finalDocs.push(d);
-    });
-
-    const property = { ...(pgProp || {}), ...(localProp || {}), documents: finalDocs };
-    return res.json({ success: true, property });
-  }
-
-  return res.status(404).json({ success: false, error: 'Property not found.' });
-});
 
 
 // API Endpoint: Remove Document from Property Listing
@@ -2119,11 +1864,14 @@ app.delete('/api/properties/:id/documents', async (req, res) => {
       saveLocalProperty(existingProp);
 
       try {
+        const P = String.fromCharCode(36);
         await pgPool.query(
-          'UPDATE properties SET raw_data = $1, updated_at = NOW() WHERE property_id = $2;',
+          'UPDATE properties SET raw_data = ' + P + '1, updated_at = NOW() WHERE property_id = ' + P + '2;',
           [JSON.stringify(existingProp), targetId]
         );
-      } catch (pgErr) {}
+      } catch (pgErr) {
+        console.warn('PostgreSQL doc removal update note:', pgErr.message);
+      }
     }
     return res.json({ success: true, message: 'Document removed from server property.' });
   } catch (err) {
@@ -2144,8 +1892,9 @@ app.get('/api/properties/:id/documents', async (req, res) => {
     }
 
     try {
+      const P = String.fromCharCode(36);
       const pgRes = await pgPool.query(
-        "SELECT raw_data FROM properties WHERE property_id = $1 OR reference_id = $1 OR raw_data->>'id' = $1 OR raw_data->>'propertyId' = $1;",
+        "SELECT raw_data FROM properties WHERE property_id = " + P + "1 OR reference_id = " + P + "1 OR raw_data->>'id' = " + P + "1 OR raw_data->>'propertyId' = " + P + "1;",
         [targetId]
       );
       if (pgRes.rows.length > 0 && Array.isArray(pgRes.rows[0].raw_data?.documents)) {
@@ -2169,35 +1918,21 @@ app.get('/api/properties/:id/documents', async (req, res) => {
   }
 });
 
-// API Endpoint: Get Site Configuration from PostgreSQL DB (with disk fallback)
-const siteConfigStoreFile = path.join(uploadsDir, 'site_config_store.json');
+// In-Memory Site Configuration Cache (Authoritative state lives in PostgreSQL)
 let localSiteConfigMap = new Map();
 
-try {
-  if (fs.existsSync(siteConfigStoreFile)) {
-    const rawDisk = fs.readFileSync(siteConfigStoreFile, 'utf8');
-    const parsedDisk = JSON.parse(rawDisk);
-    if (typeof parsedDisk === 'object' && parsedDisk !== null) {
-      Object.keys(parsedDisk).forEach(key => localSiteConfigMap.set(key, parsedDisk[key]));
-    }
-  }
-} catch (e) {}
 
 app.get('/api/site-config', async (req, res) => {
   try {
     const config = {};
-    localSiteConfigMap.forEach((val, key) => { config[key] = val; });
+    const result = await pgPool.query('SELECT module_id, config_data FROM site_config;');
+    result.rows.forEach(row => {
+      if (row.module_id && row.config_data) {
+        config[row.module_id] = row.config_data;
+      }
+    });
 
-    try {
-      const result = await pgPool.query('SELECT module_id, config_data FROM site_config;');
-      result.rows.forEach(row => {
-        if (row.module_id && row.config_data) {
-          config[row.module_id] = row.config_data;
-        }
-      });
-    } catch (pgErr) {}
-
-    // CRITICAL: Unpack master_draft if present so any child modules (e.g., featuredListings) are exposed at the top level
+    // Unpack master_draft if present so any child modules (e.g., featuredListings) are exposed at the top level
     if (config.master_draft && typeof config.master_draft === 'object') {
       Object.keys(config.master_draft).forEach(modKey => {
         if (!config[modKey] && typeof config.master_draft[modKey] === 'object' && config.master_draft[modKey] !== null) {
@@ -2208,7 +1943,8 @@ app.get('/api/site-config', async (req, res) => {
 
     return res.json({ success: true, config });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message, config: {} });
+    console.error('CRITICAL: PostgreSQL site_config fetch failed:', err.message);
+    return res.status(503).json({ success: false, error: 'Database unavailable: ' + err.message, config: {} });
   }
 });
 
@@ -2216,37 +1952,22 @@ app.get('/api/site-config', async (req, res) => {
 app.post('/api/site-config', async (req, res) => {
   try {
     const fullConfig = req.body || {};
+    const P = String.fromCharCode(36);
+    const queryText =
+      'INSERT INTO site_config (module_id, config_data, updated_at) ' +
+      'VALUES (' + P + '1, ' + P + '2, NOW()) ' +
+      'ON CONFLICT (module_id) DO UPDATE SET ' +
+      '  config_data = EXCLUDED.config_data, ' +
+      '  updated_at = NOW();';
+
+    const promises = Object.keys(fullConfig).map(modId => {
+      return pgPool.query(queryText, [modId, JSON.stringify(fullConfig[modId])]);
+    });
+    await Promise.all(promises);
+
     Object.keys(fullConfig).forEach(modId => {
       localSiteConfigMap.set(modId, fullConfig[modId]);
-      // Keep master_draft completely synchronized so background sync never reverts changes
-      if (localSiteConfigMap.has('master_draft')) {
-        const md = localSiteConfigMap.get('master_draft');
-        if (md && typeof md === 'object') {
-          md[modId] = fullConfig[modId];
-          localSiteConfigMap.set('master_draft', md);
-        }
-      }
     });
-
-    try {
-      const objToStore = {};
-      localSiteConfigMap.forEach((val, key) => { objToStore[key] = val; });
-      fs.writeFileSync(siteConfigStoreFile, JSON.stringify(objToStore, null, 2), 'utf8');
-    } catch (e) {}
-
-    try {
-      const promises = Object.keys(fullConfig).map(modId => {
-        const queryText = `
-          INSERT INTO site_config (module_id, config_data, updated_at)
-          VALUES ($1, $2, NOW())
-          ON CONFLICT (module_id) DO UPDATE SET
-            config_data = EXCLUDED.config_data,
-            updated_at = NOW();
-        `;
-        return pgPool.query(queryText, [modId, JSON.stringify(fullConfig[modId])]);
-      });
-      await Promise.all(promises);
-    } catch (pgErr) {}
 
     // Authoritative Firebase Admin SDK Sync: Keeps Firestore siteManagement in lockstep with PostgreSQL
     try {
@@ -2299,49 +2020,47 @@ app.post('/api/enquiries', async (req, res) => {
       updatedAt: nowIso
     };
 
-    // 1. Save to local disk fallback store
-    saveLocalEnquiry(fullPayload);
+    // 1. Authoritative PostgreSQL DB write
+    const P = String.fromCharCode(36);
+    const phs = [];
+    for (let i = 1; i <= 19; i++) { phs.push(P + i); }
 
-    // 2. Save to PostgreSQL DB
-    try {
-      const queryText = `
-        INSERT INTO enquiries (
-          enquiry_id, property_id, property_title, property_reference_id,
-          owner_id, owner_name, owner_email,
-          customer_id, buyer_id, customer_name, buyer_name,
-          customer_email, buyer_email, customer_phone, buyer_phone,
-          message, preferred_visit_date, status, raw_data, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW()
-        ) ON CONFLICT (enquiry_id) DO UPDATE SET
-          status = EXCLUDED.status,
-          raw_data = EXCLUDED.raw_data,
-          updated_at = NOW();
-      `;
-      await pgPool.query(queryText, [
-        eId,
-        fullPayload.propertyId || '',
-        fullPayload.propertyTitle || '',
-        fullPayload.propertyReferenceId || '',
-        fullPayload.ownerId || '',
-        fullPayload.ownerName || '',
-        fullPayload.ownerEmail || '',
-        fullPayload.customerId || fullPayload.buyerId || '',
-        fullPayload.buyerId || fullPayload.customerId || '',
-        fullPayload.customerName || fullPayload.buyerName || '',
-        fullPayload.buyerName || fullPayload.customerName || '',
-        fullPayload.customerEmail || fullPayload.buyerEmail || '',
-        fullPayload.buyerEmail || fullPayload.customerEmail || '',
-        fullPayload.customerPhone || fullPayload.buyerPhone || '',
-        fullPayload.buyerPhone || fullPayload.customerPhone || '',
-        fullPayload.message || '',
-        fullPayload.preferredVisitDate || null,
-        fullPayload.status || 'SUBMITTED',
-        JSON.stringify(fullPayload)
-      ]);
-    } catch (pgErr) {
-      console.warn('PostgreSQL save enquiry note:', pgErr.message);
-    }
+    const queryText = 
+      'INSERT INTO enquiries (' +
+      '  enquiry_id, property_id, property_title, property_reference_id, ' +
+      '  owner_id, owner_name, owner_email, ' +
+      '  customer_id, buyer_id, customer_name, buyer_name, ' +
+      '  customer_email, buyer_email, customer_phone, buyer_phone, ' +
+      '  message, preferred_visit_date, status, raw_data, created_at, updated_at' +
+      ') VALUES (' +
+      '  ' + phs.join(', ') + ', NOW(), NOW()' +
+      ') ON CONFLICT (enquiry_id) DO UPDATE SET ' +
+      '  status = EXCLUDED.status, ' +
+      '  raw_data = EXCLUDED.raw_data, ' +
+      '  updated_at = NOW();';
+
+    await pgPool.query(queryText, [
+      eId,
+      fullPayload.propertyId || '',
+      fullPayload.propertyTitle || '',
+      fullPayload.propertyReferenceId || '',
+      fullPayload.ownerId || '',
+      fullPayload.ownerName || '',
+      fullPayload.ownerEmail || '',
+      fullPayload.customerId || fullPayload.buyerId || '',
+      fullPayload.buyerId || fullPayload.customerId || '',
+      fullPayload.customerName || fullPayload.buyerName || '',
+      fullPayload.buyerName || fullPayload.customerName || '',
+      fullPayload.customerEmail || fullPayload.buyerEmail || '',
+      fullPayload.buyerEmail || fullPayload.customerEmail || '',
+      fullPayload.customerPhone || fullPayload.buyerPhone || '',
+      fullPayload.buyerPhone || fullPayload.customerPhone || '',
+      fullPayload.message || '',
+      fullPayload.preferredVisitDate || null,
+      fullPayload.status || 'SUBMITTED',
+      JSON.stringify(fullPayload)
+    ]);
+    saveLocalEnquiry(fullPayload);
 
     // 3. Auto-ingest enquiry into CRM Leads & Deals with HOT score and broadcast
     try {
@@ -2428,25 +2147,8 @@ app.get('/api/enquiries', async (req, res) => {
   try {
     const { ownerId, ownerEmail, customerId, customerEmail, buyerId, buyerEmail } = req.query;
 
-    const localList = getLocalEnquiries();
-    let pgEnquiries = [];
-
-    try {
-      const result = await pgPool.query('SELECT raw_data FROM enquiries ORDER BY updated_at DESC LIMIT 200;');
-      pgEnquiries = result.rows.map(row => row.raw_data).filter(Boolean);
-    } catch (pgErr) {
-      console.warn('PostgreSQL fetch enquiries note:', pgErr.message);
-    }
-
-    const mergedMap = new Map();
-    [...localList, ...pgEnquiries].forEach(e => {
-      if (e && (e.enquiryId || e.id)) {
-        const id = e.enquiryId || e.id;
-        mergedMap.set(id, { ...mergedMap.get(id), ...e });
-      }
-    });
-
-    let allEnquiries = Array.from(mergedMap.values());
+    const result = await pgPool.query('SELECT raw_data FROM enquiries ORDER BY updated_at DESC LIMIT 200;');
+    let allEnquiries = result.rows.map(row => row.raw_data).filter(Boolean);
 
     if (ownerId || ownerEmail || customerId || customerEmail || buyerId || buyerEmail) {
       const oId = String(ownerId || '').toLowerCase().trim();
@@ -2470,9 +2172,10 @@ app.get('/api/enquiries', async (req, res) => {
       });
     }
 
-    return res.json({ success: true, enquiries: allEnquiries });
+    return res.json({ success: true, count: allEnquiries.length, enquiries: allEnquiries });
   } catch (err) {
-    return res.json({ success: true, enquiries: getLocalEnquiries() });
+    console.error('CRITICAL: PostgreSQL fetch enquiries failed:', err.message);
+    return res.status(503).json({ success: false, error: 'Database unavailable: ' + err.message });
   }
 });
 
@@ -2483,6 +2186,9 @@ app.patch('/api/enquiries/:id', async (req, res) => {
     const { status } = req.body;
     if (!eId || !status) return res.status(400).json({ success: false, error: 'Enquiry ID and status required.' });
 
+    const P = String.fromCharCode(36);
+    await pgPool.query('UPDATE enquiries SET status = ' + P + '1, updated_at = NOW() WHERE enquiry_id = ' + P + '2;', [status, eId]);
+
     const localEnq = localEnquiriesMap.get(eId);
     if (localEnq) {
       localEnq.status = status;
@@ -2490,13 +2196,9 @@ app.patch('/api/enquiries/:id', async (req, res) => {
       saveLocalEnquiry(localEnq);
     }
 
-    try {
-      await pgPool.query('UPDATE enquiries SET status = $1, updated_at = NOW() WHERE enquiry_id = $2;', [status, eId]);
-    } catch (e) {}
-
     return res.json({ success: true, message: 'Enquiry status updated successfully.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Database update failed: ' + err.message });
   }
 });
 
@@ -2510,7 +2212,7 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
     }
 
     const newMsg = {
-      id: messageData.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: messageData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)),
       senderId: messageData.senderId || 'user',
       senderName: messageData.senderName || 'User',
       senderRole: messageData.senderRole || 'USER',
@@ -2518,7 +2220,19 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
       createdAt: messageData.createdAt || new Date().toISOString()
     };
 
-    // 1. Update in-memory / local disk store
+    const P = String.fromCharCode(36);
+    const msgSql =
+      'UPDATE enquiries ' +
+      'SET raw_data = jsonb_set(' +
+      '  COALESCE(raw_data, \'{}\'::jsonb), ' +
+      '  \'{messages}\', ' +
+      '  (COALESCE(raw_data->\'messages\', \'[]\'::jsonb) || ' + P + '1::jsonb)' +
+      '), ' +
+      'updated_at = NOW() ' +
+      'WHERE enquiry_id = ' + P + '2;';
+
+    await pgPool.query(msgSql, [JSON.stringify(newMsg), eId]);
+
     const localEnq = localEnquiriesMap.get(eId);
     if (localEnq) {
       if (!Array.isArray(localEnq.messages)) localEnq.messages = [];
@@ -2527,25 +2241,9 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
       saveLocalEnquiry(localEnq);
     }
 
-    // 2. Update in PostgreSQL DB
-    try {
-      await pgPool.query(`
-        UPDATE enquiries 
-        SET raw_data = jsonb_set(
-          COALESCE(raw_data, '{}'::jsonb),
-          '{messages}',
-          (COALESCE(raw_data->'messages', '[]'::jsonb) || $1::jsonb)
-        ),
-        updated_at = NOW()
-        WHERE enquiry_id = $2;
-      `, [JSON.stringify(newMsg), eId]);
-    } catch (pgErr) {
-      console.warn('PostgreSQL message append note:', pgErr.message);
-    }
-
     return res.json({ success: true, message: newMsg });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Database update failed: ' + err.message });
   }
 });
 
@@ -2555,36 +2253,18 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
 app.get('/api/users/:id', async (req, res) => {
   try {
     const target = String(req.params.id).trim();
-    let userFound = localUsersMap.get(target);
-
-    if (!userFound) {
-      const tLower = target.toLowerCase();
-      for (const u of localUsersMap.values()) {
-        if (u && (String(u.uid || u.id) === target || String(u.email || '').toLowerCase() === tLower)) {
-          userFound = u;
-          break;
-        }
-      }
-    }
-
-    if (!userFound) {
-      try {
-        const pgRes = await pgPool.query(
-          "SELECT raw_data FROM users WHERE uid = $1 OR email = $1 OR raw_data->>'id' = $1;",
-          [target]
-        );
-        if (pgRes.rows.length > 0) {
-          userFound = pgRes.rows[0].raw_data;
-        }
-      } catch (e) {}
-    }
-
-    if (userFound) {
-      return res.json({ success: true, user: userFound });
+    const P = String.fromCharCode(36);
+    const pgRes = await pgPool.query(
+      "SELECT raw_data FROM users WHERE uid = " + P + "1 OR email = " + P + "1 OR raw_data->>'id' = " + P + "1;",
+      [target]
+    );
+    if (pgRes.rows.length > 0) {
+      return res.json({ success: true, user: pgRes.rows[0].raw_data });
     }
     return res.status(404).json({ success: false, error: 'User not found.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('CRITICAL: PostgreSQL user fetch failed:', err.message);
+    return res.status(503).json({ success: false, error: 'Database unavailable: ' + err.message });
   }
 });
 
@@ -2678,47 +2358,44 @@ app.post('/api/visitors', async (req, res) => {
       updatedAt: nowIso
     };
 
-    // 1. Save to local fallback store
-    saveLocalVisitor(fullPayload);
+    // 1. Authoritative PostgreSQL write
+    const P = String.fromCharCode(36);
+    const phs = [];
+    for (let i = 1; i <= 11; i++) { phs.push(P + i); }
 
-    // 2. Save to PostgreSQL DB
-    try {
-      const queryText = `
-        INSERT INTO site_visitors (
-          visitor_id, name, phone, email, preferred_property_type,
-          preferred_location, stay_duration_seconds, source, status,
-          notes, raw_data, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
-        ) ON CONFLICT (visitor_id) DO UPDATE SET
-          name = EXCLUDED.name,
-          phone = EXCLUDED.phone,
-          email = EXCLUDED.email,
-          status = EXCLUDED.status,
-          notes = EXCLUDED.notes,
-          raw_data = EXCLUDED.raw_data,
-          updated_at = NOW();
-      `;
-      await pgPool.query(queryText, [
-        vId,
-        fullPayload.name,
-        fullPayload.phone,
-        fullPayload.email,
-        fullPayload.preferredPropertyType,
-        fullPayload.preferredLocation,
-        fullPayload.stayDurationSeconds,
-        fullPayload.source,
-        fullPayload.status,
-        fullPayload.notes,
-        JSON.stringify(fullPayload)
-      ]);
-    } catch (pgErr) {
-      console.warn('PostgreSQL save visitor note:', pgErr.message);
-    }
+    const queryText = 
+      'INSERT INTO site_visitors (' +
+      '  visitor_id, name, phone, email, preferred_property_type, ' +
+      '  preferred_location, stay_duration_seconds, source, status, ' +
+      '  notes, raw_data, created_at, updated_at' +
+      ') VALUES (' +
+      '  ' + phs.join(', ') + ', NOW(), NOW()' +
+      ') ON CONFLICT (visitor_id) DO UPDATE SET ' +
+      '  name = EXCLUDED.name, ' +
+      '  phone = EXCLUDED.phone, ' +
+      '  email = EXCLUDED.email, ' +
+      '  status = EXCLUDED.status, ' +
+      '  notes = EXCLUDED.notes, ' +
+      '  raw_data = EXCLUDED.raw_data, ' +
+      '  updated_at = NOW();';
+
+    await pgPool.query(queryText, [
+      vId,
+      fullPayload.name,
+      fullPayload.phone,
+      fullPayload.email,
+      fullPayload.preferredPropertyType,
+      fullPayload.preferredLocation,
+      fullPayload.stayDurationSeconds,
+      fullPayload.source,
+      fullPayload.status,
+      fullPayload.notes,
+      JSON.stringify(fullPayload)
+    ]);
+    saveLocalVisitor(fullPayload);
 
     // Auto-ingest visitor into CRM Leads
     try {
-      const P = String.fromCharCode(36);
       const leadId = 'lead-' + vId;
       const crmLeadSql = 'INSERT INTO crm_leads (' +
         'lead_id, name, phone, email, source, score, status, preferred_location, ' +
@@ -2747,40 +2424,19 @@ app.post('/api/visitors', async (req, res) => {
 
     return res.json({ success: true, visitorId: vId, visitor: fullPayload });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Database save failed: ' + err.message });
   }
 });
 
-// Get Site Visitors List from PostgreSQL DB (with local fallback merge)
+// Get Site Visitors List from PostgreSQL DB (Authoritative - Zero Silent Fallback)
 app.get('/api/visitors', async (req, res) => {
   try {
-    const localList = getLocalVisitors();
-    let pgVisitors = [];
-
-    try {
-      const result = await pgPool.query('SELECT raw_data FROM site_visitors ORDER BY created_at DESC LIMIT 300;');
-      pgVisitors = result.rows.map(row => row.raw_data).filter(Boolean);
-    } catch (pgErr) {
-      console.warn('PostgreSQL fetch visitors note:', pgErr.message);
-    }
-
-    const mergedMap = new Map();
-    [...localList, ...pgVisitors].forEach(v => {
-      if (v && (v.visitorId || v.id)) {
-        const id = v.visitorId || v.id;
-        mergedMap.set(id, { ...mergedMap.get(id), ...v });
-      }
-    });
-
-    const allVisitors = Array.from(mergedMap.values()).sort((a, b) => {
-      const tA = new Date(a.createdAt || a.updatedAt || 0).getTime();
-      const tB = new Date(b.createdAt || b.updatedAt || 0).getTime();
-      return tB - tA;
-    });
-
+    const result = await pgPool.query('SELECT raw_data FROM site_visitors ORDER BY created_at DESC LIMIT 300;');
+    const allVisitors = result.rows.map(row => row.raw_data).filter(Boolean);
     return res.json({ success: true, count: allVisitors.length, visitors: allVisitors });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('CRITICAL: PostgreSQL fetch visitors failed:', err.message);
+    return res.status(503).json({ success: false, error: 'Database unavailable: ' + err.message });
   }
 });
 
@@ -2790,31 +2446,41 @@ app.patch('/api/visitors/:id', async (req, res) => {
     const vId = req.params.id;
     const { status, notes, assignedAgent } = req.body || {};
     const nowIso = new Date().toISOString();
+    const P = String.fromCharCode(36);
 
-    const localVis = localVisitorsMap.get(vId) || { id: vId, visitorId: vId };
-    if (status) localVis.status = status;
-    if (notes !== undefined) localVis.notes = notes;
-    if (assignedAgent !== undefined) localVis.assignedAgent = assignedAgent;
-    localVis.updatedAt = nowIso;
-    saveLocalVisitor(localVis);
-
-    try {
-      await pgPool.query(`
-        UPDATE site_visitors 
-        SET 
-          status = COALESCE($1, status),
-          notes = COALESCE($2, notes),
-          raw_data = $3,
-          updated_at = NOW()
-        WHERE visitor_id = $4;
-      `, [status || null, notes !== undefined ? notes : null, JSON.stringify(localVis), vId]);
-    } catch (pgErr) {
-      console.warn('PostgreSQL update visitor note:', pgErr.message);
+    const existingRes = await pgPool.query(
+      'SELECT raw_data FROM site_visitors WHERE visitor_id = ' + P + '1;',
+      [vId]
+    );
+    if (existingRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Visitor not found.' });
     }
 
-    return res.json({ success: true, visitor: localVis });
+    const currentVis = existingRes.rows[0].raw_data || { id: vId, visitorId: vId };
+    if (status) currentVis.status = status;
+    if (notes !== undefined) currentVis.notes = notes;
+    if (assignedAgent !== undefined) currentVis.assignedAgent = assignedAgent;
+    currentVis.updatedAt = nowIso;
+
+    const updateSql = 
+      'UPDATE site_visitors SET ' +
+      '  status = COALESCE(' + P + '1, status), ' +
+      '  notes = COALESCE(' + P + '2, notes), ' +
+      '  raw_data = ' + P + '3, ' +
+      '  updated_at = NOW() ' +
+      'WHERE visitor_id = ' + P + '4;';
+
+    await pgPool.query(updateSql, [
+      status || null,
+      notes !== undefined ? notes : null,
+      JSON.stringify(currentVis),
+      vId
+    ]);
+
+    saveLocalVisitor(currentVis);
+    return res.json({ success: true, visitor: currentVis });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Database update failed: ' + err.message });
   }
 });
 
@@ -2822,21 +2488,12 @@ app.patch('/api/visitors/:id', async (req, res) => {
 app.delete('/api/visitors/:id', async (req, res) => {
   try {
     const vId = req.params.id;
+    const P = String.fromCharCode(36);
+    await pgPool.query('DELETE FROM site_visitors WHERE visitor_id = ' + P + '1;', [vId]);
     localVisitorsMap.delete(vId);
-    try {
-      const arrayToStore = Array.from(localVisitorsMap.values());
-      fs.writeFileSync(visitorsStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-    } catch (e) {}
-
-    try {
-      await pgPool.query('DELETE FROM site_visitors WHERE visitor_id = $1;', [vId]);
-    } catch (pgErr) {
-      console.warn('PostgreSQL delete visitor note:', pgErr.message);
-    }
-
     return res.json({ success: true, message: 'Visitor deleted successfully.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Database delete failed: ' + err.message });
   }
 });
 
@@ -2902,12 +2559,13 @@ app.get('/api/admin/firebase-users', async (req, res) => {
       console.warn('Firestore users read note:', fsErr.message);
     }
 
-    const localList = getLocalUsers();
     let pgUsers = [];
     try {
       const result = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 1000;');
       pgUsers = result.rows.map(row => row.raw_data).filter(Boolean);
-    } catch (pgErr) {}
+    } catch (pgErr) {
+      console.warn('PostgreSQL fetch users note in firebase-users:', pgErr.message);
+    }
 
     const deletedUsersSet = new Set(localDeletedUsersSet);
     try {
@@ -2919,7 +2577,7 @@ app.get('/api/admin/firebase-users', async (req, res) => {
     } catch (eDelFetch) {}
 
     const userMap = new Map();
-    [...authUsers, ...fsUsers, ...localList, ...pgUsers].forEach(u => {
+    [...authUsers, ...fsUsers, ...pgUsers].forEach(u => {
       if (!u) return;
       const emailKey = (u.email || '').toLowerCase().trim();
       const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
@@ -3185,14 +2843,17 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
       localSiteConfigMap.set(modId, modData);
 
       try {
-        await pgPool.query(`
-          INSERT INTO site_config (module_id, config_data, updated_at)
-          VALUES ($1, $2, NOW())
-          ON CONFLICT (module_id) DO UPDATE SET
-            config_data = EXCLUDED.config_data,
-            updated_at = NOW();
-        `, [modId, JSON.stringify(modData)]);
-      } catch (ePgSave) {}
+        const P = String.fromCharCode(36);
+        const queryText =
+          'INSERT INTO site_config (module_id, config_data, updated_at) ' +
+          'VALUES (' + P + '1, ' + P + '2, NOW()) ' +
+          'ON CONFLICT (module_id) DO UPDATE SET ' +
+          '  config_data = EXCLUDED.config_data, ' +
+          '  updated_at = NOW();';
+        await pgPool.query(queryText, [modId, JSON.stringify(modData)]);
+      } catch (ePgSave) {
+        console.warn('Sync site_config insert note:', ePgSave.message);
+      }
 
       if (adminDb) {
         try {
@@ -3205,17 +2866,11 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
       }
     }
 
-    // Persist to local disk fallback files
-    try {
-      fs.writeFileSync(siteConfigStoreFile, JSON.stringify(unifiedConfig, null, 2), 'utf8');
-      fs.writeFileSync(usersStoreFile, JSON.stringify(unifiedUsers, null, 2), 'utf8');
-    } catch (eDisk) {}
-
     console.log(`[EaseLand Sync] Success: ${unifiedUsers.length} users and ${Object.keys(unifiedConfig).length} CMS modules synchronized.`);
 
     return res.json({
       success: true,
-      message: '3-way synchronization completed across Firestore, PostgreSQL, and local disk.',
+      message: 'Synchronization completed across Firestore and PostgreSQL.',
       usersCount: unifiedUsers.length,
       cmsCount: Object.keys(unifiedConfig).length,
       users: unifiedUsers,
@@ -3229,28 +2884,12 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
   try {
-    const localList = getLocalUsers();
-    let pgUsers = [];
-
-    try {
-      const result = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 500;');
-      pgUsers = result.rows.map(row => row.raw_data).filter(Boolean);
-    } catch (pgErr) {
-      console.warn('PostgreSQL fetch users note:', pgErr.message);
-    }
-
-    const mergedMap = new Map();
-    [...localList, ...pgUsers].forEach(u => {
-      if (u && (u.uid || u.id || u.email)) {
-        const key = String(u.uid || u.id || u.email).toLowerCase().trim();
-        mergedMap.set(key, { ...mergedMap.get(key), ...u });
-      }
-    });
-
-    const allUsers = Array.from(mergedMap.values());
+    const result = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 500;');
+    const allUsers = result.rows.map(row => row.raw_data).filter(Boolean);
     return res.json({ success: true, count: allUsers.length, users: allUsers });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('CRITICAL: PostgreSQL fetch users failed:', err.message);
+    return res.status(503).json({ success: false, error: 'Database unavailable: ' + err.message });
   }
 });
 
@@ -3323,7 +2962,8 @@ app.post('/api/users', async (req, res) => {
         JSON.stringify(fullPayload)
       ]);
     } catch (pgErr) {
-      console.warn('PostgreSQL save user note:', pgErr.message);
+      console.error('CRITICAL: PostgreSQL save user failed:', pgErr.message);
+      return res.status(500).json({ success: false, error: 'Database save failed: ' + pgErr.message });
     }
 
     return res.json({ success: true, uid: uUid, user: fullPayload });
@@ -3460,11 +3100,6 @@ app.delete('/api/users/:uid', async (req, res) => {
         propIdsSet.add(pId);
       }
     }
-    try {
-      const propsArray = Array.from(localPropsMap.values());
-      fs.writeFileSync(propertiesStoreFile, JSON.stringify(propsArray, null, 2), 'utf8');
-    } catch (e) {}
-
     localUsersMap.delete(uUid);
     if (targetEmail) {
       for (const [k, u] of localUsersMap.entries()) {
@@ -3473,10 +3108,6 @@ app.delete('/api/users/:uid', async (req, res) => {
         }
       }
     }
-    try {
-      const arrayToStore = Array.from(localUsersMap.values());
-      fs.writeFileSync(usersStoreFile, JSON.stringify(arrayToStore, null, 2), 'utf8');
-    } catch (e) {}
 
     // 4. Cascade delete from Cloud Firestore via Firebase Admin SDK
     try {

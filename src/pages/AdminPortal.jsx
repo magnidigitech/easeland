@@ -482,13 +482,40 @@ export default function AdminPortal({ onNavigate }) {
     return list.filter(p => p && !isPropertyDeleted(p) && !isFakeProperty(p));
   }, [allProperties]);
 
+  const resolvePromotedProperty = React.useCallback((id) => {
+    if (!id) return null;
+    const target = String(id).trim().toLowerCase();
+    // 1. Try candidateSourceProperties
+    let match = candidateSourceProperties.find(p => {
+      if (!p) return false;
+      const id1 = String(p.id || '').trim().toLowerCase();
+      const id2 = String(p.propertyId || '').trim().toLowerCase();
+      const ref = String(p.referenceId || '').trim().toLowerCase();
+      return id1 === target || id2 === target || ref === target;
+    });
+    // 2. Try mockApi.getPropertyById (searches all local storage stores)
+    if (!match) {
+      try {
+        match = mockApi.getPropertyById(id);
+      } catch (e) {}
+    }
+    // 3. Try current featuredListings promotedProperties cache
+    if (!match && Array.isArray(siteConfig?.featuredListings?.promotedProperties)) {
+      match = siteConfig.featuredListings.promotedProperties.find(p => {
+        if (!p) return false;
+        const id1 = String(p.id || '').trim().toLowerCase();
+        const id2 = String(p.propertyId || '').trim().toLowerCase();
+        const ref = String(p.referenceId || '').trim().toLowerCase();
+        return id1 === target || id2 === target || ref === target;
+      });
+    }
+    if (match && !isPropertyDeleted(match) && !isFakeProperty(match)) return match;
+    return null;
+  }, [candidateSourceProperties, siteConfig?.featuredListings?.promotedProperties]);
+
   const promotedPropertiesList = React.useMemo(() => {
-    return promotedPropertyIds.map((id) => {
-      const match = candidateSourceProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
-      if (match && !isFakeProperty(match)) return match;
-      return null;
-    }).filter(Boolean);
-  }, [promotedPropertyIds, candidateSourceProperties]);
+    return promotedPropertyIds.map((id) => resolvePromotedProperty(id)).filter(Boolean);
+  }, [promotedPropertyIds, resolvePromotedProperty]);
 
   const candidatePropertiesForPromotion = React.useMemo(() => {
     const query = promoSearchQuery.trim().toLowerCase();
@@ -526,17 +553,10 @@ export default function AdminPortal({ onNavigate }) {
       showOnlyFeatured: true
     };
     const targetIds = safeArray(mergedFeatured.featuredPropertyIds).map(String).filter(Boolean);
-    const activePromotedList = targetIds.map((id) => {
-      const match = candidateSourceProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
-      if (match && !isFakeProperty(match)) return match;
-      if (Array.isArray(currentFeatured.promotedProperties)) {
-        const prevMatch = currentFeatured.promotedProperties.find(p => String(p.id || p.propertyId || p.referenceId) === String(id));
-        if (prevMatch && !isFakeProperty(prevMatch)) return prevMatch;
-      }
-      return null;
-    }).filter(Boolean);
+    const activePromotedList = targetIds.map((id) => resolvePromotedProperty(id)).filter(Boolean);
 
-    mergedFeatured.promotedProperties = activePromotedList;
+    const cleanPromotedProperties = JSON.parse(JSON.stringify(activePromotedList, (k, v) => (v === undefined ? null : v)));
+    mergedFeatured.promotedProperties = cleanPromotedProperties;
 
     const updatedConfig = {
       ...siteConfig,
@@ -550,7 +570,7 @@ export default function AdminPortal({ onNavigate }) {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('easeland_site_config', JSON.stringify(updatedConfig));
-        localStorage.setItem('easeland_promoted_properties', JSON.stringify(activePromotedList));
+        localStorage.setItem('easeland_promoted_properties', JSON.stringify(cleanPromotedProperties));
       } catch (e) {}
       window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: updatedConfig }));
     }
