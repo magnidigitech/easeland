@@ -96,9 +96,37 @@ process.on('unhandledRejection', (reason, promise) => {
 // Enable CORS
 app.use(cors());
 
-// Health check endpoints for Coolify / Traefik / reverse proxy
-app.get('/health', (req, res) => res.status(200).send('OK'));
-app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
+// Authoritative PostgreSQL Database State (Fail-Fast Architecture)
+const pgDbState = {
+  connected: false,
+  error: null,
+  lastChecked: null
+};
+
+// Health check endpoints for Coolify / Traefik / reverse proxy - Fail Fast
+app.get('/health', (req, res) => {
+  if (!pgDbState.connected) {
+    return res.status(503).send('UNHEALTHY: PostgreSQL disconnected (' + (pgDbState.error || 'Connection failed') + ')');
+  }
+  return res.status(200).send('OK');
+});
+
+app.get('/api/health', (req, res) => {
+  if (!pgDbState.connected) {
+    return res.status(503).json({
+      status: 'error',
+      uptime: process.uptime(),
+      database: 'DISCONNECTED',
+      error: pgDbState.error || 'PostgreSQL database connection failed.'
+    });
+  }
+  return res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    database: 'CONNECTED',
+    tables: 'INITIALIZED'
+  });
+});
 
 // Configure Multer Memory Storage
 const storage = multer.memoryStorage();
@@ -564,9 +592,12 @@ const pgPool = new Pool({
   max: 20
 });
 
-// IMPORTANT: Catch idle pool errors so connection drops or DNS EAI_AGAIN never crash Node process
+// IMPORTANT: Catch idle pool errors and update pgDbState to fail fast
 pgPool.on('error', (err) => {
-  console.warn('PostgreSQL Pool background client error:', err.message);
+  pgDbState.connected = false;
+  pgDbState.error = err.message;
+  pgDbState.lastChecked = new Date().toISOString();
+  console.error('CRITICAL: PostgreSQL Pool background client error: ' + err.message);
 });
 
 // Auto-initialize PostgreSQL tables asynchronously (Non-blocking)
@@ -851,9 +882,16 @@ async function initPgDb() {
     }
 
     client.release();
-    console.log('PostgreSQL tables (properties, media_files, site_config, enquiries, site_visitors, users, admin_deleted_properties) initialized successfully.');
+    pgDbState.connected = true;
+    pgDbState.error = null;
+    pgDbState.lastChecked = new Date().toISOString();
+    console.log('PostgreSQL tables initialized successfully. Primary database is AUTHORITATIVE and ONLINE.');
   } catch (err) {
-    console.warn('PostgreSQL connection/init note (Local disk store active):', err.message);
+    pgDbState.connected = false;
+    pgDbState.error = err.message;
+    pgDbState.lastChecked = new Date().toISOString();
+    console.error('CRITICAL DATABASE ERROR: PostgreSQL connection/initialization failed: ' + err.message);
+    console.error('Health checks will fail fast (HTTP 503) to prevent silent split-brain errors.');
   }
 }
 
@@ -1947,6 +1985,36 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
   } catch (err) {
     console.error('Purge all properties handler error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
+  }
+// Database Health & Live Reconnect Verification Endpoint
+app.post('/api/admin/database/reconnect', async (req, res) => {
+  const { databaseUrl } = req.body || {};
+  const targetUrl = databaseUrl || process.env.DATABASE_URL;
+  if (!targetUrl) {
+    return res.status(400).json({ success: false, error: 'Database URL is required.' });
+  }
+  try {
+    const testPool = new pg.Pool({
+      connectionString: targetUrl,
+      connectionTimeoutMillis: 5000,
+      ssl: (targetUrl.includes('sslmode=') || targetUrl.includes('supabase') || targetUrl.includes('neon')) ? { rejectUnauthorized: false } : false
+    });
+    const client = await testPool.connect();
+    const ver = await client.query('SELECT NOW() as server_time, version();');
+    client.release();
+    await testPool.end();
+
+    return res.json({
+      success: true,
+      message: 'PostgreSQL connection verified successfully.',
+      serverTime: ver.rows[0].server_time,
+      version: ver.rows[0].version
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: 'PostgreSQL connection failed: ' + err.message
+    });
   }
 });
 
