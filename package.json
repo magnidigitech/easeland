@@ -10,6 +10,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "security:gate": "node scripts/securityAudit.js",
     "security:agents": "npx --yes ecc-agentshield scan --path ../.agents --baseline ../.agents/.agentshield-baseline.json --gate",
+    "test:e2e:db": "node scripts/verifyEndToEnd.js",
     "preview": "vite preview"
   },
   "dependencies": {
