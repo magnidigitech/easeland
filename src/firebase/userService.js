@@ -82,33 +82,48 @@ export async function createUserProfile(uid, data) {
         }
       } catch (e) {}
 
-      // 2. Wipe stale profile, draft, location, KYC, and enquiry caches to ensure zero trace of old data
+      // 2. Wipe stale profile, draft, location, KYC, and enquiry caches ONLY if user was previously deleted
+      const rawDel = localStorage.getItem('easeland_deleted_users');
+      let wasDeleted = false;
+      if (rawDel) {
+        try {
+          const delArr = JSON.parse(rawDel);
+          wasDeleted = delArr.some(item => {
+            const itLow = String(item || '').toLowerCase().trim();
+            return itLow === uIdLow || (emLow && itLow === emLow);
+          });
+        } catch (e) {}
+      }
+
+      if (wasDeleted) {
+        try {
+          localStorage.removeItem('easeland_user_profile_' + uid);
+          localStorage.removeItem('easeland_draft_' + uid);
+          localStorage.removeItem('easeland_wizard_location_' + uid);
+          localStorage.removeItem('easeland_kyc_' + uid);
+          localStorage.removeItem('easeland_owner_verification_' + uid);
+          localStorage.removeItem('easeland_user_enquiries_' + uid);
+
+          // Clean any old enquiries
+          const rawEnqs = localStorage.getItem('easeland_enquiries');
+          if (rawEnqs) {
+            try {
+              const parsedEnqs = JSON.parse(rawEnqs);
+              if (Array.isArray(parsedEnqs)) {
+                const cleanedEnqs = parsedEnqs.filter(e => {
+                  const cId = String(e.customerId || e.ownerId || e.buyerId || '').toLowerCase().trim();
+                  const cEmail = String(e.customerEmail || e.ownerEmail || e.buyerEmail || '').toLowerCase().trim();
+                  return cId !== uIdLow && (!emLow || cEmail !== emLow);
+                });
+                localStorage.setItem('easeland_enquiries', JSON.stringify(cleanedEnqs));
+              }
+            } catch (eEnq) {}
+          }
+        } catch (eWipe) {}
+      }
+
+      // Update registered users cache to reflect ACTIVE with 0 listings
       try {
-        localStorage.removeItem('easeland_user_profile_' + uid);
-        localStorage.removeItem('easeland_draft_' + uid);
-        localStorage.removeItem('easeland_wizard_location_' + uid);
-        localStorage.removeItem('easeland_kyc_' + uid);
-        localStorage.removeItem('easeland_owner_verification_' + uid);
-        localStorage.removeItem('easeland_user_enquiries_' + uid);
-
-
-        // Clean any old enquiries
-        const rawEnqs = localStorage.getItem('easeland_enquiries');
-        if (rawEnqs) {
-          try {
-            const parsedEnqs = JSON.parse(rawEnqs);
-            if (Array.isArray(parsedEnqs)) {
-              const cleanedEnqs = parsedEnqs.filter(e => {
-                const cId = String(e.customerId || e.ownerId || e.buyerId || '').toLowerCase().trim();
-                const cEmail = String(e.customerEmail || e.ownerEmail || e.buyerEmail || '').toLowerCase().trim();
-                return cId !== uIdLow && (!emLow || cEmail !== emLow);
-              });
-              localStorage.setItem('easeland_enquiries', JSON.stringify(cleanedEnqs));
-            }
-          } catch (eEnq) {}
-        }
-
-        // Update registered users cache to reflect ACTIVE with 0 listings
         const rawReg = localStorage.getItem('easeland_registered_users');
         if (rawReg) {
           try {
@@ -119,13 +134,18 @@ export async function createUserProfile(uid, data) {
                 const uEm = String(u.email || '').toLowerCase().trim();
                 return uId !== uIdLow && (!emLow || uEm !== emLow);
               });
+              const cityVal = data.city || data.location || '';
+              const phoneVal = data.phone || data.phoneNumber || '';
               updatedReg.push({
                 uid,
                 id: uid,
                 displayName: data.displayName || data.name || 'EaseLand User',
                 name: data.displayName || data.name || 'EaseLand User',
                 email: data.email || '',
-                phone: data.phone || data.phoneNumber || '',
+                phone: phoneVal,
+                phoneNumber: phoneVal,
+                city: cityVal,
+                location: cityVal,
                 role: 'USER',
                 status: 'ACTIVE',
                 accountStatus: 'ACTIVE',
@@ -137,16 +157,21 @@ export async function createUserProfile(uid, data) {
             }
           } catch (eReg) {}
         }
-      } catch (eWipe) {}
+      } catch (eRegWipe) {}
     }
 
     const userRef = doc(db, 'users', uid);
+    const cityVal = data.city || data.location || '';
+    const phoneVal = data.phone || data.phoneNumber || '';
     const profile = {
       uid,
       displayName: data.displayName || data.name || 'EaseLand User',
       name: data.displayName || data.name || 'EaseLand User',
       email: data.email || '',
-      phone: data.phone || data.phoneNumber || '',
+      phone: phoneVal,
+      phoneNumber: phoneVal,
+      city: cityVal,
+      location: cityVal,
       role: 'USER',
       status: 'ACTIVE',
       accountStatus: 'ACTIVE',
@@ -157,8 +182,8 @@ export async function createUserProfile(uid, data) {
       updatedAt: serverTimestamp()
     };
 
-    // Clean overwrite without merge: true to wipe any old removed fields or residual notes
-    await setDoc(userRef, profile);
+    // Upsert with merge: true to preserve any previously saved fields such as phone or city
+    await setDoc(userRef, profile, { merge: true });
     syncUserToPostgres({ ...profile, id: uid, uid, status: 'ACTIVE', accountStatus: 'ACTIVE' });
 
     if (typeof window !== 'undefined') {
@@ -194,6 +219,7 @@ export async function getCurrentUserProfile(uid) {
       }
 
       const extractedPhone = data.phone || data.phoneNumber || data.mobile || data.contactNumber || data.contactPhone || data.phoneNo || data.contact || '';
+      const extractedCity = data.city || data.location || '';
       const extractedName = data.displayName || data.name || data.fullName || '';
       return {
         success: true,
@@ -202,6 +228,8 @@ export async function getCurrentUserProfile(uid) {
           ...data,
           phone: extractedPhone,
           phoneNumber: extractedPhone,
+          city: extractedCity,
+          location: extractedCity,
           displayName: extractedName || data.displayName,
           name: extractedName || data.displayName
         }
@@ -223,6 +251,7 @@ export async function updateOwnProfile(uid, updates) {
     const userRef = doc(db, 'users', uid);
 
     const phoneVal = updates.phone || updates.phoneNumber || updates.mobile || updates.contactNumber || '';
+    const cityVal = updates.city || updates.location || '';
     const nameVal = updates.displayName || updates.name || '';
 
     const safeUpdates = {
@@ -233,10 +262,18 @@ export async function updateOwnProfile(uid, updates) {
       safeUpdates.phone = phoneVal;
       safeUpdates.phoneNumber = phoneVal;
     }
+    if (cityVal) {
+      safeUpdates.city = cityVal;
+      safeUpdates.location = cityVal;
+    }
     if (nameVal) {
       safeUpdates.displayName = nameVal;
       safeUpdates.name = nameVal;
     }
+
+    // Never pass role or adminRole to client updates, to avoid Firestore permission denial
+    delete safeUpdates.role;
+    delete safeUpdates.adminRole;
 
     const savePromise = setDoc(userRef, safeUpdates, { merge: true });
     const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 2000));

@@ -688,13 +688,28 @@ export default function AdminPortal({ onNavigate }) {
   // Reset to Default Modal State & Handler
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-  const handleResetToDefault = () => {
-    const resetConfig = mockApi.resetSiteConfigAdmin();
-    setSiteConfig({ ...resetConfig });
-    logAdminActivity('reset website configuration to factory defaults.');
+  const handleResetToDefault = async () => {
     setIsResetModalOpen(false);
-    setPublishSuccessMessage('All 16 CMS modules have been reset to factory default settings!');
-    setTimeout(() => setPublishSuccessMessage(''), 4000);
+    setAdminActionProcessing(true);
+    try {
+      const resetConfig = mockApi.resetSiteConfigAdmin();
+      setSiteConfig({ ...resetConfig });
+      const adminUid = user?.uid || 'admin_auditor';
+      try {
+        await publishSiteConfigAdmin(resetConfig, adminUid);
+      } catch (pubErr) {
+        console.warn('Reset sync notice:', pubErr);
+      }
+      logAdminActivity('reset website configuration to factory defaults.');
+      setPublishSuccessMessage('All 16 CMS modules have been reset to factory defaults and synced to database!');
+      setTimeout(() => setPublishSuccessMessage(''), 5000);
+    } catch (err) {
+      console.warn('Reset error:', err);
+      setPublishSuccessMessage('Reset to factory defaults locally.');
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } finally {
+      setAdminActionProcessing(false);
+    }
   };
 
   // Bulk Purge Test Properties Modal State

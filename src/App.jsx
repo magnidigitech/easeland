@@ -584,6 +584,15 @@ export default function App() {
     if (siteConfig && siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
     }
+    if (typeof document !== 'undefined') {
+      if (siteConfig?.seo?.metaTitle) {
+        document.title = siteConfig.seo.metaTitle;
+      }
+      if (siteConfig?.seo?.metaDescription) {
+        const metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) metaDesc.setAttribute('content', siteConfig.seo.metaDescription);
+      }
+    }
     const handleApproved = () => loadProperties();
     const handleConfigUpdated = (e) => {
       const detail = e.detail || mockApi.getSiteConfig();
@@ -606,6 +615,14 @@ export default function App() {
       const themeToApply = detail?.theme || (detail?.branding ? detail : null);
       if (themeToApply) {
         applySiteTheme(themeToApply);
+      }
+      if (typeof document !== 'undefined') {
+        const seoData = detail?.seo || detail;
+        if (seoData?.metaTitle) document.title = seoData.metaTitle;
+        if (seoData?.metaDescription) {
+          const metaDesc = document.querySelector('meta[name="description"]');
+          if (metaDesc) metaDesc.setAttribute('content', seoData.metaDescription);
+        }
       }
     };
 
@@ -792,6 +809,14 @@ export default function App() {
       <OfflineIndicator />
       <PwaUpdatePrompt />
       <PwaInstallBanner />
+
+      {/* EMERGENCY MAINTENANCE BANNER */}
+      {siteConfig?.overview?.emergencyMaintenance && (
+        <div className="bg-amber-500 text-slate-950 font-black text-xs py-2 px-4 text-center shadow-md border-b border-amber-600 flex items-center justify-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-slate-950" />
+          <span>Scheduled System Maintenance Mode is Active. Read-only platform exploration enabled.</span>
+        </div>
+      )}
 
       {/* NAVBAR */}
       <Navbar
@@ -1216,8 +1241,8 @@ export default function App() {
             {/* GENERAL CONTACT FORM */}
             <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-300 shadow-xl text-slate-900">
-                <h3 className="text-xl font-extrabold text-slate-900 mb-1">Have Questions? Contact EaseLand Admin</h3>
-                <p className="text-xs text-slate-600 font-medium mb-6">Website inquiries, platform feedback, or support assistance.</p>
+                <h3 className="text-xl font-extrabold text-slate-900 mb-1">{siteConfig?.contact?.heading || 'Have Questions? Contact EaseLand Admin'}</h3>
+                <p className="text-xs text-slate-600 font-medium mb-6">{siteConfig?.contact?.subheading || 'Website inquiries, platform feedback, or support assistance.'}</p>
 
                 {generalContactSubmitted ? (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center text-emerald-900 space-y-2">
@@ -1526,6 +1551,20 @@ export default function App() {
               </ul>
             </div>
           </div>
+
+          {(siteConfig?.footer?.socialTwitter || siteConfig?.footer?.socialLinkedin || siteConfig?.footer?.socialYoutube) && (
+            <div className="flex items-center justify-center gap-4 mb-4 text-xs font-bold text-gray-400">
+              {siteConfig?.footer?.socialTwitter && (
+                <a href={siteConfig.footer.socialTwitter} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">Twitter / X</a>
+              )}
+              {siteConfig?.footer?.socialLinkedin && (
+                <a href={siteConfig.footer.socialLinkedin} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">LinkedIn</a>
+              )}
+              {siteConfig?.footer?.socialYoutube && (
+                <a href={siteConfig.footer.socialYoutube} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">YouTube</a>
+              )}
+            </div>
+          )}
 
           <div className="text-center text-[11px] text-gray-500 font-semibold">
             {siteConfig?.footer?.copyrightText || '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.'}

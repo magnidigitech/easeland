@@ -339,7 +339,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5 border border-amber-300"
             >
               <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-              <span>POST PROPERTY</span>
+              <span>{siteConfig?.navbar?.postButtonLabel || 'POST PROPERTY'}</span>
             </button>
           </div>
 
