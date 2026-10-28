@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "2026-10-28",
+  "platform": "EaseLand Real Estate Platform",
+  "domain": "easeland.in",
+  "headquarters": {
+    "locality": "Guntur",
+    "district": "Guntur Central",
+    "state": "Andhra Pradesh",
+    "country": "India",
+    "postalCode": "522002",
+    "coordinates": {
+      "latitude": 16.3124,
+      "longitude": 80.4285
+    }
+  },
+  "geographicHierarchy": {
+    "primaryFocusHubs": [
+      {
+        "id": "hub-guntur",
+        "city": "Guntur",
+        "district": "Guntur",
+        "state": "Andhra Pradesh",
+        "country": "India",
+        "coordinates": { "latitude": 16.3067, "longitude": 80.4365 },
+        "zoomDefault": 14,
+        "reraAuthority": "AP RERA",
+        "microLocalities": [
+          "Brodipet",
+          "Arundelpet",
+          "Lakshmipuram",
+          "Pattabhipuram",
+          "Korritepadu",
+          "Vidyanagar",
+          "Syamala Nagar",
+          "Gorantla",
+          "Nallapadu",
+          "Kaza",
+          "Inner Ring Road"
+        ],
+        "topCategories": [
+          "Open Plot Ventures",
+          "Open Plot (City)",
+          "Independent House/Villa",
+          "Apartments/Flat",
+          "Commerical Property"
+        ],
+        "sameAs": "https://en.wikipedia.org/wiki/Guntur"
+      },
+      {
+        "id": "hub-amaravati",
+        "city": "Amaravati",
+        "district": "Guntur",
+        "state": "Andhra Pradesh",
+        "country": "India",
+        "coordinates": { "latitude": 16.5131, "longitude": 80.5159 },
+        "zoomDefault": 13,
+        "reraAuthority": "AP CRDA / AP RERA",
+        "microLocalities": [
+          "CRDA Capital Region",
+          "Mandadam",
+          "Velagapudi",
+          "Thullur",
+          "Uddandarayunipalem",
+          "Nelapadu",
+          "Inavolu",
+          "Sakhamuru",
+          "Ainavolu",
+          "Seed Access Road"
+        ],
+        "topCategories": [
+          "Amaravathi LPS layout plots",
+          "Open Plot Ventures",
+          "Agricultural Lands",
+          "Commerical Property"
+        ],
+        "sameAs": "https://en.wikipedia.org/wiki/Amaravati"
+      },
+      {
+        "id": "hub-vijayawada",
+        "city": "Vijayawada",
+        "district": "NTR",
+        "state": "Andhra Pradesh",
+        "country": "India",
+        "coordinates": { "latitude": 16.5062, "longitude": 80.6480 },
+        "zoomDefault": 13,
+        "reraAuthority": "AP RERA",
+        "microLocalities": [
+          "Benz Circle",
+          "MG Road",
+          "Poranki",
+          "Penamaluru",
+          "Gannavaram Highway",
+          "Kanuru",
+          "Mangalagiri Corridor",
+          "Tadepalli Bypass"
+        ],
+        "topCategories": [
+          "Apartments/Flat",
+          "Commerical Property",
+          "Open Plot Ventures",
+          "Independent House/Villa"
+        ],
+        "sameAs": "https://en.wikipedia.org/wiki/Vijayawada"
+      },
+      {
+        "id": "hub-hyderabad",
+        "city": "Hyderabad",
+        "district": "Hyderabad & Rangareddy",
+        "state": "Telangana",
+        "country": "India",
+        "coordinates": { "latitude": 17.3850, "longitude": 78.4867 },
+        "zoomDefault": 12,
+        "reraAuthority": "TG RERA",
+        "microLocalities": [
+          "Gachibowli",
+          "Madhapur",
+          "Hitec City",
+          "Kondapur",
+          "Kukatpally",
+          "Tellapur",
+          "Mokila",
+          "Shadnagar",
+          "Adibatla",
+          "Financial District"
+        ],
+        "topCategories": [
+          "Apartments/Flat",
+          "Open Plot Ventures",
+          "Independent House/Villa",
+          "Commerical Property"
+        ],
+        "sameAs": "https://en.wikipedia.org/wiki/Hyderabad"
+      },
+      {
+        "id": "hub-visakhapatnam",
+        "city": "Visakhapatnam",
+        "district": "Visakhapatnam",
+        "state": "Andhra Pradesh",
+        "country": "India",
+        "coordinates": { "latitude": 17.6868, "longitude": 83.2185 },
+        "zoomDefault": 12,
+        "reraAuthority": "AP RERA",
+        "microLocalities": [
+          "Madhurawada",
+          "Yendada",
+          "Gajuwaka",
+          "Rushikonda",
+          "Seethammadhara",
+          "Bhimili Highway"
+        ],
+        "topCategories": [
+          "Apartments/Flat",
+          "Open Plot Ventures",
+          "Independent House/Villa"
+        ],
+        "sameAs": "https://en.wikipedia.org/wiki/Visakhapatnam"
+      }
+    ],
+    "stateCoverage": [
+      {
+        "state": "Andhra Pradesh",
+        "isoCode": "IN-AP",
+        "capital": "Amaravati",
+        "keyDistricts": ["Guntur", "NTR / Krishna", "Visakhapatnam", "East Godavari", "Tirupati", "Nellore"],
+        "reraPortal": "https://rera.ap.gov.in"
+      },
+      {
+        "state": "Telangana",
+        "isoCode": "IN-TG",
+        "capital": "Hyderabad",
+        "keyDistricts": ["Hyderabad", "Rangareddy", "Medchal-Malkajgiri", "Sangareddy", "Warangal"],
+        "reraPortal": "https://rera.telangana.gov.in"
+      }
+    ],
+    "nationalScope": {
+      "country": "India",
+      "isoCode": "IN",
+      "coverage": "Pan-India Verified Direct Discovery",
+      "supportedRegions": [
+        "Andhra Pradesh",
+        "Telangana",
+        "Karnataka",
+        "Tamil Nadu",
+        "Maharashtra",
+        "Delhi NCR",
+        "Pan-India"
+      ]
+    }
+  },
+  "seoEntityTaxonomy": {
+    "organizationType": "RealEstateAgent",
+    "primarySpecialties": [
+      "Open Plot Boundary Certified Ventures",
+      "In-City Residential Plots",
+      "CRDA Amaravathi LPS Plots",
+      "Gated Luxury Villas",
+      "High-Rise Residential Apartments",
+      "Agricultural Farmland Acreages",
+      "Main-Road Commercial Real Estate",
+      "Direct Deal Facilitation & Mediation"
+    ],
+    "serviceGuarantees": [
+      "100% Physically Audited Title Documents",
+      "Certified Satellite Polygon Boundaries",
+      "Direct Owner & Pre-Screened Buyer Matching",
+      "Assisted Negotiation Table Support",
+      "Zero Boundary Dispute Guarantee"
+    ]
+  }
+}

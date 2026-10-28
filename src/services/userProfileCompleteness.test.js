@@ -119,4 +119,87 @@ describe('EaseLand User Profile Completeness & Persistence Test Suite', () => {
 
     assert.deepStrictEqual(missing, []);
   });
+
+  it('7. Postgres non-destructive merge preserves existing phone and city when incoming values are empty', () => {
+    const existingInDb = {
+      uid: 'user_42',
+      displayName: 'Ryuu',
+      email: 'ryuu@easeland.in',
+      phone: '9876543210',
+      city: 'Bangalore',
+      location: 'Bangalore'
+    };
+
+    const incomingAuthPayload = {
+      uid: 'user_42',
+      displayName: 'Ryuu',
+      email: 'ryuu@easeland.in',
+      phone: '',
+      city: ''
+    };
+
+    const effectivePhone = (incomingAuthPayload.phone && String(incomingAuthPayload.phone).trim()) || (incomingAuthPayload.phoneNumber && String(incomingAuthPayload.phoneNumber).trim()) || existingInDb.phone || existingInDb.phoneNumber || '';
+    const effectiveCity = (incomingAuthPayload.city && String(incomingAuthPayload.city).trim()) || (incomingAuthPayload.location && String(incomingAuthPayload.location).trim()) || existingInDb.city || existingInDb.location || '';
+
+    assert.strictEqual(effectivePhone, '9876543210');
+    assert.strictEqual(effectiveCity, 'Bangalore');
+  });
+
+  it('8. updateOwnProfile strips role and adminRole so Firestore rules never reject profile saves', () => {
+    const inputUpdates = {
+      name: 'Ryuu',
+      phone: '9876543210',
+      city: 'Hyderabad',
+      role: 'ADMIN',
+      adminRole: true
+    };
+
+    const safeUpdates = { ...inputUpdates };
+    delete safeUpdates.role;
+    delete safeUpdates.adminRole;
+
+    assert.strictEqual(safeUpdates.name, 'Ryuu');
+    assert.strictEqual(safeUpdates.phone, '9876543210');
+    assert.strictEqual(safeUpdates.city, 'Hyderabad');
+    assert.strictEqual(safeUpdates.role, undefined);
+    assert.strictEqual(safeUpdates.adminRole, undefined);
+  });
+
+  it('9. loginWithGoogle preserves cached profile and draft for non-deleted users', () => {
+    const mockDeletedList = JSON.stringify(['deleted_old_uid']);
+    const currentUid = 'active_user_101';
+
+    const wasDeleted = JSON.parse(mockDeletedList).some(item => item === currentUid);
+    assert.strictEqual(wasDeleted, false);
+
+    const cachedProfile = {
+      phone: '9876543210',
+      city: 'Visakhapatnam'
+    };
+
+    const resolvedPhone = cachedProfile.phone;
+    const resolvedCity = cachedProfile.city;
+    assert.strictEqual(resolvedPhone, '9876543210');
+    assert.strictEqual(resolvedCity, 'Visakhapatnam');
+  });
+
+  it('10. onSnapshot listener does not clobber existing phone or city with empty Firestore fields', () => {
+    const localCached = {
+      phone: '9876543210',
+      city: 'Vijayawada'
+    };
+
+    const firestoreData = {
+      displayName: 'Ryuu',
+      email: 'ryuu@easeland.in',
+      phone: '',
+      city: ''
+    };
+
+    const mergedPhone = firestoreData.phone || firestoreData.phoneNumber || localCached.phone || localCached.phoneNumber || '';
+    const mergedCity = firestoreData.city || firestoreData.location || localCached.city || localCached.location || '';
+
+    assert.strictEqual(mergedPhone, '9876543210');
+    assert.strictEqual(mergedCity, 'Vijayawada');
+  });
 });

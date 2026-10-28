@@ -4,22 +4,22 @@ import { Sparkles, ChevronRight, ShieldCheck, TrendingUp, MapPin } from 'lucide-
 export default function AnimatedPromotionBanner({ onPostProperty, onExploreMap }) {
   const animatedPhrases = [
     {
-      badge: 'DIRECT BUYER SPOTLIGHT',
+      badge: 'PRE-SCREENED BUYER NETWORK',
       highlight: '10x Faster Inquiries',
       title: 'Feature Your Land Plot or Home in EaseLand Verified Spotlight',
-      subtitle: 'Connect directly with verified buyers across India with zero brokerage commissions and 100% legal document verification.'
+      subtitle: 'Connect directly with serious, pre-screened buyers across India. Enjoy assisted deal facilitation, verified boundaries, and 100% legal audit peace of mind.'
     },
     {
-      badge: 'ZERO BROKERAGE COMMISSION',
-      highlight: 'Direct Owner Connect',
-      title: 'Sell or Rent Your Verified Property Directly to Real Buyers',
-      subtitle: 'Get your plot boundaries delineated on satellite maps and your title deeds audited within 24 hours.'
+      badge: 'ASSISTED DEAL FACILITATION',
+      highlight: 'Direct Deal Table',
+      title: 'Sell or Rent Your Verified Property Directly to Real Decision Makers',
+      subtitle: 'Sit together at the deal table with complete legal backing. Delineated plot boundaries, verified title deeds, and smooth, protected closing.'
     },
     {
       badge: 'PAN-INDIA GEOSPATIAL SEARCH',
       highlight: 'Verified Map Discovery',
-      title: 'Target Buyers Searching in Guntur, Amaravathi, Hyderabad & Beyond',
-      subtitle: 'Showcase your property with drone footage, verified boundary coordinates, and direct WhatsApp inquiries.'
+      title: 'Target Buyers Searching in Guntur, Amaravati, Hyderabad & Beyond',
+      subtitle: 'Showcase your property with drone footage, verified boundary coordinates, and direct high-intent inquiries.'
     }
   ];
 
@@ -37,10 +37,10 @@ export default function AnimatedPromotionBanner({ onPostProperty, onExploreMap }
   const tickerItems = [
     '⭐ Verified Spotlight Placement',
     '📍 Leaflet Satellite Boundary Polygons',
-    '⚡ 10x More Direct Buyer Enquiries',
+    '⚡ 10x More High-Intent Inquiries',
     '🛡️ 100% Legal Document Audits',
     '📞 Direct Phone & WhatsApp Connections',
-    '🤝 Zero Brokerage Commissions',
+    '🤝 Assisted Deal Facilitation & Mediation',
     '🏡 Residential Plots, Villas, Flats & Farmlands'
   ];
 

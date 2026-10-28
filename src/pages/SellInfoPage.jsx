@@ -19,7 +19,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.15),transparent_50%)]"></div>
         <div className="max-w-4xl mx-auto relative z-10">
           <span className="text-xs font-extrabold uppercase tracking-widest text-amber-300 bg-amber-900/60 px-3.5 py-1.5 rounded-full border border-amber-500/40 shadow-sm">
-            {siteConfig?.sellPage?.badgeText || 'POST PROPERTY FOR FREE'}
+            {siteConfig?.sellPage?.badgeText || 'DIRECT OWNER LISTINGS'}
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mt-4 mb-6">
@@ -47,7 +47,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
             className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-sm px-8 py-4 rounded-xl shadow-xl inline-flex items-center gap-2 transition-all cursor-pointer animate-smooth-zoom"
           >
             <PlusCircle className="w-5 h-5 stroke-[2.5]" />
-            <span>Post Free Property Listing</span>
+            <span>List Verified Property Now</span>
           </button>
         </div>
       </div>

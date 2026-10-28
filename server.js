@@ -194,6 +194,51 @@ app.get('/manifest.json', (req, res) => {
   return res.status(404).send('Manifest not found');
 });
 
+// Google & Bing XML Sitemap
+app.get('/sitemap.xml', (req, res) => {
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  const sitemapDist = path.join(__dirname, 'dist', 'sitemap.xml');
+  if (fs.existsSync(sitemapDist)) {
+    return res.sendFile(sitemapDist);
+  }
+  const sitemapPublic = path.join(__dirname, 'public', 'sitemap.xml');
+  if (fs.existsSync(sitemapPublic)) {
+    return res.sendFile(sitemapPublic);
+  }
+  return res.status(404).send('Sitemap not found');
+});
+
+// Search Engine Robots.txt
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  const robotsDist = path.join(__dirname, 'dist', 'robots.txt');
+  if (fs.existsSync(robotsDist)) {
+    return res.sendFile(robotsDist);
+  }
+  const robotsPublic = path.join(__dirname, 'public', 'robots.txt');
+  if (fs.existsSync(robotsPublic)) {
+    return res.sendFile(robotsPublic);
+  }
+  return res.status(404).send('Robots.txt not found');
+});
+
+// Authoritative Geo-Mapping Endpoint
+app.get(['/geo-mapping.json', '/api/geo-metadata'], (req, res) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  const geoDist = path.join(__dirname, 'dist', 'geo-mapping.json');
+  if (fs.existsSync(geoDist)) {
+    return res.sendFile(geoDist);
+  }
+  const geoPublic = path.join(__dirname, 'public', 'geo-mapping.json');
+  if (fs.existsSync(geoPublic)) {
+    return res.sendFile(geoPublic);
+  }
+  return res.status(404).json({ error: 'Geo mapping not found' });
+});
+
 // Cache Buster: Serve hashed Vite bundle assets with 1-year immutable caching
 app.use('/assets', express.static(path.join(__dirname, 'dist', 'assets'), {
   maxAge: '1y',
@@ -646,6 +691,8 @@ async function initPgDb() {
         email VARCHAR(255),
         display_name TEXT,
         phone VARCHAR(50),
+        city VARCHAR(255),
+        location VARCHAR(255),
         role VARCHAR(50) DEFAULT 'USER',
         account_status VARCHAR(50) DEFAULT 'ACTIVE',
         email_verified BOOLEAN DEFAULT false,
@@ -761,6 +808,8 @@ async function initPgDb() {
 
     // Follow-up & stage milestone data columns migration for crm_deals and crm_leads
     try {
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(255);');
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
@@ -769,7 +818,7 @@ async function initPgDb() {
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
     } catch (migErr) {
-      console.warn('CRM schema migration note:', migErr.message);
+      console.warn('CRM and User schema migration note:', migErr.message);
     }
 
     try {
@@ -822,6 +871,35 @@ async function initPgDb() {
       console.warn('PostgreSQL admin deleted hydration note:', hydrateDelErr.message);
     }
 
+    try {
+      const allUsers = await client.query('SELECT uid, email, display_name, phone, city, location, role, account_status, raw_data FROM users;');
+      allUsers.rows.forEach(r => {
+        const raw = r.raw_data || {};
+        const uId = r.uid || raw.uid || raw.id;
+        if (uId) {
+          const userObj = {
+            ...raw,
+            uid: uId,
+            id: uId,
+            email: r.email || raw.email,
+            displayName: r.display_name || raw.displayName || raw.name,
+            name: r.display_name || raw.displayName || raw.name,
+            phone: r.phone || raw.phone || raw.phoneNumber,
+            phoneNumber: r.phone || raw.phone || raw.phoneNumber,
+            city: r.city || raw.city || raw.location,
+            location: r.location || r.city || raw.location || raw.city,
+            role: r.role || raw.role || 'USER',
+            accountStatus: r.account_status || raw.accountStatus || 'ACTIVE'
+          };
+          localUsersMap.set(uId, userObj);
+          if (userObj.email) localUsersMap.set(userObj.email, userObj);
+        }
+      });
+      console.log('Hydrated users store from PostgreSQL into localUsersMap.');
+    } catch (hydrateUserErr) {
+      console.warn('PostgreSQL user hydration note:', hydrateUserErr.message);
+    }
+
     client.release();
     pgDbState.connected = true;
     pgDbState.error = null;
@@ -846,10 +924,19 @@ function saveLocalUser(u) {
   if (!u || (!u.uid && !u.id && !u.email)) return;
   const key = u.uid || u.id || u.email;
   const existing = localUsersMap.get(key) || {};
+  const effectivePhone = (u.phone && String(u.phone).trim()) || (u.phoneNumber && String(u.phoneNumber).trim()) || existing.phone || existing.phoneNumber || '';
+  const effectiveCity = (u.city && String(u.city).trim()) || (u.location && String(u.location).trim()) || existing.city || existing.location || '';
+  const effectiveName = (u.displayName && String(u.displayName).trim()) || (u.name && String(u.name).trim()) || existing.displayName || existing.name || '';
   const updated = {
     ...existing,
     ...u,
     uid: u.uid || u.id || existing.uid || existing.id,
+    phone: effectivePhone,
+    phoneNumber: effectivePhone,
+    city: effectiveCity,
+    location: effectiveCity,
+    displayName: effectiveName || u.displayName || existing.displayName,
+    name: effectiveName || u.name || existing.name,
     updatedAt: new Date().toISOString()
   };
   localUsersMap.set(key, updated);
@@ -2760,19 +2847,23 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
     const syncP6 = String.fromCharCode(36) + '6';
     const syncP7 = String.fromCharCode(36) + '7';
     const syncP8 = String.fromCharCode(36) + '8';
+    const syncP9 = String.fromCharCode(36) + '9';
+    const syncP10 = String.fromCharCode(36) + '10';
 
     const syncUpsertQuery = 
       "INSERT INTO users (" +
-      "  uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at" +
+      "  uid, email, display_name, phone, city, location, role, account_status, email_verified, raw_data, created_at, updated_at" +
       ") VALUES (" +
-      "  " + syncP1 + ", " + syncP2 + ", " + syncP3 + ", " + syncP4 + ", " + syncP5 + ", " + syncP6 + ", " + syncP7 + ", " + syncP8 + ", NOW(), NOW()" +
+      "  " + syncP1 + ", " + syncP2 + ", " + syncP3 + ", " + syncP4 + ", " + syncP5 + ", " + syncP6 + ", " + syncP7 + ", " + syncP8 + ", " + syncP9 + ", " + syncP10 + ", NOW(), NOW()" +
       ") ON CONFLICT (uid) DO UPDATE SET " +
-      "  email = EXCLUDED.email, " +
-      "  display_name = EXCLUDED.display_name, " +
-      "  phone = EXCLUDED.phone, " +
-      "  role = EXCLUDED.role, " +
-      "  account_status = EXCLUDED.account_status, " +
-      "  raw_data = EXCLUDED.raw_data, " +
+      "  email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email), " +
+      "  display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), users.display_name), " +
+      "  phone = CASE WHEN COALESCE(EXCLUDED.phone, '') <> '' THEN EXCLUDED.phone ELSE users.phone END, " +
+      "  city = CASE WHEN COALESCE(EXCLUDED.city, '') <> '' THEN EXCLUDED.city ELSE users.city END, " +
+      "  location = CASE WHEN COALESCE(EXCLUDED.location, '') <> '' THEN EXCLUDED.location ELSE users.location END, " +
+      "  role = COALESCE(NULLIF(EXCLUDED.role, ''), users.role), " +
+      "  account_status = COALESCE(NULLIF(EXCLUDED.account_status, ''), users.account_status), " +
+      "  raw_data = COALESCE(users.raw_data, '{}'::jsonb) || EXCLUDED.raw_data, " +
       "  updated_at = NOW();";
 
     for (const u of unifiedUsers) {
@@ -2782,7 +2873,9 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
           u.uid,
           u.email,
           u.displayName || u.name,
-          u.phone || '',
+          u.phone || u.phoneNumber || '',
+          u.city || u.location || '',
+          u.location || u.city || '',
           u.role || 'USER',
           u.accountStatus || 'ACTIVE',
           Boolean(u.emailVerified),
@@ -2898,19 +2991,33 @@ app.post('/api/users', async (req, res) => {
   try {
     invalidateAdminUsersCache();
     const userData = req.body || {};
-    const uUid = userData.uid || userData.id || `user-${Date.now()}`;
+    const uUid = userData.uid || userData.id || ('user-' + Date.now());
     const nowIso = new Date().toISOString();
 
+    const existing = localUsersMap.get(uUid) || {};
+    const incomingPhone = (userData.phone || userData.phoneNumber || '').trim();
+    const incomingCity = (userData.city || userData.location || '').trim();
+    const incomingName = (userData.displayName || userData.name || '').trim();
+
+    const effectivePhone = incomingPhone || existing.phone || existing.phoneNumber || '';
+    const effectiveCity = incomingCity || existing.city || existing.location || '';
+    const effectiveName = incomingName || existing.displayName || existing.name || 'EaseLand User';
+
     const fullPayload = {
+      ...existing,
       ...userData,
       uid: uUid,
       id: uUid,
-      displayName: (userData.displayName || userData.name || 'EaseLand User').trim(),
-      email: (userData.email || '').trim(),
-      phone: (userData.phone || userData.phoneNumber || '').trim(),
-      role: userData.role || 'USER',
-      status: userData.status || userData.accountStatus || 'ACTIVE',
-      accountStatus: userData.accountStatus || userData.status || 'ACTIVE',
+      displayName: effectiveName,
+      name: effectiveName,
+      email: (userData.email || existing.email || '').trim(),
+      phone: effectivePhone,
+      phoneNumber: effectivePhone,
+      city: effectiveCity,
+      location: effectiveCity,
+      role: userData.role || existing.role || 'USER',
+      status: userData.status || userData.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
+      accountStatus: userData.accountStatus || userData.status || existing.accountStatus || existing.status || 'ACTIVE',
       updatedAt: nowIso
     };
 
@@ -2928,7 +3035,6 @@ app.post('/api/users', async (req, res) => {
     removeLocalDeletedUser(uUid);
     if (fullPayload.email) removeLocalDeletedUser(fullPayload.email);
 
-
     try {
       const p1 = String.fromCharCode(36) + '1';
       const p2 = String.fromCharCode(36) + '2';
@@ -2938,25 +3044,31 @@ app.post('/api/users', async (req, res) => {
       const p6 = String.fromCharCode(36) + '6';
       const p7 = String.fromCharCode(36) + '7';
       const p8 = String.fromCharCode(36) + '8';
+      const p9 = String.fromCharCode(36) + '9';
+      const p10 = String.fromCharCode(36) + '10';
 
       const queryText = 
         "INSERT INTO users (" +
-        "  uid, email, display_name, phone, role, account_status, email_verified, raw_data, created_at, updated_at" +
+        "  uid, email, display_name, phone, city, location, role, account_status, email_verified, raw_data, created_at, updated_at" +
         ") VALUES (" +
-        "  " + p1 + ", " + p2 + ", " + p3 + ", " + p4 + ", " + p5 + ", " + p6 + ", " + p7 + ", " + p8 + ", NOW(), NOW()" +
+        "  " + p1 + ", " + p2 + ", " + p3 + ", " + p4 + ", " + p5 + ", " + p6 + ", " + p7 + ", " + p8 + ", " + p9 + ", " + p10 + ", NOW(), NOW()" +
         ") ON CONFLICT (uid) DO UPDATE SET " +
-        "  email = EXCLUDED.email, " +
-        "  display_name = EXCLUDED.display_name, " +
-        "  phone = EXCLUDED.phone, " +
-        "  role = EXCLUDED.role, " +
-        "  account_status = EXCLUDED.account_status, " +
-        "  raw_data = EXCLUDED.raw_data, " +
+        "  email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email), " +
+        "  display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), users.display_name), " +
+        "  phone = CASE WHEN COALESCE(EXCLUDED.phone, '') <> '' THEN EXCLUDED.phone ELSE users.phone END, " +
+        "  city = CASE WHEN COALESCE(EXCLUDED.city, '') <> '' THEN EXCLUDED.city ELSE users.city END, " +
+        "  location = CASE WHEN COALESCE(EXCLUDED.location, '') <> '' THEN EXCLUDED.location ELSE users.location END, " +
+        "  role = COALESCE(NULLIF(EXCLUDED.role, ''), users.role), " +
+        "  account_status = COALESCE(NULLIF(EXCLUDED.account_status, ''), users.account_status), " +
+        "  raw_data = COALESCE(users.raw_data, '{}'::jsonb) || EXCLUDED.raw_data, " +
         "  updated_at = NOW();";
       await pgPool.query(queryText, [
         uUid,
         fullPayload.email,
         fullPayload.displayName,
         fullPayload.phone,
+        fullPayload.city,
+        fullPayload.location,
         fullPayload.role,
         fullPayload.accountStatus,
         Boolean(fullPayload.emailVerified),

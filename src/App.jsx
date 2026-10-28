@@ -34,6 +34,7 @@ import { parseRouteFromUrl } from './utils/routeUtils.js';
 import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles } from 'lucide-react';
 import { DEFAULT_SHOWCASE_PROPERTIES } from './services/showcaseProperties.js';
 import AnimatedPromotionBanner from './components/AnimatedPromotionBanner.jsx';
+import RegionalHubsSection from './components/RegionalHubsSection.jsx';
 
 export const getInitialPageState = parseRouteFromUrl;
 
@@ -100,11 +101,11 @@ export default function App() {
       localStored.phone || localStored.phoneNumber ||
       (isAdminSession ? adminPhone : '')
     );
-    const activeCity = (
+    const activeCity = String(
       authProfile?.city || authProfile?.location ||
       authUser?.city || authUser?.location ||
       localStored.city || localStored.location ||
-      (isAdminSession ? adminCity : '')
+      (isAdminSession ? adminCity : '') || ''
     ).trim();
 
     return {
@@ -127,6 +128,9 @@ export default function App() {
     authUser?.email,
     authUser?.displayName,
     authUser?.phoneNumber,
+    authUser?.phone,
+    authUser?.city,
+    authUser?.location,
     authProfile?.displayName,
     authProfile?.name,
     authProfile?.email,
@@ -303,11 +307,11 @@ export default function App() {
       localStored.phone || localStored.phoneNumber ||
       adminPhone
     );
-    const city = (
+    const city = String(
       u?.city || u?.location ||
       p?.city || p?.location ||
       localStored.city || localStored.location ||
-      adminCity
+      adminCity || ''
     ).trim();
 
     if (!name) missing.push('Full Name');
@@ -514,7 +518,10 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
 
     // 4. Listen for session profile updates
-    const handleProfileUpdated = () => {};
+    const handleProfileUpdated = () => {
+      setProfileRefreshTick(t => t + 1);
+      setIsProfileWarningOpen(false);
+    };
     window.addEventListener('easeland-user-profile-updated', handleProfileUpdated);
 
     return () => {
@@ -699,6 +706,24 @@ export default function App() {
     } catch (e) {}
 
     setActivePage('map');
+  };
+
+  const handleCitySelect = (cityName) => {
+    const updatedFilters = createDefaultFilterState({
+      city: cityName || '',
+      search: cityName || ''
+    });
+    setFilters(updatedFilters);
+    try {
+      const searchString = searchStateToUrlParams(updatedFilters);
+      if (window.location.pathname + window.location.search !== searchString) {
+        window.history.pushState(null, '', searchString);
+      }
+    } catch (e) {}
+    setActivePage('map');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleSelectProperty = (prop) => {
@@ -1313,6 +1338,9 @@ export default function App() {
                 )}
               </div>
             </section>
+
+            {/* STRATEGIC REGIONAL INVESTMENT HUBS (GEO & SEO CORRIDORS) */}
+            <RegionalHubsSection onSelectCity={handleCitySelect} onSelectCategory={handleCategorySelect} />
           </div>
         )}
 

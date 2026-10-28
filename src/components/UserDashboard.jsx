@@ -57,7 +57,8 @@ export default function UserDashboard({
   initialTab = 'overview',
   tabKey = 0
 }) {
-  const { profile, updateProfileData, deleteOwnAccount } = useAuth();
+  const { profile, updateProfileData, deleteOwnAccount, user: authUser } = useAuth();
+  const effectiveUser = user || authUser;
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [isDeletingOwnAccount, setIsDeletingOwnAccount] = useState(false);
 
@@ -261,7 +262,8 @@ export default function UserDashboard({
 
   // Account settings form state
   const getInitialProfileState = () => {
-    const uid = user?.uid || user?.id;
+    const effective = user || authUser;
+    const uid = effective?.uid || effective?.id || profile?.uid;
     let localStored = {};
     if (typeof window !== 'undefined' && uid) {
       try {
@@ -272,10 +274,10 @@ export default function UserDashboard({
     const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
     const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
 
-    const ph = sanitizePhone(user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone);
-    const ct = (user?.city || user?.location || localStored.city || localStored.location || adminCity).trim();
-    const nm = user?.name || user?.displayName || localStored.displayName || localStored.name || '';
-    const em = user?.email || localStored.email || '';
+    const ph = sanitizePhone(effective?.phone || effective?.phoneNumber || profile?.phone || profile?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone);
+    const ct = String(effective?.city || effective?.location || profile?.city || profile?.location || localStored.city || localStored.location || adminCity || '').trim();
+    const nm = effective?.name || effective?.displayName || profile?.displayName || profile?.name || localStored.displayName || localStored.name || '';
+    const em = effective?.email || profile?.email || localStored.email || '';
 
     return {
       name: nm,
@@ -292,8 +294,27 @@ export default function UserDashboard({
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const uid = user?.uid || user?.id;
+    const handleProfileUpdate = (e) => {
+      const detail = e?.detail;
+      if (!detail) return;
+      setProfileForm(prev => ({
+        ...prev,
+        name: detail.name || detail.displayName || prev.name,
+        email: detail.email || prev.email,
+        phone: detail.phone || detail.phoneNumber || prev.phone,
+        city: String(detail.city || detail.location || prev.city || '').trim()
+      }));
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('easeland-user-profile-updated', handleProfileUpdate);
+      return () => window.removeEventListener('easeland-user-profile-updated', handleProfileUpdate);
+    }
+  }, []);
+
+  useEffect(() => {
+    const effective = user || authUser;
+    if (!effective && !profile) return;
+    const uid = effective?.uid || effective?.id || profile?.uid;
     let localStored = {};
     if (typeof window !== 'undefined' && uid) {
       try {
@@ -305,10 +326,10 @@ export default function UserDashboard({
     const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
 
     setProfileForm(prev => {
-      const ph = sanitizePhone(user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone) || prev.phone || '';
-      const ct = (user?.city || user?.location || profile?.city || profile?.location || localStored.city || localStored.location || adminCity || prev.city || '').trim();
-      const nm = user?.name || user?.displayName || profile?.displayName || profile?.name || localStored.displayName || localStored.name || prev.name || '';
-      const em = user?.email || profile?.email || localStored.email || prev.email || '';
+      const ph = sanitizePhone(effective?.phone || effective?.phoneNumber || profile?.phone || profile?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone) || prev.phone || '';
+      const ct = String(effective?.city || effective?.location || profile?.city || profile?.location || localStored.city || localStored.location || adminCity || prev.city || '').trim();
+      const nm = effective?.name || effective?.displayName || profile?.displayName || profile?.name || localStored.displayName || localStored.name || prev.name || '';
+      const em = effective?.email || profile?.email || localStored.email || prev.email || '';
       return {
         ...prev,
         name: nm,
@@ -325,6 +346,9 @@ export default function UserDashboard({
     user?.displayName,
     user?.phone,
     user?.city,
+    authUser?.uid,
+    authUser?.phone,
+    authUser?.city,
     profile?.phone,
     profile?.phoneNumber,
     profile?.city,
@@ -901,10 +925,10 @@ export default function UserDashboard({
           city: cityVal
         }));
         if (typeof window !== 'undefined') {
-          const uid = user?.uid || user?.id;
-          if (uid) {
+          const targetUid = effectiveUser?.uid || effectiveUser?.id || profile?.uid || user?.uid || user?.id;
+          if (targetUid) {
             try {
-              const uKey = 'easeland_user_profile_' + uid;
+              const uKey = 'easeland_user_profile_' + targetUid;
               const cur = JSON.parse(localStorage.getItem(uKey) || '{}');
               localStorage.setItem(uKey, JSON.stringify({
                 ...cur,
@@ -916,6 +940,32 @@ export default function UserDashboard({
                 city: cityVal,
                 location: cityVal
               }));
+            } catch (e) {}
+
+            try {
+              const rawReg = localStorage.getItem('easeland_registered_users');
+              if (rawReg) {
+                const regArr = JSON.parse(rawReg);
+                const uIdLow = String(targetUid).toLowerCase().trim();
+                const emLow = String(emailVal).toLowerCase().trim();
+                const updatedReg = regArr.map(u => {
+                  const thisId = String(u.id || u.uid || '').toLowerCase().trim();
+                  const thisEm = String(u.email || '').toLowerCase().trim();
+                  if (thisId === uIdLow || (emLow && thisEm === emLow)) {
+                    return {
+                      ...u,
+                      name: nameVal,
+                      displayName: nameVal,
+                      phone: phoneVal,
+                      phoneNumber: phoneVal,
+                      city: cityVal,
+                      location: cityVal
+                    };
+                  }
+                  return u;
+                });
+                localStorage.setItem('easeland_registered_users', JSON.stringify(updatedReg));
+              }
             } catch (e) {}
           }
           try {
@@ -936,7 +986,7 @@ export default function UserDashboard({
             localStorage.setItem('easeland_admin_city', cityVal);
           }
           window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', {
-            detail: { name: nameVal, email: emailVal, phone: phoneVal, city: cityVal }
+            detail: { name: nameVal, email: emailVal, phone: phoneVal, city: cityVal, location: cityVal }
           }));
         }
         setTimeout(() => setSavedSuccess(false), 3000);

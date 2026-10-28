@@ -67,16 +67,27 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
     const adminPhone = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_phone') || '') : '';
     const adminCity = typeof window !== 'undefined' ? (localStorage.getItem('easeland_admin_city') || '') : '';
     const sessionUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('easeland_session_user') || '{}') : {};
+    let regUser = {};
+    if (typeof window !== 'undefined' && uid) {
+      try {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const regArr = JSON.parse(rawReg);
+          regUser = regArr.find(u => u && (u.uid === uid || u.id === uid)) || {};
+        }
+      } catch (e) {}
+    }
 
-    const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || stored?.name || stored?.displayName || sessionUser?.name || sessionUser?.displayName || '').trim();
-    const email = (user?.email || profile?.email || stored?.email || sessionUser?.email || '').trim();
+    const name = (user?.name || user?.displayName || profile?.name || profile?.displayName || stored?.name || stored?.displayName || regUser?.name || regUser?.displayName || sessionUser?.name || sessionUser?.displayName || '').trim();
+    const email = (user?.email || profile?.email || stored?.email || regUser?.email || sessionUser?.email || '').trim();
     const phone = sanitizePhone(
       user?.phone || user?.phoneNumber || profile?.phone || profile?.phoneNumber ||
       stored?.phone || stored?.phoneNumber ||
+      regUser?.phone || regUser?.phoneNumber ||
       adminPhone ||
       sessionUser?.phone || sessionUser?.phoneNumber || ''
     );
-    const city = (user?.city || user?.location || profile?.city || profile?.location || stored?.city || stored?.location || adminCity || sessionUser?.city || sessionUser?.location || '').trim();
+    const city = String(user?.city || user?.location || profile?.city || profile?.location || stored?.city || stored?.location || regUser?.city || regUser?.location || adminCity || sessionUser?.city || sessionUser?.location || '').trim();
 
     if (!name) missing.push('Full Name');
     if (!email) missing.push('Email Address');

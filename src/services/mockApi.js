@@ -315,7 +315,7 @@ export const DEFAULT_SITE_CONFIG = {
   sellPage: {
     title: 'List Your Property — Connect with Verified Serious Buyers',
     subtitle: 'Post your open plot, villa, apartment, or commercial land in under 3 minutes. Our verification specialist inspects your property within 24 hours.',
-    badgeText: 'POST PROPERTY FOR FREE'
+    badgeText: 'DIRECT OWNER LISTINGS'
   },
   categories: [
     { id: 'cat-1', title: 'Open Plot Ventures', countText: 'Layout & Gated Ventures', icon: 'MapPin', imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80' },
@@ -370,9 +370,9 @@ export const DEFAULT_SITE_CONFIG = {
     enablePlotPolygons: true
   },
   seo: {
-    metaTitle: 'EaseLand — Pan-India Verified Property & Land Marketplace',
-    metaDescription: 'Discover and verify open plots, villas, apartments, and agricultural lands. 100% verified title deeds, zero boundary disputes, and Leaflet Google satellite map polygons.',
-    keywords: 'land plots, buy land, guntur real estate, hyderabad plots, verified property, transparent deals, plot boundary, real estate india',
+    metaTitle: 'EaseLand — Verified Property Discovery & Direct Deal Facilitation',
+    metaDescription: 'Discover verified open plots, villas, apartments, and agricultural lands across Guntur, Andhra Pradesh, Telangana, and Pan-India. 100% physically audited titles, certified satellite boundary polygons, and direct deal facilitation.',
+    keywords: 'real estate guntur, plots in guntur, amaravati plots, crda layout plots, hyderabad real estate, andhra pradesh land for sale, telangana properties, buy land india, verified property listings, agricultural land, residential plots, deal facilitation',
     ogImageUrl: '/easeland_logo.png',
     canonicalUrl: 'https://easeland.in'
   },

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "EaseLand — Direct Property Discovery & Verification Platform",
+  "name": "EaseLand — Verified Property Discovery & Deal Facilitation Platform",
   "short_name": "EaseLand",
-  "description": "Pan-India direct property marketplace connecting Property Owners and Customers with zero brokers. Find, Explore, Verify, and Connect.",
+  "description": "India's premier verified property discovery and direct deal facilitation platform. Explore residential plots, villas, flats, and farmlands with certified satellite boundaries and complete legal peace of mind.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

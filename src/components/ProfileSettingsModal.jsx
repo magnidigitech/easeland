@@ -32,7 +32,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       name: profile?.displayName || profile?.name || user?.displayName || user?.name || localStored.displayName || localStored.name || '',
       email: profile?.email || user?.email || localStored.email || '',
       phone: sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone),
-      city: profile?.city || profile?.location || user?.city || user?.location || localStored.city || localStored.location || adminCity
+      city: String(profile?.city || profile?.location || user?.city || user?.location || localStored.city || localStored.location || adminCity || '').trim()
     };
   };
 
@@ -90,7 +90,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       const activeName = profile?.displayName || profile?.name || user?.displayName || user?.name || localStored.displayName || localStored.name || '';
       const activeEmail = profile?.email || user?.email || localStored.email || '';
       const activePhone = sanitizePhone(profile?.phone || profile?.phoneNumber || user?.phone || user?.phoneNumber || localStored.phone || localStored.phoneNumber || adminPhone);
-      const activeCity = profile?.city || profile?.location || user?.city || user?.location || localStored.city || localStored.location || adminCity;
+      const activeCity = String(profile?.city || profile?.location || user?.city || user?.location || localStored.city || localStored.location || adminCity || '').trim();
       setProfileData({
         name: activeName,
         email: activeEmail,
@@ -106,7 +106,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       setError(null);
       setSuccessMsg(null);
     }
-  }, [isOpen, user?.uid, user?.phone, profile?.phone]);
+  }, [isOpen, user?.uid, user?.phone, user?.phoneNumber, user?.city, user?.location, profile?.phone, profile?.phoneNumber, profile?.city, profile?.location]);
 
   if (!isOpen) return null;
 
@@ -207,7 +207,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
         localStorage.setItem('easeland_admin_city', finalCity);
       }
       window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', {
-        detail: { name: finalName, email: finalEmail, phone: finalPhone, city: finalCity }
+        detail: { name: finalName, email: finalEmail, phone: finalPhone, city: finalCity, location: finalCity }
       }));
     }
 

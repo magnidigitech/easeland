@@ -110,13 +110,17 @@ export function AuthProvider({ children }) {
     if (result.success && result.profile) {
       setProfile(result.profile);
     } else if (Object.keys(storedProfile).length > 0 && storedProfile.accountStatus !== 'REMOVED') {
+      const cityVal = storedProfile.city || storedProfile.location || '';
+      const phoneVal = storedProfile.phone || storedProfile.phoneNumber || '';
       setProfile(prev => ({
         uid: uid,
         displayName: storedProfile.displayName || storedProfile.name || 'EaseLand User',
         name: storedProfile.name || storedProfile.displayName || 'EaseLand User',
         email: storedProfile.email || '',
-        phone: storedProfile.phone || storedProfile.phoneNumber || '',
-        phoneNumber: storedProfile.phone || storedProfile.phoneNumber || '',
+        phone: phoneVal,
+        phoneNumber: phoneVal,
+        city: cityVal,
+        location: cityVal,
         role: 'USER',
         accountStatus: 'ACTIVE',
         capabilities: ['CUSTOMER', 'OWNER'],
@@ -172,6 +176,11 @@ export function AuthProvider({ children }) {
     // Listen for Firebase Auth state changes and restore session
     const unsubscribe = subscribeToAuthState((currentUser) => {
       if (currentUser) {
+        // Synchronous profile hydration from local storage for 0ms instant UI response
+        const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
+        const userProfileData = storedProfile;
+        const sessUser = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+
         if (currentUser && currentUser.uid) {
           if (typeof window !== 'undefined') {
             try {
@@ -189,23 +198,26 @@ export function AuthProvider({ children }) {
             } catch (eDel) {}
           }
 
+          const effectivePhone = userProfileData?.phone || userProfileData?.phoneNumber || sessUser?.phone || sessUser?.phoneNumber || currentUser.phoneNumber || '';
+          const effectiveCity = userProfileData?.city || userProfileData?.location || sessUser?.city || sessUser?.location || '';
+          const effectiveName = userProfileData?.displayName || userProfileData?.name || currentUser.displayName || sessUser?.name || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
+
           syncUserToPostgres({
             uid: currentUser.uid,
             id: currentUser.uid,
-            displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
-            name: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+            displayName: effectiveName,
+            name: effectiveName,
             email: currentUser.email || '',
-            phone: currentUser.phoneNumber || '',
+            phone: effectivePhone,
+            phoneNumber: effectivePhone,
+            city: effectiveCity,
+            location: effectiveCity,
             role: currentUser.email === 'admin@easeland.in' ? 'ADMIN' : 'USER',
             accountStatus: 'ACTIVE',
             emailVerified: currentUser.emailVerified,
             authProvider: currentUser.providerData?.[0]?.providerId === 'google.com' ? 'Google OAuth' : 'Email/Password'
           });
         }
-
-        // Synchronous profile hydration from local storage for 0ms instant UI response
-        const storedProfile = JSON.parse(localStorage.getItem('easeland_user_profile_' + currentUser.uid) || '{}');
-        const userProfileData = storedProfile;
 
         const isAdmin = currentUser.email === 'admin@easeland.in' ||
           (typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true') ||
@@ -281,12 +293,23 @@ export function AuthProvider({ children }) {
           try {
             const userDocRef = doc(db, 'users', currentUser.uid);
             unsubUserDoc = onSnapshot(userDocRef, (docSnap) => {
+              const uKey = 'easeland_user_profile_' + currentUser.uid;
+              const curProf = JSON.parse(localStorage.getItem(uKey) || '{}');
+              const curSess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+
               if (!docSnap.exists()) {
-                // If user document is missing in Firestore, re-establish active clean slate
+                const pPhone = curProf.phone || curProf.phoneNumber || curSess.phone || curSess.phoneNumber || currentUser.phoneNumber || '';
+                const pCity = curProf.city || curProf.location || curSess.city || curSess.location || '';
+                const pName = curProf.displayName || curProf.name || currentUser.displayName || curSess.name || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
+                // If user document is missing in Firestore, re-establish active clean slate with known attributes
                 createUserProfile(currentUser.uid, {
-                  displayName: currentUser.displayName || (currentUser.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User'),
+                  displayName: pName,
+                  name: pName,
                   email: currentUser.email || '',
-                  phone: currentUser.phoneNumber || ''
+                  phone: pPhone,
+                  phoneNumber: pPhone,
+                  city: pCity,
+                  location: pCity
                 });
                 return;
               }
@@ -308,16 +331,24 @@ export function AuthProvider({ children }) {
                 const resolvedCity = fsData.city || fsData.location || '';
                 const resolvedName = fsData.displayName || fsData.name || '';
 
+                const finalPhone = (resolvedPhone && String(resolvedPhone).trim() !== '')
+                  ? resolvedPhone
+                  : (curProf.phone || curProf.phoneNumber || curSess.phone || curSess.phoneNumber || '');
+                const finalCity = (resolvedCity && String(resolvedCity).trim() !== '')
+                  ? resolvedCity
+                  : (curProf.city || curProf.location || curSess.city || curSess.location || '');
+                const finalName = resolvedName || curProf.displayName || curProf.name || curSess.name || '';
+
                 setUser(prev => {
                   if (!prev) return prev;
                   return {
                     ...prev,
-                    name: resolvedName || prev.name,
-                    displayName: resolvedName || prev.displayName,
-                    phone: resolvedPhone || prev.phone,
-                    phoneNumber: resolvedPhone || prev.phoneNumber,
-                    city: resolvedCity || prev.city,
-                    location: resolvedCity || prev.location,
+                    name: finalName || prev.name,
+                    displayName: finalName || prev.displayName,
+                    phone: finalPhone || prev.phone,
+                    phoneNumber: finalPhone || prev.phoneNumber,
+                    city: finalCity || prev.city,
+                    location: finalCity || prev.location,
                     accountStatus: uAccStatus,
                     status: uAccStatus,
                     suspension: fsData.suspension || null
@@ -328,12 +359,12 @@ export function AuthProvider({ children }) {
                   return {
                     ...(prev || {}),
                     ...fsData,
-                    name: resolvedName || prev?.name,
-                    displayName: resolvedName || prev?.displayName,
-                    phone: resolvedPhone || prev?.phone,
-                    phoneNumber: resolvedPhone || prev?.phoneNumber,
-                    city: resolvedCity || prev?.city,
-                    location: resolvedCity || prev?.location,
+                    name: finalName || prev?.name,
+                    displayName: finalName || prev?.displayName,
+                    phone: finalPhone || prev?.phone,
+                    phoneNumber: finalPhone || prev?.phoneNumber,
+                    city: finalCity || prev?.city,
+                    location: finalCity || prev?.location,
                     accountStatus: uAccStatus,
                     status: uAccStatus,
                     suspension: fsData.suspension || null
@@ -342,29 +373,26 @@ export function AuthProvider({ children }) {
 
                 // Update persistent local caches so page refreshes and route guards are always instantaneous and never stale
                 try {
-                  const uKey = 'easeland_user_profile_' + currentUser.uid;
-                  const curProf = JSON.parse(localStorage.getItem(uKey) || '{}');
                   localStorage.setItem(uKey, JSON.stringify({
                     ...curProf,
                     ...fsData,
-                    name: resolvedName || curProf.name,
-                    displayName: resolvedName || curProf.displayName,
-                    phone: resolvedPhone || curProf.phone,
-                    phoneNumber: resolvedPhone || curProf.phoneNumber,
-                    city: resolvedCity || curProf.city,
-                    location: resolvedCity || curProf.location,
+                    name: finalName,
+                    displayName: finalName,
+                    phone: finalPhone,
+                    phoneNumber: finalPhone,
+                    city: finalCity,
+                    location: finalCity,
                     accountStatus: uAccStatus
                   }));
 
-                  const curSess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
                   localStorage.setItem('easeland_session_user', JSON.stringify({
                     ...curSess,
-                    name: resolvedName || curSess.name,
-                    displayName: resolvedName || curSess.displayName,
-                    phone: resolvedPhone || curSess.phone,
-                    phoneNumber: resolvedPhone || curSess.phoneNumber,
-                    city: resolvedCity || curSess.city,
-                    location: resolvedCity || curSess.location,
+                    name: finalName,
+                    displayName: finalName,
+                    phone: finalPhone,
+                    phoneNumber: finalPhone,
+                    city: finalCity,
+                    location: finalCity,
                     accountStatus: uAccStatus
                   }));
                 } catch (e) {}
@@ -578,18 +606,25 @@ export function AuthProvider({ children }) {
       if (typeof window !== 'undefined') {
         try {
           const rawDel = localStorage.getItem('easeland_deleted_users');
+          let wasDeleted = false;
           if (rawDel) {
             const delArr = JSON.parse(rawDel);
             const uIdLow = String(result.user.uid || '').toLowerCase().trim();
+            wasDeleted = delArr.some(item => {
+              const itLow = String(item || '').toLowerCase().trim();
+              return itLow === uIdLow || (lowerEmail && itLow === lowerEmail);
+            });
             const filtered = delArr.filter(item => {
               const itLow = String(item || '').toLowerCase().trim();
               return itLow !== uIdLow && (!lowerEmail || itLow !== lowerEmail);
             });
             localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
           }
-          localStorage.removeItem('easeland_user_profile_' + result.user.uid);
-          localStorage.removeItem('easeland_draft_' + result.user.uid);
-          localStorage.removeItem('easeland_wizard_location_' + result.user.uid);
+          if (wasDeleted) {
+            localStorage.removeItem('easeland_user_profile_' + result.user.uid);
+            localStorage.removeItem('easeland_draft_' + result.user.uid);
+            localStorage.removeItem('easeland_wizard_location_' + result.user.uid);
+          }
         } catch (e) {}
       }
 
@@ -597,10 +632,15 @@ export function AuthProvider({ children }) {
       let pRes = await getCurrentUserProfile(result.user.uid);
       if (!pRes.success || !pRes.profile) {
         try {
+          const uKey = 'easeland_user_profile_' + result.user.uid;
+          const exProf = JSON.parse(localStorage.getItem(uKey) || '{}');
           await createUserProfile(result.user.uid, {
-            displayName: result.user.displayName || 'EaseLand User',
+            displayName: exProf.displayName || exProf.name || result.user.displayName || 'EaseLand User',
             email: result.user.email || lowerEmail,
-            phone: result.user.phoneNumber || ''
+            phone: exProf.phone || exProf.phoneNumber || result.user.phoneNumber || '',
+            phoneNumber: exProf.phoneNumber || exProf.phone || result.user.phoneNumber || '',
+            city: exProf.city || exProf.location || '',
+            location: exProf.location || exProf.city || ''
           });
           pRes = await getCurrentUserProfile(result.user.uid);
         } catch (e) {}
@@ -612,6 +652,7 @@ export function AuthProvider({ children }) {
       const dedicatedAdminEmail = (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim();
       const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
       const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
+      const dedicatedAdminCity = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
       loggedInUser = {
         uid: 'admin_uid_001',
         email: dedicatedAdminEmail,
@@ -619,6 +660,8 @@ export function AuthProvider({ children }) {
         name: dedicatedAdminName,
         phone: dedicatedAdminPhone,
         phoneNumber: dedicatedAdminPhone,
+        city: dedicatedAdminCity,
+        location: dedicatedAdminCity,
         emailVerified: true
       };
       userProfileData = {
@@ -628,6 +671,8 @@ export function AuthProvider({ children }) {
         email: dedicatedAdminEmail,
         phone: dedicatedAdminPhone,
         phoneNumber: dedicatedAdminPhone,
+        city: dedicatedAdminCity,
+        location: dedicatedAdminCity,
         role: 'ADMIN',
         adminRole: true,
         capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'],
@@ -643,13 +688,17 @@ export function AuthProvider({ children }) {
     )) {
       const mockUid = 'user_' + Math.abs(lowerEmail.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0));
       const storedUserObj = JSON.parse(localStorage.getItem('easeland_user_profile_' + mockUid) || '{}');
+      const mCity = storedUserObj.city || storedUserObj.location || '';
+      const mPhone = storedUserObj.phone || storedUserObj.phoneNumber || '';
       loggedInUser = {
         uid: mockUid,
         email: lowerEmail,
         displayName: storedUserObj.displayName || storedUserObj.name || lowerEmail.split('@')[0] || 'EaseLand User',
         name: storedUserObj.name || storedUserObj.displayName || lowerEmail.split('@')[0] || 'EaseLand User',
-        phone: storedUserObj.phone || storedUserObj.phoneNumber || '',
-        phoneNumber: storedUserObj.phone || storedUserObj.phoneNumber || '',
+        phone: mPhone,
+        phoneNumber: mPhone,
+        city: mCity,
+        location: mCity,
         emailVerified: true
       };
       userProfileData = {
@@ -657,8 +706,10 @@ export function AuthProvider({ children }) {
         displayName: storedUserObj.displayName || storedUserObj.name || lowerEmail.split('@')[0] || 'EaseLand User',
         name: storedUserObj.name || storedUserObj.displayName || lowerEmail.split('@')[0] || 'EaseLand User',
         email: lowerEmail,
-        phone: storedUserObj.phone || storedUserObj.phoneNumber || '',
-        phoneNumber: storedUserObj.phone || storedUserObj.phoneNumber || '',
+        phone: mPhone,
+        phoneNumber: mPhone,
+        city: mCity,
+        location: mCity,
         role: 'USER',
         adminRole: false,
         capabilities: ['CUSTOMER', 'OWNER'],
@@ -712,6 +763,7 @@ export function AuthProvider({ children }) {
     const dedicatedAdminEmail = (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim();
     const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
     const dedicatedAdminPhone = localStorage.getItem('easeland_admin_phone') || '';
+    const dedicatedAdminCity = localStorage.getItem('easeland_admin_city') || 'Guntur, Andhra Pradesh';
     const dedicatedAdminPassword = localStorage.getItem('easeland_admin_password') || 'Admin@12345';
 
     const isEmailValid = lowerEmail === dedicatedAdminEmail || lowerEmail === 'admin@easeland.in';
@@ -725,6 +777,8 @@ export function AuthProvider({ children }) {
         name: dedicatedAdminName,
         phone: dedicatedAdminPhone,
         phoneNumber: dedicatedAdminPhone,
+        city: dedicatedAdminCity,
+        location: dedicatedAdminCity,
         emailVerified: true
       };
       const adminProfile = {
@@ -734,6 +788,8 @@ export function AuthProvider({ children }) {
         email: dedicatedAdminEmail,
         phone: dedicatedAdminPhone,
         phoneNumber: dedicatedAdminPhone,
+        city: dedicatedAdminCity,
+        location: dedicatedAdminCity,
         role: 'ADMIN',
         adminRole: true,
         capabilities: ['ADMIN', 'CUSTOMER', 'OWNER'],
@@ -859,6 +915,32 @@ export function AuthProvider({ children }) {
 
     if (targetUid) {
       try {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const regArr = JSON.parse(rawReg);
+          const uIdLow = String(targetUid).toLowerCase().trim();
+          const emLow = String(updatesToSave.email || '').toLowerCase().trim();
+          const updatedReg = regArr.map(u => {
+            const thisId = String(u.id || u.uid || '').toLowerCase().trim();
+            const thisEm = String(u.email || '').toLowerCase().trim();
+            if (thisId === uIdLow || (emLow && thisEm === emLow)) {
+              return {
+                ...u,
+                name: updatesToSave.name || u.name,
+                displayName: updatesToSave.displayName || u.displayName,
+                phone: updatesToSave.phone || u.phone,
+                phoneNumber: updatesToSave.phoneNumber || u.phoneNumber,
+                city: updatesToSave.city || u.city,
+                location: updatesToSave.location || u.location
+              };
+            }
+            return u;
+          });
+          localStorage.setItem('easeland_registered_users', JSON.stringify(updatedReg));
+        }
+      } catch (e) {}
+
+      try {
         syncUserToPostgres({
           uid: targetUid,
           id: targetUid,
@@ -867,6 +949,7 @@ export function AuthProvider({ children }) {
           email: updatesToSave.email,
           phone: updatesToSave.phone,
           city: updatesToSave.city,
+          location: updatesToSave.location,
           role: updatedProfile.role || (isAdmin ? 'ADMIN' : 'USER'),
           accountStatus: 'ACTIVE'
         });
@@ -906,29 +989,44 @@ export function AuthProvider({ children }) {
       if (typeof window !== 'undefined') {
         try {
           const rawDel = localStorage.getItem('easeland_deleted_users');
+          let wasDeleted = false;
           if (rawDel) {
             const delArr = JSON.parse(rawDel);
             const uIdLow = String(result.user.uid || '').toLowerCase().trim();
             const emLow = String(result.user.email || '').toLowerCase().trim();
-            const filtered = delArr.filter(item => {
+            wasDeleted = delArr.some(item => {
               const itLow = String(item || '').toLowerCase().trim();
-              return itLow !== uIdLow && (!emLow || itLow !== emLow);
+              return itLow === uIdLow || (emLow && itLow === emLow);
             });
-            localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
+            if (wasDeleted) {
+              const filtered = delArr.filter(item => {
+                const itLow = String(item || '').toLowerCase().trim();
+                return itLow !== uIdLow && (!emLow || itLow !== emLow);
+              });
+              localStorage.setItem('easeland_deleted_users', JSON.stringify(filtered));
+            }
           }
-          localStorage.removeItem('easeland_user_profile_' + result.user.uid);
-          localStorage.removeItem('easeland_draft_' + result.user.uid);
-          localStorage.removeItem('easeland_wizard_location_' + result.user.uid);
+          if (wasDeleted) {
+            localStorage.removeItem('easeland_user_profile_' + result.user.uid);
+            localStorage.removeItem('easeland_draft_' + result.user.uid);
+            localStorage.removeItem('easeland_wizard_location_' + result.user.uid);
+          }
         } catch (e) {}
       }
+
+      const existingStored = typeof window !== 'undefined'
+        ? JSON.parse(localStorage.getItem('easeland_user_profile_' + result.user.uid) || '{}')
+        : {};
 
       let pRes = await getCurrentUserProfile(result.user.uid);
       if (!pRes.success || !pRes.profile) {
         try {
           await createUserProfile(result.user.uid, {
-            displayName: result.user.displayName || 'EaseLand User',
-            email: result.user.email || '',
-            phone: result.user.phoneNumber || ''
+            displayName: result.user.displayName || existingStored.displayName || 'EaseLand User',
+            email: result.user.email || existingStored.email || '',
+            phone: result.user.phoneNumber || existingStored.phone || existingStored.phoneNumber || '',
+            city: existingStored.city || existingStored.location || '',
+            location: existingStored.city || existingStored.location || ''
           });
           pRes = await getCurrentUserProfile(result.user.uid);
         } catch(e) {}
@@ -966,9 +1064,20 @@ export function AuthProvider({ children }) {
         return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
       }
 
-      const resolvedPhone = userProfileData?.phone || userProfileData?.phoneNumber || result.user.phoneNumber || '';
-      const resolvedCity = userProfileData?.city || userProfileData?.location || '';
-      const resolvedName = userProfileData?.displayName || userProfileData?.name || result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
+      const resolvedPhone = userProfileData?.phone || userProfileData?.phoneNumber || existingStored.phone || existingStored.phoneNumber || result.user.phoneNumber || '';
+      const resolvedCity = userProfileData?.city || userProfileData?.location || existingStored.city || existingStored.location || '';
+      const resolvedName = userProfileData?.displayName || userProfileData?.name || existingStored.displayName || existingStored.name || result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
+
+      const mergedProfileData = {
+        ...existingStored,
+        ...userProfileData,
+        phone: resolvedPhone,
+        phoneNumber: resolvedPhone,
+        city: resolvedCity,
+        location: resolvedCity,
+        displayName: resolvedName,
+        name: resolvedName
+      };
 
       const activeUserObj = {
         uid: result.user.uid,
@@ -987,9 +1096,9 @@ export function AuthProvider({ children }) {
       setUser(activeUserObj);
       try {
         localStorage.setItem('easeland_session_user', JSON.stringify(activeUserObj));
-        localStorage.setItem('easeland_user_profile_' + result.user.uid, JSON.stringify(userProfileData));
+        localStorage.setItem('easeland_user_profile_' + result.user.uid, JSON.stringify(mergedProfileData));
       } catch(e) {}
-      setProfile(userProfileData);
+      setProfile(mergedProfileData);
 
       return { success: true, user: activeUserObj };
     }
@@ -1118,6 +1227,21 @@ export function AuthProvider({ children }) {
       } catch (err) {}
     }
 
+    try {
+      syncUserToPostgres({
+        uid: user.uid,
+        id: user.uid,
+        displayName: cleanName,
+        name: cleanName,
+        email: cleanEmail,
+        phone: updatedUserObj.phone || user.phone || user.phoneNumber || '',
+        city: cleanCity,
+        location: cleanCity,
+        role: updatedProfileObj.role || 'USER',
+        accountStatus: 'ACTIVE'
+      });
+    } catch (e) {}
+
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('easeland_session_user', JSON.stringify(updatedUserObj));
@@ -1132,6 +1256,7 @@ export function AuthProvider({ children }) {
         }
         localStorage.setItem('easeland_registered_users', JSON.stringify(reg));
       } catch (e) {}
+      window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', { detail: updatedUserObj }));
     }
 
     setUser(updatedUserObj);
