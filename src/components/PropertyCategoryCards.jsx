@@ -41,7 +41,7 @@ const DEFAULT_CATEGORIES = [
   },
   {
     id: 'commerical-property',
-    name: 'Commerical Property',
+    name: 'Commercial Property',
     category: 'Commerical Property',
     count: 'Shops & Office Spaces',
     icon: Store,
