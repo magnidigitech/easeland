@@ -2062,8 +2062,9 @@ app.post('/api/site-config', async (req, res) => {
       const adminDb = getAdminDb();
       if (adminDb) {
         const fsPromises = Object.keys(fullConfig).map(async (modId) => {
-          const modData = fullConfig[modId];
-          const payload = typeof modData === 'object' && modData !== null ? modData : { value: modData };
+          const payload = typeof modData === 'object' && modData !== null
+            ? { ...modData, state: 'PUBLISHED' }
+            : { value: modData, state: 'PUBLISHED' };
           await adminDb.collection('siteManagement').doc(modId).set(payload, { merge: true });
           await adminDb.collection('siteManagement').doc('master_draft').set({ [modId]: payload }, { merge: true });
         });
