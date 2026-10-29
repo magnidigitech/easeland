@@ -45,6 +45,7 @@ import {
 } from '../firebase/propertyService.js';
 import { mockApi } from '../services/mockApi';
 import { useAuth } from '../context/AuthContext.jsx';
+import { fetchUserFromPostgres } from '../firebase/userService.js';
 
 export default function UserDashboard({
   user,
@@ -354,8 +355,43 @@ export default function UserDashboard({
     profile?.city,
     profile?.location,
     profile?.displayName,
-    profile?.name
   ]);
+
+  useEffect(() => {
+    const targetUid = effectiveUser?.uid || effectiveUser?.id || profile?.uid || user?.uid;
+    if (!targetUid) return;
+
+    fetchUserFromPostgres(targetUid).then(pgUser => {
+      if (!pgUser) return;
+      const pgPhone = sanitizePhone(pgUser.phone || pgUser.phoneNumber);
+      const pgCity = String(pgUser.city || pgUser.location || '').trim();
+      const pgName = (pgUser.displayName || pgUser.name || '').trim();
+      const pgEmail = (pgUser.email || '').trim();
+
+      if (pgPhone || pgCity || pgName || pgEmail) {
+        setProfileForm(prev => ({
+          ...prev,
+          name: prev.name || pgName,
+          email: prev.email || pgEmail,
+          phone: prev.phone || pgPhone,
+          city: prev.city || pgCity
+        }));
+
+        const uKey = 'easeland_user_profile_' + targetUid;
+        try {
+          const cur = JSON.parse(localStorage.getItem(uKey) || '{}');
+          localStorage.setItem(uKey, JSON.stringify({
+            ...cur,
+            ...pgUser,
+            name: cur.name || pgName,
+            email: cur.email || pgEmail,
+            phone: cur.phone || pgPhone,
+            city: cur.city || pgCity
+          }));
+        } catch (e) {}
+      }
+    }).catch(() => {});
+  }, [effectiveUser?.uid, effectiveUser?.id, profile?.uid, user?.uid]);
 
   useEffect(() => {
     if (activeTab === 'account') {

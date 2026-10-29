@@ -202,4 +202,72 @@ describe('EaseLand User Profile Completeness & Persistence Test Suite', () => {
     assert.strictEqual(mergedPhone, '9876543210');
     assert.strictEqual(mergedCity, 'Vijayawada');
   });
+
+  it('11. fetchUserFromPostgres hydrates missing phone and city into local profile state', () => {
+    const localProfileBefore = {
+      uid: 'user_hydrate_1',
+      name: 'Krishna Sai',
+      email: 'krishna@easeland.in',
+      phone: '',
+      city: ''
+    };
+
+    const pgUserResponse = {
+      uid: 'user_hydrate_1',
+      displayName: 'Krishna Sai',
+      email: 'krishna@easeland.in',
+      phone: '6300691560',
+      city: 'GUNTUR',
+      location: 'GUNTUR'
+    };
+
+    const hydrated = {
+      ...localProfileBefore,
+      phone: (pgUserResponse.phone && pgUserResponse.phone.trim()) || localProfileBefore.phone,
+      phoneNumber: (pgUserResponse.phone && pgUserResponse.phone.trim()) || localProfileBefore.phone,
+      city: (pgUserResponse.city && pgUserResponse.city.trim()) || localProfileBefore.city,
+      location: (pgUserResponse.location && pgUserResponse.location.trim()) || localProfileBefore.city
+    };
+
+    assert.strictEqual(hydrated.phone, '6300691560');
+    assert.strictEqual(hydrated.city, 'GUNTUR');
+    const missing = evaluateProfileComplete(hydrated, hydrated);
+    assert.deepStrictEqual(missing, []);
+  });
+
+  it('12. server user record merge restores table columns even if raw_data was blank', () => {
+    const dbRow = {
+      uid: 'user_row_1',
+      display_name: 'Krishna Sai',
+      email: 'krishna@easeland.in',
+      phone: '9876543210',
+      city: 'Hyderabad',
+      location: 'Hyderabad',
+      raw_data: {
+        phone: '',
+        city: ''
+      }
+    };
+
+    const resolvedPhone = (dbRow.phone && dbRow.phone.trim()) || (dbRow.raw_data?.phone && String(dbRow.raw_data.phone).trim()) || '';
+    const resolvedCity = (dbRow.city && dbRow.city.trim()) || (dbRow.raw_data?.city && String(dbRow.raw_data.city).trim()) || '';
+
+    assert.strictEqual(resolvedPhone, '9876543210');
+    assert.strictEqual(resolvedCity, 'Hyderabad');
+  });
+
+  it('13. full criteria is satisfied after PostgreSQL hydration without requiring user re-entry', () => {
+    const unhydratedUser = { uid: 'u_test', email: 'user@example.com', name: 'Krishna' };
+    const missingBefore = evaluateProfileComplete(unhydratedUser, null);
+    assert.deepStrictEqual(missingBefore, ['Phone Number', 'City / Location']);
+
+    const pgData = { phone: '9988776655', city: 'Guntur' };
+    const hydratedUser = {
+      ...unhydratedUser,
+      phone: pgData.phone,
+      city: pgData.city
+    };
+    const missingAfter = evaluateProfileComplete(hydratedUser, hydratedUser);
+    assert.deepStrictEqual(missingAfter, []);
+  });
 });

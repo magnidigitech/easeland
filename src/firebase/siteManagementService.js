@@ -95,13 +95,16 @@ export async function getSiteConfigAdmin() {
             const pgFeatured = existing || {};
             // PostgreSQL is the authoritative central store. Never let older Firestore data override PostgreSQL broadcast!
             if (existing && typeof existing === 'object') {
+              const pgIds = Array.isArray(pgFeatured.featuredPropertyIds) ? pgFeatured.featuredPropertyIds : [];
               mergedConfig[docSnap.id] = {
                 ...fsData,
                 ...pgFeatured,
-                featuredPropertyIds: Array.isArray(pgFeatured.featuredPropertyIds) ? pgFeatured.featuredPropertyIds : [],
-                promotedProperties: (Array.isArray(pgFeatured.promotedProperties) && pgFeatured.promotedProperties.length > 0)
-                  ? pgFeatured.promotedProperties
-                  : (Array.isArray(fsData.promotedProperties) ? fsData.promotedProperties : []),
+                featuredPropertyIds: pgIds,
+                promotedProperties: pgIds.length === 0
+                  ? []
+                  : (Array.isArray(pgFeatured.promotedProperties) && pgFeatured.promotedProperties.length > 0)
+                    ? pgFeatured.promotedProperties
+                    : [],
                 displayCount: pgFeatured.displayCount !== undefined ? pgFeatured.displayCount : (fsData.displayCount ?? 6),
                 sectionTitle: pgFeatured.sectionTitle || fsData.sectionTitle || 'Featured & Recent Verified Properties',
                 badgeText: pgFeatured.badgeText || fsData.badgeText || 'VERIFIED LISTINGS',
@@ -154,9 +157,11 @@ export async function getSiteConfigAdmin() {
               mergedConfig.featuredListings = {
                 ...remoteFeatured,
                 featuredPropertyIds: remoteIds,
-                promotedProperties: (Array.isArray(remoteFeatured.promotedProperties) && remoteFeatured.promotedProperties.length > 0)
-                  ? remoteFeatured.promotedProperties
-                  : (Array.isArray(localFeatured.promotedProperties) ? localFeatured.promotedProperties : []),
+                promotedProperties: remoteIds.length === 0
+                  ? []
+                  : (Array.isArray(remoteFeatured.promotedProperties) && remoteFeatured.promotedProperties.length > 0)
+                    ? remoteFeatured.promotedProperties
+                    : [],
                 displayCount: remoteFeatured.displayCount !== undefined ? remoteFeatured.displayCount : (localFeatured.displayCount ?? 6),
                 sectionTitle: remoteFeatured.sectionTitle || localFeatured.sectionTitle || 'Featured & Recent Verified Properties',
                 badgeText: remoteFeatured.badgeText || localFeatured.badgeText || 'VERIFIED LISTINGS',

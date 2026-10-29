@@ -44,16 +44,35 @@ export function formatFirestoreError(error) {
   return error.message || 'A database service error occurred. Please try again.';
 }
 
+export async function fetchUserFromPostgres(uid) {
+  try {
+    if (!uid) return null;
+    const res = await fetch('/api/users/' + encodeURIComponent(uid));
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.success && data.user) {
+      return data.user;
+    }
+  } catch (err) {
+    console.warn('PostgreSQL fetch user note:', err);
+  }
+  return null;
+}
+
 export async function syncUserToPostgres(userData) {
   try {
-    if (!userData || (!userData.uid && !userData.id && !userData.email)) return;
-    await fetch('/api/users', {
+    if (!userData || (!userData.uid && !userData.id && !userData.email)) return null;
+    const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.user || null;
   } catch (err) {
     console.warn('PostgreSQL user sync note:', err);
+    return null;
   }
 }
 

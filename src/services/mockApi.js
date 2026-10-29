@@ -105,7 +105,21 @@ export const isFakeProperty = (p) => {
     return true;
   }
   const title = String(p.title || '').toLowerCase().trim();
-  if (FAKE_TITLES_LOWER.some(t => title.includes(t)) || title.startsWith('featured customer property #') || title.startsWith('property #')) {
+  if (
+    !title ||
+    title === 'untitled property' ||
+    title === 'untitled' ||
+    title === '.' ||
+    title === ',' ||
+    FAKE_TITLES_LOWER.some(t => title.includes(t)) ||
+    title.startsWith('featured customer property #') ||
+    title.startsWith('property #')
+  ) {
+    return true;
+  }
+  const st = String(p.status || p.listingStatus || '').toUpperCase();
+  const lst = String(p.listingStatus || '').toUpperCase();
+  if (st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true) {
     return true;
   }
   const ownerEmail = String(p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || '').toLowerCase().trim();

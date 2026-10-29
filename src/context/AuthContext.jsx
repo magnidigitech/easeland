@@ -15,7 +15,8 @@ import {
   getCurrentUserProfile,
   updateOwnProfile,
   updateCommunicationPreferences,
-  syncUserToPostgres
+  syncUserToPostgres,
+  fetchUserFromPostgres
 } from '../firebase/userService.js';
 import {
   checkAndTriggerSecurityAlert,
@@ -94,7 +95,7 @@ export function AuthProvider({ children }) {
   const [pending2FASession, setPending2FASession] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Helper to load user's Firestore profile
+  // Helper to load user's profile from Firestore and PostgreSQL
   const reloadProfile = async (uid) => {
     if (!uid) return;
     const result = await getCurrentUserProfile(uid);
@@ -107,28 +108,40 @@ export function AuthProvider({ children }) {
       }
     } catch (e) {}
 
-    if (result.success && result.profile) {
-      setProfile(result.profile);
-    } else if (Object.keys(storedProfile).length > 0 && storedProfile.accountStatus !== 'REMOVED') {
-      const cityVal = storedProfile.city || storedProfile.location || '';
-      const phoneVal = storedProfile.phone || storedProfile.phoneNumber || '';
-      setProfile(prev => ({
-        uid: uid,
-        displayName: storedProfile.displayName || storedProfile.name || 'EaseLand User',
-        name: storedProfile.name || storedProfile.displayName || 'EaseLand User',
-        email: storedProfile.email || '',
-        phone: phoneVal,
-        phoneNumber: phoneVal,
-        city: cityVal,
-        location: cityVal,
-        role: 'USER',
-        accountStatus: 'ACTIVE',
-        capabilities: ['CUSTOMER', 'OWNER'],
-        ownerVerificationState: 'NOT_VERIFIED',
-        ...(prev || {}),
-        ...storedProfile
-      }));
-    }
+    // Hydrate from PostgreSQL as well to guarantee persistence
+    const pgUser = await fetchUserFromPostgres(uid).catch(() => null);
+    const pgPhone = (pgUser?.phone && String(pgUser.phone).trim()) || (pgUser?.phoneNumber && String(pgUser.phoneNumber).trim()) || '';
+    const pgCity = (pgUser?.city && String(pgUser.city).trim()) || (pgUser?.location && String(pgUser.location).trim()) || '';
+    const pgName = (pgUser?.displayName && String(pgUser.displayName).trim()) || (pgUser?.name && String(pgUser.name).trim()) || '';
+    const pgEmail = (pgUser?.email && String(pgUser.email).trim()) || '';
+
+    const fsProfile = (result.success && result.profile) ? result.profile : {};
+    const effectivePhone = pgPhone || fsProfile.phone || fsProfile.phoneNumber || storedProfile.phone || storedProfile.phoneNumber || '';
+    const effectiveCity = pgCity || fsProfile.city || fsProfile.location || storedProfile.city || storedProfile.location || '';
+    const effectiveName = pgName || fsProfile.displayName || fsProfile.name || storedProfile.displayName || storedProfile.name || 'EaseLand User';
+    const effectiveEmail = pgEmail || fsProfile.email || storedProfile.email || '';
+
+    const merged = {
+      uid: uid,
+      ...storedProfile,
+      ...fsProfile,
+      ...(pgUser || {}),
+      phone: effectivePhone,
+      phoneNumber: effectivePhone,
+      city: effectiveCity,
+      location: effectiveCity,
+      displayName: effectiveName,
+      name: effectiveName,
+      email: effectiveEmail,
+      role: fsProfile.role || storedProfile.role || pgUser?.role || 'USER',
+      accountStatus: fsProfile.accountStatus || storedProfile.accountStatus || pgUser?.accountStatus || 'ACTIVE',
+      capabilities: fsProfile.capabilities || storedProfile.capabilities || ['CUSTOMER', 'OWNER']
+    };
+
+    setProfile(merged);
+    try {
+      localStorage.setItem('easeland_user_profile_' + uid, JSON.stringify(merged));
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -217,6 +230,74 @@ export function AuthProvider({ children }) {
             emailVerified: currentUser.emailVerified,
             authProvider: currentUser.providerData?.[0]?.providerId === 'google.com' ? 'Google OAuth' : 'Email/Password'
           });
+
+          // Asynchronous hydration from PostgreSQL to restore saved profile on fresh devices or page refresh
+          fetchUserFromPostgres(currentUser.uid).then(pgUser => {
+            if (!pgUser) return;
+            const uKey = 'easeland_user_profile_' + currentUser.uid;
+            const curProf = JSON.parse(localStorage.getItem(uKey) || '{}');
+            const curSess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+
+            const pgPhone = (pgUser.phone && String(pgUser.phone).trim()) || (pgUser.phoneNumber && String(pgUser.phoneNumber).trim()) || '';
+            const pgCity = (pgUser.city && String(pgUser.city).trim()) || (pgUser.location && String(pgUser.location).trim()) || '';
+            const pgName = (pgUser.displayName && String(pgUser.displayName).trim()) || (pgUser.name && String(pgUser.name).trim()) || '';
+            const pgEmail = (pgUser.email && String(pgUser.email).trim()) || '';
+
+            if (pgPhone || pgCity || pgName || pgEmail) {
+              const finalPhone = pgPhone || curProf.phone || curProf.phoneNumber || '';
+              const finalCity = pgCity || curProf.city || curProf.location || '';
+              const finalName = pgName || curProf.displayName || curProf.name || currentUser.displayName || 'EaseLand User';
+              const finalEmail = pgEmail || curProf.email || currentUser.email || '';
+
+              const mergedStored = {
+                ...curProf,
+                ...pgUser,
+                displayName: finalName,
+                name: finalName,
+                phone: finalPhone,
+                phoneNumber: finalPhone,
+                city: finalCity,
+                location: finalCity,
+                email: finalEmail
+              };
+
+              const mergedUser = {
+                ...curSess,
+                ...currentUser,
+                displayName: finalName,
+                name: finalName,
+                phone: finalPhone,
+                phoneNumber: finalPhone,
+                city: finalCity,
+                location: finalCity,
+                email: finalEmail
+              };
+
+              try {
+                localStorage.setItem(uKey, JSON.stringify(mergedStored));
+                localStorage.setItem('easeland_session_user', JSON.stringify(mergedUser));
+              } catch (e) {}
+
+              setUser(prev => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  ...mergedUser
+                };
+              });
+
+              setProfile(prev => {
+                return {
+                  ...(prev || {}),
+                  ...mergedStored
+                };
+              });
+
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', { detail: mergedUser }));
+              }
+            }
+          }).catch(() => {});
         }
 
         const isAdmin = currentUser.email === 'admin@easeland.in' ||
@@ -401,10 +482,13 @@ export function AuthProvider({ children }) {
                   window.dispatchEvent(new CustomEvent('easeland-user-profile-updated', {
                     detail: {
                       uid: currentUser.uid,
-                      name: resolvedName,
-                      displayName: resolvedName,
-                      phone: resolvedPhone,
-                      city: resolvedCity,
+                      name: finalName,
+                      displayName: finalName,
+                      email: currentUser.email || fsData.email || curProf.email || '',
+                      phone: finalPhone,
+                      phoneNumber: finalPhone,
+                      city: finalCity,
+                      location: finalCity,
                       accountStatus: uAccStatus
                     }
                   }));
@@ -648,6 +732,34 @@ export function AuthProvider({ children }) {
       if (pRes.success && pRes.profile) {
         userProfileData = pRes.profile;
       }
+      // Also hydrate from PostgreSQL to guarantee phone & city persistence
+      try {
+        const pgUser = await fetchUserFromPostgres(result.user.uid);
+        if (pgUser) {
+          const pgPhone = (pgUser.phone && String(pgUser.phone).trim()) || (pgUser.phoneNumber && String(pgUser.phoneNumber).trim()) || '';
+          const pgCity = (pgUser.city && String(pgUser.city).trim()) || (pgUser.location && String(pgUser.location).trim()) || '';
+          const pgName = (pgUser.displayName && String(pgUser.displayName).trim()) || (pgUser.name && String(pgUser.name).trim()) || '';
+          userProfileData = {
+            ...userProfileData,
+            ...pgUser,
+            phone: pgPhone || userProfileData?.phone || userProfileData?.phoneNumber || '',
+            phoneNumber: pgPhone || userProfileData?.phoneNumber || userProfileData?.phone || '',
+            city: pgCity || userProfileData?.city || userProfileData?.location || '',
+            location: pgCity || userProfileData?.location || userProfileData?.city || '',
+            displayName: pgName || userProfileData?.displayName || userProfileData?.name || loggedInUser.displayName || 'EaseLand User',
+            name: pgName || userProfileData?.name || userProfileData?.displayName || loggedInUser.name || 'EaseLand User'
+          };
+          loggedInUser = {
+            ...loggedInUser,
+            displayName: userProfileData.displayName,
+            name: userProfileData.name,
+            phone: userProfileData.phone,
+            phoneNumber: userProfileData.phone,
+            city: userProfileData.city,
+            location: userProfileData.city
+          };
+        }
+      } catch (ePg) {}
     } else if (lowerEmail === (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim() || lowerEmail === 'admin@easeland.in') {
       const dedicatedAdminEmail = (localStorage.getItem('easeland_admin_email') || 'admin@easeland.in').toLowerCase().trim();
       const dedicatedAdminName = localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
@@ -1064,9 +1176,19 @@ export function AuthProvider({ children }) {
         return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
       }
 
-      const resolvedPhone = userProfileData?.phone || userProfileData?.phoneNumber || existingStored.phone || existingStored.phoneNumber || result.user.phoneNumber || '';
-      const resolvedCity = userProfileData?.city || userProfileData?.location || existingStored.city || existingStored.location || '';
-      const resolvedName = userProfileData?.displayName || userProfileData?.name || existingStored.displayName || existingStored.name || result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
+      // Also hydrate from PostgreSQL to guarantee persistence across Google logins
+      let pgUser = null;
+      try {
+        pgUser = await fetchUserFromPostgres(result.user.uid);
+      } catch (ePg) {}
+
+      const pgPhone = (pgUser?.phone && String(pgUser.phone).trim()) || (pgUser?.phoneNumber && String(pgUser.phoneNumber).trim()) || '';
+      const pgCity = (pgUser?.city && String(pgUser.city).trim()) || (pgUser?.location && String(pgUser.location).trim()) || '';
+      const pgName = (pgUser?.displayName && String(pgUser.displayName).trim()) || (pgUser?.name && String(pgUser.name).trim()) || '';
+
+      const resolvedPhone = pgPhone || userProfileData?.phone || userProfileData?.phoneNumber || existingStored.phone || existingStored.phoneNumber || result.user.phoneNumber || '';
+      const resolvedCity = pgCity || userProfileData?.city || userProfileData?.location || existingStored.city || existingStored.location || '';
+      const resolvedName = pgName || userProfileData?.displayName || userProfileData?.name || existingStored.displayName || existingStored.name || result.user.displayName || (result.user.email === 'admin@easeland.in' ? 'EaseLand Admin' : 'EaseLand User');
 
       const mergedProfileData = {
         ...existingStored,

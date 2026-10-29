@@ -473,10 +473,6 @@ export default function AdminPortal({ onNavigate }) {
     }
   }, [siteConfig?.featuredListings?.sectionTitle, siteConfig?.featuredListings?.badgeText, siteConfig?.featuredListings?.displayCount]);
 
-  const promotedPropertyIds = React.useMemo(() => {
-    return safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
-  }, [siteConfig?.featuredListings?.featuredPropertyIds]);
-
   const candidateSourceProperties = React.useMemo(() => {
     const list = Array.isArray(allProperties) && allProperties.length > 0 ? allProperties : [];
     return list.filter(p => p && !isPropertyDeleted(p) && !isFakeProperty(p));
@@ -509,9 +505,21 @@ export default function AdminPortal({ onNavigate }) {
         return id1 === target || id2 === target || ref === target;
       });
     }
-    if (match && !isPropertyDeleted(match) && !isFakeProperty(match)) return match;
+    if (match && !isPropertyDeleted(match) && !isFakeProperty(match)) {
+      const st = String(match.status || match.listingStatus || '').toUpperCase();
+      const lst = String(match.listingStatus || '').toUpperCase();
+      if (st === 'DRAFT' || lst === 'DRAFT' || match.isDraft === true) return null;
+      const title = (match.title || '').trim();
+      if (!title || title.toLowerCase() === 'untitled property' || title === '.' || title === ',') return null;
+      return match;
+    }
     return null;
   }, [candidateSourceProperties, siteConfig?.featuredListings?.promotedProperties]);
+
+  const promotedPropertyIds = React.useMemo(() => {
+    const rawIds = safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
+    return rawIds.filter(id => Boolean(resolvePromotedProperty(id)));
+  }, [siteConfig?.featuredListings?.featuredPropertyIds, resolvePromotedProperty]);
 
   const promotedPropertiesList = React.useMemo(() => {
     return promotedPropertyIds.map((id) => resolvePromotedProperty(id)).filter(Boolean);
@@ -520,7 +528,14 @@ export default function AdminPortal({ onNavigate }) {
   const candidatePropertiesForPromotion = React.useMemo(() => {
     const query = promoSearchQuery.trim().toLowerCase();
     return candidateSourceProperties.filter(prop => {
-      if (!prop || isPropertyDeleted(prop)) return false;
+      if (!prop || isPropertyDeleted(prop) || isFakeProperty(prop)) return false;
+
+      // Drafts, incomplete, and untitled properties can NEVER be promoted!
+      const st = String(prop.status || prop.listingStatus || '').toUpperCase();
+      const lst = String(prop.listingStatus || '').toUpperCase();
+      if (st === 'DRAFT' || lst === 'DRAFT' || prop.isDraft === true) return false;
+      const title = (prop.title || '').trim();
+      if (!title || title.toLowerCase() === 'untitled property' || title === '.' || title === ',') return false;
 
       if (promoStatusFilter === 'VERIFIED_ONLY') {
         const isVer = prop.verificationStatus === 'APPROVED' || prop.verificationStatus === 'VERIFIED' || prop.verified === true;
@@ -534,14 +549,14 @@ export default function AdminPortal({ onNavigate }) {
 
       if (!query) return true;
 
-      const title = String(prop.title || '').toLowerCase();
+      const pTitle = String(prop.title || '').toLowerCase();
       const city = String(prop.city || prop.location?.city || prop.locality || prop.location?.locality || '').toLowerCase();
       const propId = String(prop.id || prop.propertyId || prop.referenceId || '').toLowerCase();
       const oName = String(prop.owner?.name || prop.ownerPublicName || '').toLowerCase();
       const oPhone = String(prop.owner?.phone || prop.ownerPublicPhone || '').toLowerCase();
       const oEmail = String(prop.owner?.email || prop.ownerPublicEmail || '').toLowerCase();
 
-      return title.includes(query) || city.includes(query) || propId.includes(query) || oName.includes(query) || oPhone.includes(query) || oEmail.includes(query);
+      return pTitle.includes(query) || city.includes(query) || propId.includes(query) || oName.includes(query) || oPhone.includes(query) || oEmail.includes(query);
     });
   }, [candidateSourceProperties, promoSearchQuery, promoTypeFilter, promoStatusFilter]);
 
@@ -553,9 +568,11 @@ export default function AdminPortal({ onNavigate }) {
       showOnlyFeatured: true
     };
     const targetIds = safeArray(mergedFeatured.featuredPropertyIds).map(String).filter(Boolean);
-    const activePromotedList = targetIds.map((id) => resolvePromotedProperty(id)).filter(Boolean);
+    const validTargetIds = targetIds.filter(id => Boolean(resolvePromotedProperty(id)));
+    const activePromotedList = validTargetIds.map((id) => resolvePromotedProperty(id)).filter(Boolean);
 
     const cleanPromotedProperties = JSON.parse(JSON.stringify(activePromotedList, (k, v) => (v === undefined ? null : v)));
+    mergedFeatured.featuredPropertyIds = validTargetIds;
     mergedFeatured.promotedProperties = cleanPromotedProperties;
 
     const updatedConfig = {

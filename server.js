@@ -2015,15 +2015,19 @@ let localSiteConfigMap = new Map();
 // so that all viewers and accounts receive the complete properties without relying on local cache.
 const hydratePromotedProperties = async (featuredConfig) => {
   if (!featuredConfig || !Array.isArray(featuredConfig.featuredPropertyIds) || featuredConfig.featuredPropertyIds.length === 0) {
+    if (featuredConfig) featuredConfig.promotedProperties = [];
     return featuredConfig;
   }
   const ids = featuredConfig.featuredPropertyIds.map(String).filter(Boolean);
-  if (ids.length === 0) return featuredConfig;
+  if (ids.length === 0) {
+    featuredConfig.promotedProperties = [];
+    return featuredConfig;
+  }
 
   try {
     const P = String.fromCharCode(36);
     const propResult = await pgPool.query(
-      'SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data FROM properties WHERE property_id = ANY(' + P + '1) OR reference_id = ANY(' + P + '1);',
+      'SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data FROM properties WHERE (property_id = ANY(' + P + '1) OR reference_id = ANY(' + P + '1)) AND (listing_status IS NULL OR listing_status != \'DRAFT\');',
       [ids]
     );
     const propMap = new Map();
@@ -2057,10 +2061,10 @@ const hydratePromotedProperties = async (featuredConfig) => {
       if (k3) propMap.set(k3, fullProp);
     });
 
-    const hydrated = ids.map(id => propMap.get(id.toLowerCase().trim())).filter(Boolean);
-    if (hydrated.length > 0) {
-      featuredConfig.promotedProperties = hydrated;
-    }
+    const hydrated = ids
+      .map(id => propMap.get(id.toLowerCase().trim()))
+      .filter(p => p && !p.isDeleted && !p.deletedByAdmin && p.listingStatus !== 'DRAFT' && p.title && p.title.toLowerCase().trim() !== 'untitled property');
+    featuredConfig.promotedProperties = hydrated;
   } catch (err) {
     console.warn('Hydrating promotedProperties warning:', err.message);
   }
@@ -2398,11 +2402,35 @@ app.get('/api/users/:id', async (req, res) => {
     const target = String(req.params.id).trim();
     const P = String.fromCharCode(36);
     const pgRes = await pgPool.query(
-      "SELECT raw_data FROM users WHERE uid = " + P + "1 OR email = " + P + "1 OR raw_data->>'id' = " + P + "1;",
+      "SELECT uid, email, display_name, phone, city, location, role, account_status, email_verified, raw_data, created_at, updated_at FROM users WHERE uid = " + P + "1 OR email = " + P + "1 OR raw_data->>'id' = " + P + "1;",
       [target]
     );
     if (pgRes.rows.length > 0) {
-      return res.json({ success: true, user: pgRes.rows[0].raw_data });
+      const row = pgRes.rows[0];
+      const raw = row.raw_data || {};
+      const resolvedPhone = (row.phone && row.phone.trim()) || (raw.phone && String(raw.phone).trim()) || (raw.phoneNumber && String(raw.phoneNumber).trim()) || '';
+      const resolvedCity = (row.city && row.city.trim()) || (row.location && row.location.trim()) || (raw.city && String(raw.city).trim()) || (raw.location && String(raw.location).trim()) || '';
+      const resolvedName = (row.display_name && row.display_name.trim()) || (raw.displayName && String(raw.displayName).trim()) || (raw.name && String(raw.name).trim()) || 'EaseLand User';
+      const resolvedEmail = (row.email && row.email.trim()) || (raw.email && String(raw.email).trim()) || '';
+
+      const mergedUser = {
+        ...raw,
+        id: row.uid,
+        uid: row.uid,
+        displayName: resolvedName,
+        name: resolvedName,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+        phoneNumber: resolvedPhone,
+        city: resolvedCity,
+        location: resolvedCity,
+        role: row.role || raw.role || 'USER',
+        accountStatus: row.account_status || raw.accountStatus || 'ACTIVE',
+        emailVerified: Boolean(row.email_verified ?? raw.emailVerified),
+        createdAt: row.created_at || raw.createdAt,
+        updatedAt: row.updated_at || raw.updatedAt
+      };
+      return res.json({ success: true, user: mergedUser });
     }
     return res.status(404).json({ success: false, error: 'User not found.' });
   } catch (err) {
@@ -2974,10 +3002,21 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
               Object.keys(d).forEach(k => {
                 if (typeof d[k] === 'object' && d[k] !== null) {
                   const existing = cmsMap.get(k) || {};
+                  // PostgreSQL is 100% authoritative for featuredListings! Never let Firestore resurrect old promotions!
+                  if (k === 'featuredListings' && existing && typeof existing === 'object' && existing.featuredPropertyIds !== undefined) {
+                    return;
+                  }
                   cmsMap.set(k, { ...d[k], ...existing });
                 }
               });
             }
+          } else if (modId === 'featuredListings') {
+            const existing = cmsMap.get(modId) || {};
+            // PostgreSQL is 100% authoritative for featuredListings! Never let Firestore resurrect old promotions!
+            if (existing && typeof existing === 'object' && existing.featuredPropertyIds !== undefined) {
+              return;
+            }
+            cmsMap.set(modId, { ...existing, ...d });
           } else {
             const existing = cmsMap.get(modId) || {};
             cmsMap.set(modId, { ...existing, ...d });
@@ -3006,11 +3045,12 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
 
       if (adminDb) {
         try {
+          const isFeatured = modId === 'featuredListings';
           await adminDb.collection('siteManagement').doc(modId).set({
             ...modData,
             state: 'PUBLISHED',
             updatedAt: new Date().toISOString()
-          }, { merge: true });
+          }, { merge: !isFeatured });
         } catch (eFsSave) {}
       }
     }
@@ -3033,8 +3073,32 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
   try {
-    const result = await pgPool.query('SELECT raw_data FROM users ORDER BY created_at DESC LIMIT 500;');
-    const allUsers = result.rows.map(row => row.raw_data).filter(Boolean);
+    const result = await pgPool.query('SELECT uid, email, display_name, phone, city, location, role, account_status, email_verified, raw_data, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT 500;');
+    const allUsers = result.rows.map(row => {
+      const raw = row.raw_data || {};
+      const resolvedPhone = (row.phone && row.phone.trim()) || (raw.phone && String(raw.phone).trim()) || (raw.phoneNumber && String(raw.phoneNumber).trim()) || '';
+      const resolvedCity = (row.city && row.city.trim()) || (row.location && row.location.trim()) || (raw.city && String(raw.city).trim()) || (raw.location && String(raw.location).trim()) || '';
+      const resolvedName = (row.display_name && row.display_name.trim()) || (raw.displayName && String(raw.displayName).trim()) || (raw.name && String(raw.name).trim()) || 'EaseLand User';
+      const resolvedEmail = (row.email && row.email.trim()) || (raw.email && String(raw.email).trim()) || '';
+
+      return {
+        ...raw,
+        id: row.uid,
+        uid: row.uid,
+        displayName: resolvedName,
+        name: resolvedName,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+        phoneNumber: resolvedPhone,
+        city: resolvedCity,
+        location: resolvedCity,
+        role: row.role || raw.role || 'USER',
+        accountStatus: row.account_status || raw.accountStatus || 'ACTIVE',
+        emailVerified: Boolean(row.email_verified ?? raw.emailVerified),
+        createdAt: row.created_at || raw.createdAt,
+        updatedAt: row.updated_at || raw.updatedAt
+      };
+    }).filter(Boolean);
     return res.json({ success: true, count: allUsers.length, users: allUsers });
   } catch (err) {
     console.error('CRITICAL: PostgreSQL fetch users failed:', err.message);
@@ -3050,29 +3114,47 @@ app.post('/api/users', async (req, res) => {
     const nowIso = new Date().toISOString();
 
     const existing = localUsersMap.get(uUid) || {};
+
+    // Also fetch existing row from PostgreSQL to ensure in-memory cold cache or server reboot doesn't lose existing values
+    let existingPg = {};
+    try {
+      const P1 = String.fromCharCode(36) + '1';
+      const pgUserCheck = await pgPool.query(
+        "SELECT uid, email, display_name, phone, city, location, role, account_status, raw_data FROM users WHERE uid = " + P1 + " LIMIT 1;",
+        [uUid]
+      );
+      if (pgUserCheck.rows.length > 0) {
+        existingPg = pgUserCheck.rows[0];
+      }
+    } catch (eCheck) {}
+
     const incomingPhone = (userData.phone || userData.phoneNumber || '').trim();
     const incomingCity = (userData.city || userData.location || '').trim();
     const incomingName = (userData.displayName || userData.name || '').trim();
+    const incomingEmail = (userData.email || '').trim();
 
-    const effectivePhone = incomingPhone || existing.phone || existing.phoneNumber || '';
-    const effectiveCity = incomingCity || existing.city || existing.location || '';
-    const effectiveName = incomingName || existing.displayName || existing.name || 'EaseLand User';
+    const existingPgRaw = existingPg.raw_data || {};
+    const effectivePhone = incomingPhone || existingPg.phone || existingPgRaw.phone || existingPgRaw.phoneNumber || existing.phone || existing.phoneNumber || '';
+    const effectiveCity = incomingCity || existingPg.city || existingPg.location || existingPgRaw.city || existingPgRaw.location || existing.city || existing.location || '';
+    const effectiveName = incomingName || existingPg.display_name || existingPgRaw.displayName || existingPgRaw.name || existing.displayName || existing.name || 'EaseLand User';
+    const effectiveEmail = incomingEmail || existingPg.email || existingPgRaw.email || existing.email || '';
 
     const fullPayload = {
+      ...existingPgRaw,
       ...existing,
       ...userData,
       uid: uUid,
       id: uUid,
       displayName: effectiveName,
       name: effectiveName,
-      email: (userData.email || existing.email || '').trim(),
+      email: effectiveEmail,
       phone: effectivePhone,
       phoneNumber: effectivePhone,
       city: effectiveCity,
       location: effectiveCity,
-      role: userData.role || existing.role || 'USER',
-      status: userData.status || userData.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
-      accountStatus: userData.accountStatus || userData.status || existing.accountStatus || existing.status || 'ACTIVE',
+      role: userData.role || existingPg.role || existingPgRaw.role || existing.role || 'USER',
+      status: userData.status || userData.accountStatus || existingPg.account_status || existingPgRaw.status || existing.status || 'ACTIVE',
+      accountStatus: userData.accountStatus || userData.status || existingPg.account_status || existingPgRaw.accountStatus || existing.accountStatus || 'ACTIVE',
       updatedAt: nowIso
     };
 

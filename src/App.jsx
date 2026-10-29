@@ -920,8 +920,9 @@ export default function App() {
 
               let featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
               
-              // Secondary fallback: If featuredIds is still empty, derive from embedded promotedProperties
-              if (featuredIds.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
+              // Secondary fallback: ONLY if featuredPropertyIds was completely omitted (undefined)
+              // If featuredPropertyIds was explicitly provided (e.g. empty array []), never resurrect fallback!
+              if (featuredConfig.featuredPropertyIds === undefined && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
                 featuredIds = featuredConfig.promotedProperties.map(p => String(p.id || p.propertyId || p.referenceId || '')).filter(Boolean);
               }
 
@@ -992,8 +993,8 @@ export default function App() {
                 }
               });
 
-              // 4. In case featuredIds was empty or omitted but promotedProperties were provided by broadcast:
-              if (explicitlyFeatured.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
+              // 4. In case featuredPropertyIds was completely omitted (undefined) but promotedProperties were provided by broadcast:
+              if (featuredConfig.featuredPropertyIds === undefined && explicitlyFeatured.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
                 featuredConfig.promotedProperties.forEach((p) => {
                   if (p && !isPropertyDeleted(p) && !isFakeProperty(p)) {
                     const mKey = String(p.id || p.propertyId || p.referenceId || '').trim().toLowerCase();
