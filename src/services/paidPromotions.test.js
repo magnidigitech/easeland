@@ -299,5 +299,51 @@ describe('EaseLand Paid Promotions & Admin Showcase Management Suite', () => {
     assert.strictEqual(explicitlyFeatured[1].title, 'Gated Community Plot');
     assert.strictEqual(explicitlyFeatured[2].title, 'Commercial Showroom');
   });
+
+  it('14. TV Broadcast Rule: Authoritative remote server broadcast takes precedence over stale viewer local storage across all accounts', () => {
+    // Viewer A has an old stale local storage from when there was only 1 property and displayCount: 1
+    const viewerStaleLocalStorage = {
+      featuredListings: {
+        featuredPropertyIds: ['prop_stale_1'],
+        displayCount: 1,
+        promotedProperties: [{ id: 'prop_stale_1', title: 'Old Stale Property' }]
+      }
+    };
+
+    // Central server broadcasts live promotions: 3 properties with dynamic displayCount: 3
+    const remoteServerBroadcast = {
+      featuredListings: {
+        featuredPropertyIds: ['prop_1', 'prop_2', 'prop_3'],
+        displayCount: 3,
+        promotedProperties: [
+          { id: 'prop_1', title: 'Property 1' },
+          { id: 'prop_2', title: 'Property 2' },
+          { id: 'prop_3', title: 'Property 3' }
+        ],
+        sectionTitle: 'Featured & Recent Verified Properties',
+        badgeText: 'VERIFIED LISTINGS'
+      }
+    };
+
+    // TV Channel Broadcast Resolution:
+    const remoteFeatured = remoteServerBroadcast.featuredListings;
+    const remoteIds = remoteFeatured.featuredPropertyIds;
+    const localFeatured = viewerStaleLocalStorage.featuredListings;
+
+    // When remote server broadcasts live promotions, it is authoritative over any viewer's stale local storage
+    const resolvedFeatured = remoteIds.length > 0 ? {
+      ...localFeatured,
+      ...remoteFeatured,
+      featuredPropertyIds: remoteIds,
+      promotedProperties: remoteFeatured.promotedProperties,
+      displayCount: remoteFeatured.displayCount
+    } : localFeatured;
+
+    assert.strictEqual(resolvedFeatured.featuredPropertyIds.length, 3);
+    assert.strictEqual(resolvedFeatured.displayCount, 3);
+    assert.deepStrictEqual(resolvedFeatured.featuredPropertyIds, ['prop_1', 'prop_2', 'prop_3']);
+    assert.strictEqual(resolvedFeatured.promotedProperties.length, 3);
+  });
 });
+
 

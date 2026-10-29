@@ -150,29 +150,41 @@ export async function getSiteConfigAdmin() {
             }
           });
 
-          // Specially protect featuredListings:
-          // Never let an outdated/empty remote array overwrite an active admin promotion configuration!
+          // Authoritative Broadcast for featuredListings:
+          // The central database (PostgreSQL / Firestore) is the TV broadcast station.
+          // Stale local storage cache must NEVER override the active server broadcast!
           const localFeatured = parsed.featuredListings;
           if (localFeatured && typeof localFeatured === 'object') {
             const remoteFeatured = mergedConfig.featuredListings || {};
             const localIds = (Array.isArray(localFeatured.featuredPropertyIds) ? localFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
             const remoteIds = (Array.isArray(remoteFeatured.featuredPropertyIds) ? remoteFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
 
-            const chosenIds = (localIds.length > 0) ? localIds : remoteIds;
-            const chosenPromoted = (Array.isArray(localFeatured.promotedProperties) && localFeatured.promotedProperties.length > 0)
-              ? localFeatured.promotedProperties
-              : (remoteFeatured.promotedProperties || []);
-
-            mergedConfig.featuredListings = {
-              ...remoteFeatured,
-              ...localFeatured,
-              featuredPropertyIds: chosenIds,
-              promotedProperties: chosenPromoted,
-              displayCount: localFeatured.displayCount ?? remoteFeatured.displayCount ?? 6,
-              sectionTitle: localFeatured.sectionTitle || remoteFeatured.sectionTitle || 'Featured & Recent Verified Properties',
-              badgeText: localFeatured.badgeText || remoteFeatured.badgeText || 'VERIFIED LISTINGS',
-              showOnlyFeatured: true
-            };
+            if (remoteIds.length > 0) {
+              // Remote broadcast is authoritative for all accounts and viewers
+              mergedConfig.featuredListings = {
+                ...localFeatured,
+                ...remoteFeatured,
+                featuredPropertyIds: remoteIds,
+                promotedProperties: (Array.isArray(remoteFeatured.promotedProperties) && remoteFeatured.promotedProperties.length > 0)
+                  ? remoteFeatured.promotedProperties
+                  : (Array.isArray(localFeatured.promotedProperties) ? localFeatured.promotedProperties : []),
+                displayCount: remoteFeatured.displayCount !== undefined ? remoteFeatured.displayCount : (localFeatured.displayCount ?? 6),
+                sectionTitle: remoteFeatured.sectionTitle || localFeatured.sectionTitle || 'Featured & Recent Verified Properties',
+                badgeText: remoteFeatured.badgeText || localFeatured.badgeText || 'VERIFIED LISTINGS',
+                showOnlyFeatured: true
+              };
+            } else if (!mergedConfig.featuredListings && localIds.length > 0) {
+              // Only when remote is completely empty or offline, use local storage
+              mergedConfig.featuredListings = {
+                ...localFeatured,
+                featuredPropertyIds: localIds,
+                promotedProperties: Array.isArray(localFeatured.promotedProperties) ? localFeatured.promotedProperties : [],
+                displayCount: localFeatured.displayCount ?? 6,
+                sectionTitle: localFeatured.sectionTitle || 'Featured & Recent Verified Properties',
+                badgeText: localFeatured.badgeText || 'VERIFIED LISTINGS',
+                showOnlyFeatured: true
+              };
+            }
           }
         }
       }

@@ -602,7 +602,7 @@ export default function App() {
     }
     const handleApproved = () => loadProperties();
     const handleConfigUpdated = (e) => {
-      const detail = e.detail || mockApi.getSiteConfig();
+      const detail = e?.detail || mockApi.getSiteConfig();
       if (!detail || typeof detail !== 'object') return;
 
       setSiteConfig((prev) => {
@@ -633,12 +633,26 @@ export default function App() {
       }
     };
 
+    const handleStorageUpdate = (e) => {
+      if (e.key === 'easeland_site_config' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed === 'object') {
+            const merged = mockApi.mergeSiteConfigWithDefaults(parsed);
+            setSiteConfig(merged);
+          }
+        } catch (err) {}
+      }
+    };
+
     window.addEventListener('easeland-property-approved', handleApproved);
     window.addEventListener('easeland-site-config-updated', handleConfigUpdated);
+    window.addEventListener('storage', handleStorageUpdate);
 
     return () => {
       window.removeEventListener('easeland-property-approved', handleApproved);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
+      window.removeEventListener('storage', handleStorageUpdate);
     };
   }, [filters, activePage]);
 
@@ -888,9 +902,12 @@ export default function App() {
 
             {/* PAID PROMOTIONS / FEATURED VERIFIED SHOWCASE */}
             {(() => {
-              // 1. Resolve active featured configuration dynamically from siteConfig and local storage
+              // 1. Authoritative TV Broadcast: Use live siteConfig broadcast from central server
               let featuredConfig = siteConfig?.featuredListings || {};
-              if (typeof window !== 'undefined') {
+              const liveIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
+
+              // Only fall back to local storage if live siteConfig has zero promotions configured (e.g. initial offline boot)
+              if (liveIds.length === 0 && typeof window !== 'undefined') {
                 try {
                   const storedConfigRaw = localStorage.getItem('easeland_site_config');
                   if (storedConfigRaw) {
@@ -898,14 +915,16 @@ export default function App() {
                     const localFeatured = parsedStoredConfig?.featuredListings;
                     if (localFeatured) {
                       const localIds = safeArray(localFeatured.featuredPropertyIds).map(String).filter(Boolean);
-                      featuredConfig = {
-                        ...featuredConfig,
-                        ...localFeatured,
-                        featuredPropertyIds: localIds.length > 0 ? localIds : safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean),
-                        promotedProperties: (Array.isArray(localFeatured.promotedProperties) && localFeatured.promotedProperties.length > 0)
-                          ? localFeatured.promotedProperties
-                          : (featuredConfig.promotedProperties || [])
-                      };
+                      if (localIds.length > 0) {
+                        featuredConfig = {
+                          ...featuredConfig,
+                          ...localFeatured,
+                          featuredPropertyIds: localIds,
+                          promotedProperties: (Array.isArray(localFeatured.promotedProperties) && localFeatured.promotedProperties.length > 0)
+                            ? localFeatured.promotedProperties
+                            : (featuredConfig.promotedProperties || [])
+                        };
+                      }
                     }
                   }
                 } catch (e) {}
@@ -913,7 +932,12 @@ export default function App() {
 
               let featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
               
-              // Fallback: If featuredIds is still empty, check easeland_promoted_properties directly
+              // Secondary fallback: If featuredIds is still empty, derive from embedded promotedProperties
+              if (featuredIds.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
+                featuredIds = featuredConfig.promotedProperties.map(p => String(p.id || p.propertyId || p.referenceId || '')).filter(Boolean);
+              }
+
+              // Fallback: If featuredIds is still empty, check easeland_promoted_properties directly (offline only)
               if (featuredIds.length === 0 && typeof window !== 'undefined') {
                 try {
                   const rawPromo = localStorage.getItem('easeland_promoted_properties');
@@ -947,10 +971,11 @@ export default function App() {
                 });
               };
 
-              addToPool(properties);
+              // Prioritize embedded broadcast properties from the admin's live server config
               if (Array.isArray(featuredConfig.promotedProperties)) {
                 addToPool(featuredConfig.promotedProperties);
               }
+              addToPool(properties);
               if (typeof window !== 'undefined') {
                 try {
                   const rawPromo = localStorage.getItem('easeland_promoted_properties');
@@ -997,6 +1022,16 @@ export default function App() {
                   return id1 === target || id2 === target || ref === target;
                 });
 
+                if (!matched && Array.isArray(featuredConfig.promotedProperties)) {
+                  matched = featuredConfig.promotedProperties.find((p) => {
+                    if (!p) return false;
+                    const id1 = String(p.id || '').trim().toLowerCase();
+                    const id2 = String(p.propertyId || '').trim().toLowerCase();
+                    const ref = String(p.referenceId || '').trim().toLowerCase();
+                    return id1 === target || id2 === target || ref === target;
+                  });
+                }
+
                 // Robust fallback to getPropertyById across all platform data stores
                 if (!matched) {
                   try {
@@ -1012,7 +1047,15 @@ export default function App() {
                 }
               });
 
-              // Strictly only show properties explicitly added to paid promotions by admin, capped by displayCount
+              if (explicitlyFeatured.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
+                featuredConfig.promotedProperties.forEach((p) => {
+                  if (p && !isPropertyDeleted(p) && !isFakeProperty(p)) {
+                    explicitlyFeatured.push(p);
+                  }
+                });
+              }
+
+              // Strictly only show properties explicitly added to paid promotions by admin, capped by dynamic displayCount
               const homepageProperties = explicitlyFeatured.slice(0, displayCount);
               const count = homepageProperties.length;
 
