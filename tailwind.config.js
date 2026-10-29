@@ -28,7 +28,9 @@ export default {
           offwhite: '#ffffff',
           softgray: '#f8fafc',
           cardbg: '#ffffff',
-          bordergray: '#e2e8f0'
+          bordergray: '#e2e8f0',
+          charcoal: '#0b172a',
+          charcoalLight: '#1e293b'
         }
       },
       fontFamily: {
