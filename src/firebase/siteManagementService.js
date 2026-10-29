@@ -93,38 +93,30 @@ export async function getSiteConfigAdmin() {
           const fsData = docSnap.data() || {};
           if (docSnap.id === 'featuredListings') {
             const pgFeatured = existing || {};
-            const pgIds = (Array.isArray(pgFeatured.featuredPropertyIds) ? pgFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
-            const fsIds = (Array.isArray(fsData.featuredPropertyIds) ? fsData.featuredPropertyIds : []).map(String).filter(Boolean);
-
-            // PostgreSQL is the primary database. Never let older or partial Firestore data overwrite PostgreSQL promotions!
-            if (pgIds.length > 0) {
+            // PostgreSQL is the authoritative central store. Never let older Firestore data override PostgreSQL broadcast!
+            if (existing && typeof existing === 'object') {
               mergedConfig[docSnap.id] = {
                 ...fsData,
                 ...pgFeatured,
-                featuredPropertyIds: pgIds,
+                featuredPropertyIds: Array.isArray(pgFeatured.featuredPropertyIds) ? pgFeatured.featuredPropertyIds : [],
                 promotedProperties: (Array.isArray(pgFeatured.promotedProperties) && pgFeatured.promotedProperties.length > 0)
                   ? pgFeatured.promotedProperties
                   : (Array.isArray(fsData.promotedProperties) ? fsData.promotedProperties : []),
-                displayCount: pgFeatured.displayCount ?? fsData.displayCount ?? 6,
+                displayCount: pgFeatured.displayCount !== undefined ? pgFeatured.displayCount : (fsData.displayCount ?? 6),
                 sectionTitle: pgFeatured.sectionTitle || fsData.sectionTitle || 'Featured & Recent Verified Properties',
                 badgeText: pgFeatured.badgeText || fsData.badgeText || 'VERIFIED LISTINGS',
                 showOnlyFeatured: true
               };
             } else if (fsIds.length > 0) {
               mergedConfig[docSnap.id] = {
-                ...pgFeatured,
                 ...fsData,
                 featuredPropertyIds: fsIds,
-                promotedProperties: (Array.isArray(fsData.promotedProperties) && fsData.promotedProperties.length > 0)
-                  ? fsData.promotedProperties
-                  : [],
-                displayCount: fsData.displayCount ?? pgFeatured.displayCount ?? 6,
-                sectionTitle: fsData.sectionTitle || pgFeatured.sectionTitle || 'Featured & Recent Verified Properties',
-                badgeText: fsData.badgeText || pgFeatured.badgeText || 'VERIFIED LISTINGS',
+                promotedProperties: Array.isArray(fsData.promotedProperties) ? fsData.promotedProperties : [],
+                displayCount: fsData.displayCount ?? 6,
+                sectionTitle: fsData.sectionTitle || 'Featured & Recent Verified Properties',
+                badgeText: fsData.badgeText || 'VERIFIED LISTINGS',
                 showOnlyFeatured: true
               };
-            } else {
-              mergedConfig[docSnap.id] = { ...fsData, ...pgFeatured };
             }
           } else {
             // PostgreSQL is authoritative for all other modules
@@ -137,7 +129,7 @@ export async function getSiteConfigAdmin() {
     console.warn('Firestore siteManagement fetch note:', error.message);
   }
 
-  // 3. Fallback & Local Merge: Local storage cache (preserve admin promotions drafts)
+  // 3. Fallback & Local Merge: Local storage cache (offline fallback only)
   if (typeof window !== 'undefined') {
     try {
       const rawStored = localStorage.getItem('easeland_site_config');
@@ -151,18 +143,15 @@ export async function getSiteConfigAdmin() {
           });
 
           // Authoritative Broadcast for featuredListings:
-          // The central database (PostgreSQL / Firestore) is the TV broadcast station.
+          // The central database (PostgreSQL) is the TV broadcast station.
           // Stale local storage cache must NEVER override the active server broadcast!
           const localFeatured = parsed.featuredListings;
           if (localFeatured && typeof localFeatured === 'object') {
-            const remoteFeatured = mergedConfig.featuredListings || {};
-            const localIds = (Array.isArray(localFeatured.featuredPropertyIds) ? localFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
-            const remoteIds = (Array.isArray(remoteFeatured.featuredPropertyIds) ? remoteFeatured.featuredPropertyIds : []).map(String).filter(Boolean);
-
-            if (remoteIds.length > 0) {
-              // Remote broadcast is authoritative for all accounts and viewers
+            const remoteFeatured = mergedConfig.featuredListings;
+            if (remoteFeatured && typeof remoteFeatured === 'object') {
+              // Remote broadcast is 100% authoritative for all accounts and viewers
+              const remoteIds = Array.isArray(remoteFeatured.featuredPropertyIds) ? remoteFeatured.featuredPropertyIds : [];
               mergedConfig.featuredListings = {
-                ...localFeatured,
                 ...remoteFeatured,
                 featuredPropertyIds: remoteIds,
                 promotedProperties: (Array.isArray(remoteFeatured.promotedProperties) && remoteFeatured.promotedProperties.length > 0)
@@ -173,15 +162,9 @@ export async function getSiteConfigAdmin() {
                 badgeText: remoteFeatured.badgeText || localFeatured.badgeText || 'VERIFIED LISTINGS',
                 showOnlyFeatured: true
               };
-            } else if (!mergedConfig.featuredListings && localIds.length > 0) {
-              // Only when remote is completely empty or offline, use local storage
+            } else if (!mergedConfig.featuredListings && Array.isArray(localFeatured.featuredPropertyIds) && localFeatured.featuredPropertyIds.length > 0) {
               mergedConfig.featuredListings = {
                 ...localFeatured,
-                featuredPropertyIds: localIds,
-                promotedProperties: Array.isArray(localFeatured.promotedProperties) ? localFeatured.promotedProperties : [],
-                displayCount: localFeatured.displayCount ?? 6,
-                sectionTitle: localFeatured.sectionTitle || 'Featured & Recent Verified Properties',
-                badgeText: localFeatured.badgeText || 'VERIFIED LISTINGS',
                 showOnlyFeatured: true
               };
             }

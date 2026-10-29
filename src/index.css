@@ -427,6 +427,21 @@ select.bg-gray-50 option {
   transform: scale(0.98);
 }
 
+/* SMOOTH GENTLE FLOATING ANIMATION FOR HERO 3D ASSETS */
+@keyframes gentleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-gentle-float {
+  animation: gentleFloat 5s ease-in-out infinite;
+  will-change: transform;
+}
+
 /* GLOBAL SPINNER ARROW REMOVAL ON NUMBER INPUTS */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {

@@ -2010,6 +2010,63 @@ app.get('/api/properties/:id/documents', async (req, res) => {
 let localSiteConfigMap = new Map();
 
 
+// Authoritative TV Broadcast Hydration:
+// Hydrates full property objects from PostgreSQL properties table into featuredListings
+// so that all viewers and accounts receive the complete properties without relying on local cache.
+const hydratePromotedProperties = async (featuredConfig) => {
+  if (!featuredConfig || !Array.isArray(featuredConfig.featuredPropertyIds) || featuredConfig.featuredPropertyIds.length === 0) {
+    return featuredConfig;
+  }
+  const ids = featuredConfig.featuredPropertyIds.map(String).filter(Boolean);
+  if (ids.length === 0) return featuredConfig;
+
+  try {
+    const P = String.fromCharCode(36);
+    const propResult = await pgPool.query(
+      'SELECT property_id, reference_id, owner_id, title, property_type, purpose, price, area, location, specs, amenities, media, listing_status, is_published, raw_data FROM properties WHERE property_id = ANY(' + P + '1) OR reference_id = ANY(' + P + '1);',
+      [ids]
+    );
+    const propMap = new Map();
+    propResult.rows.forEach(row => {
+      const raw = row.raw_data || {};
+      const fullProp = {
+        ...raw,
+        id: row.property_id || raw.id || raw.propertyId,
+        propertyId: row.property_id || raw.propertyId || row.id,
+        referenceId: row.reference_id || raw.referenceId,
+        ownerId: row.owner_id || raw.ownerId,
+        title: row.title || raw.title,
+        propertyType: row.property_type || raw.propertyType,
+        purpose: row.purpose || raw.purpose,
+        price: row.price !== null ? Number(row.price) : raw.price,
+        area: row.area !== null ? Number(row.area) : raw.area,
+        location: row.location || raw.location,
+        specs: row.specs || raw.specs,
+        amenities: row.amenities || raw.amenities,
+        media: row.media || raw.media,
+        photos: raw.photos || (Array.isArray(row.media) ? row.media.filter(m => m && (m.type === 'PHOTO' || !m.type)) : []),
+        status: row.listing_status || raw.status || 'LIVE',
+        listingStatus: row.listing_status || raw.listingStatus || 'LIVE',
+        isPublished: Boolean(row.is_published)
+      };
+      const k1 = String(fullProp.id || '').toLowerCase().trim();
+      const k2 = String(fullProp.propertyId || '').toLowerCase().trim();
+      const k3 = String(fullProp.referenceId || '').toLowerCase().trim();
+      if (k1) propMap.set(k1, fullProp);
+      if (k2) propMap.set(k2, fullProp);
+      if (k3) propMap.set(k3, fullProp);
+    });
+
+    const hydrated = ids.map(id => propMap.get(id.toLowerCase().trim())).filter(Boolean);
+    if (hydrated.length > 0) {
+      featuredConfig.promotedProperties = hydrated;
+    }
+  } catch (err) {
+    console.warn('Hydrating promotedProperties warning:', err.message);
+  }
+  return featuredConfig;
+};
+
 app.get('/api/site-config', async (req, res) => {
   try {
     const config = {};
@@ -2029,6 +2086,13 @@ app.get('/api/site-config', async (req, res) => {
       });
     }
 
+    if (config.featuredListings) {
+      await hydratePromotedProperties(config.featuredListings);
+    }
+    if (config.master_draft?.featuredListings) {
+      await hydratePromotedProperties(config.master_draft.featuredListings);
+    }
+
     return res.json({ success: true, config });
   } catch (err) {
     console.error('CRITICAL: PostgreSQL site_config fetch failed:', err.message);
@@ -2040,6 +2104,13 @@ app.get('/api/site-config', async (req, res) => {
 app.post('/api/site-config', async (req, res) => {
   try {
     const fullConfig = req.body || {};
+    if (fullConfig.featuredListings) {
+      await hydratePromotedProperties(fullConfig.featuredListings);
+    }
+    if (fullConfig.master_draft?.featuredListings) {
+      await hydratePromotedProperties(fullConfig.master_draft.featuredListings);
+    }
+
     const P = String.fromCharCode(36);
     const queryText =
       'INSERT INTO site_config (module_id, config_data, updated_at) ' +
@@ -2056,24 +2127,6 @@ app.post('/api/site-config', async (req, res) => {
     Object.keys(fullConfig).forEach(modId => {
       localSiteConfigMap.set(modId, fullConfig[modId]);
     });
-
-    // Authoritative Firebase Admin SDK Sync: Keeps Firestore siteManagement in lockstep with PostgreSQL
-    try {
-      const adminDb = getAdminDb();
-      if (adminDb) {
-        const fsPromises = Object.keys(fullConfig).map(async (modId) => {
-          const modData = fullConfig[modId];
-          const payload = typeof modData === 'object' && modData !== null
-            ? { ...modData, state: 'PUBLISHED' }
-            : { value: modData, state: 'PUBLISHED' };
-          await adminDb.collection('siteManagement').doc(modId).set(payload, { merge: true });
-          await adminDb.collection('siteManagement').doc('master_draft').set({ [modId]: payload }, { merge: true });
-        });
-        await Promise.all(fsPromises);
-      }
-    } catch (fsErr) {
-      console.warn('Server sync to Firestore siteManagement note:', fsErr.message);
-    }
 
     return res.json({ success: true, message: 'Site configuration saved to PostgreSQL.', config: fullConfig });
   } catch (err) {

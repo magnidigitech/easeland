@@ -898,36 +898,24 @@ export default function App() {
           <div>
             <HeroSearch onSearch={handleHeroSearch} />
             
-            <PropertyCategoryCards onSelectCategory={handleCategorySelect} />
-
-            {/* PAID PROMOTIONS / FEATURED VERIFIED SHOWCASE */}
+            <PropertyCategoryCards onSelectCategory={handleCategorySelect} />            {/* PAID PROMOTIONS / FEATURED VERIFIED SHOWCASE */}
             {(() => {
               // 1. Authoritative TV Broadcast: Use live siteConfig broadcast from central server
               let featuredConfig = siteConfig?.featuredListings || {};
-              const liveIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
 
-              // Only fall back to local storage if live siteConfig has zero promotions configured (e.g. initial offline boot)
-              if (liveIds.length === 0 && typeof window !== 'undefined') {
-                try {
-                  const storedConfigRaw = localStorage.getItem('easeland_site_config');
-                  if (storedConfigRaw) {
-                    const parsedStoredConfig = JSON.parse(storedConfigRaw);
-                    const localFeatured = parsedStoredConfig?.featuredListings;
-                    if (localFeatured) {
-                      const localIds = safeArray(localFeatured.featuredPropertyIds).map(String).filter(Boolean);
-                      if (localIds.length > 0) {
-                        featuredConfig = {
-                          ...featuredConfig,
-                          ...localFeatured,
-                          featuredPropertyIds: localIds,
-                          promotedProperties: (Array.isArray(localFeatured.promotedProperties) && localFeatured.promotedProperties.length > 0)
-                            ? localFeatured.promotedProperties
-                            : (featuredConfig.promotedProperties || [])
-                        };
+              // Only fall back to local storage if siteConfig is completely offline/empty
+              if (!siteConfig || Object.keys(siteConfig).length === 0) {
+                if (typeof window !== 'undefined') {
+                  try {
+                    const storedConfigRaw = localStorage.getItem('easeland_site_config');
+                    if (storedConfigRaw) {
+                      const parsedStoredConfig = JSON.parse(storedConfigRaw);
+                      if (parsedStoredConfig?.featuredListings) {
+                        featuredConfig = parsedStoredConfig.featuredListings;
                       }
                     }
-                  }
-                } catch (e) {}
+                  } catch (e) {}
+                }
               }
 
               let featuredIds = safeArray(featuredConfig.featuredPropertyIds).map(String).filter(Boolean);
@@ -935,19 +923,6 @@ export default function App() {
               // Secondary fallback: If featuredIds is still empty, derive from embedded promotedProperties
               if (featuredIds.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
                 featuredIds = featuredConfig.promotedProperties.map(p => String(p.id || p.propertyId || p.referenceId || '')).filter(Boolean);
-              }
-
-              // Fallback: If featuredIds is still empty, check easeland_promoted_properties directly (offline only)
-              if (featuredIds.length === 0 && typeof window !== 'undefined') {
-                try {
-                  const rawPromo = localStorage.getItem('easeland_promoted_properties');
-                  if (rawPromo) {
-                    const parsedPromo = JSON.parse(rawPromo);
-                    if (Array.isArray(parsedPromo) && parsedPromo.length > 0) {
-                      featuredIds = parsedPromo.map(p => String(p.id || p.propertyId || p.referenceId || '')).filter(Boolean);
-                    }
-                  }
-                } catch (e) {}
               }
 
               const parsedDisplay = Number(featuredConfig.displayCount);
@@ -962,8 +937,8 @@ export default function App() {
                   if (!p || isPropertyDeleted(p) || isFakeProperty(p)) return;
                   const k1 = String(p.id || '').trim().toLowerCase();
                   const k2 = String(p.propertyId || '').trim().toLowerCase();
-                  const k3 = String(p.referenceId || '').trim().toLowerCase();
-                  const primaryKey = k1 || k2 || k3;
+                  const ref = String(p.referenceId || '').trim().toLowerCase();
+                  const primaryKey = k1 || k2 || ref;
                   if (primaryKey && !seenPoolKeys.has(primaryKey)) {
                     seenPoolKeys.add(primaryKey);
                     candidatePool.push(p);
@@ -976,53 +951,14 @@ export default function App() {
                 addToPool(featuredConfig.promotedProperties);
               }
               addToPool(properties);
-              if (typeof window !== 'undefined') {
-                try {
-                  const rawPromo = localStorage.getItem('easeland_promoted_properties');
-                  if (rawPromo) addToPool(JSON.parse(rawPromo));
-                } catch (e) {}
-                try {
-                  const rawAdmin = localStorage.getItem('easeland_admin_cached_properties');
-                  if (rawAdmin) addToPool(JSON.parse(rawAdmin));
-                } catch (e) {}
-                try {
-                  const rawProps = localStorage.getItem('easeland_properties');
-                  if (rawProps) addToPool(JSON.parse(rawProps));
-                } catch (e) {}
-                try {
-                  const rawUserProps = localStorage.getItem('easeland_user_properties');
-                  if (rawUserProps) addToPool(JSON.parse(rawUserProps));
-                } catch (e) {}
-                try {
-                  const rawOwnerProps = localStorage.getItem('easeland_owner_properties');
-                  if (rawOwnerProps) addToPool(JSON.parse(rawOwnerProps));
-                } catch (e) {}
-                try {
-                  const rawSubProps = localStorage.getItem('easeland_submitted_properties');
-                  if (rawSubProps) addToPool(JSON.parse(rawSubProps));
-                } catch (e) {}
-              }
-              try {
-                if (typeof mockApi.getAllPropertiesAdmin === 'function') {
-                  addToPool(mockApi.getAllPropertiesAdmin());
-                } else if (typeof mockApi.getProperties === 'function') {
-                  addToPool(mockApi.getProperties());
-                }
-              } catch (e) {}
 
               // 3. Match properties in exact slot order defined by Admin
               const explicitlyFeatured = [];
               featuredIds.forEach((fId) => {
                 const target = String(fId).trim().toLowerCase();
-                let matched = candidatePool.find((p) => {
-                  if (!p) return false;
-                  const id1 = String(p.id || '').trim().toLowerCase();
-                  const id2 = String(p.propertyId || '').trim().toLowerCase();
-                  const ref = String(p.referenceId || '').trim().toLowerCase();
-                  return id1 === target || id2 === target || ref === target;
-                });
-
-                if (!matched && Array.isArray(featuredConfig.promotedProperties)) {
+                // 3a. Authoritative match: Server broadcast promotedProperties
+                let matched = null;
+                if (Array.isArray(featuredConfig.promotedProperties)) {
                   matched = featuredConfig.promotedProperties.find((p) => {
                     if (!p) return false;
                     const id1 = String(p.id || '').trim().toLowerCase();
@@ -1031,8 +967,17 @@ export default function App() {
                     return id1 === target || id2 === target || ref === target;
                   });
                 }
-
-                // Robust fallback to getPropertyById across all platform data stores
+                // 3b. Pool match (all properties)
+                if (!matched) {
+                  matched = candidatePool.find((p) => {
+                    if (!p) return false;
+                    const id1 = String(p.id || '').trim().toLowerCase();
+                    const id2 = String(p.propertyId || '').trim().toLowerCase();
+                    const ref = String(p.referenceId || '').trim().toLowerCase();
+                    return id1 === target || id2 === target || ref === target;
+                  });
+                }
+                // 3c. Fallback across all stores
                 if (!matched) {
                   try {
                     matched = mockApi.getPropertyById(fId);
@@ -1047,10 +992,14 @@ export default function App() {
                 }
               });
 
+              // 4. In case featuredIds was empty or omitted but promotedProperties were provided by broadcast:
               if (explicitlyFeatured.length === 0 && Array.isArray(featuredConfig.promotedProperties) && featuredConfig.promotedProperties.length > 0) {
                 featuredConfig.promotedProperties.forEach((p) => {
                   if (p && !isPropertyDeleted(p) && !isFakeProperty(p)) {
-                    explicitlyFeatured.push(p);
+                    const mKey = String(p.id || p.propertyId || p.referenceId || '').trim().toLowerCase();
+                    if (!explicitlyFeatured.some((ef) => String(ef.id || ef.propertyId || ef.referenceId || '').trim().toLowerCase() === mKey)) {
+                      explicitlyFeatured.push(p);
+                    }
                   }
                 });
               }
