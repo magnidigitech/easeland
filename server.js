@@ -2692,6 +2692,92 @@ function invalidateAdminUsersCache() {
   cachedAdminUsersExpiry = 0;
 }
 
+function unifyServerUsers(userList, deletedUsersSet = new Set()) {
+  const canonicalUsers = new Map();
+  const keyToCanonical = new Map();
+
+  const mergeNonEmpty = (target, src) => {
+    const res = { ...target };
+    for (const [k, v] of Object.entries(src || {})) {
+      if (v !== undefined && v !== null && v !== '') {
+        res[k] = v;
+      } else if (res[k] === undefined || res[k] === null) {
+        res[k] = v;
+      }
+    }
+    return res;
+  };
+
+  (userList || []).forEach(u => {
+    if (!u) return;
+    const emailKey = (u.email || '').toLowerCase().trim();
+    const rawUid = u.uid || u.id || '';
+    const uidKey = String(rawUid).toLowerCase().trim();
+    if (!emailKey && !uidKey) return;
+
+    const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+    if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
+    if (deletedUsersSet.has(uidKey) || (emailKey && deletedUsersSet.has(emailKey))) return;
+
+    const canonicalFromEmail = emailKey ? keyToCanonical.get(emailKey) : null;
+    const canonicalFromUid = uidKey ? keyToCanonical.get(uidKey) : null;
+
+    let canonicalKey = canonicalFromEmail || canonicalFromUid || (emailKey || uidKey);
+
+    let existing = canonicalUsers.get(canonicalKey) || {};
+    if (canonicalFromEmail && canonicalFromUid && canonicalFromEmail !== canonicalFromUid) {
+      const otherUser = canonicalUsers.get(canonicalFromUid) || {};
+      existing = mergeNonEmpty(otherUser, existing);
+      canonicalUsers.delete(canonicalFromUid);
+      for (const [k, v] of keyToCanonical.entries()) {
+        if (v === canonicalFromUid) keyToCanonical.set(k, canonicalKey);
+      }
+    }
+
+    const combined = mergeNonEmpty(existing, u);
+
+    const isSyntheticUid = (id) => !id || id === 'admin_uid_001' || String(id).startsWith('owner-');
+    const bestUid = (!isSyntheticUid(u.uid) ? u.uid : (!isSyntheticUid(existing.uid) ? existing.uid : (u.uid || existing.uid || u.id || existing.id || rawUid)));
+
+    const isAdmin = emailKey === 'admin@easeland.in' || combined.role === 'ADMIN' || Boolean(combined.adminRole);
+    const cleanName = isAdmin ? 'EaseLand Admin' : (combined.displayName || combined.name || (emailKey ? emailKey.split('@')[0] : 'Registered User'));
+
+    const cleanPhone = (combined.phone || combined.phoneNumber || '').trim();
+    const cleanCity = (combined.city || combined.location || '').trim();
+
+    const mergedUser = {
+      ...combined,
+      uid: bestUid,
+      id: bestUid,
+      email: combined.email || (emailKey || ''),
+      displayName: cleanName,
+      name: cleanName,
+      phone: cleanPhone,
+      phoneNumber: cleanPhone,
+      city: cleanCity,
+      location: cleanCity,
+      status: combined.status || combined.accountStatus || 'ACTIVE',
+      accountStatus: combined.accountStatus || combined.status || 'ACTIVE',
+      role: isAdmin ? 'ADMIN' : (combined.role || 'USER'),
+      adminRole: Boolean(isAdmin)
+    };
+
+    canonicalUsers.set(canonicalKey, mergedUser);
+    if (emailKey) keyToCanonical.set(emailKey, canonicalKey);
+    if (uidKey) keyToCanonical.set(uidKey, canonicalKey);
+    if (existing.uid) keyToCanonical.set(String(existing.uid).toLowerCase().trim(), canonicalKey);
+    if (bestUid) keyToCanonical.set(String(bestUid).toLowerCase().trim(), canonicalKey);
+  });
+
+  return Array.from(canonicalUsers.values()).filter(u => {
+    const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+    const uEm = String(u.email || '').toLowerCase().trim();
+    const uSt = String(u.accountStatus || u.status || '').toUpperCase();
+    if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return false;
+    return !deletedUsersSet.has(uUid) && (!uEm || !deletedUsersSet.has(uEm));
+  });
+}
+
 // Registered Users API Endpoints (Firebase Auth + PostgreSQL User Governance)
 app.get('/api/admin/firebase-users', async (req, res) => {
   try {
@@ -2761,43 +2847,7 @@ app.get('/api/admin/firebase-users', async (req, res) => {
       });
     } catch (eDelFetch) {}
 
-    const userMap = new Map();
-    [...authUsers, ...fsUsers, ...pgUsers].forEach(u => {
-      if (!u) return;
-      const emailKey = (u.email || '').toLowerCase().trim();
-      const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
-      if (!emailKey && !uidKey) return;
-
-      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
-      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
-      if (deletedUsersSet.has(uidKey) || (emailKey && deletedUsersSet.has(emailKey))) return;
-
-      const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
-      const isAdmin = u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN';
-      const cleanName = isAdmin ? 'EaseLand Admin' : (u.displayName || u.name || existing.displayName || existing.name || 'Registered User');
-
-      const mergedObj = {
-        ...existing,
-        ...u,
-        uid: u.uid || u.id || existing.uid || existing.id,
-        id: u.id || u.uid || existing.id || existing.uid,
-        email: u.email || existing.email || '',
-        displayName: cleanName,
-        name: cleanName,
-        role: isAdmin ? 'ADMIN' : (existing.role || u.role || 'USER')
-      };
-
-      if (emailKey) userMap.set(emailKey, mergedObj);
-      if (uidKey) userMap.set(uidKey, mergedObj);
-    });
-
-    const allUsers = Array.from(new Set(userMap.values())).filter(u => {
-      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-      const uEm = String(u.email || '').toLowerCase().trim();
-      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
-      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return false;
-      return !deletedUsersSet.has(uUid) && (!uEm || !deletedUsersSet.has(uEm));
-    });
+    const allUsers = unifyServerUsers([...authUsers, ...fsUsers, ...pgUsers], deletedUsersSet);
 
     const payload = { success: true, count: allUsers.length, users: allUsers };
     cachedAdminUsersData = payload;
@@ -2816,7 +2866,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
     const adminDb = getAdminDb();
 
     // 1. Sync Users
-    const userMap = new Map();
+    const rawUsersToSync = [];
     const deletedUsersSet = new Set(localDeletedUsersSet);
     try {
       const delRes = await pgPool.query('SELECT uid, email FROM admin_deleted_users;');
@@ -2837,7 +2887,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
           const uid = u.uid;
           if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
           const isAdmin = email === 'admin@easeland.in' || u.customClaims?.adminRole;
-          userMap.set(uid, {
+          rawUsersToSync.push({
             uid,
             id: uid,
             email,
@@ -2869,17 +2919,15 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
           const uSt = String(d.accountStatus || d.status || '').toUpperCase();
           if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
           if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
-          const existing = userMap.get(uid) || {};
-          userMap.set(uid, {
-            ...existing,
+          rawUsersToSync.push({
             ...d,
             uid,
             id: uid,
-            email: (d.email || existing.email || '').toLowerCase().trim(),
-            displayName: d.displayName || d.name || existing.displayName || 'EaseLand User',
-            name: d.displayName || d.name || existing.name || 'EaseLand User',
-            role: (d.email === 'admin@easeland.in' || d.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (d.role || existing.role || 'USER'),
-            accountStatus: d.accountStatus || existing.accountStatus || 'ACTIVE'
+            email: (d.email || '').toLowerCase().trim(),
+            displayName: d.displayName || d.name || 'EaseLand User',
+            name: d.displayName || d.name || 'EaseLand User',
+            role: (d.email === 'admin@easeland.in' || d.role === 'ADMIN') ? 'ADMIN' : (d.role || 'USER'),
+            accountStatus: d.accountStatus || 'ACTIVE'
           });
         });
       } catch (eFs) {
@@ -2899,18 +2947,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
         const uSt = String(u.accountStatus || u.status || '').toUpperCase();
         if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
         if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
-        const existing = userMap.get(uid) || {};
-        userMap.set(uid, {
-          ...existing,
-          ...u,
-          uid,
-          id: uid,
-          email: (u.email || existing.email || '').toLowerCase().trim(),
-          displayName: u.displayName || u.name || existing.displayName || 'EaseLand User',
-          name: u.displayName || u.name || existing.name || 'EaseLand User',
-          role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER'),
-          accountStatus: u.accountStatus || existing.accountStatus || 'ACTIVE'
-        });
+        rawUsersToSync.push(u);
       });
     } catch (ePg) {
       console.warn('[EaseLand Sync] PostgreSQL users note:', ePg.message);
@@ -2923,17 +2960,10 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
       const uSt = String(u.accountStatus || u.status || '').toUpperCase();
       if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return;
       if (deletedUsersSet.has(String(uid).toLowerCase().trim()) || (email && deletedUsersSet.has(email))) return;
-      const existing = userMap.get(uid) || {};
-      userMap.set(uid, { ...existing, ...u, uid, id: uid });
+      rawUsersToSync.push({ ...u, uid, id: uid });
     });
 
-    const unifiedUsers = Array.from(userMap.values()).filter(u => {
-      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-      const uEm = String(u.email || '').toLowerCase().trim();
-      const uSt = String(u.accountStatus || u.status || '').toUpperCase();
-      if (uSt === 'REMOVED' || uSt === 'DELETED' || uSt === 'ACCOUNT_DELETED') return false;
-      return !deletedUsersSet.has(uUid) && (!uEm || !deletedUsersSet.has(uEm));
-    });
+    const unifiedUsers = unifyServerUsers(rawUsersToSync, deletedUsersSet);
 
     // Write back unified users across all 3 layers
     const syncP1 = String.fromCharCode(36) + '1';

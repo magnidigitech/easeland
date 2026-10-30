@@ -886,42 +886,89 @@ export default function AdminPortal({ onNavigate }) {
         (uUid && deletedUsers.includes(uUid)) || (uEmail && deletedUsers.includes(uEmail));
     };
 
+    const unifyAndDeduplicateUsers = (userList, isDeletedFn = () => false) => {
+      const canonicalUsers = new Map();
+      const keyToCanonical = new Map();
+
+      const mergeNonEmpty = (target, src) => {
+        const res = { ...target };
+        for (const [k, v] of Object.entries(src || {})) {
+          if (v !== undefined && v !== null && v !== '') {
+            res[k] = v;
+          } else if (res[k] === undefined || res[k] === null) {
+            res[k] = v;
+          }
+        }
+        return res;
+      };
+
+      (userList || []).forEach(u => {
+        if (!u || isDeletedFn(u)) return;
+        const emailKey = (u.email || '').toLowerCase().trim();
+        const rawUid = u.uid || u.id || '';
+        const uidKey = String(rawUid).toLowerCase().trim();
+        if (!emailKey && !uidKey) return;
+
+        const canonicalFromEmail = emailKey ? keyToCanonical.get(emailKey) : null;
+        const canonicalFromUid = uidKey ? keyToCanonical.get(uidKey) : null;
+
+        let canonicalKey = canonicalFromEmail || canonicalFromUid || (emailKey || uidKey);
+
+        let existing = canonicalUsers.get(canonicalKey) || {};
+        if (canonicalFromEmail && canonicalFromUid && canonicalFromEmail !== canonicalFromUid) {
+          const otherUser = canonicalUsers.get(canonicalFromUid) || {};
+          existing = mergeNonEmpty(otherUser, existing);
+          canonicalUsers.delete(canonicalFromUid);
+          for (const [k, v] of keyToCanonical.entries()) {
+            if (v === canonicalFromUid) keyToCanonical.set(k, canonicalKey);
+          }
+        }
+
+        const combined = mergeNonEmpty(existing, u);
+
+        const isSyntheticUid = (id) => !id || id === 'admin_uid_001' || String(id).startsWith('owner-');
+        const bestUid = (!isSyntheticUid(u.uid) ? u.uid : (!isSyntheticUid(existing.uid) ? existing.uid : (u.uid || existing.uid || u.id || existing.id || rawUid)));
+
+        const rawName = combined.name || combined.displayName || '';
+        const isScarlett = rawName.includes('Scarlett') || emailKey === 'admin@easeland.in';
+        const cleanName = isScarlett ? 'EaseLand Admin' : (rawName || (emailKey ? emailKey.split('@')[0] : 'Registered User'));
+
+        const cleanPhone = (combined.phone || combined.phoneNumber || '').trim();
+        const cleanCity = (combined.city || combined.location || '').trim();
+
+        const mergedUser = {
+          ...combined,
+          uid: bestUid,
+          id: bestUid,
+          email: combined.email || (emailKey || ''),
+          name: cleanName,
+          displayName: cleanName,
+          phone: cleanPhone,
+          phoneNumber: cleanPhone,
+          city: cleanCity,
+          location: cleanCity,
+          status: combined.status || combined.accountStatus || 'ACTIVE',
+          accountStatus: combined.accountStatus || combined.status || 'ACTIVE',
+          role: (emailKey === 'admin@easeland.in' || combined.role === 'ADMIN') ? 'ADMIN' : (combined.role || 'USER'),
+          adminRole: emailKey === 'admin@easeland.in' || Boolean(combined.adminRole || combined.role === 'ADMIN'),
+          suspension: combined.suspension || existing.suspension || null
+        };
+
+        canonicalUsers.set(canonicalKey, mergedUser);
+        if (emailKey) keyToCanonical.set(emailKey, canonicalKey);
+        if (uidKey) keyToCanonical.set(uidKey, canonicalKey);
+        if (existing.uid) keyToCanonical.set(String(existing.uid).toLowerCase().trim(), canonicalKey);
+        if (bestUid) keyToCanonical.set(String(bestUid).toLowerCase().trim(), canonicalKey);
+      });
+
+      return Array.from(canonicalUsers.values()).filter(u => !isDeletedFn(u));
+    };
+
     setRegisteredUsersList(prev => {
-      const userMap = new Map();
       const cleanPrev = (prev || []).filter(u => !isUserDeleted(u));
       const cleanIncoming = (incomingUsers || []).filter(u => !isUserDeleted(u));
 
-      [...cleanPrev, ...cleanIncoming].forEach(u => {
-        if (!u || isUserDeleted(u)) return;
-        const emailKey = (u.email || '').toLowerCase().trim();
-        const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
-        if (!emailKey && !uidKey) return;
-
-        const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
-        const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
-        const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
-        const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
-
-        const mergedUser = {
-          ...existing,
-          ...u,
-          uid: u.uid || u.id || existing.uid || existing.id,
-          id: u.id || u.uid || existing.id || existing.uid,
-          email: u.email || existing.email || '',
-          name: cleanName,
-          displayName: cleanName,
-          status: u.status || u.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
-          accountStatus: u.accountStatus || u.status || existing.accountStatus || existing.status || 'ACTIVE',
-          role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER'),
-          suspension: u.suspension || existing.suspension || null
-        };
-
-        if (emailKey) userMap.set(emailKey, mergedUser);
-        if (uidKey) userMap.set(uidKey, mergedUser);
-      });
-
-      return Array.from(new Set(userMap.values()))
-        .filter(u => !isUserDeleted(u))
+      return unifyAndDeduplicateUsers([...cleanPrev, ...cleanIncoming], isUserDeleted)
         .map(u => {
           const uUid = String(u.uid || u.id || '').toLowerCase().trim();
           const uEmail = (u.email || '').toLowerCase().trim();
@@ -1276,35 +1323,10 @@ export default function AdminPortal({ onNavigate }) {
         }
       });
 
-      const userMap = new Map();
-      [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers].forEach(u => {
-        if (!u || isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)) return;
-        const emailKey = (u.email || '').toLowerCase().trim();
-        const uidKey = String(u.uid || u.id || '').toLowerCase().trim();
-        if (!emailKey && !uidKey) return;
-
-        const existing = (emailKey && userMap.get(emailKey)) || (uidKey && userMap.get(uidKey)) || {};
-        const rawName = u.name || u.displayName || existing.name || existing.displayName || '';
-        const isScarlett = rawName.includes('Scarlett') || u.email === 'admin@easeland.in';
-        const cleanName = isScarlett ? 'EaseLand Admin' : rawName;
-
-        const mergedUser = {
-          ...existing,
-          ...u,
-          uid: u.uid || u.id || existing.uid || existing.id,
-          id: u.id || u.uid || existing.id || existing.uid,
-          email: u.email || existing.email || '',
-          name: cleanName,
-          displayName: cleanName,
-          status: u.status || u.accountStatus || existing.status || existing.accountStatus || 'ACTIVE',
-          role: (u.email === 'admin@easeland.in' || u.role === 'ADMIN' || existing.role === 'ADMIN') ? 'ADMIN' : (u.role || existing.role || 'USER')
-        };
-
-        if (emailKey) userMap.set(emailKey, mergedUser);
-        if (uidKey) userMap.set(uidKey, mergedUser);
-      });
-
-      let users = Array.from(new Set(userMap.values())).filter(u => !isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus));
+      let users = unifyAndDeduplicateUsers(
+        [...pgServerUsers, ...firestoreUsers, ...localRegisteredUsers, ...localProfileUsers, ...propertyOwnerUsers],
+        (u) => isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)
+      );
 
       // Enrich verification queue properties with matching registered user account details
       const enrichedQueue = queue.map(p => {
