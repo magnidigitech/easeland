@@ -2128,6 +2128,20 @@ app.post('/api/site-config', async (req, res) => {
     });
     await Promise.all(promises);
 
+    // Keep master_draft in sync when featuredListings is updated directly
+    if (fullConfig.featuredListings && !fullConfig.master_draft) {
+      try {
+        const draftRes = await pgPool.query("SELECT config_data FROM site_config WHERE module_id = 'master_draft';");
+        if (draftRes.rows.length > 0) {
+          const currentDraft = draftRes.rows[0].config_data || {};
+          currentDraft.featuredListings = fullConfig.featuredListings;
+          await pgPool.query(queryText, ['master_draft', JSON.stringify(currentDraft)]);
+        }
+      } catch (eDraft) {
+        console.warn('Syncing featuredListings to master_draft notice:', eDraft.message);
+      }
+    }
+
     Object.keys(fullConfig).forEach(modId => {
       localSiteConfigMap.set(modId, fullConfig[modId]);
     });

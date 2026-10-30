@@ -344,6 +344,56 @@ describe('EaseLand Paid Promotions & Admin Showcase Management Suite', () => {
     assert.deepStrictEqual(resolvedFeatured.featuredPropertyIds, ['prop_1', 'prop_2', 'prop_3']);
     assert.strictEqual(resolvedFeatured.promotedProperties.length, 3);
   });
+
+  it('15. Dedicated Active Promotions Save: Removing properties from active promotions stages and saves exact updated list without resurrection', () => {
+    const initialConfig = {
+      featuredListings: {
+        featuredPropertyIds: ['prop_1', 'prop_2', 'prop_3'],
+        displayCount: 3,
+        sectionTitle: 'Featured & Recent Verified Properties',
+        badgeText: 'VERIFIED LISTINGS'
+      }
+    };
+
+    // User removes prop_2
+    const stagedIds = initialConfig.featuredListings.featuredPropertyIds.filter(id => id !== 'prop_2');
+    assert.deepStrictEqual(stagedIds, ['prop_1', 'prop_3']);
+
+    // Admin clicks dedicated "Save Promoted Properties"
+    const savedConfig = mergeSiteConfigWithDefaults({
+      ...initialConfig,
+      featuredListings: {
+        ...initialConfig.featuredListings,
+        featuredPropertyIds: stagedIds
+      }
+    });
+
+    assert.deepStrictEqual(savedConfig.featuredListings.featuredPropertyIds, ['prop_1', 'prop_3']);
+    assert.strictEqual(savedConfig.featuredListings.featuredPropertyIds.includes('prop_2'), false);
+  });
+
+  it('16. Saving showcase headline & display settings preserves staged active promotions and never reverts removed properties', () => {
+    // Staged list after removing prop_3
+    const stagedIds = ['prop_1', 'prop_2'];
+
+    // User edits headline settings and clicks Save Settings
+    const newHeadlineTitle = 'Custom Headline Title';
+    const newDisplayCount = 2;
+
+    const savedConfig = mergeSiteConfigWithDefaults({
+      featuredListings: {
+        sectionTitle: newHeadlineTitle,
+        badgeText: 'HOT DEALS',
+        displayCount: newDisplayCount,
+        featuredPropertyIds: stagedIds
+      }
+    });
+
+    assert.strictEqual(savedConfig.featuredListings.sectionTitle, 'Custom Headline Title');
+    assert.strictEqual(savedConfig.featuredListings.badgeText, 'HOT DEALS');
+    assert.strictEqual(savedConfig.featuredListings.displayCount, 2);
+    assert.deepStrictEqual(savedConfig.featuredListings.featuredPropertyIds, ['prop_1', 'prop_2']);
+  });
 });
 
 

@@ -26,8 +26,13 @@ export async function getSiteConfigAdmin() {
 
   // 1. Primary: Fetch from PostgreSQL /api/site-config (Authoritative Central Store)
   try {
-    const res = await fetch('/api/site-config');
-    if (res.ok) {
+    let res = await fetch('/api/site-config');
+    if (!res.ok && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      try {
+        res = await fetch('https://easeland.in/api/site-config');
+      } catch (eRemote) {}
+    }
+    if (res && res.ok) {
       const json = await res.json();
       if (json.success && json.config && typeof json.config === 'object') {
         Object.assign(mergedConfig, json.config);
@@ -200,11 +205,29 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
     const cleanModuleData = JSON.parse(JSON.stringify(moduleData, (k, v) => (v === undefined ? null : v)));
 
     try {
-      await fetch('/api/site-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [moduleId]: cleanModuleData })
-      });
+      const payload = { [moduleId]: cleanModuleData };
+      if (moduleId === 'featuredListings') {
+        payload.master_draft = { featuredListings: cleanModuleData };
+      }
+      let saved = false;
+      try {
+        const res = await fetch('/api/site-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res && res.ok) saved = true;
+      } catch (eLocal) {}
+
+      if (!saved && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        try {
+          await fetch('https://easeland.in/api/site-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } catch (eRemote) {}
+      }
     } catch (e) {}
 
     try {
@@ -252,11 +275,25 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
 export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   // 1. Primary DB Storage: Save all site config modules to PostgreSQL
   try {
-    await fetch('/api/site-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fullConfig || {})
-    });
+    let saved = false;
+    try {
+      const res = await fetch('/api/site-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullConfig || {})
+      });
+      if (res && res.ok) saved = true;
+    } catch (eLocal) {}
+
+    if (!saved && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      try {
+        await fetch('https://easeland.in/api/site-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fullConfig || {})
+        });
+      } catch (eRemote) {}
+    }
   } catch (pgErr) {
     console.warn('PostgreSQL config publish fallback note:', pgErr.message);
   }

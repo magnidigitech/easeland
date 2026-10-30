@@ -462,6 +462,12 @@ export default function AdminPortal({ onNavigate }) {
   const [promoDisplayCount, setPromoDisplayCount] = useState(() => Number(siteConfig?.featuredListings?.displayCount) || 6);
   const [isSavingPromoSettings, setIsSavingPromoSettings] = useState(false);
   const [isPromoSettingsSaved, setIsPromoSettingsSaved] = useState(false);
+  const [stagedPromotedIds, setStagedPromotedIds] = useState(() => {
+    return safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
+  });
+  const [isSavingActivePromotions, setIsSavingActivePromotions] = useState(false);
+  const [isActivePromotionsSaved, setIsActivePromotionsSaved] = useState(false);
+  const [hasUnsavedPromoChanges, setHasUnsavedPromoChanges] = useState(false);
 
   useEffect(() => {
     if (siteConfig?.featuredListings) {
@@ -470,8 +476,12 @@ export default function AdminPortal({ onNavigate }) {
       if (siteConfig.featuredListings.displayCount !== undefined) {
         setPromoDisplayCount(Number(siteConfig.featuredListings.displayCount) || 6);
       }
+      const incomingIds = safeArray(siteConfig.featuredListings.featuredPropertyIds).map(String).filter(Boolean);
+      if (!hasUnsavedPromoChanges) {
+        setStagedPromotedIds(incomingIds);
+      }
     }
-  }, [siteConfig?.featuredListings?.sectionTitle, siteConfig?.featuredListings?.badgeText, siteConfig?.featuredListings?.displayCount]);
+  }, [siteConfig?.featuredListings?.sectionTitle, siteConfig?.featuredListings?.badgeText, siteConfig?.featuredListings?.displayCount, siteConfig?.featuredListings?.featuredPropertyIds, hasUnsavedPromoChanges]);
 
   const candidateSourceProperties = React.useMemo(() => {
     const list = Array.isArray(allProperties) && allProperties.length > 0 ? allProperties : [];
@@ -517,9 +527,8 @@ export default function AdminPortal({ onNavigate }) {
   }, [candidateSourceProperties, siteConfig?.featuredListings?.promotedProperties]);
 
   const promotedPropertyIds = React.useMemo(() => {
-    const rawIds = safeArray(siteConfig?.featuredListings?.featuredPropertyIds).map(String).filter(Boolean);
-    return rawIds.filter(id => Boolean(resolvePromotedProperty(id)));
-  }, [siteConfig?.featuredListings?.featuredPropertyIds, resolvePromotedProperty]);
+    return safeArray(stagedPromotedIds).map(String).filter(id => Boolean(resolvePromotedProperty(id)));
+  }, [stagedPromotedIds, resolvePromotedProperty]);
 
   const promotedPropertiesList = React.useMemo(() => {
     return promotedPropertyIds.map((id) => resolvePromotedProperty(id)).filter(Boolean);
@@ -605,34 +614,65 @@ export default function AdminPortal({ onNavigate }) {
     }
   };
 
+  const handleSaveActivePromotions = async () => {
+    setIsSavingActivePromotions(true);
+    try {
+      const targetIds = safeArray(stagedPromotedIds).map(String).filter(Boolean);
+      const validTargetIds = targetIds.filter(id => Boolean(resolvePromotedProperty(id)));
+
+      await savePromotionsConfig({
+        featuredPropertyIds: validTargetIds
+      }, validTargetIds.length === 0
+        ? 'All active customer promotions cleared and saved. Showcase is now completely hidden.'
+        : 'Active Promoted Customer Properties (' + validTargetIds.length + ') saved successfully to Cloud & Live Website!');
+
+      setStagedPromotedIds(validTargetIds);
+      setHasUnsavedPromoChanges(false);
+      setIsActivePromotionsSaved(true);
+      setTimeout(() => setIsActivePromotionsSaved(false), 3000);
+      logAdminActivity('saved Active Promoted Properties list (count: ' + validTargetIds.length + ').');
+    } catch (err) {
+      console.error('Error saving active promotions:', err);
+      setPromoToast('Error saving active promotions. Please try again.');
+    } finally {
+      setIsSavingActivePromotions(false);
+    }
+  };
+
   const handleAddPaidPromotion = (propertyId) => {
     if (!propertyId) return;
     const pIdStr = String(propertyId);
-    if (promotedPropertyIds.includes(pIdStr)) {
+    if (stagedPromotedIds.includes(pIdStr)) {
       setPromoToast('This property is already in the Paid Promotions list.');
       setTimeout(() => setPromoToast(''), 3000);
       return;
     }
-    const nextIds = [...promotedPropertyIds, pIdStr];
-    savePromotionsConfig({ featuredPropertyIds: nextIds }, 'Property added to Paid Promotions! It is now live on the Home Page.');
+    const nextIds = [...stagedPromotedIds, pIdStr];
+    setStagedPromotedIds(nextIds);
+    setHasUnsavedPromoChanges(true);
+    setPromoToast('Property added to active list! Click "Save Promoted Properties" to apply live.');
+    setTimeout(() => setPromoToast(''), 4000);
     logAdminActivity('added property ' + pIdStr + ' to Paid Promotions showcase.');
   };
 
   const handleRemovePaidPromotion = (propertyId) => {
     if (!propertyId) return;
     const pIdStr = String(propertyId);
-    const nextIds = promotedPropertyIds.filter(id => id !== pIdStr);
+    const nextIds = stagedPromotedIds.filter(id => id !== pIdStr);
+    setStagedPromotedIds(nextIds);
+    setHasUnsavedPromoChanges(true);
     const msg = nextIds.length === 0
-      ? 'Property removed. Paid Promotions is now empty and completely hidden from the website.'
-      : 'Property removed from Paid Promotions.';
-    savePromotionsConfig({ featuredPropertyIds: nextIds }, msg);
+      ? 'Property removed. Click "Save Promoted Properties" to confirm empty showcase.'
+      : 'Property removed from active list. Click "Save Promoted Properties" to apply live.';
+    setPromoToast(msg);
+    setTimeout(() => setPromoToast(''), 4000);
     logAdminActivity('removed property ' + pIdStr + ' from Paid Promotions.');
   };
 
   const handleTogglePaidPromotion = (propertyId) => {
     if (!propertyId) return;
     const pIdStr = String(propertyId);
-    if (promotedPropertyIds.includes(pIdStr)) {
+    if (stagedPromotedIds.includes(pIdStr)) {
       handleRemovePaidPromotion(pIdStr);
     } else {
       handleAddPaidPromotion(pIdStr);
@@ -641,20 +681,26 @@ export default function AdminPortal({ onNavigate }) {
 
   const handleMovePaidPromotion = (propertyId, direction) => {
     const pIdStr = String(propertyId);
-    const index = promotedPropertyIds.indexOf(pIdStr);
+    const index = stagedPromotedIds.indexOf(pIdStr);
     if (index === -1) return;
-    const nextIds = [...promotedPropertyIds];
+    const nextIds = [...stagedPromotedIds];
     if (direction === 'UP' && index > 0) {
       const temp = nextIds[index - 1];
       nextIds[index - 1] = nextIds[index];
       nextIds[index] = temp;
-      savePromotionsConfig({ featuredPropertyIds: nextIds }, 'Promotion display priority updated to Slot #' + index + '.');
+      setStagedPromotedIds(nextIds);
+      setHasUnsavedPromoChanges(true);
+      setPromoToast('Priority moved up to Slot #' + index + '. Click "Save Promoted Properties" to apply live.');
+      setTimeout(() => setPromoToast(''), 4000);
       logAdminActivity('moved property ' + pIdStr + ' up to Slot #' + index + ' in Paid Promotions.');
     } else if (direction === 'DOWN' && index < nextIds.length - 1) {
       const temp = nextIds[index + 1];
       nextIds[index + 1] = nextIds[index];
       nextIds[index] = temp;
-      savePromotionsConfig({ featuredPropertyIds: nextIds }, 'Promotion display priority updated to Slot #' + (index + 2) + '.');
+      setStagedPromotedIds(nextIds);
+      setHasUnsavedPromoChanges(true);
+      setPromoToast('Priority moved down to Slot #' + (index + 2) + '. Click "Save Promoted Properties" to apply live.');
+      setTimeout(() => setPromoToast(''), 4000);
       logAdminActivity('moved property ' + pIdStr + ' down to Slot #' + (index + 2) + ' in Paid Promotions.');
     }
   };
@@ -669,11 +715,17 @@ export default function AdminPortal({ onNavigate }) {
     const cleanedBadge = (promoBadgeText || '').trim() || 'VERIFIED LISTINGS';
 
     try {
+      const targetIds = safeArray(stagedPromotedIds).map(String).filter(Boolean);
+      const validTargetIds = targetIds.filter(id => Boolean(resolvePromotedProperty(id)));
+
       await savePromotionsConfig({
         sectionTitle: cleanedTitle,
         badgeText: cleanedBadge,
-        displayCount: validCount
-      }, 'Paid Promotions showcase headline and settings saved!');
+        displayCount: validCount,
+        featuredPropertyIds: validTargetIds
+      }, 'Showcase headline & display settings saved!');
+      setStagedPromotedIds(validTargetIds);
+      setHasUnsavedPromoChanges(false);
       logAdminActivity('saved Paid Promotions showcase title & display settings (Slots: ' + validCount + ').');
       setIsPromoSettingsSaved(true);
       setTimeout(() => setIsPromoSettingsSaved(false), 3000);
@@ -4256,7 +4308,7 @@ export default function AdminPortal({ onNavigate }) {
                             ) : (
                               <>
                                 <Save className="w-3.5 h-3.5 text-brand-yellow" />
-                                <span>Save</span>
+                                <span>Save Settings</span>
                               </>
                             )}
                           </button>
@@ -4279,7 +4331,8 @@ export default function AdminPortal({ onNavigate }) {
                                 savePromotionsConfig({
                                   sectionTitle: promoSectionTitle || 'Featured & Recent Verified Properties',
                                   badgeText: promoBadgeText || 'VERIFIED LISTINGS',
-                                  displayCount: slotVal
+                                  displayCount: slotVal,
+                                  featuredPropertyIds: stagedPromotedIds
                                 }, 'Showcase set to ' + slotVal + ' Max Display Slots.');
                               }}
                               className={'px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ' + (
@@ -4313,31 +4366,74 @@ export default function AdminPortal({ onNavigate }) {
                 <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
                   <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/70">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
                         <h3 className="text-sm font-black text-brand-charcoal uppercase tracking-wider">
                           Active Promoted Customer Properties ({promotedPropertyIds.length})
                         </h3>
+                        {hasUnsavedPromoChanges && (
+                          <span className="bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border border-amber-300 animate-pulse">
+                            Unsaved Changes
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 font-medium mt-0.5">
                         These customer properties will be presented on the Homepage in the exact slot order below.
                       </p>
                     </div>
 
-                    {promotedPropertyIds.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                      {/* Separate Save Button for Active Promoted Customer Properties */}
                       <button
                         type="button"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to clear all paid promotions? The showcase will immediately become hidden across the website.')) {
-                            savePromotionsConfig({ featuredPropertyIds: [] }, 'All paid promotions removed. Showcase is now completely hidden.');
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all self-start sm:self-auto flex items-center gap-1"
+                        onClick={handleSaveActivePromotions}
+                        disabled={isSavingActivePromotions}
+                        className={'font-black text-xs px-4 py-2 rounded-xl shadow transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ' + (
+                          isActivePromotionsSaved
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : isSavingActivePromotions
+                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                            : hasUnsavedPromoChanges
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300 shadow-md'
+                            : 'bg-brand-charcoal hover:bg-slate-800 text-white'
+                        )}
+                        title="Save active promoted customer properties to cloud database & public website"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Clear All Promotions</span>
+                        {isSavingActivePromotions ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-yellow" />
+                            <span>Saving Promoted Properties...</span>
+                          </>
+                        ) : isActivePromotionsSaved ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-white" />
+                            <span>Saved Live!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className={'w-3.5 h-3.5 ' + (hasUnsavedPromoChanges ? 'text-white' : 'text-brand-yellow')} />
+                            <span>{hasUnsavedPromoChanges ? 'Save Promoted Properties *' : 'Save Promoted Properties'}</span>
+                          </>
+                        )}
                       </button>
-                    )}
+
+                      {promotedPropertyIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (window.confirm('Are you sure you want to clear all paid promotions? The showcase will immediately become hidden across the website.')) {
+                              setStagedPromotedIds([]);
+                              setHasUnsavedPromoChanges(false);
+                              await savePromotionsConfig({ featuredPropertyIds: [] }, 'All paid promotions removed and saved. Showcase is now completely hidden.');
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 text-xs font-extrabold px-3 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Clear All Promotions</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {promotedPropertiesList.length === 0 ? (
