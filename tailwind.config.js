@@ -8,14 +8,14 @@ export default {
     extend: {
       colors: {
         metallic: {
-          dark: '#071026',
-          steel: '#0b2545',
-          titanium: '#1e3a8a',
+          dark: 'var(--metallic-dark, #071026)',
+          steel: 'var(--metallic-steel, #0b2545)',
+          titanium: 'var(--metallic-titanium, #1e3a8a)',
           slate: '#1e293b',
           chrome: '#cbd5e1',
           silver: '#e2e8f0',
-          gold: '#eab308',
-          goldHover: '#ca8a04',
+          gold: 'var(--metallic-gold, #eab308)',
+          goldHover: 'var(--brand-yellow-hover, #ca8a04)',
           amber: '#f59e0b',
         },
         brand: {

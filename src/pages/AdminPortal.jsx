@@ -61,7 +61,7 @@ import {
   Tag,
   Loader2
 } from 'lucide-react';
-import { mockApi, safeArray, isFakeProperty } from '../services/mockApi';
+import { mockApi, applySiteTheme, safeArray, isFakeProperty } from '../services/mockApi';
 import { DEFAULT_SHOWCASE_PROPERTIES } from '../services/showcaseProperties.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -342,8 +342,34 @@ export default function AdminPortal({ onNavigate }) {
   const updateCmsConfig = React.useCallback((updater) => {
     hasUnsavedCmsChangesRef.current = true;
     setHasUnsavedCmsChanges(true);
-    setSiteConfig(updater);
+    setSiteConfig((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (next && next.theme) {
+        applySiteTheme(next.theme);
+      }
+      return next;
+    });
   }, []);
+
+  useEffect(() => {
+    if (siteConfig && siteConfig.theme) {
+      applySiteTheme(siteConfig.theme);
+    }
+  }, [siteConfig?.theme]);
+
+  // Popup Modal States for Category & FAQ creation
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [newCategoryForm, setNewCategoryForm] = useState({
+    title: '',
+    countText: '',
+    imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
+  });
+
+  const [isAddFaqModalOpen, setIsAddFaqModalOpen] = useState(false);
+  const [newFaqForm, setNewFaqForm] = useState({
+    question: '',
+    answer: ''
+  });
   const [cmsTab, setCmsTab] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -1907,23 +1933,43 @@ export default function AdminPortal({ onNavigate }) {
       } else if (defaultConfig[moduleId] !== undefined) {
         next[moduleId] = { ...defaultConfig[moduleId] };
       }
+      if (moduleId === 'theme' && siteConfig.theme) {
+        applySiteTheme(siteConfig.theme);
+      }
       return next;
     });
     setPublishSuccessMessage('Module ' + moduleId + ' reset to defaults. Click Save or Publish Live to persist.');
     setTimeout(() => setPublishSuccessMessage(''), 4000);
   };
 
-  const handleAddCategory = () => {
+  const handleOpenAddCategoryModal = () => {
+    setNewCategoryForm({
+      title: '',
+      countText: '',
+      imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
+    });
+    setIsAddCategoryModalOpen(true);
+  };
+
+  const handleCreateCategorySubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!newCategoryForm.title || !newCategoryForm.title.trim()) {
+      alert('Please enter a category title.');
+      return;
+    }
     const newCat = {
       id: 'cat-' + Date.now(),
-      title: 'New Property Category',
-      countText: '0 Properties',
-      imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
+      title: newCategoryForm.title.trim(),
+      countText: newCategoryForm.countText.trim() || '0 Properties',
+      imageUrl: newCategoryForm.imageUrl.trim() || 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
     };
     updateCmsConfig(prev => ({
       ...prev,
-      categories: [...safeArray(prev.categories), newCat]
+      categories: [newCat, ...safeArray(prev.categories)]
     }));
+    setIsAddCategoryModalOpen(false);
+    setPublishSuccessMessage('New category card "' + newCat.title + '" added to draft! Remember to save.');
+    setTimeout(() => setPublishSuccessMessage(''), 4000);
   };
 
   const handleRemoveCategory = (catId) => {
@@ -3186,16 +3232,33 @@ export default function AdminPortal({ onNavigate }) {
   };
 
   // FAQ management helpers
-  const handleAddFaq = () => {
+  const handleOpenAddFaqModal = () => {
+    setNewFaqForm({ question: '', answer: '' });
+    setIsAddFaqModalOpen(true);
+  };
+
+  const handleCreateFaqSubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!newFaqForm.question || !newFaqForm.question.trim()) {
+      alert('Please enter a question.');
+      return;
+    }
+    if (!newFaqForm.answer || !newFaqForm.answer.trim()) {
+      alert('Please enter an answer.');
+      return;
+    }
     const newFaq = {
       id: 'faq-' + Date.now(),
-      question: 'New Frequently Asked Question',
-      answer: 'Detailed answer provided by platform administrator.'
+      question: newFaqForm.question.trim(),
+      answer: newFaqForm.answer.trim()
     };
     updateCmsConfig(prev => ({
       ...prev,
-      faqs: [...safeArray(prev.faqs || prev.faq), newFaq]
+      faqs: [newFaq, ...safeArray(prev.faqs || prev.faq)]
     }));
+    setIsAddFaqModalOpen(false);
+    setPublishSuccessMessage('New FAQ question added to draft! Remember to save.');
+    setTimeout(() => setPublishSuccessMessage(''), 4000);
   };
 
   const handleRemoveFaq = (id) => {
@@ -4080,7 +4143,7 @@ export default function AdminPortal({ onNavigate }) {
                       </div>
                       <button
                         type="button"
-                        onClick={handleAddCategory}
+                        onClick={handleOpenAddCategoryModal}
                         className="bg-brand-yellow text-brand-charcoal font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow"
                       >
                         <PlusCircle className="w-4 h-4" />
@@ -4170,7 +4233,7 @@ export default function AdminPortal({ onNavigate }) {
                       </div>
                       <button
                         type="button"
-                        onClick={handleAddFaq}
+                        onClick={handleOpenAddFaqModal}
                         className="bg-brand-yellow text-brand-charcoal font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow"
                       >
                         <PlusCircle className="w-4 h-4" />
@@ -4429,6 +4492,24 @@ export default function AdminPortal({ onNavigate }) {
                         <option value="Outfit">Outfit (Bold Geometric)</option>
                         <option value="Roboto">Roboto (Classic Sans)</option>
                       </select>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
+                      <div className="text-xs font-black text-gray-700">Live Visual Palette Preview</div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          className="bg-brand-yellow text-brand-charcoal font-black text-xs px-4 py-2 rounded-xl shadow transition-colors"
+                        >
+                          Primary Brand Button
+                        </button>
+                        <div className="bg-brand-navy text-white text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-sm">
+                          Dark Charcoal / Navy Surface
+                        </div>
+                        <div className="bg-metallic-steel text-white text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-sm">
+                          Secondary Steel Surface
+                        </div>
+                      </div>
                     </div>
 
                     <CmsModuleActionBar
@@ -8261,6 +8342,167 @@ export default function AdminPortal({ onNavigate }) {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: ADD PROPERTY CATEGORY CARD POPUP */}
+      {isAddCategoryModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-gray-200 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black">
+                  <Layers className="w-5 h-5 text-brand-charcoal" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-brand-charcoal">Add Property Category Card</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Create a new category card shown on the homepage.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddCategoryModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategorySubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Category Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Farmlands & Agriculture, Luxury Villas, Open Plots"
+                  value={newCategoryForm.title}
+                  onChange={(e) => setNewCategoryForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Count Subtext</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 120+ Verified Properties, Starting 25L"
+                  value={newCategoryForm.countText}
+                  onChange={(e) => setNewCategoryForm(prev => ({ ...prev, countText: e.target.value }))}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                />
+              </div>
+
+              <div>
+                <MediaUploadInput
+                  label="Category Cover Image Asset"
+                  value={newCategoryForm.imageUrl}
+                  onChange={(val) => setNewCategoryForm(prev => ({ ...prev, imageUrl: val }))}
+                />
+              </div>
+
+              {newCategoryForm.imageUrl && (
+                <div className="relative rounded-xl overflow-hidden border border-gray-200 h-28 bg-gray-100">
+                  <img
+                    src={newCategoryForm.imageUrl}
+                    alt="Category Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2.5">
+                    <span className="text-white text-xs font-extrabold drop-shadow">
+                      {newCategoryForm.title || 'Category Preview'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCategoryModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Add Category Card</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: ADD FAQ QUESTION POPUP */}
+      {isAddFaqModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-gray-200 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black">
+                  <HelpCircle className="w-5 h-5 text-brand-charcoal" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-brand-charcoal">Add Frequently Asked Question</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Add a new Q&A pair to the FAQ section.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddFaqModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateFaqSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Question *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. How does EaseLand verify land plot boundaries?"
+                  value={newFaqForm.question}
+                  onChange={(e) => setNewFaqForm(prev => ({ ...prev, question: e.target.value }))}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Answer *</label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Provide a clear, detailed answer for buyers, sellers, and visitors..."
+                  value={newFaqForm.answer}
+                  onChange={(e) => setNewFaqForm(prev => ({ ...prev, answer: e.target.value }))}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-yellow leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddFaqModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Add FAQ Question</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

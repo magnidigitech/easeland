@@ -1516,14 +1516,16 @@ export default function App() {
       {activePage !== 'map' && activePage !== 'admin' && activePage !== 'crm' && (
         <footer className="bg-brand-charcoal text-white pt-12 pb-8 border-t border-white/10 mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/10 text-xs">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <img
-                  src="/easeland_emblem_transparent.png"
-                  alt="EaseLand Logo"
-                  className="h-10 w-auto object-contain"
-                />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/10 text-xs">
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <img
+                    src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem_transparent.png"}
+                    alt="EaseLand Logo"
+                    className="h-10 sm:h-11 w-auto object-contain select-none"
+                    loading="eager"
+                    decoding="async"
+                  />
                 <div>
                   <span className="text-xl font-extrabold tracking-tight text-white font-sans">
                     Ease<span className="text-brand-yellow">Land</span>

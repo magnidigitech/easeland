@@ -47,8 +47,24 @@ export const applySiteTheme = (themeConfig) => {
 
   if (themeConfig.primaryColor) {
     root.style.setProperty('--brand-yellow', themeConfig.primaryColor);
-    root.style.setProperty('--brand-yellow-hover', themeConfig.primaryColor);
     root.style.setProperty('--metallic-gold', themeConfig.primaryColor);
+
+    const cleanHex = themeConfig.primaryColor.replace('#', '');
+    if (cleanHex.length === 6) {
+      const r = parseInt(cleanHex.substring(0, 2), 16);
+      const g = parseInt(cleanHex.substring(2, 4), 16);
+      const b = parseInt(cleanHex.substring(4, 6), 16);
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      root.style.setProperty('--brand-yellow-text', yiq >= 128 ? '#0b2545' : '#ffffff');
+
+      const hr = Math.max(0, Math.floor(r * 0.9)).toString(16).padStart(2, '0');
+      const hg = Math.max(0, Math.floor(g * 0.9)).toString(16).padStart(2, '0');
+      const hb = Math.max(0, Math.floor(b * 0.9)).toString(16).padStart(2, '0');
+      root.style.setProperty('--brand-yellow-hover', '#' + hr + hg + hb);
+    } else {
+      root.style.setProperty('--brand-yellow-hover', themeConfig.primaryColor);
+      root.style.setProperty('--brand-yellow-text', '#0b2545');
+    }
   }
 
   if (themeConfig.darkBgColor) {
@@ -67,7 +83,7 @@ export const applySiteTheme = (themeConfig) => {
   if (themeConfig.fontFamily) {
     root.style.setProperty('--brand-font', themeConfig.fontFamily);
     if (document.body) {
-      document.body.style.fontFamily = `"${themeConfig.fontFamily}", sans-serif`;
+      document.body.style.fontFamily = '"' + themeConfig.fontFamily + '", sans-serif';
     }
   }
 };

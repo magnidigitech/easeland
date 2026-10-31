@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config.js';
 import { logAdminActivity } from './verificationService.js';
-import { sanitizeSiteConfig } from '../services/mockApi.js';
+import { sanitizeSiteConfig, applySiteTheme } from '../services/mockApi.js';
 
 const CMS_MODULE_KEYS = [
   'overview', 'homepage', 'navbar', 'footer', 'buyPage',
@@ -26,10 +26,20 @@ export async function getSiteConfigAdmin() {
 
   // 1. Primary: Fetch from PostgreSQL /api/site-config (Authoritative Central Store)
   try {
-    let res = await fetch('/api/site-config');
-    if (!res.ok && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    let res = null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2500);
+      res = await fetch('/api/site-config', { signal: controller.signal });
+      clearTimeout(timer);
+    } catch (eLocal) {}
+
+    if ((!res || !res.ok) && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       try {
-        res = await fetch('https://easeland.in/api/site-config');
+        const controllerRemote = new AbortController();
+        const timerRemote = setTimeout(() => controllerRemote.abort(), 3500);
+        res = await fetch('https://easeland.in/api/site-config', { signal: controllerRemote.signal });
+        clearTimeout(timerRemote);
       } catch (eRemote) {}
     }
     if (res && res.ok) {
@@ -199,6 +209,9 @@ export async function getSiteConfigAdmin() {
   }
 
   const sanitized = sanitizeSiteConfig(mergedConfig);
+  if (sanitized && sanitized.theme) {
+    applySiteTheme(sanitized.theme);
+  }
   if (typeof window !== 'undefined' && Object.keys(sanitized).length > 0) {
     try {
       localStorage.setItem('easeland_site_config', JSON.stringify(sanitized));
@@ -298,10 +311,17 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         fullConfig.master_draft[moduleId] = moduleData;
       }
       const sanitized = sanitizeSiteConfig(fullConfig);
+      if (sanitized && sanitized.theme) {
+        applySiteTheme(sanitized.theme);
+      }
       try {
         localStorage.setItem('easeland_site_config', JSON.stringify(sanitized));
       } catch (e) {}
       window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: sanitized }));
+    }
+
+    if (moduleId === 'theme' && cleanModuleData) {
+      applySiteTheme(cleanModuleData);
     }
 
     return { success: true };
@@ -378,6 +398,9 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
 
   if (typeof window !== 'undefined') {
     const sanitized = sanitizeSiteConfig(publishPayload);
+    if (sanitized && sanitized.theme) {
+      applySiteTheme(sanitized.theme);
+    }
     try {
       localStorage.setItem('easeland_site_config', JSON.stringify(sanitized));
     } catch (e) {}

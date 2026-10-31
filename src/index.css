@@ -5,8 +5,11 @@
 :root {
   --brand-yellow: #FFE135;
   --brand-yellow-hover: #F7D02C;
+  --brand-yellow-text: #0b2545;
   --brand-navy: #000080;
   --brand-navy-light: #1A1A99;
+  --brand-charcoal: #0b172a;
+  --brand-charcoal-light: #1e293b;
   --brand-blue: #38bdf8;
   --brand-font: 'Plus Jakarta Sans', sans-serif;
   
@@ -81,11 +84,11 @@
 
 /* 70% WHITE / 20% NAVY BLUE / 10% YELLOW THEME UTILITY CLASSES */
 .bg-metallic-dark {
-  background: linear-gradient(135deg, #0b2545 0%, #1e3a8a 100%) !important;
+  background: var(--metallic-dark, var(--brand-navy, #0b2545)) !important;
 }
 
 .bg-metallic-steel {
-  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%) !important;
+  background: var(--metallic-steel, var(--brand-navy-light, #1e3a8a)) !important;
 }
 
 .bg-metallic-card {
@@ -96,24 +99,24 @@
 }
 
 .bg-metallic-card:hover {
-  border-color: #eab308 !important;
+  border-color: var(--metallic-gold, var(--brand-yellow, #eab308)) !important;
   box-shadow: 0 10px 30px -4px rgba(234, 179, 8, 0.25) !important;
 }
 
 .bg-metallic-gold,
 .bg-brand-yellow {
-  background: #eab308 !important;
-  color: #0b2545 !important;
-  -webkit-text-fill-color: #0b2545 !important;
+  background: var(--brand-yellow, var(--metallic-gold, #eab308)) !important;
+  color: var(--brand-yellow-text, #0b2545) !important;
+  -webkit-text-fill-color: var(--brand-yellow-text, #0b2545) !important;
   font-weight: 800 !important;
 }
 
 .bg-metallic-gold-hover:hover,
 .hover\:bg-brand-yellowHover:hover,
 .hover\:bg-amber-400:hover {
-  background: #ca8a04 !important;
-  color: #0b2545 !important;
-  -webkit-text-fill-color: #0b2545 !important;
+  background: var(--brand-yellow-hover, #ca8a04) !important;
+  color: var(--brand-yellow-text, #0b2545) !important;
+  -webkit-text-fill-color: var(--brand-yellow-text, #0b2545) !important;
 }
 
 .bg-metallic-silver {
@@ -125,7 +128,7 @@
 
 .text-metallic-gold,
 .text-brand-yellow {
-  color: #eab308 !important;
+  color: var(--brand-yellow, var(--metallic-gold, #eab308)) !important;
   background: none !important;
 }
 
@@ -136,7 +139,7 @@
 
 .border-metallic-gold,
 .border-brand-yellow {
-  border-color: #eab308 !important;
+  border-color: var(--brand-yellow, var(--metallic-gold, #eab308)) !important;
   box-shadow: none !important;
 }
 
@@ -158,23 +161,23 @@
 /* DYNAMIC BRAND COLOR THEME ENGINE OVERRIDES */
 .bg-brand-navy,
 .bg-brand-charcoal {
-  background: linear-gradient(145deg, #0b2545 0%, #1e3a8a 100%) !important;
+  background: var(--brand-charcoal, var(--brand-navy, #0b2545)) !important;
   color: #ffffff !important;
 }
 
 .hover\:bg-brand-navyLight:hover,
 .hover\:bg-brand-charcoalLight:hover {
-  background: linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 100%) !important;
+  background: var(--brand-charcoal-light, var(--brand-navy-light, #1e3a8a)) !important;
 }
 
 .text-brand-navy,
 .text-brand-charcoal {
-  color: #0b2545 !important;
+  color: var(--brand-charcoal, #0b2545) !important;
 }
 
 .border-brand-navy,
 .border-brand-charcoal {
-  border-color: #cbd5e1 !important;
+  border-color: var(--brand-charcoal-light, #cbd5e1) !important;
 }
 
 /* FORM ELEMENTS & DROPDOWN ACCESSIBILITY - High Contrast Legible Text */
