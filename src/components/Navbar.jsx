@@ -60,7 +60,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none shrink-0"
           >
             <img
-              src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem_transparent.png"}
+              src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem.svg"}
               alt="EaseLand Logo"
               className="h-9 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform"
             />

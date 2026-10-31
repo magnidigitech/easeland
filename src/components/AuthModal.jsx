@@ -283,7 +283,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
           <div className="flex items-center gap-3 mb-2">
             <img
-              src="/easeland_emblem_transparent.png"
+              src="/easeland_emblem.svg"
               alt="EaseLand Logo"
               className="h-9 w-auto object-contain"
             />

@@ -338,7 +338,7 @@ export const DEFAULT_SITE_CONFIG = {
     logoTextPrefix: 'Ease',
     logoTextSuffix: 'Land',
     logoSubtext: 'DIRECT PROPERTY PLATFORM',
-    logoEmblemUrl: '/easeland_emblem_transparent.png',
+    logoEmblemUrl: '/easeland_emblem.svg',
     buyLabel: 'BUY',
     rentLabel: 'RENT',
     sellLabel: 'SELL',
@@ -395,7 +395,7 @@ export const DEFAULT_SITE_CONFIG = {
   },
   branding: {
     logoUrl: '/easeland_logo.png',
-    emblemUrl: '/easeland_emblem_transparent.png',
+    emblemUrl: '/easeland_emblem.svg',
     brandTagline: 'India\'s Direct Property & Verified Land Discovery Platform',
     slogan: '100% Verified. Transparent Deals.'
   },

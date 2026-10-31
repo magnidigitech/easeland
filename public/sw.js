@@ -16,6 +16,7 @@ const PRECACHE_ASSETS = [
   '/index.html',
   '/offline.html',
   '/manifest.json',
+  '/easeland_emblem.svg',
   '/easeland_emblem_transparent.png',
   '/easeland_logo.png',
   '/icons/icon-72x72.png',

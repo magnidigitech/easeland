@@ -3453,27 +3453,6 @@ export default function AdminPortal({ onNavigate }) {
               <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${adminActionProcessing ? 'animate-spin' : ''}`} />
               <span>SYNC CLOUD & DB</span>
             </button>
-
-            <button
-              type="button"
-              onClick={handleSaveDraftConfig}
-              disabled={adminActionProcessing}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
-            >
-              <Archive className="w-3.5 h-3.5 text-blue-100" />
-              <span>SAVE CHANGES</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handlePublishSiteConfig}
-              disabled={adminActionProcessing}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 cursor-pointer disabled:opacity-50 shrink-0"
-            >
-              <Globe className="w-4 h-4 text-emerald-100 animate-pulse" />
-              <span>PUBLISH TO LIVE SITE</span>
-            </button>
-
           </div>
 
         </div>

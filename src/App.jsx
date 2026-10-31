@@ -1520,7 +1520,7 @@ export default function App() {
               <div>
                 <div className="flex items-center gap-3 mb-3">
                   <img
-                    src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem_transparent.png"}
+                    src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem.svg"}
                     alt="EaseLand Logo"
                     className="h-10 sm:h-11 w-auto object-contain select-none"
                     loading="eager"

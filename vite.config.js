@@ -14,6 +14,10 @@ function htmlCacheBusterPlugin() {
 
       let transformed = html.replace('</head>', '    ' + metaTags + '\n  </head>');
       transformed = transformed.replace(
+        /href="\/easeland_emblem\.svg"/g,
+        'href="/easeland_emblem.svg?v=' + buildTimestamp + '"'
+      );
+      transformed = transformed.replace(
         /href="\/easeland_emblem_transparent\.png"/g,
         'href="/easeland_emblem_transparent.png?v=' + buildTimestamp + '"'
       );
