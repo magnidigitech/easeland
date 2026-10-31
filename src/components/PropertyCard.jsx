@@ -126,6 +126,18 @@ export default function PropertyCard({
             )}
           </div>
           {(() => {
+            const isRental = purpose === 'RENT' || purpose === 'LEASE' || purpose === 'rent' || purpose === 'lease';
+            if (isRental) {
+              const deposit = property.securityDeposit || property.specs?.securityDeposit;
+              if (deposit && Number(deposit) > 0) {
+                return (
+                  <div className="text-[11px] font-semibold text-slate-500 -mt-0.5 mb-1.5">
+                    Deposit: Rs. {Number(deposit).toLocaleString('en-IN')}
+                  </div>
+                );
+              }
+              return null;
+            }
             const pNum = Number(property.price);
             const aNum = Number(property.area);
             const unit = property.areaUnit || property.specs?.areaUnit || 'sq ft';

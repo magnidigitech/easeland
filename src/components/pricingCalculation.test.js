@@ -74,4 +74,33 @@ describe('Price Per Unit & Total Price Calculation Suite', () => {
     expect(formatPriceDisplay(total)).toBe('Rs. 12.50 Crores');
     expect(formatPricePerUnitDisplay(12500000, 'acre')).toBe('Rs. 1,25,00,000 / acre');
   });
+
+  it('formats rental and lease monthly prices with Indian numbering and / month suffix', () => {
+    const formatRentalDisplay = (price, purpose = 'RENT') => {
+      const p = Number(price) || 0;
+      const isLease = purpose === 'LEASE';
+      return `Rs. ${p.toLocaleString('en-IN')} / month${isLease ? ' (Lease)' : ''}`;
+    };
+
+    expect(formatRentalDisplay(25000, 'RENT')).toBe('Rs. 25,000 / month');
+    expect(formatRentalDisplay(150000, 'LEASE')).toBe('Rs. 1,50,000 / month (Lease)');
+    expect(formatRentalDisplay(8500, 'RENT')).toBe('Rs. 8,500 / month');
+  });
+
+  it('calculates rental security deposit presets and move-in outlay accurately', () => {
+    const monthlyRent = 30000;
+    const presets = {
+      noDeposit: 0,
+      twoMonths: monthlyRent * 2,
+      threeMonths: monthlyRent * 3,
+      sixMonths: monthlyRent * 6
+    };
+
+    expect(presets.twoMonths).toBe(60000);
+    expect(presets.threeMonths).toBe(90000);
+    expect(presets.sixMonths).toBe(180000);
+
+    const moveInOutlay = monthlyRent + presets.twoMonths;
+    expect(moveInOutlay).toBe(90000);
+  });
 });

@@ -249,6 +249,18 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
                 {property.priceDisplay}
               </span>
               {(() => {
+                const isRental = property.purpose === 'RENT' || property.purpose === 'LEASE' || property.purpose === 'rent' || property.purpose === 'lease';
+                if (isRental) {
+                  const deposit = property.securityDeposit || property.specs?.securityDeposit;
+                  if (deposit && Number(deposit) > 0) {
+                    return (
+                      <span className="text-xs font-bold text-slate-500 block mt-0.5">
+                        Deposit: Rs. {Number(deposit).toLocaleString('en-IN')}
+                      </span>
+                    );
+                  }
+                  return null;
+                }
                 const pNum = Number(property.price);
                 const aNum = Number(property.area);
                 const unit = property.areaUnit || property.specs?.areaUnit || 'sq ft';

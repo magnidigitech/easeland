@@ -397,17 +397,62 @@ export default function PropertyReviewStep({
             </span>
           </div>
 
-          <div>
-            <span className="block text-gray-500 font-bold mb-0.5">Expected Price</span>
-            <span className="font-extrabold text-emerald-700 text-sm">
-              {formData.priceDisplay || `Rs. ${Number(formData.price || 0).toLocaleString('en-IN')}`}
-            </span>
-            {(formData.pricePerUnit || (Number(formData.area) > 0 && Number(formData.price) > 0)) && (
-              <span className="block text-[11px] font-bold text-slate-500 mt-0.5">
-                Rs. {Math.round(Number(formData.pricePerUnit) || (Number(formData.price) / Number(formData.area))).toLocaleString('en-IN')} / {formData.areaUnit || formData.specs?.areaUnit || 'sq ft'}
-              </span>
-            )}
-          </div>
+          {(() => {
+            const isRental = formData.purpose === 'RENT' || formData.purpose === 'LEASE';
+            if (isRental) {
+              return (
+                <>
+                  <div>
+                    <span className="block text-gray-500 font-bold mb-0.5">{formData.purpose === 'LEASE' ? 'Monthly Lease' : 'Monthly Rent'}</span>
+                    <span className="font-extrabold text-emerald-700 text-sm">
+                      {formData.priceDisplay || `Rs. ${Number(formData.price || 0).toLocaleString('en-IN')} / month`}
+                    </span>
+                    {formData.isNegotiable && (
+                      <span className="block text-[10px] font-bold text-emerald-600 mt-0.5">Negotiable</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="block text-gray-500 font-bold mb-0.5">Security Deposit</span>
+                    <span className="font-extrabold text-brand-charcoal">
+                      {formData.securityDeposit && Number(formData.securityDeposit) > 0
+                        ? `Rs. ${Number(formData.securityDeposit).toLocaleString('en-IN')}`
+                        : 'Nil / No Deposit'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="block text-gray-500 font-bold mb-0.5">Maintenance</span>
+                    <span className="font-extrabold text-brand-charcoal">
+                      {formData.maintenanceType === 'INCLUDED'
+                        ? 'Included in Rent'
+                        : (formData.maintenance && Number(formData.maintenance) > 0 ? `Rs. ${Number(formData.maintenance).toLocaleString('en-IN')} / month` : 'Extra')}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="block text-gray-500 font-bold mb-0.5">Available From</span>
+                    <span className="font-extrabold text-brand-charcoal">
+                      {formData.availableFrom || 'Immediately'}
+                    </span>
+                  </div>
+                </>
+              );
+            }
+            return (
+              <div>
+                <span className="block text-gray-500 font-bold mb-0.5">Expected Price</span>
+                <span className="font-extrabold text-emerald-700 text-sm">
+                  {formData.priceDisplay || `Rs. ${Number(formData.price || 0).toLocaleString('en-IN')}`}
+                </span>
+                {(formData.pricePerUnit || (Number(formData.area) > 0 && Number(formData.price) > 0)) && (
+                  <span className="block text-[11px] font-bold text-slate-500 mt-0.5">
+                    Rs. {Math.round(Number(formData.pricePerUnit) || (Number(formData.price) / Number(formData.area))).toLocaleString('en-IN')} / {formData.areaUnit || formData.specs?.areaUnit || 'sq ft'}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
 
           <div>
             <span className="block text-gray-500 font-bold mb-0.5">Total Area</span>

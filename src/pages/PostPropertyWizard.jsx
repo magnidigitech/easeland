@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2, Settings, Calculator } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, CheckCircle2, AlertCircle, RotateCcw, Building2, Tag, MapPin, X, Trash2, Settings, Calculator, Banknote } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PropertyType, Purpose, ListingStatus } from '../firebase/schema.js';
 import { createPropertyDraft, savePropertyDraftStep, getOwnerDrafts, getPropertyById, deletePropertyListing } from '../firebase/propertyService.js';
@@ -42,6 +42,12 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
     area: '',
     areaUnit: AreaUnit.SQ_FT,
     description: '',
+    securityDeposit: '',
+    maintenance: '',
+    maintenanceType: 'EXTRA',
+    isNegotiable: false,
+    availableFrom: 'Immediately',
+    preferredTenants: '',
     specs: { areaUnit: AreaUnit.SQ_FT },
     amenities: [],
     media: [],
@@ -243,12 +249,24 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
       area: cleanArea,
       areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT,
       description: p.description || propCandidate.description || '',
+      securityDeposit: p.securityDeposit || p.specs?.securityDeposit || '',
+      maintenance: p.maintenance || p.specs?.maintenance || '',
+      maintenanceType: p.maintenanceType || p.specs?.maintenanceType || (p.maintenance === 'Included' || p.specs?.maintenance === 'Included' ? 'INCLUDED' : 'EXTRA'),
+      isNegotiable: p.isNegotiable !== undefined ? p.isNegotiable : (p.specs?.isNegotiable !== undefined ? p.specs?.isNegotiable : false),
+      availableFrom: p.availableFrom || p.specs?.availableFrom || 'Immediately',
+      preferredTenants: p.preferredTenants || p.specs?.preferredTenants || '',
       specs: {
         ...(baseP.specs || {}),
         ...(propCandidate.specs || {}),
         ...(pendingData.specs || {}),
         ...(defaultFurn ? { furnishing: defaultFurn } : {}),
-        areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT
+        areaUnit: p.areaUnit || p.specs?.areaUnit || propCandidate.areaUnit || AreaUnit.SQ_FT,
+        securityDeposit: p.securityDeposit || p.specs?.securityDeposit || '',
+        maintenance: p.maintenance || p.specs?.maintenance || '',
+        maintenanceType: p.maintenanceType || p.specs?.maintenanceType || (p.maintenance === 'Included' || p.specs?.maintenance === 'Included' ? 'INCLUDED' : 'EXTRA'),
+        isNegotiable: p.isNegotiable !== undefined ? p.isNegotiable : (p.specs?.isNegotiable !== undefined ? p.specs?.isNegotiable : false),
+        availableFrom: p.availableFrom || p.specs?.availableFrom || 'Immediately',
+        preferredTenants: p.preferredTenants || p.specs?.preferredTenants || ''
       },
       amenities: Array.isArray(p.amenities) ? p.amenities : (Array.isArray(propCandidate.amenities) ? propCandidate.amenities : []),
       media: mediaList,
@@ -431,8 +449,10 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
   // Helper: Calculate formatted display strings
   const getPriceDisplay = () => {
     const p = Number(formData.price) || 0;
-    if (formData.purpose === Purpose.RENT) {
-      return `Rs. ${p.toLocaleString('en-IN')} / month`;
+    const isRental = formData.purpose === Purpose.RENT || formData.purpose === Purpose.LEASE || formData.purpose === 'RENT' || formData.purpose === 'LEASE';
+    if (isRental) {
+      const isLease = formData.purpose === Purpose.LEASE || formData.purpose === 'LEASE';
+      return `Rs. ${p.toLocaleString('en-IN')} / month${isLease ? ' (Lease)' : ''}`;
     }
     if (p >= 10000000) {
       return `Rs. ${(p / 10000000).toFixed(2)} Crores`;
@@ -479,10 +499,19 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
       if (!formData.title || formData.title.trim().length < 2) {
         errors.title = 'Property Title is required (minimum 2 characters).';
       }
+      const isRental = formData.purpose === Purpose.RENT || formData.purpose === Purpose.LEASE || formData.purpose === 'RENT' || formData.purpose === 'LEASE';
       const priceNum = Number(formData.price);
-      const ppuNum = Number(formData.pricePerUnit);
-      if ((!formData.price && !formData.pricePerUnit) || (isNaN(priceNum) && isNaN(ppuNum)) || (priceNum <= 0 && ppuNum <= 0)) {
-        errors.price = 'Please enter a valid price or price per unit.';
+      if (isRental) {
+        if (!formData.price || isNaN(priceNum) || priceNum <= 0) {
+          errors.price = (formData.purpose === Purpose.LEASE || formData.purpose === 'LEASE')
+            ? 'Please enter a valid monthly lease amount.'
+            : 'Please enter a valid expected monthly rent.';
+        }
+      } else {
+        const ppuNum = Number(formData.pricePerUnit);
+        if ((!formData.price && !formData.pricePerUnit) || (isNaN(priceNum) && isNaN(ppuNum)) || (priceNum <= 0 && ppuNum <= 0)) {
+          errors.price = 'Please enter a valid price or price per unit.';
+        }
       }
       const areaNum = Number(formData.area);
       if (!formData.area || isNaN(areaNum) || areaNum <= 0) {
@@ -583,6 +612,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
 
       const effectiveBoundary = customUpdates?.boundary !== undefined ? customUpdates.boundary : (formData.boundary || formData.ownerSubmittedBoundary || null);
 
+      const effPurpose = customUpdates?.purpose !== undefined ? customUpdates.purpose : formData.purpose;
+      const isRental = effPurpose === Purpose.RENT || effPurpose === Purpose.LEASE || effPurpose === 'RENT' || effPurpose === 'LEASE';
+
       const draftData = {
         ...formData,
         ...(customUpdates || {}),
@@ -601,22 +633,34 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
         category: customUpdates?.category !== undefined ? customUpdates.category : (formData.category || 'Open Plot Ventures'),
         propertyType: customUpdates?.propertyType !== undefined ? customUpdates.propertyType : formData.propertyType,
         otherPropertyType: customUpdates?.otherPropertyType !== undefined ? customUpdates.otherPropertyType : (formData.otherPropertyType || ''),
-        purpose: customUpdates?.purpose !== undefined ? customUpdates.purpose : formData.purpose,
+        purpose: effPurpose,
         price: priceNum,
         priceDisplay: getPriceDisplay(),
-        pricePerUnit: ppuNum > 0 ? ppuNum : null,
-        pricePerUnitDisplay: ppuNum > 0 ? ('Rs. ' + ppuNum.toLocaleString('en-IN') + ' / ' + (formData.areaUnit || AreaUnit.SQ_FT)) : '',
+        pricePerUnit: isRental ? null : (ppuNum > 0 ? ppuNum : null),
+        pricePerUnitDisplay: isRental ? '' : (ppuNum > 0 ? ('Rs. ' + ppuNum.toLocaleString('en-IN') + ' / ' + (formData.areaUnit || AreaUnit.SQ_FT)) : ''),
         area: areaNum,
         areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
         areaDisplay: getAreaDisplay(),
         description: customUpdates?.description !== undefined ? customUpdates.description : formData.description,
+        securityDeposit: customUpdates?.securityDeposit !== undefined ? customUpdates.securityDeposit : formData.securityDeposit,
+        maintenance: customUpdates?.maintenance !== undefined ? customUpdates.maintenance : formData.maintenance,
+        maintenanceType: customUpdates?.maintenanceType !== undefined ? customUpdates.maintenanceType : formData.maintenanceType,
+        isNegotiable: customUpdates?.isNegotiable !== undefined ? customUpdates.isNegotiable : formData.isNegotiable,
+        availableFrom: customUpdates?.availableFrom !== undefined ? customUpdates.availableFrom : formData.availableFrom,
+        preferredTenants: customUpdates?.preferredTenants !== undefined ? customUpdates.preferredTenants : formData.preferredTenants,
         specs: (() => {
           const effectivePropType = customUpdates?.propertyType !== undefined ? customUpdates.propertyType : formData.propertyType;
           const isLand = ['OPEN_PLOT', 'LAND', 'AGRICULTURAL_LAND', 'COMMERCIAL_LAND'].includes(String(effectivePropType || '').toUpperCase());
           const merged = {
             ...(formData.specs || {}),
             ...(customUpdates?.specs || {}),
-            areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT
+            areaUnit: formData.areaUnit || formData.specs?.areaUnit || AreaUnit.SQ_FT,
+            securityDeposit: customUpdates?.securityDeposit !== undefined ? customUpdates.securityDeposit : formData.securityDeposit,
+            maintenance: customUpdates?.maintenance !== undefined ? customUpdates.maintenance : formData.maintenance,
+            maintenanceType: customUpdates?.maintenanceType !== undefined ? customUpdates.maintenanceType : formData.maintenanceType,
+            isNegotiable: customUpdates?.isNegotiable !== undefined ? customUpdates.isNegotiable : formData.isNegotiable,
+            availableFrom: customUpdates?.availableFrom !== undefined ? customUpdates.availableFrom : formData.availableFrom,
+            preferredTenants: customUpdates?.preferredTenants !== undefined ? customUpdates.preferredTenants : formData.preferredTenants
           };
           if (!isLand && !merged.furnishing) {
             merged.furnishing = 'Unfurnished';
@@ -1037,272 +1081,594 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
         )}
 
         {/* STEP 2: BASIC INFORMATION & PRICING */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-brand-navy pb-2 border-b border-gray-200 flex items-center gap-2">
-              <Tag className="w-5 h-5 text-brand-yellow" />
-              <span>2. Basic Information & Pricing</span>
-            </h3>
+        {step === 2 && (() => {
+          const isRental = formData.purpose === Purpose.RENT || formData.purpose === Purpose.LEASE || formData.purpose === 'RENT' || formData.purpose === 'LEASE';
+          const isLease = formData.purpose === Purpose.LEASE || formData.purpose === 'LEASE';
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Property Title *
-                </label>
-                <span className={`text-[11px] font-bold ${(formData.title || '').trim().length >= 2 ? 'text-emerald-700' : 'text-slate-500'}`}>
-                  {(formData.title || '').trim().length} / 2 min chars
+          return (
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-brand-navy pb-2 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-brand-yellow" />
+                  <span>2. Basic Information & {isRental ? (isLease ? 'Lease Terms' : 'Rental Terms') : 'Pricing'}</span>
+                </div>
+                <span className={`text-[11px] font-extrabold uppercase px-2.5 py-1 rounded-lg ${
+                  isRental ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'bg-amber-100 text-amber-900 border border-amber-200'
+                }`}>
+                  {isRental ? (isLease ? 'Lease Listing' : 'Rental Listing') : 'Sale Listing'}
                 </span>
-              </div>
-              <input
-                type="text"
-                required
-                placeholder="Enter Property Title"
-                value={formData.title}
-                onChange={(e) => {
-                  setFormData({ ...formData, title: e.target.value });
-                  if (fieldErrors.title) setFieldErrors(prev => ({ ...prev, title: null }));
-                  if (errorMsg) setErrorMsg(null);
-                }}
-                className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
-                  fieldErrors.title ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
-                }`}
-              />
-              {fieldErrors.title && (
-                <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
-                  ⚠️ {fieldErrors.title}
-                </p>
-              )}
-            </div>
+              </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* 1. TOTAL AREA (TOTAL UNITS) */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Total Area (Total Units) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Property Title *
+                  </label>
+                  <span className={`text-[11px] font-bold ${(formData.title || '').trim().length >= 2 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {(formData.title || '').trim().length} / 2 min chars
+                  </span>
+                </div>
                 <input
-                  type="number"
-                  min="0"
-                  step="any"
+                  type="text"
                   required
-                  placeholder="Enter Total Area / Units"
-                  value={formData.area}
-                  onKeyDown={(e) => {
-                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
-                      e.preventDefault();
-                    }
-                  }}
+                  placeholder={
+                    isRental
+                      ? (isLease ? 'e.g. 2500 sq ft Commercial Floor for Lease in Prime Business Hub' : 'e.g. Spacious 2 BHK Flat with Balcony in Gated Community')
+                      : 'Enter Property Title'
+                  }
+                  value={formData.title}
                   onChange={(e) => {
-                    const clean = e.target.value.replace(/[^0-9.]/g, '');
-                    const newArea = clean;
-                    const areaNum = Number(newArea);
-                    const ppuNum = Number(formData.pricePerUnit);
-
-                    let nextPrice = formData.price;
-                    if (areaNum > 0 && ppuNum > 0) {
-                      nextPrice = String(Math.round(areaNum * ppuNum));
-                    }
-
-                    setFormData(prev => ({
-                      ...prev,
-                      area: newArea,
-                      price: nextPrice
-                    }));
-                    if (fieldErrors.area) setFieldErrors(prev => ({ ...prev, area: null }));
-                    if (fieldErrors.price && nextPrice) setFieldErrors(prev => ({ ...prev, price: null }));
+                    setFormData({ ...formData, title: e.target.value });
+                    if (fieldErrors.title) setFieldErrors(prev => ({ ...prev, title: null }));
                     if (errorMsg) setErrorMsg(null);
                   }}
                   className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
-                    fieldErrors.area ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                    fieldErrors.title ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
                   }`}
                 />
-                {formData.area && !fieldErrors.area && (
-                  <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
-                    Display: {getAreaDisplay()}
-                  </span>
-                )}
-                {fieldErrors.area && (
+                {fieldErrors.title && (
                   <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
-                    ⚠️ {fieldErrors.area}
+                    ⚠️ {fieldErrors.title}
                   </p>
                 )}
               </div>
 
-              {/* 2. MEASUREMENT AREA UNIT */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Measurement Area Unit
-                </label>
-                <select
-                  value={formData.areaUnit || AreaUnit.SQ_FT}
-                  onChange={(e) => {
-                    const newUnit = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      areaUnit: newUnit,
-                      specs: {
-                        ...(prev.specs || {}),
-                        areaUnit: newUnit
+              {/* AREA & MEASUREMENT UNIT (SHARED ACROSS SALE & RENT) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. TOTAL AREA */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    {isRental ? 'Total Area (Carpet / Built-up) *' : 'Total Area (Total Units) *'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    placeholder={isRental ? 'e.g. 1200' : 'Enter Total Area / Units'}
+                    value={formData.area}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                        e.preventDefault();
                       }
-                    }));
-                  }}
-                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:ring-amber-400 focus:outline-none transition-all cursor-pointer"
-                >
-                  {Object.values(AreaUnit).map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                </select>
-                <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
-                  Unit: {formData.areaUnit || AreaUnit.SQ_FT}
-                </span>
-              </div>
+                    }}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/[^0-9.]/g, '');
+                      const newArea = clean;
+                      const areaNum = Number(newArea);
+                      const ppuNum = Number(formData.pricePerUnit);
 
-              {/* 3. PRICE PER UNIT */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Price Per {formData.areaUnit || AreaUnit.SQ_FT} (INR)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder={`Enter price per ${formData.areaUnit || 'unit'}`}
-                  value={formData.pricePerUnit || ''}
-                  onKeyDown={(e) => {
-                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
-                      e.preventDefault();
-                    }
-                  }}
-                  onChange={(e) => {
-                    const clean = e.target.value.replace(/[^0-9.]/g, '');
-                    const newPPU = clean;
-                    const ppuNum = Number(newPPU);
-                    const areaNum = Number(formData.area);
+                      let nextPrice = formData.price;
+                      if (!isRental && areaNum > 0 && ppuNum > 0) {
+                        nextPrice = String(Math.round(areaNum * ppuNum));
+                      }
 
-                    let nextPrice = formData.price;
-                    if (ppuNum > 0 && areaNum > 0) {
-                      nextPrice = String(Math.round(areaNum * ppuNum));
-                    }
+                      setFormData(prev => ({
+                        ...prev,
+                        area: newArea,
+                        price: nextPrice
+                      }));
+                      if (fieldErrors.area) setFieldErrors(prev => ({ ...prev, area: null }));
+                      if (!isRental && fieldErrors.price && nextPrice) setFieldErrors(prev => ({ ...prev, price: null }));
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                      fieldErrors.area ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                    }`}
+                  />
+                  {formData.area && !fieldErrors.area && (
+                    <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
+                      Display: {getAreaDisplay()}
+                    </span>
+                  )}
+                  {fieldErrors.area && (
+                    <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                      ⚠️ {fieldErrors.area}
+                    </p>
+                  )}
+                </div>
 
-                    setFormData(prev => ({
-                      ...prev,
-                      pricePerUnit: newPPU,
-                      price: nextPrice
-                    }));
-                    if (fieldErrors.price && nextPrice) setFieldErrors(prev => ({ ...prev, price: null }));
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                  className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:ring-amber-400 focus:outline-none transition-all"
-                />
-                {formData.pricePerUnit && Number(formData.pricePerUnit) > 0 && (
-                  <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
-                    Display: Rs. {Number(formData.pricePerUnit).toLocaleString('en-IN')} / {formData.areaUnit || AreaUnit.SQ_FT}
+                {/* 2. MEASUREMENT AREA UNIT */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Measurement Area Unit
+                  </label>
+                  <select
+                    value={formData.areaUnit || AreaUnit.SQ_FT}
+                    onChange={(e) => {
+                      const newUnit = e.target.value;
+                      setFormData(prev => ({
+                        ...prev,
+                        areaUnit: newUnit,
+                        specs: {
+                          ...(prev.specs || {}),
+                          areaUnit: newUnit
+                        }
+                      }));
+                    }}
+                    className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:ring-amber-400 focus:outline-none transition-all cursor-pointer"
+                  >
+                    {Object.values(AreaUnit).map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                  </select>
+                  <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
+                    Unit: {formData.areaUnit || AreaUnit.SQ_FT}
                   </span>
-                )}
+                </div>
               </div>
 
-              {/* 4. TOTAL EXPECTED PRICE */}
+              {/* DYNAMIC PRICING SECTION */}
+              {isRental ? (
+                /* RENTAL & LEASE SPECIFIC PRICING */
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-black uppercase tracking-wider text-brand-navy">
+                        {isLease ? 'Lease Considerations & Deposit' : 'Monthly Rent & Security Deposit'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500">
+                      Standard Indian Rental Terms
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* EXPECTED MONTHLY RENT */}
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        {isLease ? 'Expected Monthly Lease (INR) *' : 'Expected Monthly Rent (INR) *'}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        placeholder="e.g. 25000"
+                        value={formData.price}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(e) => {
+                          const clean = e.target.value.replace(/[^0-9]/g, '');
+                          setFormData(prev => ({
+                            ...prev,
+                            price: clean
+                          }));
+                          if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        className={`w-full p-3.5 bg-white border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:outline-none transition-all ${
+                          fieldErrors.price ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                        }`}
+                      />
+                      {formData.price && !fieldErrors.price && (
+                        <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
+                          Display: {getPriceDisplay()}
+                        </span>
+                      )}
+                      {fieldErrors.price && (
+                        <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                          ⚠️ {fieldErrors.price}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* SECURITY DEPOSIT / ADVANCE */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Security Deposit / Advance (INR)
+                        </label>
+                        <span className="text-[10px] font-extrabold text-emerald-700">Refundable</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 50000 (0 if none)"
+                        value={formData.securityDeposit ?? ''}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(e) => {
+                          const clean = e.target.value.replace(/[^0-9]/g, '');
+                          setFormData(prev => ({
+                            ...prev,
+                            securityDeposit: clean,
+                            specs: { ...(prev.specs || {}), securityDeposit: clean }
+                          }));
+                        }}
+                        className="w-full p-3.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all"
+                      />
+                      {/* PRESET CHIPS IF RENT IS SET */}
+                      {Number(formData.price) > 0 && (
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-slate-500">Quick fill:</span>
+                          {[
+                            { label: 'No Deposit', val: '0' },
+                            { label: '2 Months', val: String(Number(formData.price) * 2) },
+                            { label: '3 Months', val: String(Number(formData.price) * 3) },
+                            { label: '6 Months', val: String(Number(formData.price) * 6) }
+                          ].map(preset => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setFormData(prev => ({
+                                ...prev,
+                                securityDeposit: preset.val,
+                                specs: { ...(prev.specs || {}), securityDeposit: preset.val }
+                              }))}
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border transition-all ${
+                                String(formData.securityDeposit) === preset.val
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {formData.securityDeposit !== '' && formData.securityDeposit !== undefined && (
+                        <span className="text-[11px] font-extrabold text-slate-700 mt-1 block">
+                          Deposit: {Number(formData.securityDeposit) > 0 ? `Rs. ${Number(formData.securityDeposit).toLocaleString('en-IN')}` : 'No Deposit Required'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* MAINTENANCE CHARGES */}
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Maintenance Charges
+                      </label>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 bg-white px-3 py-2.5 rounded-xl border border-gray-300 hover:border-gray-400 transition-colors w-full">
+                          <input
+                            type="checkbox"
+                            checked={formData.maintenanceType === 'INCLUDED'}
+                            onChange={(e) => {
+                              const isInc = e.target.checked;
+                              setFormData(prev => ({
+                                ...prev,
+                                maintenanceType: isInc ? 'INCLUDED' : 'EXTRA',
+                                maintenance: isInc ? '0' : prev.maintenance,
+                                specs: {
+                                  ...(prev.specs || {}),
+                                  maintenanceType: isInc ? 'INCLUDED' : 'EXTRA',
+                                  maintenance: isInc ? '0' : prev.maintenance
+                                }
+                              }));
+                            }}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span>Maintenance Included in Monthly Rent</span>
+                        </label>
+
+                        {formData.maintenanceType !== 'INCLUDED' && (
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Monthly Maintenance (INR)"
+                              value={formData.maintenance || ''}
+                              onKeyDown={(e) => {
+                                if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onChange={(e) => {
+                                const clean = e.target.value.replace(/[^0-9]/g, '');
+                                setFormData(prev => ({
+                                  ...prev,
+                                  maintenance: clean,
+                                  specs: { ...(prev.specs || {}), maintenance: clean }
+                                }));
+                              }}
+                              className="w-full p-3.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all"
+                            />
+                            {formData.maintenance && Number(formData.maintenance) > 0 && (
+                              <span className="text-[11px] font-extrabold text-slate-600 mt-1 block">
+                                Display: Rs. {Number(formData.maintenance).toLocaleString('en-IN')} / month
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* RENT NEGOTIABILITY & AVAILABILITY */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Availability & Terms
+                      </label>
+                      <select
+                        value={formData.availableFrom || 'Immediately'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            availableFrom: val,
+                            specs: { ...(prev.specs || {}), availableFrom: val }
+                          }));
+                        }}
+                        className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer"
+                      >
+                        <option value="Immediately">Available Immediately (Ready to Move)</option>
+                        <option value="Within 15 Days">Available within 15 Days</option>
+                        <option value="Within 30 Days">Available within 30 Days</option>
+                        <option value="After 1 Month">Available after 1 Month</option>
+                      </select>
+
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 bg-white px-3 py-2 rounded-xl border border-gray-300 hover:border-gray-400 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(formData.isNegotiable)}
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            setFormData(prev => ({
+                              ...prev,
+                              isNegotiable: val,
+                              specs: { ...(prev.specs || {}), isNegotiable: val }
+                            }));
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <span>Rent is Negotiable</span>
+                      </label>
+                    </div>
+
+                    {/* PREFERRED TENANTS */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Preferred Tenant Profile
+                      </label>
+                      <select
+                        value={formData.preferredTenants || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            preferredTenants: val,
+                            specs: { ...(prev.specs || {}), preferredTenants: val }
+                          }));
+                        }}
+                        className="w-full p-3.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer"
+                      >
+                        <option value="">-- Any Suitable Tenant (No Specific Preference) --</option>
+                        <option value="Families & Working Professionals">Families & Working Professionals</option>
+                        <option value="Families Only">Families Only</option>
+                        <option value="Working Professionals Only">Working Professionals Only</option>
+                        <option value="Bachelors / Students">Bachelors / Students</option>
+                        <option value="Company Lease / Corporate">Company Lease / Corporate</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* SALE SPECIFIC PRICING */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 3. PRICE PER UNIT */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Price Per {formData.areaUnit || AreaUnit.SQ_FT} (INR)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder={`Enter price per ${formData.areaUnit || 'unit'}`}
+                      value={formData.pricePerUnit || ''}
+                      onKeyDown={(e) => {
+                        if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^0-9.]/g, '');
+                        const newPPU = clean;
+                        const ppuNum = Number(newPPU);
+                        const areaNum = Number(formData.area);
+
+                        let nextPrice = formData.price;
+                        if (ppuNum > 0 && areaNum > 0) {
+                          nextPrice = String(Math.round(areaNum * ppuNum));
+                        }
+
+                        setFormData(prev => ({
+                          ...prev,
+                          pricePerUnit: newPPU,
+                          price: nextPrice
+                        }));
+                        if (fieldErrors.price && nextPrice) setFieldErrors(prev => ({ ...prev, price: null }));
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:ring-amber-400 focus:outline-none transition-all"
+                    />
+                    {formData.pricePerUnit && Number(formData.pricePerUnit) > 0 && (
+                      <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
+                        Display: Rs. {Number(formData.pricePerUnit).toLocaleString('en-IN')} / {formData.areaUnit || AreaUnit.SQ_FT}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 4. TOTAL EXPECTED PRICE */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Total Expected Price (INR) *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      placeholder="Total calculated price"
+                      value={formData.price}
+                      onKeyDown={(e) => {
+                        if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^0-9]/g, '');
+                        const newPrice = clean;
+                        const priceNum = Number(newPrice);
+                        const areaNum = Number(formData.area);
+
+                        let nextPPU = formData.pricePerUnit;
+                        if (priceNum > 0 && areaNum > 0) {
+                          nextPPU = String(Math.round(priceNum / areaNum));
+                        }
+
+                        setFormData(prev => ({
+                          ...prev,
+                          price: newPrice,
+                          pricePerUnit: nextPPU
+                        }));
+                        if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
+                        fieldErrors.price ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                      }`}
+                    />
+                    {formData.price && !fieldErrors.price && (
+                      <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
+                        Display: {getPriceDisplay()}
+                      </span>
+                    )}
+                    {fieldErrors.price && (
+                      <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
+                        ⚠️ {fieldErrors.price}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* DYNAMIC CALCULATION / OVERVIEW BANNER */}
+              {isRental ? (
+                /* RENTAL OVERVIEW SUMMARY CARD */
+                Number(formData.price) > 0 && (
+                  <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold text-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <Banknote className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[11px] block font-bold">
+                          {isLease ? 'Monthly Lease Rate:' : 'Monthly Rent:'}
+                        </span>
+                        <span className="text-emerald-800 font-black text-base">
+                          {getPriceDisplay()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-bold text-slate-600 flex-wrap sm:justify-end">
+                      <div className="bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                        <span className="text-slate-400 text-[10px] block uppercase font-extrabold">Security Deposit</span>
+                        <span className="text-slate-800 font-black text-[11px]">
+                          {formData.securityDeposit && Number(formData.securityDeposit) > 0
+                            ? `Rs. ${Number(formData.securityDeposit).toLocaleString('en-IN')}`
+                            : 'Nil'}
+                        </span>
+                      </div>
+                      <div className="bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                        <span className="text-slate-400 text-[10px] block uppercase font-extrabold">Maintenance</span>
+                        <span className="text-slate-800 font-black text-[11px]">
+                          {formData.maintenanceType === 'INCLUDED'
+                            ? 'Included'
+                            : (formData.maintenance && Number(formData.maintenance) > 0 ? `Rs. ${Number(formData.maintenance).toLocaleString('en-IN')}/mo` : 'Extra')}
+                        </span>
+                      </div>
+                      <div className="bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                        <span className="text-slate-400 text-[10px] block uppercase font-extrabold">Move-in Outlay</span>
+                        <span className="text-emerald-700 font-black text-[11px]">
+                          Rs. {(Number(formData.price || 0) + Number(formData.securityDeposit || 0)).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              ) : (
+                /* SALE MULTIPLICATION BANNER */
+                Number(formData.area) > 0 && (Number(formData.pricePerUnit) > 0 || Number(formData.price) > 0) && (
+                  <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-800">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Calculator className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="text-slate-600">Total Price Calculation:</span>
+                      <span className="font-mono bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-slate-900 font-extrabold text-[11px]">
+                        {Number(formData.area).toLocaleString('en-IN')} {formData.areaUnit || AreaUnit.SQ_FT} × Rs. {Number(formData.pricePerUnit || (Number(formData.area) > 0 ? Math.round(Number(formData.price) / Number(formData.area)) : 0)).toLocaleString('en-IN')} / {formData.areaUnit || AreaUnit.SQ_FT}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <span className="text-slate-500 text-[11px]">Total:</span>
+                      <span className="text-emerald-700 font-black text-sm">
+                        {getPriceDisplay()}
+                      </span>
+                    </div>
+                  </div>
+                )
+              )}
+
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Total Expected Price (INR) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Property Description *
+                  </label>
+                  <span className={`text-[11px] font-bold ${(formData.description || '').trim().length >= 3 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {(formData.description || '').trim().length} / 3 min chars
+                  </span>
+                </div>
+                <textarea
+                  rows={4}
                   required
-                  placeholder="Total calculated price"
-                  value={formData.price}
-                  onKeyDown={(e) => {
-                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
-                      e.preventDefault();
-                    }
-                  }}
+                  placeholder={
+                    isRental
+                      ? 'Describe property condition, furnishing, floor number, parking, maintenance terms, nearby schools/IT parks, and any restrictions...'
+                      : 'Enter Property Description'
+                  }
+                  value={formData.description}
                   onChange={(e) => {
-                    const clean = e.target.value.replace(/[^0-9]/g, '');
-                    const newPrice = clean;
-                    const priceNum = Number(newPrice);
-                    const areaNum = Number(formData.area);
-
-                    let nextPPU = formData.pricePerUnit;
-                    if (priceNum > 0 && areaNum > 0) {
-                      nextPPU = String(Math.round(priceNum / areaNum));
-                    }
-
-                    setFormData(prev => ({
-                      ...prev,
-                      price: newPrice,
-                      pricePerUnit: nextPPU
-                    }));
-                    if (fieldErrors.price) setFieldErrors(prev => ({ ...prev, price: null }));
+                    setFormData({ ...formData, description: e.target.value });
+                    if (fieldErrors.description) setFieldErrors(prev => ({ ...prev, description: null }));
                     if (errorMsg) setErrorMsg(null);
                   }}
                   className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
-                    fieldErrors.price ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
+                    fieldErrors.description ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
                   }`}
                 />
-                {formData.price && !fieldErrors.price && (
-                  <span className="text-[11px] font-extrabold text-emerald-700 mt-1 block">
-                    Display: {getPriceDisplay()}
-                  </span>
-                )}
-                {fieldErrors.price && (
+                {fieldErrors.description && (
                   <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
-                    ⚠️ {fieldErrors.price}
+                    ⚠️ {fieldErrors.description}
                   </p>
                 )}
               </div>
             </div>
-
-            {/* INTERACTIVE CALCULATION SUMMARY BANNER */}
-            {Number(formData.area) > 0 && (Number(formData.pricePerUnit) > 0 || Number(formData.price) > 0) && (
-              <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-800">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Calculator className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span className="text-slate-600">Total Price Calculation:</span>
-                  <span className="font-mono bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-slate-900 font-extrabold text-[11px]">
-                    {Number(formData.area).toLocaleString('en-IN')} {formData.areaUnit || AreaUnit.SQ_FT} × Rs. {Number(formData.pricePerUnit || (Number(formData.area) > 0 ? Math.round(Number(formData.price) / Number(formData.area)) : 0)).toLocaleString('en-IN')} / {formData.areaUnit || AreaUnit.SQ_FT}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <span className="text-slate-500 text-[11px]">Total:</span>
-                  <span className="text-emerald-700 font-black text-sm">
-                    {getPriceDisplay()}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Property Description *
-                </label>
-                <span className={`text-[11px] font-bold ${(formData.description || '').trim().length >= 3 ? 'text-emerald-700' : 'text-slate-500'}`}>
-                  {(formData.description || '').trim().length} / 3 min chars
-                </span>
-              </div>
-              <textarea
-                rows={4}
-                required
-                placeholder="Enter Property Description"
-                value={formData.description}
-                onChange={(e) => {
-                  setFormData({ ...formData, description: e.target.value });
-                  if (fieldErrors.description) setFieldErrors(prev => ({ ...prev, description: null }));
-                  if (errorMsg) setErrorMsg(null);
-                }}
-                className={`w-full p-3.5 bg-gray-50 border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:bg-white focus:outline-none transition-all ${
-                  fieldErrors.description ? 'border-red-500 ring-2 ring-red-200 bg-red-50/30' : 'border-gray-300 focus:ring-amber-400'
-                }`}
-              />
-              {fieldErrors.description && (
-                <p className="text-[11px] font-extrabold text-red-600 mt-1 flex items-center gap-1">
-                  ⚠️ {fieldErrors.description}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* STEP 3: PROPERTY LOCATION */}
         {step === 3 && (
