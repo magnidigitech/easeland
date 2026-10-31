@@ -4877,8 +4877,8 @@ export default function AdminPortal({ onNavigate }) {
 
                     {/* Quick Preset Slot Selectors & Dynamic Allocation Feedback */}
                     <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold text-gray-500">Quick Slot Presets:</span>
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full shrink-0">
+                        <span className="text-[11px] font-bold text-gray-500 shrink-0">Quick Slot Presets:</span>
                         {[1, 2, 3, 4, 6, 8, 12].map((slotVal) => {
                           const isActive = Number(promoDisplayCount) === slotVal;
                           return (
@@ -4894,7 +4894,7 @@ export default function AdminPortal({ onNavigate }) {
                                   featuredPropertyIds: stagedPromotedIds
                                 }, 'Showcase set to ' + slotVal + ' Max Display Slots.');
                               }}
-                              className={'px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ' + (
+                              className={'px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer shrink-0 ' + (
                                 isActive
                                   ? 'bg-brand-charcoal text-brand-yellow shadow-xs'
                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -4941,7 +4941,7 @@ export default function AdminPortal({ onNavigate }) {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 whitespace-nowrap self-start sm:self-auto">
                       {/* Separate Save Button for Active Promoted Customer Properties */}
                       <button
                         type="button"
@@ -5232,7 +5232,7 @@ export default function AdminPortal({ onNavigate }) {
                         const ownerPhone = prop.owner?.phone || prop.ownerPublicPhone || 'Contact in Records';
 
                         return (
-                          <div key={pId} className="p-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 transition-colors">
+                          <div key={pId} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
                                 <img
@@ -5310,17 +5310,17 @@ export default function AdminPortal({ onNavigate }) {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="bg-emerald-100 text-emerald-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full border border-emerald-300">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 whitespace-nowrap">
+                    <span className="bg-emerald-100 text-emerald-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full border border-emerald-300 shrink-0">
                       {allProperties.filter(p => p && (p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.isPlatformVerified)).length} Verified & Live
                     </span>
-                    <span className="bg-amber-100 text-amber-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full border border-amber-300">
+                    <span className="bg-amber-100 text-amber-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full border border-amber-300 shrink-0">
                       {verificationQueue.length} Pending Audit
                     </span>
                     <button
                       type="button"
                       onClick={() => setIsPurgeModalOpen(true)}
-                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-300 font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow"
+                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-300 font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow shrink-0"
                       title="Wipe ALL property listings across PostgreSQL, Firestore, and Local Storage — Use with Caution"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-red-600 shrink-0" />
@@ -5511,12 +5511,12 @@ export default function AdminPortal({ onNavigate }) {
             {/* TAB: VERIFICATION QUEUE */}
             {activeTab === 'verification' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-5 rounded-2xl border border-gray-200 shadow-sm gap-3">
                   <div>
                     <h3 className="text-lg font-black text-brand-charcoal">Verification Queue</h3>
                     <p className="text-xs text-gray-500 font-medium">Pending properties requiring document audit and field inspection approval.</p>
                   </div>
-                  <span className="bg-amber-100 text-amber-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full">
+                  <span className="bg-amber-100 text-amber-800 font-extrabold text-xs px-3.5 py-1.5 rounded-full shrink-0 self-start sm:self-auto">
                     {verificationQueue.length} Pending Audit
                   </span>
                 </div>
@@ -5789,11 +5789,11 @@ export default function AdminPortal({ onNavigate }) {
                             </p>
                           </div>
 
-                          <div className="text-right flex flex-col items-end gap-2">
+                          <div className="flex flex-col sm:items-end sm:text-right gap-2">
                             <div>
                               {diffs.price?.changed ? (
                                 <div>
-                                  <div className="flex items-center gap-1.5 justify-end">
+                                  <div className="flex items-center gap-1.5 sm:justify-end">
                                     <span className="text-[10px] font-black uppercase text-purple-900 bg-purple-200 px-1.5 py-0.5 rounded border border-purple-300">
                                       PROPOSED
                                     </span>
@@ -5801,7 +5801,7 @@ export default function AdminPortal({ onNavigate }) {
                                       {diffs.price.proposedDisplay}
                                     </span>
                                   </div>
-                                  <span className="text-xs font-bold text-slate-500 line-through block text-right">
+                                  <span className="text-xs font-bold text-slate-500 line-through block sm:text-right">
                                     Live: {diffs.price.liveDisplay}
                                   </span>
                                 </div>
@@ -5817,7 +5817,7 @@ export default function AdminPortal({ onNavigate }) {
                             <button
                               type="button"
                               onClick={() => handleDeleteProperty(activeAuditProp)}
-                              className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-extrabold px-3 py-1.5 rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                              className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-extrabold px-3 py-1.5 rounded-xl transition-all text-xs flex items-center gap-1.5 shadow-sm self-start sm:self-auto"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Delete Property</span>
@@ -6652,7 +6652,7 @@ export default function AdminPortal({ onNavigate }) {
                                       return (
                                         <div
                                           key={idx}
-                                          className={'p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-slate-900 min-w-0 overflow-hidden shadow-sm ' +
+                                          className={'p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-900 min-w-0 overflow-hidden shadow-sm ' +
                                             (isProposedDoc ? 'bg-purple-50 border-2 border-purple-300 ring-2 ring-purple-100' : 'bg-blue-50 border border-blue-200')}
                                         >
                                           <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
@@ -6674,7 +6674,7 @@ export default function AdminPortal({ onNavigate }) {
                                               </span>
                                             </div>
                                           </div>
-                                          <div className="flex items-center gap-2 shrink-0">
+                                          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
                                             {docUrlStr && docUrlStr !== '#' && (
                                               <a
                                                 href={docUrlStr}
@@ -6811,8 +6811,8 @@ export default function AdminPortal({ onNavigate }) {
               <div className="space-y-6">
 
                 {/* METRICS HEADER */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar py-1 w-full">
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between shrink-0 min-w-[210px] sm:min-w-0 flex-1">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Registered Users</span>
                       <span className="text-2xl font-black text-brand-charcoal mt-1 block">{registeredUsersList.length}</span>
@@ -6822,7 +6822,7 @@ export default function AdminPortal({ onNavigate }) {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between shrink-0 min-w-[210px] sm:min-w-0 flex-1">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Active Users</span>
                       <span className="text-2xl font-black text-emerald-600 mt-1 block">
@@ -6834,7 +6834,7 @@ export default function AdminPortal({ onNavigate }) {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between shrink-0 min-w-[210px] sm:min-w-0 flex-1">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Suspended Users</span>
                       <span className="text-2xl font-black text-amber-600 mt-1 block">
@@ -6846,7 +6846,7 @@ export default function AdminPortal({ onNavigate }) {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between shrink-0 min-w-[210px] sm:min-w-0 flex-1">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Removed / Deleted</span>
                       <span className="text-2xl font-black text-red-600 mt-1 block">
@@ -6875,7 +6875,7 @@ export default function AdminPortal({ onNavigate }) {
                     <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto flex-wrap sm:flex-nowrap">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 whitespace-nowrap">
                     <button
                       type="button"
                       onClick={handleSyncCloudAndDb}
@@ -6899,7 +6899,7 @@ export default function AdminPortal({ onNavigate }) {
                           setUserStatusFilter(st);
                           setUserCurrentPage(1);
                         }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${userStatusFilter === st
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 ${userStatusFilter === st
                             ? 'bg-brand-charcoal text-white shadow'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                           }`}
@@ -7157,7 +7157,7 @@ export default function AdminPortal({ onNavigate }) {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 justify-center sm:justify-end">
                           <button
                             type="button"
                             disabled={currentPageClamped <= 1}
@@ -7262,14 +7262,14 @@ export default function AdminPortal({ onNavigate }) {
                 )}
 
                 {/* KPI METRIC CARDS */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+                <div className="flex sm:grid sm:grid-cols-4 gap-3 overflow-x-auto no-scrollbar py-1 w-full">
+                  <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 shrink-0 min-w-[170px] sm:min-w-0 flex-1">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block">Total Captured</span>
                     <span className="text-2xl font-black text-blue-900">{visitorLeads.length}</span>
                     <span className="text-[10px] text-blue-600 block mt-0.5 font-semibold">Saved in PostgreSQL</span>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 shrink-0 min-w-[170px] sm:min-w-0 flex-1">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">New / Pending</span>
                     <span className="text-2xl font-black text-amber-900">
                       {visitorLeads.filter(v => v.status === 'NEW').length}
@@ -7277,7 +7277,7 @@ export default function AdminPortal({ onNavigate }) {
                     <span className="text-[10px] text-amber-700 block mt-0.5 font-semibold">Awaiting first contact</span>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 shrink-0 min-w-[170px] sm:min-w-0 flex-1">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">Contacted / Converted</span>
                     <span className="text-2xl font-black text-emerald-900">
                       {visitorLeads.filter(v => v.status === 'CONTACTED' || v.status === 'CONVERTED' || v.status === 'QUALIFIED').length}
@@ -7285,7 +7285,7 @@ export default function AdminPortal({ onNavigate }) {
                     <span className="text-[10px] text-emerald-600 block mt-0.5 font-semibold">Active in sales cycle</span>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200">
+                  <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 shrink-0 min-w-[170px] sm:min-w-0 flex-1">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 block">Avg Site Engagement</span>
                     <span className="text-2xl font-black text-purple-900">1+ Min</span>
                     <span className="text-[10px] text-purple-600 block mt-0.5 font-semibold">High purchase intent</span>
@@ -7499,8 +7499,8 @@ export default function AdminPortal({ onNavigate }) {
                     <h3 className="text-lg font-black text-brand-charcoal">Reports & Activity Logs</h3>
                     <p className="text-xs text-gray-500 font-medium">Real-time audit logs of all legal approvals, user suspensions, CMS edits, and site publications.</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-brand-charcoal text-brand-yellow font-extrabold text-xs px-3 py-1.5 rounded-full border border-gray-800">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0 self-start sm:self-auto">
+                    <span className="bg-brand-charcoal text-brand-yellow font-extrabold text-xs px-3 py-1.5 rounded-full border border-gray-800 shrink-0">
                       {activityLogs.length} Total Logs
                     </span>
                     {activityLogs.length > 0 && (
@@ -7511,7 +7511,7 @@ export default function AdminPortal({ onNavigate }) {
                             try { localStorage.removeItem('easeland_admin_activity_logs'); } catch (e) { }
                           }
                         }}
-                        className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-3 py-1.5 rounded-xl border border-red-200 transition-colors"
+                        className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs px-3 py-1.5 rounded-xl border border-red-200 transition-colors shrink-0 whitespace-nowrap"
                       >
                         Clear Audit Trail
                       </button>
@@ -7532,7 +7532,7 @@ export default function AdminPortal({ onNavigate }) {
                 </div>
 
                 {/* LOG ENTRIES CONTAINER */}
-                <div className="p-4 bg-slate-950 text-slate-100 rounded-2xl border border-slate-800 text-xs font-mono max-h-96 overflow-y-auto space-y-2 shadow-inner">
+                <div className="p-4 bg-slate-950 text-slate-100 rounded-2xl border border-slate-800 text-xs font-mono max-h-[60dvh] overflow-y-auto space-y-2 shadow-inner">
                   {activityLogs.filter(log => !logSearchQuery.trim() || log.toLowerCase().includes(logSearchQuery.toLowerCase().trim())).length === 0 ? (
                     <div className="py-8 text-center text-slate-500 font-sans text-xs">
                       No activity logs match your filter search.
@@ -7556,12 +7556,12 @@ export default function AdminPortal({ onNavigate }) {
             {/* TAB: ADMIN PROFILE & SECURITY SETTINGS */}
             {activeTab === 'profile-settings' && (
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                <div className="border-b border-gray-100 pb-4 flex items-center justify-between">
+                <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-black text-brand-charcoal">Administrator Profile & Security Settings</h3>
                     <p className="text-xs text-gray-500 font-medium">Update your admin credentials, contact info, and security preferences.</p>
                   </div>
-                  <span className="bg-purple-100 text-purple-900 font-extrabold text-xs px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <span className="bg-purple-100 text-purple-900 font-extrabold text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
                     <ShieldCheck className="w-4 h-4 text-purple-700" />
                     PLATFORM ADMIN
                   </span>
@@ -7660,7 +7660,7 @@ export default function AdminPortal({ onNavigate }) {
                   </div>
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                <div className="pt-2 flex justify-stretch sm:justify-end">
                   <button
                     onClick={() => {
                       if (adminPassword && adminPassword !== adminConfirmPassword) {
@@ -7683,7 +7683,7 @@ export default function AdminPortal({ onNavigate }) {
                       }
                       setTimeout(() => setPublishSuccessMessage(''), 3000);
                     }}
-                    className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all"
+                    className="w-full sm:w-auto justify-center bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     Save Admin Credentials
@@ -7699,8 +7699,8 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 1: SUSPENSION DURATION & REASON CUSTOMIZER */}
       {isSuspendModalOpen && selectedUserForSuspension && (
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -7825,8 +7825,8 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 2: ACCOUNT REMOVAL CONFIRMATION */}
       {isRemoveModalOpen && selectedUserForRemoval && (
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-red-600">
                 <XCircle className="w-5 h-5" />
@@ -7878,8 +7878,8 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 3: CHECK DEAL DETAILS & DOSSIER */}
       {selectedDealForDossier && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 max-h-[90dvh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 max-h-[92dvh] overflow-y-auto">
             {/* HEADER */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>
@@ -7903,11 +7903,11 @@ export default function AdminPortal({ onNavigate }) {
                 <span>Current Deal Stage</span>
                 <span className="text-brand-yellow font-black uppercase">{selectedDealForDossier.stage}</span>
               </div>
-              <div className="grid grid-cols-5 gap-1.5 text-[9px] font-black uppercase text-center">
+              <div className="flex sm:grid sm:grid-cols-5 gap-1.5 text-[9px] font-black uppercase text-center overflow-x-auto no-scrollbar py-0.5">
                 {['NEW', 'SITE_VISIT', 'DOCUMENT_AUDIT', 'ADVANCE_PAID', 'DEAL_CLOSED'].map((stg) => (
                   <div
                     key={stg}
-                    className={`p-1.5 rounded-lg border ${selectedDealForDossier.stage === stg
+                    className={`p-1.5 rounded-lg border shrink-0 min-w-[90px] sm:min-w-0 ${selectedDealForDossier.stage === stg
                         ? 'bg-brand-yellow text-brand-charcoal border-brand-yellow font-extrabold shadow'
                         : 'bg-white/10 text-gray-300 border-white/10'
                       }`}
@@ -8005,8 +8005,8 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 4: SCHEDULE NEW FOLLOW-UP OR SITE VISIT */}
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-brand-charcoal">
                 <Calendar className="w-5 h-5 text-brand-yellow" />
@@ -8112,8 +8112,8 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 5: RESET TO FACTORY DEFAULT CONFIRMATION */}
       {isResetModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-200 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-200 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black">
@@ -8162,8 +8162,8 @@ export default function AdminPortal({ onNavigate }) {
 
       {/* MODAL 6: PURGE ALL TEST PROPERTIES CONFIRMATION */}
       {isPurgeModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-red-200 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-red-200 max-h-[92dvh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center font-black">
