@@ -3518,8 +3518,8 @@ export default function AdminPortal({ onNavigate }) {
                 <span>{item.label}</span>
                 {(item.count !== undefined ? item.count > 0 : Boolean(item.badge)) && (
                   <span
-                    style={isActive ? { color: '#ffffff', backgroundColor: '#0f172a' } : undefined}
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black inline-flex items-center justify-center min-w-[18px] ${
+                    style={isActive ? { color: '#ffffff', WebkitTextFillColor: '#ffffff', backgroundColor: '#0f172a' } : { color: '#020617', WebkitTextFillColor: '#020617', backgroundColor: '#fbbf24' }}
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black inline-flex items-center justify-center min-w-[18px] text-white ${
                       isActive ? 'bg-slate-900 text-white shadow-xs' : 'bg-amber-400 text-slate-950'
                     }`}
                   >

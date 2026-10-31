@@ -114,6 +114,19 @@
   font-weight: 800 !important;
 }
 
+/* Explicit contrast override for child text and dark badges inside yellow containers */
+.bg-metallic-gold .text-white,
+.bg-brand-yellow .text-white,
+.bg-metallic-gold [class*="text-white"],
+.bg-brand-yellow [class*="text-white"],
+.bg-metallic-gold .bg-slate-900,
+.bg-brand-yellow .bg-slate-900,
+.bg-metallic-gold .bg-brand-charcoal,
+.bg-brand-yellow .bg-brand-charcoal {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
 .bg-metallic-gold-hover:hover,
 .hover\:bg-brand-yellowHover:hover,
 .hover\:bg-amber-400:hover {

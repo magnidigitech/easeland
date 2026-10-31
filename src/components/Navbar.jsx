@@ -52,20 +52,20 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl text-slate-900 border-b border-slate-200 shadow-sm">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 gap-4">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-3 sm:gap-4">
 
           {/* LOGO - Returns Admin to Admin Studio or Users to Homepage */}
           <div
             onClick={() => setActivePage(user?.role === 'ADMIN' ? 'admin' : 'home')}
-            className="flex items-center gap-3 cursor-pointer group select-none shrink-0"
+            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none shrink-0"
           >
             <img
               src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem_transparent.png"}
               alt="EaseLand Logo"
-              className="h-10 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform"
+              className="h-9 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform"
             />
-            <div>
-              <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 font-sans">
+            <div className="flex flex-col justify-center">
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 font-sans leading-tight">
                 {siteConfig?.navbar?.logoTextPrefix || (siteConfig?.overview?.siteName ? siteConfig.overview.siteName : 'Ease')}<span className="text-amber-500">{siteConfig?.navbar?.logoTextSuffix || (siteConfig?.overview?.siteName ? '' : 'Land')}</span>
               </span>
               <span className="hidden sm:block text-[10px] uppercase tracking-widest text-slate-500 font-semibold whitespace-nowrap">
@@ -347,21 +347,21 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           <div className="flex md:hidden items-center gap-2">
             <button
               onClick={onPostPropertyClick}
-              className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg shadow-sm border border-amber-300 shrink-0 whitespace-nowrap flex items-center gap-1"
+              className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs px-3.5 py-2 rounded-xl shadow-xs border border-amber-300/80 shrink-0 whitespace-nowrap flex items-center gap-1.5 transition-all transform active:scale-95 cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Post</span>
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-700 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
+              className="p-2 text-brand-charcoal hover:text-slate-950 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               aria-label="Toggle navigation menu"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
                 )}
               </svg>
             </button>
