@@ -296,12 +296,12 @@ export default function PropertyDocumentStep({ propertyId, ownerId, documentsLis
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
           <span className="text-[11px] text-gray-500 font-medium">
             Supported formats: PDF, JPEG, PNG, WebP (Max 25MB per document).
           </span>
 
-          <label className="cursor-pointer bg-brand-charcoal hover:bg-black text-brand-yellow font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2 shrink-0">
+          <label className="cursor-pointer bg-brand-charcoal hover:bg-black text-brand-yellow font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto transition-all">
             <Upload className="w-4 h-4" />
             <span>Select & Upload Document</span>
             <input
@@ -334,7 +334,7 @@ export default function PropertyDocumentStep({ propertyId, ownerId, documentsLis
               const displaySize = sizeNum > 0 ? `${(sizeNum / (1024 * 1024)).toFixed(2)} MB` : '< 0.5 MB';
 
               return (
-                <div key={docItem.docId || idx} className="bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between gap-3 shadow-sm">
+                <div key={docItem.docId || idx} className="bg-white p-4 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" />
@@ -349,7 +349,7 @@ export default function PropertyDocumentStep({ propertyId, ownerId, documentsLis
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-end sm:self-auto">
                     <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
                       {docItem.verificationStatus || 'PENDING'}
                     </span>

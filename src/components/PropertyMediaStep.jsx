@@ -324,7 +324,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
 
       {/* SECTION 1: PROPERTY PHOTOS */}
       <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
               <Camera className="w-4 h-4 text-brand-yellow shrink-0" />
@@ -336,7 +336,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
             </span>
           </div>
 
-          <label className="cursor-pointer bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 shrink-0 transition-all">
+          <label className="cursor-pointer bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 shrink-0 self-start sm:self-auto w-full sm:w-auto transition-all">
             <Upload className="w-4 h-4" />
             <span>Upload Photos</span>
             <input
@@ -534,7 +534,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full md:w-auto">
             <select
               value={selectedVideoCategory}
               onChange={(e) => setSelectedVideoCategory(e.target.value)}
@@ -544,7 +544,7 @@ export default function PropertyMediaStep({ propertyId, ownerId, mediaList = [],
               <option value={MediaType.DRONE_VIDEO}>Drone / Aerial Video</option>
             </select>
 
-            <label className="cursor-pointer bg-brand-charcoal hover:bg-black text-brand-yellow font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 shrink-0 transition-all">
+            <label className="cursor-pointer bg-brand-charcoal hover:bg-black text-brand-yellow font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto transition-all">
               <Film className="w-4 h-4" />
               <span>Upload Video File</span>
               <input

@@ -3430,9 +3430,12 @@ export default function AdminPortal({ onNavigate }) {
                 <IconComponent className={`w-3.5 h-3.5 ${isActive ? 'text-brand-charcoal' : 'text-brand-yellow'}`} />
                 <span>{item.label}</span>
                 {(item.count !== undefined ? item.count > 0 : Boolean(item.badge)) && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                    isActive ? 'bg-brand-charcoal text-white' : 'bg-amber-400 text-slate-950'
-                  }`}>
+                  <span
+                    style={isActive ? { color: '#ffffff', backgroundColor: '#0f172a' } : undefined}
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black inline-flex items-center justify-center min-w-[18px] ${
+                      isActive ? 'bg-slate-900 text-white shadow-xs' : 'bg-amber-400 text-slate-950'
+                    }`}
+                  >
                     {item.count ?? item.badge}
                   </span>
                 )}
@@ -5020,110 +5023,112 @@ export default function AdminPortal({ onNavigate }) {
                         const ownerEmail = prop.owner?.email || prop.ownerPublicEmail || '';
 
                         return (
-                          <div key={pId + '-' + idx} className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-gray-50/80 transition-colors">
-                            <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
-                              {/* Order & Rank Controls */}
-                              <div className="flex flex-col items-center justify-center gap-1 shrink-0 bg-gray-100 p-2 rounded-2xl border border-gray-200">
-                                <button
-                                  type="button"
-                                  disabled={idx === 0}
-                                  onClick={() => handleMovePaidPromotion(pId, 'UP')}
-                                  className={'p-1 rounded-lg transition-all ' + (idx === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-white hover:text-brand-charcoal hover:shadow-sm')}
-                                  title="Move Up in Showcase Order"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" />
-                                </button>
-                                <span className="text-xs font-black text-brand-charcoal px-1.5 py-0.5 rounded-md bg-white border border-gray-200 shadow-xs">
-                                  #{idx + 1}
-                                </span>
-                                {idx < (Number(promoDisplayCount) || 6) ? (
-                                  <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1 py-0.5 rounded">
-                                    LIVE
+                          <div key={pId + '-' + idx} className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 hover:bg-gray-50/80 transition-colors">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                              <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                                {/* Order & Rank Controls */}
+                                <div className="flex flex-col items-center justify-center gap-1 shrink-0 bg-gray-100 p-2 rounded-2xl border border-gray-200">
+                                  <button
+                                    type="button"
+                                    disabled={idx === 0}
+                                    onClick={() => handleMovePaidPromotion(pId, 'UP')}
+                                    className={'p-1 rounded-lg transition-all ' + (idx === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-white hover:text-brand-charcoal hover:shadow-sm')}
+                                    title="Move Up in Showcase Order"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="text-xs font-black text-brand-charcoal px-1.5 py-0.5 rounded-md bg-white border border-gray-200 shadow-xs">
+                                    #{idx + 1}
                                   </span>
-                                ) : (
-                                  <span className="text-[9px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.5 rounded" title="This property exceeds Max Display Slots and is on standby">
-                                    STANDBY
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  disabled={idx === promotedPropertiesList.length - 1}
-                                  onClick={() => handleMovePaidPromotion(pId, 'DOWN')}
-                                  className={'p-1 rounded-lg transition-all ' + (idx === promotedPropertiesList.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-white hover:text-brand-charcoal hover:shadow-sm')}
-                                  title="Move Down in Showcase Order"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-
-                              {/* Thumbnail */}
-                              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 relative">
-                                <img
-                                  src={imgUrl}
-                                  alt={prop.title || 'Property'}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    e.currentTarget.src = NO_PHOTO_PLACEHOLDER;
-                                  }}
-                                />
-                                <span className="absolute top-1 left-1 bg-brand-charcoal/80 backdrop-blur-xs text-amber-300 font-extrabold text-[9px] px-1.5 py-0.5 rounded">
-                                  PROMOTED
-                                </span>
-                              </div>
-
-                              {/* Property Title, Price, Location */}
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="font-black text-sm text-brand-charcoal line-clamp-1">{prop.title}</h4>
-                                  <span className="text-[10px] font-extrabold text-brand-charcoal bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
-                                    {prop.propertyType || prop.category || 'Open Plot'}
-                                  </span>
-                                  <span className="text-[10px] font-mono text-gray-400">ID: {pId}</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-xs flex-wrap">
-                                  <span className="font-extrabold text-emerald-700">{pPrice}</span>
-                                  {prop.area && (
-                                    <span className="text-gray-500 font-medium">{prop.area} sq ft</span>
+                                  {idx < (Number(promoDisplayCount) || 6) ? (
+                                    <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1 py-0.5 rounded">
+                                      LIVE
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.5 rounded" title="This property exceeds Max Display Slots and is on standby">
+                                      STANDBY
+                                    </span>
                                   )}
-                                  <span className="text-gray-500 flex items-center gap-1">
-                                    <MapPin className="w-3 h-3 text-gray-400" />
-                                    {pLoc}
+                                  <button
+                                    type="button"
+                                    disabled={idx === promotedPropertiesList.length - 1}
+                                    onClick={() => handleMovePaidPromotion(pId, 'DOWN')}
+                                    className={'p-1 rounded-lg transition-all ' + (idx === promotedPropertiesList.length - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-white hover:text-brand-charcoal hover:shadow-sm')}
+                                    title="Move Down in Showcase Order"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                {/* Thumbnail */}
+                                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 relative">
+                                  <img
+                                    src={imgUrl}
+                                    alt={prop.title || 'Property'}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.src = NO_PHOTO_PLACEHOLDER;
+                                    }}
+                                  />
+                                  <span className="absolute top-1 left-1 bg-brand-charcoal/80 backdrop-blur-xs text-amber-300 font-extrabold text-[9px] px-1.5 py-0.5 rounded">
+                                    PROMOTED
                                   </span>
                                 </div>
 
-                                {/* Customer Paid Ownership Card */}
-                                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5 max-w-lg flex items-center gap-3 text-[11px]">
-                                  <div className="w-7 h-7 rounded-lg bg-brand-charcoal text-brand-yellow flex items-center justify-center shrink-0 font-bold">
-                                    <User className="w-3.5 h-3.5" />
+                                {/* Property Title, Price, Location */}
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="font-black text-sm text-brand-charcoal line-clamp-1">{prop.title}</h4>
+                                    <span className="text-[10px] font-extrabold text-brand-charcoal bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                                      {prop.propertyType || prop.category || 'Open Plot'}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-gray-400">ID: {pId}</span>
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-extrabold text-brand-charcoal line-clamp-1">{ownerName}</span>
-                                      <span className="text-[9px] font-bold text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded">PAID CUSTOMER</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-gray-600 mt-0.5 flex-wrap">
-                                      <span className="flex items-center gap-1 font-semibold text-slate-900">
-                                        <Phone className="w-2.5 h-2.5 text-gray-400" />
-                                        {ownerPhone}
+                                  <div className="flex items-center gap-2.5 text-xs flex-wrap">
+                                    <span className="font-extrabold text-emerald-700">{pPrice}</span>
+                                    {prop.area && (
+                                      <span className="text-gray-500 font-medium">{prop.area} sq ft</span>
+                                    )}
+                                    <span className="text-gray-500 flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-gray-400" />
+                                      {pLoc}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Customer Paid Ownership Card */}
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 w-full sm:w-auto lg:max-w-md flex items-center gap-3 text-[11px] shrink-0">
+                                <div className="w-7 h-7 rounded-lg bg-brand-charcoal text-brand-yellow flex items-center justify-center shrink-0 font-bold">
+                                  <User className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-extrabold text-brand-charcoal truncate">{ownerName}</span>
+                                    <span className="text-[9px] font-bold text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded shrink-0">PAID CUSTOMER</span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-gray-600 mt-0.5 flex-wrap">
+                                    <span className="flex items-center gap-1 font-semibold text-slate-900 shrink-0">
+                                      <Phone className="w-2.5 h-2.5 text-gray-400" />
+                                      {ownerPhone}
+                                    </span>
+                                    {ownerEmail && (
+                                      <span className="flex items-center gap-1 text-gray-500 break-all">
+                                        <Mail className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                        {ownerEmail}
                                       </span>
-                                      {ownerEmail && (
-                                        <span className="flex items-center gap-1 text-gray-500">
-                                          <Mail className="w-2.5 h-2.5 text-gray-400" />
-                                          {ownerEmail}
-                                        </span>
-                                      )}
-                                    </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+                            <div className="flex items-center gap-2 w-full lg:w-auto justify-end shrink-0 pt-2 border-t border-gray-100 lg:border-0 lg:pt-0">
                               <button
                                 type="button"
                                 onClick={() => window.open('/property/' + pId, '_blank')}
-                                className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-xs px-3 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                                className="flex-1 lg:flex-initial justify-center bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
                                 title="Open Live Property Detail Page"
                               >
                                 <ExternalLink className="w-3.5 h-3.5 text-brand-yellow" />
@@ -5133,7 +5138,7 @@ export default function AdminPortal({ onNavigate }) {
                               <button
                                 type="button"
                                 onClick={() => handleRemovePaidPromotion(pId)}
-                                className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-extrabold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all"
+                                className="flex-1 lg:flex-initial justify-center bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all"
                                 title="Remove property from Paid Promotions"
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-red-600" />
@@ -8043,7 +8048,7 @@ export default function AdminPortal({ onNavigate }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-extrabold text-gray-700 mb-1">Scheduled Date</label>
                   <input
