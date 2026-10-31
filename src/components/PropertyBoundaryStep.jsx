@@ -1034,22 +1034,22 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
       </div>
 
       {/* CONFIRMATION BUTTON */}
-      <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+      <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={onSkipBoundary}
-          className="text-xs font-bold text-gray-500 hover:text-gray-700"
+          className="text-xs font-bold text-gray-500 hover:text-gray-700 underline underline-offset-4 decoration-gray-300 hover:decoration-gray-700 shrink-0 py-2"
         >
-          Skip for Now
+          Skip for Now →
         </button>
 
         <button
           type="button"
           onClick={handleConfirmSubmission}
-          className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-6 py-3 rounded-xl shadow-md flex items-center gap-2"
+          className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl shadow-md flex items-center gap-1.5 shrink-0"
         >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Save Boundary Submission</span>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>Save Boundary</span>
         </button>
       </div>
 

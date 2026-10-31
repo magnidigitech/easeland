@@ -31,7 +31,7 @@ import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wi
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
 import { trackPageView } from './utils/metaPixel.js';
 import { parseRouteFromUrl } from './utils/routeUtils.js';
-import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles } from 'lucide-react';
+import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles, PlusCircle } from 'lucide-react';
 import { DEFAULT_SHOWCASE_PROPERTIES } from './services/showcaseProperties.js';
 import AnimatedPromotionBanner from './components/AnimatedPromotionBanner.jsx';
 import RegionalHubsSection from './components/RegionalHubsSection.jsx';
@@ -841,7 +841,7 @@ export default function App() {
 
   return (
     <div className={'bg-brand-offwhite text-brand-charcoal font-sans flex flex-col w-full max-w-full overflow-x-hidden ' + (
-      (activePage === 'map' || activePage === 'properties') ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen'
+      (activePage === 'map' || activePage === 'properties') ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen pb-16 md:pb-0'
     )}>
       
       {/* PWA STATUS & PROMPTS */}
@@ -1699,14 +1699,14 @@ export default function App() {
       {/* ENGAGEMENT VISITOR LEAD POPUP MODAL (1-MIN ENGAGEMENT FOR UNAUTHENTICATED VISITORS) */}
       <VisitorLeadModal currentUser={currentUser} />
 
-      {/* SCROLL TO TOP ARROW HEAD BUTTON (Hidden on Map Page) */}
-      {activePage !== 'map' && activePage !== 'properties' && (
+      {/* SCROLL TO TOP ARROW HEAD BUTTON (Hidden on Map Page & Post-Property Wizard to avoid CTA collision) */}
+      {activePage !== 'map' && activePage !== 'properties' && activePage !== 'post-property' && (
         <button
           id="scroll-to-top-btn"
           onClick={scrollToTop}
           aria-label="Scroll to top of current page"
           title="Scroll to top of page"
-          className={`fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
+          className={`fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
             showScrollTop
               ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
               : 'opacity-0 translate-y-8 scale-75 pointer-events-none'
@@ -1714,6 +1714,84 @@ export default function App() {
         >
           <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform duration-200" />
         </button>
+      )}
+
+      {/* MOBILE PWA BOTTOM APP BAR (Hidden on desktop md:flex, and hidden in wizard/property-detail/admin/crm) */}
+      {activePage !== 'post-property' && activePage !== 'property-detail' && activePage !== 'admin' && activePage !== 'crm' && (
+        <nav
+          aria-label="Mobile Bottom App Bar"
+          className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 pb-[calc(0.45rem+env(safe-area-inset-bottom))] flex items-center justify-around"
+        >
+          {/* HOME */}
+          <button
+            onClick={() => changeActivePage('home')}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              activePage === 'home' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <Building2 className={`w-5 h-5 ${activePage === 'home' ? 'stroke-[2.5] text-amber-500' : 'text-slate-500'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Home</span>
+          </button>
+
+          {/* EXPLORE / MAP */}
+          <button
+            onClick={() => changeActivePage('map')}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              activePage === 'map' || activePage === 'properties' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <Search className={`w-5 h-5 ${activePage === 'map' || activePage === 'properties' ? 'stroke-[2.5] text-amber-500' : 'text-slate-500'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Explore</span>
+          </button>
+
+          {/* POST (+ CTA) */}
+          <button
+            onClick={handlePostPropertyClick}
+            className="flex flex-col items-center justify-center -mt-3.5 group cursor-pointer"
+            aria-label="Post Property"
+          >
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/35 border-2 border-white group-active:scale-95 transition-transform">
+              <PlusCircle className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <span className="text-[10px] font-black text-slate-900 mt-0.5">Post</span>
+          </button>
+
+          {/* SAVED WISHLIST */}
+          <button
+            onClick={() => changeActivePage('wishlist')}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              activePage === 'wishlist' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <div className="relative">
+              <Heart className={`w-5 h-5 ${activePage === 'wishlist' ? 'fill-current text-rose-500' : 'text-slate-500'}`} />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
+                  {wishlistCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight">Saved</span>
+          </button>
+
+          {/* DASHBOARD / ACCOUNT */}
+          <button
+            onClick={() => {
+              if (currentUser) {
+                changeActivePage('dashboard');
+              } else {
+                setAuthIntent(null);
+                setIsAuthModalOpen(true);
+              }
+            }}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              activePage === 'dashboard' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <User className={`w-5 h-5 ${activePage === 'dashboard' ? 'stroke-[2.5] text-amber-500' : 'text-slate-500'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">{currentUser ? 'Account' : 'Login'}</span>
+          </button>
+        </nav>
       )}
 
     </div>

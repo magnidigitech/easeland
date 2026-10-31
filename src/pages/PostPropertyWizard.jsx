@@ -724,7 +724,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-3xl mx-auto pt-6 sm:pt-10 pb-24 sm:pb-12 px-4 sm:px-6 lg:px-8">
       
       {/* RESUME DRAFT MODAL */}
       {showResumeModal && (
@@ -837,8 +837,9 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
             : `Direct Property Owner Draft Workflow — Step ${step} of 8.`}
         </p>
 
-        {/* INTERACTIVE STEP JUMP PILLS */}
-        <div className="flex flex-wrap gap-1.5 pt-3">
+        {/* INTERACTIVE STEP JUMP PILLS: DESKTOP WRAPPED, MOBILE HORIZONTAL SWIPE STRIP */}
+        {/* Desktop Step Jump Pills (sm+) */}
+        <div className="hidden sm:flex sm:flex-wrap gap-1.5 pt-3">
           {[
             { num: 1, label: 'Type & Purpose' },
             { num: 2, label: 'Title & Price' },
@@ -866,6 +867,57 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
               <span>{s.num}. {s.label}</span>
             </button>
           ))}
+        </div>
+
+        {/* Mobile Swipeable Step Strip (<sm) */}
+        <div className="sm:hidden pt-3">
+          <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-600 mb-1.5 px-0.5">
+            <span>STEP {step} OF 8</span>
+            <span className="text-brand-navy font-black">
+              {[
+                'Type & Purpose',
+                'Title & Price',
+                'Location',
+                'Specs',
+                'Media & Photos',
+                'Documents',
+                'Boundary',
+                'Review & Submit'
+              ][step - 1]}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-1 -mx-4 px-4">
+            {[
+              { num: 1, label: '1. Type' },
+              { num: 2, label: '2. Price' },
+              { num: 3, label: '3. Location' },
+              { num: 4, label: '4. Specs' },
+              { num: 5, label: '5. Photos' },
+              { num: 6, label: '6. Docs' },
+              { num: 7, label: '7. Boundary' },
+              { num: 8, label: '8. Review' }
+            ].map((s) => (
+              <button
+                key={s.num}
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setFieldErrors({});
+                  setStep(s.num);
+                }}
+                className={`px-3 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  step === s.num
+                    ? 'bg-brand-navy text-brand-yellow shadow-sm ring-2 ring-brand-yellow/50 scale-[1.02]'
+                    : s.num < step
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <span>{s.label}</span>
+                {s.num < step && <span className="ml-1 text-[10px]">✓</span>}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* STEPPER PROGRESS BAR */}
@@ -1778,7 +1830,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
               </div>
             )}
 
-            <div className="flex items-center justify-between">
+            {/* DESKTOP INLINE ACTION ROW (sm+) */}
+            <div className="hidden sm:flex sm:items-center sm:justify-between">
               <button
                 type="button"
                 onClick={handlePrevStep}
@@ -1813,6 +1866,45 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
                   <ChevronRight className="w-4 h-4 text-brand-navy" />
                 </button>
               </div>
+            </div>
+
+            {/* MOBILE FIXED BOTTOM ACTION STRIP (<sm) */}
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handlePrevStep}
+                disabled={step === 1}
+                className={`p-2.5 rounded-xl text-xs flex items-center justify-center shrink-0 transition-colors border ${
+                  step === 1
+                    ? 'cursor-not-allowed text-slate-400 bg-gray-100 border-gray-200'
+                    : 'text-brand-navy bg-white border-gray-300 font-extrabold shadow-xs active:bg-gray-100'
+                }`}
+                title="Previous Step"
+                aria-label="Previous Step"
+              >
+                <ChevronLeft className={`w-4 h-4 ${step === 1 ? 'text-slate-400' : 'text-brand-navy'}`} />
+                <span className="hidden xs:inline ml-1 font-extrabold">Prev</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSaveDraft(step)}
+                disabled={savingDraft}
+                className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-gray-200 shrink-0"
+                title="Save Draft"
+              >
+                <Save className="w-4 h-4 text-brand-navy" />
+                <span>{savingDraft ? 'Saving...' : 'Save'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNextStep}
+                className="flex-1 py-2.5 px-3 bg-brand-yellow hover:bg-brand-yellowHover active:bg-yellow-400 text-brand-navy font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all truncate"
+              >
+                <span className="truncate">{step === 7 ? 'Proceed to Review' : 'Next Step'}</span>
+                <ChevronRight className="w-4 h-4 text-brand-navy shrink-0" />
+              </button>
             </div>
           </div>
         )}

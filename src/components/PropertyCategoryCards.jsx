@@ -112,9 +112,9 @@ export default function PropertyCategoryCards({ onSelectCategory }) {
   }, [siteConfig?.categories]);
 
   return (
-    <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section className="py-10 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 sm:mb-10">
         <div>
           <span className="text-xs font-extrabold uppercase tracking-widest text-slate-950 bg-metallic-gold px-3.5 py-1.5 rounded-md shadow-md border border-amber-300 inline-block">
             Property Categories
@@ -123,12 +123,51 @@ export default function PropertyCategoryCards({ onSelectCategory }) {
             Explore Properties by Category
           </h2>
         </div>
-        <p className="text-sm text-slate-600 font-medium max-w-md mt-2 md:mt-0 leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-md mt-2 md:mt-0 leading-relaxed">
           All property categories utilize our single Universal Map Discovery Engine with verified listings and direct owner contacts.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* MOBILE HORIZONTAL SWIPE STRIP (sm:hidden) */}
+      <div className="flex sm:hidden overflow-x-auto no-scrollbar gap-3.5 pb-3 -mx-4 px-4 snap-x snap-mandatory">
+        {categories.map((cat) => {
+          const IconComponent = cat.icon;
+          return (
+            <div
+              key={cat.id}
+              onClick={() => onSelectCategory(cat.category)}
+              className="w-[260px] shrink-0 snap-start bg-white rounded-2xl p-5 border border-slate-200 shadow-md flex flex-col justify-between cursor-pointer active:scale-98 transition-transform"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-slate-950 text-amber-400 flex items-center justify-center shadow-md border border-slate-800">
+                    <IconComponent className="w-5 h-5 stroke-[2]" />
+                  </div>
+                  <span className="text-[10px] font-extrabold bg-slate-950 text-white px-2.5 py-0.5 rounded-full shadow-sm border border-slate-800 tracking-wide">
+                    {cat.badge}
+                  </span>
+                </div>
+
+                <h3 className="text-base font-extrabold text-slate-900 mb-1.5">
+                  {cat.name}
+                </h3>
+                
+                <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed mb-3">
+                  {cat.description}
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-extrabold text-amber-600">
+                <span>Explore Map</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* DESKTOP / TABLET GRID (hidden sm:grid) */}
+      <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {categories.map((cat) => {
           const IconComponent = cat.icon;
           return (

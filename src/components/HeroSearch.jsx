@@ -639,8 +639,8 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           </form>
 
           {/* POPULAR SEARCHES PILLS BAR */}
-          <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-start sm:justify-center gap-2 text-xs font-bold text-slate-400">
-            <span className="flex items-center gap-1 text-slate-400 font-bold mr-1">
+          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs font-bold text-slate-400">
+            <span className="flex items-center gap-1 text-slate-400 font-bold mr-1 shrink-0 whitespace-nowrap">
               <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
               Popular Searches:
             </span>
@@ -656,7 +656,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                     triggerSearch(item.label, purpose, category);
                   }
                 }}
-                className={`px-3.5 py-1.5 rounded-full border transition-all flex items-center gap-1.5 font-bold ${
+                className={`px-3.5 py-1.5 rounded-full border transition-all flex items-center gap-1.5 font-bold shrink-0 whitespace-nowrap ${
                   item.isNearMe
                     ? 'bg-sky-950/80 text-sky-400 border-sky-600/50 hover:bg-sky-900 shadow-sm font-extrabold'
                     : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800 hover:border-amber-400/50 hover:text-amber-400'

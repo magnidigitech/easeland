@@ -1136,33 +1136,33 @@ export default function UserDashboard({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* HEADER BAR */}
-        <div className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-sm mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-slate-200">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-metallic-gold text-slate-950 font-black text-2xl flex items-center justify-center shadow-md border-2 border-amber-300">
+        <div className="bg-white text-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-sm mb-4 sm:mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 sm:gap-6 border border-slate-200">
+          <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-metallic-gold text-slate-950 font-black text-xl sm:text-2xl flex items-center justify-center shadow-md border-2 border-amber-300 shrink-0">
               {(profileForm?.name || user?.name || user?.displayName || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 truncate">
                   {profileForm.name}
                 </h1>
-                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shrink-0">
                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
                   Verified User
                 </span>
               </div>
-              <p className="text-slate-600 text-xs mt-1 font-medium flex items-center gap-3">
-                {profileForm.email && <span>{profileForm.email}</span>}
+              <p className="text-slate-600 text-xs mt-0.5 font-medium flex items-center flex-wrap gap-x-2 gap-y-0.5">
+                {profileForm.email && <span className="truncate max-w-[200px] sm:max-w-none">{profileForm.email}</span>}
                 {profileForm.phone && (
                   <>
                     <span>•</span>
-                    <span>{profileForm.phone}</span>
+                    <span className="shrink-0">{profileForm.phone}</span>
                   </>
                 )}
                 {profileForm.city && (
                   <>
                     <span>•</span>
-                    <span className="text-amber-600 font-bold">{profileForm.city}</span>
+                    <span className="text-amber-600 font-bold shrink-0">{profileForm.city}</span>
                   </>
                 )}
               </p>
@@ -1171,18 +1171,94 @@ export default function UserDashboard({
 
           <button
             onClick={onPostProperty}
-            className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-3.5 rounded-xl shadow-md flex items-center gap-2 transition-transform hover:scale-105 border border-amber-300"
+            className="w-full md:w-auto bg-metallic-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-transform hover:scale-105 border border-amber-300 shrink-0"
           >
             <PlusCircle className="w-4 h-4 stroke-[2.5]" />
             <span>POST NEW PROPERTY</span>
           </button>
         </div>
 
+        {/* MOBILE HORIZONTAL SCROLLING TAB BAR (<lg) */}
+        <div className="lg:hidden sticky top-14 sm:top-16 z-20 -mx-4 px-4 py-2 bg-slate-50/95 backdrop-blur-md border-b border-slate-200 mb-6 overflow-x-auto no-scrollbar scroll-smooth flex items-center gap-2">
+          {(user?.role === 'ADMIN' || user?.email === 'admin@easeland.in' || user?.email?.includes('admin')) && (
+            <button
+              onClick={() => onNavigate('admin')}
+              className="px-3.5 py-2 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 shadow-sm border border-amber-300 whitespace-nowrap shrink-0 flex items-center gap-1.5"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-950" />
+              <span>Admin Studio</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => handleTabChange('overview')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
+              activeTab === 'overview'
+                ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md font-black'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <LayoutDashboard className={`w-3.5 h-3.5 ${activeTab === 'overview' ? 'text-slate-950' : 'text-amber-500'}`} />
+            <span>Overview</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('properties')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
+              activeTab === 'properties'
+                ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md font-black'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className={`w-3.5 h-3.5 ${activeTab === 'properties' ? 'text-slate-950' : 'text-amber-500'}`} />
+            <span>My Properties ({activeUserProperties.length})</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('verification')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
+              activeTab === 'verification'
+                ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md font-black'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldCheck className={`w-3.5 h-3.5 ${activeTab === 'verification' ? 'text-slate-950' : 'text-amber-500'}`} />
+            <span>Verification</span>
+            {activeUserProperties.some(p => p.status === 'PENDING_VERIFICATION') && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping ml-0.5" />
+            )}
+          </button>
+
+          <button
+            onClick={() => handleTabChange('wishlist')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
+              activeTab === 'wishlist'
+                ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md font-black'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 ${activeTab === 'wishlist' ? 'text-slate-950' : 'text-amber-500'}`} />
+            <span>Wishlist ({wishlistProperties.length})</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('account')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
+              activeTab === 'account'
+                ? 'bg-metallic-gold text-slate-950 border-amber-300 shadow-md font-black'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <Settings className={`w-3.5 h-3.5 ${activeTab === 'account' ? 'text-slate-950' : 'text-amber-500'}`} />
+            <span>Settings</span>
+          </button>
+        </div>
+
         {/* MAIN DASHBOARD CONTAINER WITH SIDEBAR & CONTENT */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* BLOCK 1: SIDEBAR NAVIGATION */}
-          <div className="lg:col-span-3 space-y-2">
+          {/* BLOCK 1: SIDEBAR NAVIGATION (HIDDEN ON MOBILE, VISIBLE ON lg+) */}
+          <div className="hidden lg:block lg:col-span-3 space-y-2">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 space-y-1">
 
               {(user?.role === 'ADMIN' || user?.email === 'admin@easeland.in' || user?.email?.includes('admin')) && (
@@ -1281,36 +1357,36 @@ export default function UserDashboard({
               <div className="space-y-6">
 
                 {/* METRICS CARDS */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Active Listings</span>
-                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{activeUserProperties.length}</span>
+                      <span className="text-xl sm:text-2xl font-black text-brand-charcoal mt-0.5 sm:mt-1 block">{activeUserProperties.length}</span>
                     </div>
-                    <div className="w-12 h-12 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black">
-                      <Building2 className="w-6 h-6 text-brand-charcoal" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black shrink-0">
+                      <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-brand-charcoal" />
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Verified Live</span>
-                      <span className="text-2xl font-black text-emerald-600 mt-1 block">
+                      <span className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5 sm:mt-1 block">
                         {activeUserProperties.filter(p => (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished)).length}
                       </span>
                     </div>
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
-                      <CheckCircle2 className="w-6 h-6" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black shrink-0">
+                      <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between">
                     <div>
                       <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Saved Wishlist</span>
-                      <span className="text-2xl font-black text-brand-charcoal mt-1 block">{wishlistProperties.length}</span>
+                      <span className="text-xl sm:text-2xl font-black text-brand-charcoal mt-0.5 sm:mt-1 block">{wishlistProperties.length}</span>
                     </div>
-                    <div className="w-12 h-12 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-black">
-                      <Heart className="w-6 h-6" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-black shrink-0">
+                      <Heart className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                   </div>
                 </div>
@@ -1412,17 +1488,17 @@ export default function UserDashboard({
                                 </div>
                               )}
                             </div>
-                            <div>
-                              <h3 className={`font-extrabold text-sm flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
-                                <span>{prop.title}</span>
-                                {!isDeletedByAdmin && <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700" />}
+                            <div className="min-w-0 flex-1">
+                              <h3 className={`font-extrabold text-sm flex items-center gap-1.5 truncate ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
+                                <span className="truncate">{prop.title}</span>
+                                {!isDeletedByAdmin && <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700 shrink-0" />}
                               </h3>
-                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-gray-500'}`}>
-                                <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                                <span>{prop.location}</span>
-                                <span>•</span>
-                                <span className={`font-bold ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500' : 'text-emerald-700'}`}>{prop.price}</span>
-                              </p>
+                              <div className={`text-xs font-medium flex items-center gap-1.5 mt-0.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-gray-500'}`}>
+                                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span className="truncate">{prop.location}</span>
+                                <span className="shrink-0">•</span>
+                                <span className={`font-bold shrink-0 whitespace-nowrap ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500' : 'text-emerald-700'}`}>{prop.price}</span>
+                              </div>
                             </div>
                           </div>
 
@@ -1490,8 +1566,8 @@ export default function UserDashboard({
               <div className="space-y-6">
 
                 {/* FILTER STATUS BAR */}
-                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1 sm:mx-0 sm:px-0 sm:flex-wrap">
                     {[
                       { id: 'ALL', label: 'All Listings' },
                       { id: 'LIVE', label: 'Live & Verified' },
@@ -1504,7 +1580,7 @@ export default function UserDashboard({
                       <button
                         key={f.id}
                         onClick={() => setPropertyFilter(f.id)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all ${propertyFilter === f.id
+                        className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 whitespace-nowrap ${propertyFilter === f.id
                             ? 'bg-brand-charcoal text-white shadow'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                           }`}
@@ -1516,7 +1592,7 @@ export default function UserDashboard({
 
                   <button
                     onClick={() => onPostProperty()}
-                    className="bg-brand-yellow text-brand-charcoal font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center gap-1.5"
+                    className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs px-4 py-2 rounded-xl shadow flex items-center justify-center gap-1.5 shrink-0"
                   >
                     <PlusCircle className="w-4 h-4" />
                     <span>Add New Property</span>
@@ -1566,7 +1642,7 @@ export default function UserDashboard({
                     }).map((prop) => {
                       const isDeletedByAdmin = prop.status === 'DELETED_BY_ADMIN';
                       return (
-                      <div key={prop.id} className={`rounded-2xl p-6 border shadow-sm space-y-4 transition-all relative overflow-hidden ${
+                      <div key={prop.id} className={`rounded-2xl p-4 sm:p-6 border shadow-sm space-y-3 sm:space-y-4 transition-all relative overflow-hidden ${
                         isDeletedByAdmin
                           ? 'bg-slate-900/[0.04] dark:bg-slate-950/80 border-slate-300 dark:border-slate-800 shadow-2xl shadow-slate-950/15 backdrop-blur-sm'
                           : 'bg-white border-gray-200'
@@ -1575,14 +1651,14 @@ export default function UserDashboard({
                           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-slate-800 to-red-600" />
                         )}
 
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
                           <div
                             onClick={() => {
                               if (!isDeletedByAdmin) {
                                 onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
                               }
                             }}
-                            className={`flex items-center gap-4 ${isDeletedByAdmin ? 'opacity-85' : 'cursor-pointer group'}`}
+                            className={`flex items-start sm:items-center gap-3 sm:gap-4 w-full md:w-auto min-w-0 ${isDeletedByAdmin ? 'opacity-85' : 'cursor-pointer group'}`}
                           >
                             <div className="relative flex-shrink-0">
                               <img
@@ -1592,33 +1668,38 @@ export default function UserDashboard({
                                   e.target.onerror = null;
                                   e.target.src = getCategoryFallbackImage(prop);
                                 }}
-                                className={`w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-40 shadow-inner' : 'group-hover:scale-105 transition-transform'}`}
+                                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl object-cover flex-shrink-0 shadow-sm ${isDeletedByAdmin ? 'grayscale opacity-40 shadow-inner' : 'group-hover:scale-105 transition-transform'}`}
                               />
                               {isDeletedByAdmin && (
-                                <div className="absolute inset-0 bg-slate-950/75 rounded-2xl flex flex-col items-center justify-center p-1 text-center">
-                                  <XCircle className="w-6 h-6 text-red-400 mb-0.5" />
-                                  <span className="text-[9px] font-black uppercase tracking-wider text-red-300">DELETED</span>
+                                <div className="absolute inset-0 bg-slate-950/75 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center p-1 text-center">
+                                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 mb-0.5" />
+                                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-red-300">DELETED</span>
                                 </div>
                               )}
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md ${isDeletedByAdmin ? 'text-slate-400 bg-slate-200 dark:bg-slate-800 line-through' : 'text-brand-yellow bg-brand-charcoal'}`}>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${isDeletedByAdmin ? 'text-slate-400 bg-slate-200 dark:bg-slate-800 line-through' : 'text-brand-yellow bg-brand-charcoal'}`}>
                                   {prop.type}
                                 </span>
                                 <span className={`text-xs font-semibold ${isDeletedByAdmin ? 'text-red-500 font-bold' : 'text-gray-500'}`}>• Ref: {prop.referenceId}</span>
                               </div>
-                              <h3 className={`font-extrabold text-base mt-1 flex items-center gap-1.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400 decoration-2' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
-                                <span>{prop.title}</span>
-                                {!isDeletedByAdmin && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-amber-700" />}
+                              <h3 className={`font-extrabold text-sm sm:text-base mt-1 flex items-center gap-1.5 truncate ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400 decoration-2' : 'text-brand-charcoal group-hover:text-amber-700 transition-colors'}`}>
+                                <span className="truncate">{prop.title}</span>
+                                {!isDeletedByAdmin && <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-700 shrink-0" />}
                               </h3>
-                              <p className={`text-xs font-medium flex items-center gap-2 mt-0.5 ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-gray-500'}`}>
-                                <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                                <span>{prop.location}</span>
-                                <span>•</span>
-                                <span className={`font-extrabold text-sm ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500' : 'text-emerald-700'}`}>{prop.price}</span>
-                                <span>({prop.area})</span>
+                              <p className={`text-xs font-medium flex items-center gap-1.5 mt-0.5 truncate ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500 decoration-slate-400' : 'text-gray-500'}`}>
+                                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span className="truncate">{prop.location}</span>
                               </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`font-extrabold text-xs sm:text-sm shrink-0 whitespace-nowrap ${isDeletedByAdmin ? 'line-through text-slate-400 dark:text-slate-500' : 'text-emerald-700'}`}>{prop.price}</span>
+                                {prop.area && (
+                                  <span className="text-[11px] sm:text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                                    {prop.area}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -1696,7 +1777,7 @@ export default function UserDashboard({
 
                         {/* ADMIN FEEDBACK BANNER */}
                         <div className={
-                          'p-4 rounded-xl border text-xs font-medium ' +
+                          'p-3 sm:p-4 rounded-xl border text-xs font-medium ' +
                           (isDeletedByAdmin
                             ? 'bg-slate-900/10 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-800 shadow-inner'
                             : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
@@ -1717,7 +1798,7 @@ export default function UserDashboard({
                               <span>Verification Status & Feedback:</span>
                             )}
                           </div>
-                          <p className={isDeletedByAdmin ? 'text-slate-600 dark:text-slate-400 font-medium leading-relaxed' : ''}>
+                          <p className={`leading-relaxed text-xs ${isDeletedByAdmin ? 'text-slate-600 dark:text-slate-400 font-medium' : ''}`}>
                             {isDeletedByAdmin
                               ? (prop.adminNote || 'Notification: Deleted by Admin. This property listing was removed from the marketplace by an EaseLand Admin. Map pins, search index listings, and buyer inquiry channels have been permanently closed.')
                               : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
@@ -1733,17 +1814,19 @@ export default function UserDashboard({
                         </div>
 
                         {/* CARD FOOTER ACTIONS */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100 text-xs font-extrabold text-gray-500">
-                          <div className="flex items-center gap-4">
-                            <span>Views: <strong className="text-brand-charcoal">{prop.views}</strong></span>
-                            <span>Enquiries: <strong className="text-brand-charcoal">{prop.enquiriesCount}</strong></span>
-                            <span>Listed: <strong className="text-brand-charcoal">{prop.dateListed}</strong></span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2.5 border-t border-gray-100 text-xs font-extrabold text-gray-500">
+                          <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs overflow-x-auto no-scrollbar py-0.5">
+                            <span className="shrink-0 whitespace-nowrap">Views: <strong className="text-brand-charcoal">{prop.views}</strong></span>
+                            <span className="shrink-0 whitespace-nowrap">•</span>
+                            <span className="shrink-0 whitespace-nowrap">Enquiries: <strong className="text-brand-charcoal">{prop.enquiriesCount}</strong></span>
+                            <span className="shrink-0 whitespace-nowrap">•</span>
+                            <span className="shrink-0 whitespace-nowrap">Listed: <strong className="text-brand-charcoal">{prop.dateListed}</strong></span>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto sm:flex-wrap">
                             {isDeletedByAdmin ? (
                               <>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white dark:bg-red-950/50 dark:text-red-300 rounded-xl text-xs font-bold border border-slate-800 shadow-sm">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white dark:bg-red-950/50 dark:text-red-300 rounded-xl text-xs font-bold border border-slate-800 shadow-sm shrink-0 whitespace-nowrap">
                                   <XCircle className="w-3.5 h-3.5 text-red-400" />
                                   <span>Permanently Delisted & Struck Off</span>
                                 </span>
@@ -1752,7 +1835,7 @@ export default function UserDashboard({
                                     handleDismissDeletedProperty(prop);
                                     handleOwnerPropertyAction('DELETE', prop);
                                   }}
-                                  className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl flex items-center gap-1.5 font-bold shadow-md hover:shadow-lg transition-all cursor-pointer border border-slate-700"
+                                  className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl flex items-center gap-1.5 font-bold shadow-md hover:shadow-lg transition-all cursor-pointer border border-slate-700 shrink-0 whitespace-nowrap"
                                   title="Dismiss from your dashboard view"
                                 >
                                   <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -1767,7 +1850,7 @@ export default function UserDashboard({
                                 e.stopPropagation();
                                 onNavigate && onNavigate('property/' + (prop.propertyId || prop.id));
                               }}
-                              className="px-3 py-1.5 bg-gray-100 hover:bg-brand-charcoal hover:text-brand-yellow text-gray-800 rounded-lg flex items-center gap-1 font-bold shadow-2xs transition-all cursor-pointer"
+                              className="px-3 py-1.5 bg-gray-100 hover:bg-brand-charcoal hover:text-brand-yellow text-gray-800 rounded-lg flex items-center gap-1 font-bold shadow-2xs transition-all cursor-pointer shrink-0 whitespace-nowrap"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span>View Listing</span>
@@ -1784,7 +1867,7 @@ export default function UserDashboard({
                                   } catch (err) {}
                                   onPostProperty(propToSave);
                                 }}
-                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                                 title="Edit property details, files, or media"
                               >
                                 <Edit className="w-3.5 h-3.5 text-white" />
@@ -1803,7 +1886,7 @@ export default function UserDashboard({
                                   } catch (err) {}
                                   onPostProperty(propToSave);
                                 }}
-                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer"
+                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
                                 <span>Edit & Resubmit</span>
@@ -1822,7 +1905,7 @@ export default function UserDashboard({
                                     } catch (err) {}
                                     onPostProperty(propToSave);
                                   }}
-                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer"
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 font-extrabold shadow-sm transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                                   title="Edit property details. New changes will be submitted for Admin re-audit while existing live details remain published."
                                 >
                                   <Edit className="w-3.5 h-3.5 text-white" />
@@ -1830,21 +1913,21 @@ export default function UserDashboard({
                                 </button>
                                 <button
                                   onClick={() => handleOwnerPropertyAction('UNAVAILABLE', prop)}
-                                  className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1 font-bold cursor-pointer"
+                                  className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-900 rounded-lg flex items-center gap-1 font-bold cursor-pointer shrink-0 whitespace-nowrap"
                                 >
                                   <Clock className="w-3.5 h-3.5 text-orange-600" />
                                   <span>Pause</span>
                                 </button>
                                 <button
                                   onClick={() => handleOwnerPropertyAction('SOLD', prop)}
-                                  className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-lg flex items-center gap-1 font-bold"
+                                  className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-lg flex items-center gap-1 font-bold shrink-0 whitespace-nowrap"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
                                   <span>Mark Sold</span>
                                 </button>
                                 <button
                                   onClick={() => handleOwnerPropertyAction('RENTED', prop)}
-                                  className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 rounded-lg flex items-center gap-1 font-bold"
+                                  className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 rounded-lg flex items-center gap-1 font-bold shrink-0 whitespace-nowrap"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
                                   <span>Mark Rented</span>
@@ -1856,7 +1939,7 @@ export default function UserDashboard({
                             {prop.status === 'UNAVAILABLE' && (
                               <button
                                 onClick={() => handleOwnerPropertyAction('LIVE', prop)}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm"
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1 font-bold shadow-sm shrink-0 whitespace-nowrap"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 <span>Unpause (Make Live)</span>
@@ -1867,7 +1950,7 @@ export default function UserDashboard({
                             {prop.isPublished && (
                               <button
                                 onClick={() => onNavigate('map')}
-                                className="px-3 py-1.5 bg-brand-charcoal hover:bg-brand-charcoalLight text-white rounded-lg flex items-center gap-1"
+                                className="px-3 py-1.5 bg-brand-charcoal hover:bg-brand-charcoalLight text-white rounded-lg flex items-center gap-1 shrink-0 whitespace-nowrap"
                               >
                                 <Eye className="w-3.5 h-3.5 text-brand-yellow" />
                                 <span>View on Map</span>
@@ -1878,7 +1961,7 @@ export default function UserDashboard({
                             {prop.status !== 'ARCHIVED' && (
                               <button
                                 onClick={() => handleOwnerPropertyAction('ARCHIVE', prop)}
-                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg flex items-center gap-1 transition-colors"
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg flex items-center gap-1 transition-colors shrink-0 whitespace-nowrap"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Archive</span>
@@ -1888,7 +1971,7 @@ export default function UserDashboard({
                             {/* DELETE PROPERTY PERMANENTLY */}
                             <button
                               onClick={() => handleOwnerPropertyAction('DELETE', prop)}
-                              className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg flex items-center gap-1 transition-colors font-bold shadow-sm"
+                              className="px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg flex items-center gap-1 transition-colors font-bold shadow-sm shrink-0 whitespace-nowrap"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Delete Property</span>

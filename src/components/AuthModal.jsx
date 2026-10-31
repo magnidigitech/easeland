@@ -266,11 +266,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in">
       <div
         className={`bg-white w-full ${
           authMethod === 'email' && mode === 'register' ? 'max-w-lg' : 'max-w-md'
-        } rounded-2xl shadow-2xl border border-brand-bordergray overflow-hidden transition-all duration-200`}
+        } rounded-t-3xl sm:rounded-2xl shadow-2xl border border-brand-bordergray overflow-hidden transition-all duration-200 max-h-[92dvh] sm:max-h-[90vh] flex flex-col`}
       >
         {/* MODAL HEADER */}
         <div className="bg-brand-charcoal text-white p-5 sm:p-6 relative">
@@ -388,7 +388,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
         {/* -------------------- MOBILE OTP FORM -------------------- */}
         {authMethod === 'mobile' && (
-          <form onSubmit={handleMobileFormSubmit} className="p-5 sm:p-6 space-y-4">
+          <form onSubmit={handleMobileFormSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto no-scrollbar flex-1">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
@@ -557,7 +557,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
         {/* -------------------- EMAIL AUTH FORM -------------------- */}
         {authMethod === 'email' && (
-          <form onSubmit={handleEmailSubmit} className="p-5 sm:p-6 space-y-3.5">
+          <form onSubmit={handleEmailSubmit} className="p-5 sm:p-6 space-y-3.5 overflow-y-auto no-scrollbar flex-1">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />

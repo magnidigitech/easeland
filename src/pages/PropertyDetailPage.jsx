@@ -544,7 +544,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   ].filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-brand-offwhite pb-8">
+    <div className="min-h-screen bg-brand-offwhite pb-28 sm:pb-8">
       
       {/* TOP NAVIGATION BAR */}
       <div className="bg-brand-charcoal text-white py-3.5 px-4 sm:px-6 lg:px-8 border-b border-white/10 shadow-sm">
@@ -709,7 +709,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
           {/* THUMBNAIL LIST */}
           {mediaList.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto pb-2">
+            <div className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar pb-2">
               {mediaList.map((item, idx) => (
                 <button
                   key={idx}
@@ -989,6 +989,39 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
         </div>
 
+      </div>
+
+      {/* MOBILE STICKY ENQUIRY BAR */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 pb-[calc(0.6rem+env(safe-area-inset-bottom))] shadow-2xl flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Listed Price</span>
+          <span className="text-base font-extrabold text-emerald-700 truncate block">
+            {property.priceDisplay}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={getEaselandWhatsAppUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => handleContactAction('WhatsApp')}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl shadow flex items-center gap-1.5 transition-all"
+          >
+            <MessageCircle className="w-4 h-4 fill-current" />
+            <span>WhatsApp</span>
+          </a>
+
+          <a
+            href="tel:6300691560"
+            onClick={() => handleContactAction('Phone')}
+            className="bg-brand-charcoal hover:bg-black text-white font-extrabold text-xs px-3 py-2.5 rounded-xl shadow flex items-center gap-1.5 transition-all"
+            title="Call EaseLand"
+          >
+            <Phone className="w-4 h-4 text-brand-yellow" />
+            <span>Call</span>
+          </a>
+        </div>
       </div>
 
     </div>
