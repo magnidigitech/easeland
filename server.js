@@ -2081,11 +2081,13 @@ app.get('/api/site-config', async (req, res) => {
       }
     });
 
-    // Unpack master_draft if present so any child modules (e.g., featuredListings) are exposed at the top level
+    // Unpack and merge master_draft if present so draft edits are exposed and merged with authoritative configuration
     if (config.master_draft && typeof config.master_draft === 'object') {
       Object.keys(config.master_draft).forEach(modKey => {
-        if (!config[modKey] && typeof config.master_draft[modKey] === 'object' && config.master_draft[modKey] !== null) {
+        if (!config[modKey]) {
           config[modKey] = config.master_draft[modKey];
+        } else if (typeof config[modKey] === 'object' && typeof config.master_draft[modKey] === 'object' && config.master_draft[modKey] !== null) {
+          config[modKey] = { ...config[modKey], ...config.master_draft[modKey] };
         }
       });
     }
@@ -2113,6 +2115,18 @@ app.post('/api/site-config', async (req, res) => {
     }
     if (fullConfig.master_draft?.featuredListings) {
       await hydratePromotedProperties(fullConfig.master_draft.featuredListings);
+    }
+
+    // Merge master_draft with existing PostgreSQL master_draft to prevent partial module saves from erasing other modules
+    if (fullConfig.master_draft && typeof fullConfig.master_draft === 'object') {
+      try {
+        const draftRes = await pgPool.query("SELECT config_data FROM site_config WHERE module_id = 'master_draft';");
+        if (draftRes.rows.length > 0 && draftRes.rows[0].config_data && typeof draftRes.rows[0].config_data === 'object') {
+          fullConfig.master_draft = { ...draftRes.rows[0].config_data, ...fullConfig.master_draft };
+        }
+      } catch (eDraftMerge) {
+        console.warn('Draft merge note:', eDraftMerge.message);
+      }
     }
 
     const P = String.fromCharCode(36);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, Phone, User, Mail, MapPin, Building, CheckCircle2, Sparkles, Clock } from 'lucide-react';
+import { X, ShieldCheck, Phone, User, Mail, MapPin, Building, CheckCircle2, Sparkles } from 'lucide-react';
 import { submitVisitorLead } from '../firebase/visitorService';
 import { trackLeadSubmitted } from '../utils/metaPixel.js';
 
@@ -18,7 +18,7 @@ export default function VisitorLeadModal({ currentUser }) {
     location: ''
   });
 
-  // Track 1-Minute (60s) on-site engagement for unauthenticated visitors
+  // Track 3-Minute (180s) on-site engagement for unauthenticated visitors
   useEffect(() => {
     // If user is logged in, skip lead modal prompt
     if (currentUser?.uid || currentUser?.id || (currentUser?.phone && currentUser?.phone.length >= 10)) {
@@ -51,8 +51,8 @@ export default function VisitorLeadModal({ currentUser }) {
           sessionStorage.setItem('easeland_visitor_active_seconds', next.toString());
         } catch (e) {}
 
-        // Trigger at exactly 1 minute (60 seconds)
-        if (next >= 60) {
+        // Trigger at exactly 3 minutes (180 seconds)
+        if (next >= 180) {
           // Verify flags before popping up
           const alreadySubmitted = localStorage.getItem('easeland_visitor_submitted') === 'true';
           const alreadyDismissed = sessionStorage.getItem('easeland_visitor_dismissed') === 'true';
@@ -106,7 +106,7 @@ export default function VisitorLeadModal({ currentUser }) {
         email: (formData.email || '').trim(),
         preferredPropertyType: formData.propertyType,
         preferredLocation: (formData.location || '').trim(),
-        stayDurationSeconds: Math.max(secondsOnSite, 60)
+        stayDurationSeconds: Math.max(secondsOnSite, 180)
       });
 
       if (res.success) {
@@ -175,8 +175,8 @@ export default function VisitorLeadModal({ currentUser }) {
             {/* HEADER BADGE & TITLE */}
             <div className="space-y-2 pr-8">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-300 text-amber-900 rounded-full text-[11px] font-black uppercase tracking-wider">
-                <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                <span>1+ Min Active On Site • Free VIP Assistance</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>Free VIP Assistance</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-brand-navy tracking-tight">
                 Looking for the Right Land Plot in AP?
@@ -304,18 +304,11 @@ export default function VisitorLeadModal({ currentUser }) {
                   <span>{submitting ? 'Saving Details to PostgreSQL...' : 'Get Verified Plot Recommendations →'}</span>
                 </button>
 
-                <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                <div className="flex items-center justify-center text-[11px] text-gray-400 px-1">
                   <span className="flex items-center gap-1 text-emerald-700 font-bold">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     Zero Spam Guarantee
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleDismiss}
-                    className="hover:text-gray-600 font-semibold cursor-pointer underline"
-                  >
-                    I'll browse on my own
-                  </button>
                 </div>
               </div>
             </form>

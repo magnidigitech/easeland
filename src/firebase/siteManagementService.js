@@ -154,13 +154,13 @@ export async function getSiteConfigAdmin() {
                 if (!mergedConfig[mk]) {
                   mergedConfig[mk] = parsed.master_draft[mk];
                 } else if (typeof mergedConfig[mk] === 'object' && typeof parsed.master_draft[mk] === 'object') {
-                  mergedConfig[mk] = { ...mergedConfig[mk], ...parsed.master_draft[mk] };
+                  mergedConfig[mk] = { ...parsed.master_draft[mk], ...mergedConfig[mk] };
                 }
               });
             } else if (!mergedConfig[k]) {
               mergedConfig[k] = parsed[k];
             } else if (typeof mergedConfig[k] === 'object' && typeof parsed[k] === 'object') {
-              mergedConfig[k] = { ...mergedConfig[k], ...parsed[k] };
+              mergedConfig[k] = { ...parsed[k], ...mergedConfig[k] };
             }
           });
 

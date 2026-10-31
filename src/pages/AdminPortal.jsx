@@ -1793,19 +1793,20 @@ export default function AdminPortal({ onNavigate }) {
       const updated = mockApi.updateSiteConfig(siteConfig);
       if (updated) setSiteConfig({ ...updated });
       try {
+        await publishSiteConfigAdmin(siteConfig, adminUid);
         await updateSiteModuleAdmin('master_draft', siteConfig, adminUid);
       } catch (e) { }
       hasUnsavedCmsChangesRef.current = false;
       setHasUnsavedCmsChanges(false);
-      logAdminActivity('saved CMS site configuration draft changes.');
-      setPublishSuccessMessage('Draft changes saved successfully across all 16 modules!');
+      logAdminActivity('saved and published CMS site configuration changes.');
+      setPublishSuccessMessage('Changes saved and applied live across all 16 modules!');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } catch (e) {
       const updated = mockApi.updateSiteConfig(siteConfig);
       if (updated) setSiteConfig({ ...updated });
       hasUnsavedCmsChangesRef.current = false;
       setHasUnsavedCmsChanges(false);
-      setPublishSuccessMessage('Draft saved locally.');
+      setPublishSuccessMessage('Changes saved and applied locally.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
       setAdminActionProcessing(false);
@@ -7658,10 +7659,13 @@ export default function AdminPortal({ onNavigate }) {
                         </button>
                       </div>
                     </div>
+                    {/* Require 2FA for Admin Portal (Hidden for now per request) */}
+                    {/*
                     <div className="pt-2 flex items-center justify-between">
                       <span className="text-xs font-bold text-gray-700">Require 2FA for Admin Portal</span>
                       <input type="checkbox" defaultChecked className="w-4 h-4 text-brand-yellow rounded" />
                     </div>
+                    */}
                   </div>
                 </div>
 
