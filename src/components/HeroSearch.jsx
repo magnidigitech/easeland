@@ -446,8 +446,6 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   return (
     <div className="relative bg-metallic-dark text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
       
-      {/* Background Decorative Graphic */}
-      <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#d4af37_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
 
       {/* Dynamic CMS Hero Background Image */}
       {(siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl) && (
