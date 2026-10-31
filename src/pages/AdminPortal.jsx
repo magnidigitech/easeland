@@ -61,7 +61,7 @@ import {
   Tag,
   Loader2
 } from 'lucide-react';
-import { mockApi, applySiteTheme, safeArray, isFakeProperty } from '../services/mockApi';
+import { mockApi, applySiteTheme, safeArray, isFakeProperty, DEFAULT_SITE_CONFIG } from '../services/mockApi';
 import { DEFAULT_SHOWCASE_PROPERTIES } from '../services/showcaseProperties.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -1875,7 +1875,7 @@ export default function AdminPortal({ onNavigate }) {
       if (updated) setSiteConfig({ ...updated });
       const moduleData = siteConfig[moduleId] !== undefined
         ? siteConfig[moduleId]
-        : (moduleId === 'categories' ? siteConfig.categories : (moduleId === 'faq' ? siteConfig.faqs : siteConfig));
+        : (moduleId === 'categories' ? siteConfig.categories : (moduleId === 'faq' ? siteConfig.faqs : (moduleId === 'maps' ? siteConfig.mapsConfig : siteConfig)));
       try {
         await updateSiteModuleAdmin(moduleId, moduleData, adminUid);
       } catch (e) { }
@@ -1923,22 +1923,45 @@ export default function AdminPortal({ onNavigate }) {
 
   const handleResetModule = (moduleId) => {
     if (!moduleId) return;
-    const defaultConfig = mockApi.getSiteConfig();
+    const freshDefaults = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG));
+
+    // 1. Update CMS configuration state in React immediately
     updateCmsConfig(prev => {
       const next = { ...prev };
       if (moduleId === 'faq') {
-        next.faqs = defaultConfig.faqs;
+        next.faqs = JSON.parse(JSON.stringify(freshDefaults.faqs));
       } else if (moduleId === 'categories') {
-        next.categories = defaultConfig.categories;
-      } else if (defaultConfig[moduleId] !== undefined) {
-        next[moduleId] = { ...defaultConfig[moduleId] };
+        next.categories = JSON.parse(JSON.stringify(freshDefaults.categories));
+      } else if (moduleId === 'maps') {
+        next.mapsConfig = JSON.parse(JSON.stringify(freshDefaults.mapsConfig));
+      } else if (freshDefaults[moduleId] !== undefined) {
+        next[moduleId] = JSON.parse(JSON.stringify(freshDefaults[moduleId]));
       }
-      if (moduleId === 'theme' && siteConfig.theme) {
-        applySiteTheme(siteConfig.theme);
+      if (moduleId === 'theme' && freshDefaults.theme) {
+        applySiteTheme(freshDefaults.theme);
       }
       return next;
     });
-    setPublishSuccessMessage('Module ' + moduleId + ' reset to defaults. Click Save or Publish Live to persist.');
+
+    // 2. Persist to mockApi store and sync to Firestore
+    try {
+      const updatedConfig = mockApi.resetModuleConfig ? mockApi.resetModuleConfig(moduleId) : null;
+      if (updatedConfig) {
+        setSiteConfig({ ...updatedConfig });
+      }
+      const adminUid = user?.uid || 'admin_auditor';
+      const moduleData = freshDefaults[moduleId] !== undefined
+        ? freshDefaults[moduleId]
+        : (moduleId === 'categories' ? freshDefaults.categories : (moduleId === 'faq' ? freshDefaults.faqs : (moduleId === 'maps' ? freshDefaults.mapsConfig : freshDefaults)));
+      updateSiteModuleAdmin(moduleId, moduleData, adminUid).catch(() => {});
+    } catch (err) {
+      console.warn('handleResetModule sync notice:', err);
+    }
+
+    hasUnsavedCmsChangesRef.current = false;
+    setHasUnsavedCmsChanges(false);
+    logAdminActivity('reset module ' + moduleId + ' to factory defaults.');
+    setPublishSuccessMessage('Module ' + moduleId + ' reset to factory defaults.');
     setTimeout(() => setPublishSuccessMessage(''), 4000);
   };
 
@@ -4481,17 +4504,83 @@ export default function AdminPortal({ onNavigate }) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Font Family</label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-gray-700">Typography & Font Family</label>
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                          Active: {siteConfig.theme?.fontFamily || 'Plus Jakarta Sans'}
+                        </span>
+                      </div>
                       <select
                         value={siteConfig.theme?.fontFamily || 'Plus Jakarta Sans'}
                         onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, fontFamily: e.target.value } }))}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-gray-800 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:outline-none transition-all cursor-pointer"
                       >
-                        <option value="Plus Jakarta Sans">Plus Jakarta Sans (Default)</option>
-                        <option value="Inter">Inter (Clean Modern)</option>
-                        <option value="Outfit">Outfit (Bold Geometric)</option>
-                        <option value="Roboto">Roboto (Classic Sans)</option>
+                        <optgroup label="Modern Geometric & Clean Sans (Default)">
+                          <option value="Plus Jakarta Sans">Plus Jakarta Sans (Default - High Clarity Geometric)</option>
+                          <option value="Inter">Inter (Clean, Balanced & High-Legibility Corporate)</option>
+                          <option value="Outfit">Outfit (Bold, Contemporary Digital Geometric)</option>
+                          <option value="Poppins">Poppins (Friendly, Rounded Geometric Sans)</option>
+                          <option value="Montserrat">Montserrat (Architectural, Premium & Strong)</option>
+                          <option value="Urbanist">Urbanist (Sleek, Modernist Luxury Real Estate)</option>
+                          <option value="DM Sans">DM Sans (Low-Contrast Clean Minimalist)</option>
+                          <option value="Manrope">Manrope (Semi-Geometric Contemporary Sans)</option>
+                          <option value="Roboto">Roboto (Classic Neutral Precision)</option>
+                        </optgroup>
+                        <optgroup label="Luxury & Editorial Serifs (Heritage & High-End)">
+                          <option value="Playfair Display">Playfair Display (High-End Luxury Real Estate Editorial)</option>
+                          <option value="Cinzel">Cinzel (Classic Roman / Royal Architectural)</option>
+                          <option value="Lora">Lora (Contemporary Elegant Literary Serif)</option>
+                          <option value="Merriweather">Merriweather (Distinguished Book Serif with High Contrast)</option>
+                        </optgroup>
+                        <optgroup label="Modernist Tech & Display">
+                          <option value="Space Grotesk">Space Grotesk (Neo-Brutalist Tech & Architectural)</option>
+                          <option value="Sora">Sora (Futuristic High-Density Display)</option>
+                        </optgroup>
                       </select>
+                      <p className="text-[11px] text-gray-500 font-medium mt-1">
+                        Select any font family above to instantly update all headings, titles, buttons, cards, and inputs across the entire application in real time.
+                      </p>
+                    </div>
+
+                    {/* LIVE TYPOGRAPHY & SPECIMEN PREVIEW CARD */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                            Live Typography Specimen — {siteConfig.theme?.fontFamily || 'Plus Jakarta Sans'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                          font-family: "{siteConfig.theme?.fontFamily || 'Plus Jakarta Sans'}", sans-serif
+                        </span>
+                      </div>
+
+                      <div
+                        style={{ fontFamily: '"' + (siteConfig.theme?.fontFamily || 'Plus Jakarta Sans') + '", sans-serif' }}
+                        className="space-y-2.5 transition-all duration-200"
+                      >
+                        <div className="text-xl sm:text-2xl font-black text-brand-charcoal tracking-tight leading-tight">
+                          Find Your Verified Sanctuary with EaseLand
+                        </div>
+                        <div className="text-sm font-semibold text-gray-600 leading-snug">
+                          Delineated GeoJSON boundary polygons, physical site inspections, and 100% dispute-free land titles directly from authenticated owners.
+                        </div>
+                        <div className="text-xs font-mono text-gray-500 tracking-widest pt-1 border-t border-gray-100">
+                          ABCDEFGHIJKLMNOPQRSTUVWXYZ • abcdefghijklmnopqrstuvwxyz • 0123456789
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <span className="px-3 py-1 bg-brand-charcoal text-white rounded-lg text-xs font-bold">
+                            Bold Heading Specimen
+                          </span>
+                          <span className="px-3 py-1 bg-brand-yellow text-brand-charcoal rounded-lg text-xs font-black">
+                            Action Button Specimen
+                          </span>
+                          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium border border-gray-200">
+                            Body Text Specimen
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">

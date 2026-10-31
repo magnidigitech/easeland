@@ -61,7 +61,10 @@
       radial-gradient(at 100% 100%, rgba(11, 37, 69, 0.05) 0px, transparent 40%);
     background-attachment: fixed;
     color: #0b2545;
-    font-family: var(--brand-font);
+    font-family: var(--brand-font, 'Plus Jakarta Sans', sans-serif);
+  }
+  html, body, #root, .font-sans, button, input, select, textarea {
+    font-family: var(--brand-font, 'Plus Jakarta Sans', sans-serif) !important;
   }
 }
 

@@ -34,7 +34,7 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif']
+        sans: ['var(--brand-font, "Plus Jakarta Sans")', 'Inter', 'sans-serif']
       }
     },
   },

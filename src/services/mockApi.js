@@ -81,9 +81,27 @@ export const applySiteTheme = (themeConfig) => {
   }
 
   if (themeConfig.fontFamily) {
-    root.style.setProperty('--brand-font', themeConfig.fontFamily);
+    const fontName = themeConfig.fontFamily;
+    root.style.setProperty('--brand-font', '"' + fontName + '", sans-serif');
     if (document.body) {
-      document.body.style.fontFamily = '"' + themeConfig.fontFamily + '", sans-serif';
+      document.body.style.fontFamily = '"' + fontName + '", sans-serif';
+    }
+
+    if (typeof document !== 'undefined') {
+      try {
+        const fontSlug = fontName.replace(/\s+/g, '+');
+        const fontUrl = 'https://fonts.googleapis.com/css2?family=' + fontSlug + ':wght@400;500;600;700;800;900&display=swap';
+        let fontLink = document.getElementById('easeland-dynamic-font-link');
+        if (!fontLink) {
+          fontLink = document.createElement('link');
+          fontLink.id = 'easeland-dynamic-font-link';
+          fontLink.rel = 'stylesheet';
+          document.head.appendChild(fontLink);
+        }
+        if (fontLink.href !== fontUrl) {
+          fontLink.href = fontUrl;
+        }
+      } catch (e) {}
     }
   }
 };
@@ -2279,9 +2297,9 @@ export const mockApi = {
       applySiteTheme(siteConfig.theme);
     }
   },
-
   mergeSiteConfigWithDefaults: mergeSiteConfigWithDefaults,
   sanitizeSiteConfig: sanitizeSiteConfig,
+  getDefaultSiteConfig: () => JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG)),
 
   getSiteConfig: () => {
     siteConfig = mergeSiteConfigWithDefaults(siteConfig);
@@ -2312,6 +2330,28 @@ export const mockApi = {
     return siteConfig;
   },
 
+  resetModuleConfig: (moduleId) => {
+    if (!moduleId) return siteConfig;
+    const defaults = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG));
+    if (moduleId === 'faq') {
+      siteConfig.faqs = defaults.faqs;
+    } else if (moduleId === 'categories') {
+      siteConfig.categories = defaults.categories;
+    } else if (moduleId === 'maps') {
+      siteConfig.mapsConfig = defaults.mapsConfig;
+    } else if (defaults[moduleId] !== undefined) {
+      siteConfig[moduleId] = defaults[moduleId];
+    }
+    setStoredData('easeland_site_config', siteConfig);
+    if (moduleId === 'theme' && siteConfig.theme) {
+      applySiteTheme(siteConfig.theme);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: siteConfig }));
+    }
+    return siteConfig;
+  },
+
   resetSiteConfigAdmin: () => {
     siteConfig = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG));
     setStoredData('easeland_site_config', siteConfig);
@@ -2324,3 +2364,6 @@ export const mockApi = {
     return siteConfig;
   }
 };
+
+export const getDefaultSiteConfig = () => JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG));
+export const resetModuleConfig = (moduleId) => mockApi.resetModuleConfig(moduleId);

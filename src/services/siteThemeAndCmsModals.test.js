@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { applySiteTheme, mockApi, safeArray } from './mockApi.js';
+import { applySiteTheme, mockApi, safeArray, DEFAULT_SITE_CONFIG, resetModuleConfig } from './mockApi.js';
 
 describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
   it('1. applySiteTheme safely exits in non-DOM or undefined config without throwing', () => {
@@ -11,8 +11,12 @@ describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
     });
   });
 
-  it('2. applySiteTheme calculates correct CSS variables and contrast text on mock document', () => {
+  it('2. applySiteTheme calculates correct CSS variables, contrast text, and font quotation on mock document', () => {
     const properties = {};
+    const mockHead = {
+      appendChild: (el) => { mockHead.children.push(el); },
+      children: []
+    };
     const mockDocument = {
       documentElement: {
         style: {
@@ -21,14 +25,21 @@ describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
           }
         }
       },
+      head: mockHead,
       body: {
         style: {}
+      },
+      getElementById: (id) => {
+        return mockHead.children.find(c => c.id === id) || null;
+      },
+      createElement: (tag) => {
+        return { tag, id: '', rel: '', href: '' };
       }
     };
 
     globalThis.document = mockDocument;
 
-    // Test with bright green (#08e717) as configured by user
+    // Test with bright green (#08e717) and Plus Jakarta Sans
     applySiteTheme({
       primaryColor: '#08e717',
       darkBgColor: '#3b8df1',
@@ -42,7 +53,10 @@ describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
     assert.strictEqual(properties['--brand-navy'], '#3b8df1');
     assert.strictEqual(properties['--brand-charcoal'], '#3b8df1');
     assert.strictEqual(properties['--brand-blue'], '#ffffff');
-    assert.strictEqual(properties['--brand-font'], 'Plus Jakarta Sans');
+    assert.strictEqual(properties['--brand-font'], '"Plus Jakarta Sans", sans-serif');
+    assert.strictEqual(mockDocument.body.style.fontFamily, '"Plus Jakarta Sans", sans-serif');
+    assert.ok(mockHead.children.length > 0);
+    assert.ok(mockHead.children[0].href.includes('family=Plus+Jakarta+Sans'));
 
     // Test with dark primary color to verify contrast flips to white
     applySiteTheme({
@@ -119,5 +133,34 @@ describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
     assert.strictEqual(result.theme.darkBgColor, '#3b8df1');
     assert.strictEqual(result.theme.accentColor, '#ffffff');
     assert.strictEqual(result.theme.fontFamily, 'Outfit');
+  });
+
+  it('6. resetModuleConfig restores individual module to exact factory defaults', () => {
+    // Mutate multiple modules in mockApi
+    mockApi.updateSiteConfig({
+      overview: { siteName: 'Mutated Custom Portal' },
+      theme: { primaryColor: '#ff0000', fontFamily: 'Cinzel' },
+      mapsConfig: { defaultLat: 99.9999 }
+    });
+
+    const activeConfig = mockApi.getSiteConfig();
+    assert.strictEqual(activeConfig.overview.siteName, 'Mutated Custom Portal');
+    assert.strictEqual(activeConfig.theme.fontFamily, 'Cinzel');
+    assert.strictEqual(activeConfig.mapsConfig.defaultLat, 99.9999);
+
+    // Reset overview module
+    const resetOverviewRes = mockApi.resetModuleConfig('overview');
+    assert.strictEqual(resetOverviewRes.overview.siteName, DEFAULT_SITE_CONFIG.overview.siteName);
+    // Other modules remain mutated until individually reset
+    assert.strictEqual(resetOverviewRes.theme.fontFamily, 'Cinzel');
+
+    // Reset maps module
+    const resetMapsRes = mockApi.resetModuleConfig('maps');
+    assert.strictEqual(resetMapsRes.mapsConfig.defaultLat, DEFAULT_SITE_CONFIG.mapsConfig.defaultLat);
+
+    // Reset theme module
+    const resetThemeRes = mockApi.resetModuleConfig('theme');
+    assert.strictEqual(resetThemeRes.theme.fontFamily, DEFAULT_SITE_CONFIG.theme.fontFamily);
+    assert.strictEqual(resetThemeRes.theme.primaryColor, DEFAULT_SITE_CONFIG.theme.primaryColor);
   });
 });
