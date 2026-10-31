@@ -412,7 +412,7 @@ export default function CrmKanbanBoard({
         </div>
 
         {/* VIEW MODE TOGGLE, STAGE ARROWS & NEW DEAL BUTTON */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 w-full sm:w-auto shrink-0 justify-between sm:justify-end">
           {/* Quick Arrow Nav Controls in Header */}
           {viewMode === 'kanban' && (
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/90 gap-1">
@@ -578,7 +578,7 @@ export default function CrmKanbanBoard({
           <div
             ref={scrollContainerRef}
             onScroll={checkScrollBounds}
-            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100dvh-340px)] custom-scrollbar scroll-smooth px-1"
+            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100dvh-340px)] custom-scrollbar scroll-smooth px-1 snap-x snap-mandatory"
           >
             {visibleStages.map((stage, sIdx) => {
               const stageDeals = displayedDeals.filter(d => d.stage === stage);
@@ -610,7 +610,7 @@ export default function CrmKanbanBoard({
                     }
                   }}
                   className={
-                    'w-80 shrink-0 min-h-[520px] rounded-2xl border-2 flex flex-col justify-between transition-all duration-200 shadow-xs relative overflow-hidden ' +
+                    'w-[84vw] sm:w-80 shrink-0 snap-center min-h-[480px] sm:min-h-[520px] rounded-2xl border-2 flex flex-col justify-between transition-all duration-200 shadow-xs relative overflow-hidden ' +
                     (isDropTarget
                       ? 'bg-amber-50/90 border-amber-400 border-dashed ring-4 ring-amber-400/30 scale-[1.01] shadow-xl'
                       : 'bg-slate-100/75 border-slate-200/90 hover:border-slate-300'

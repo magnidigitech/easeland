@@ -99,7 +99,7 @@ export default function CrmMatchmaker({
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
               Select Active Buyer ({leads.length}):
             </span>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full shrink-0">
               {leads.map(l => (
                 <button
                   key={l.id}
@@ -252,7 +252,7 @@ export default function CrmMatchmaker({
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
               Select Land Listing ({availableProperties.length}):
             </span>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full shrink-0">
               {availableProperties.map(p => {
                 const pId = p.id || p.propertyId;
                 const isSelected = (activeProperty?.id || activeProperty?.propertyId) === pId;

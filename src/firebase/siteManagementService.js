@@ -40,6 +40,8 @@ export async function getSiteConfigAdmin() {
           Object.keys(json.config.master_draft).forEach((k) => {
             if (!mergedConfig[k]) {
               mergedConfig[k] = json.config.master_draft[k];
+            } else if (typeof mergedConfig[k] === 'object' && typeof json.config.master_draft[k] === 'object') {
+              mergedConfig[k] = { ...mergedConfig[k], ...json.config.master_draft[k] };
             }
           });
         }
@@ -87,6 +89,8 @@ export async function getSiteConfigAdmin() {
           Object.keys(draftData).forEach((k) => {
             if (!mergedConfig[k]) {
               mergedConfig[k] = draftData[k];
+            } else if (typeof mergedConfig[k] === 'object' && typeof draftData[k] === 'object') {
+              mergedConfig[k] = { ...mergedConfig[k], ...draftData[k] };
             }
           });
         }
@@ -145,8 +149,18 @@ export async function getSiteConfigAdmin() {
         const parsed = JSON.parse(rawStored);
         if (parsed && typeof parsed === 'object') {
           Object.keys(parsed).forEach((k) => {
-            if (!mergedConfig[k]) {
+            if (k === 'master_draft' && parsed.master_draft && typeof parsed.master_draft === 'object') {
+              Object.keys(parsed.master_draft).forEach((mk) => {
+                if (!mergedConfig[mk]) {
+                  mergedConfig[mk] = parsed.master_draft[mk];
+                } else if (typeof mergedConfig[mk] === 'object' && typeof parsed.master_draft[mk] === 'object') {
+                  mergedConfig[mk] = { ...mergedConfig[mk], ...parsed.master_draft[mk] };
+                }
+              });
+            } else if (!mergedConfig[k]) {
               mergedConfig[k] = parsed[k];
+            } else if (typeof mergedConfig[k] === 'object' && typeof parsed[k] === 'object') {
+              mergedConfig[k] = { ...mergedConfig[k], ...parsed[k] };
             }
           });
 
@@ -205,7 +219,12 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
     const cleanModuleData = JSON.parse(JSON.stringify(moduleData, (k, v) => (v === undefined ? null : v)));
 
     try {
-      const payload = { [moduleId]: cleanModuleData };
+      let payload = {};
+      if (moduleId === 'master_draft' && typeof cleanModuleData === 'object' && cleanModuleData !== null) {
+        payload = { ...cleanModuleData, master_draft: cleanModuleData };
+      } else {
+        payload = { [moduleId]: cleanModuleData, master_draft: { [moduleId]: cleanModuleData } };
+      }
       if (moduleId === 'featuredListings') {
         payload.master_draft = { featuredListings: cleanModuleData };
       }
@@ -231,20 +250,35 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
     } catch (e) {}
 
     try {
-      const docRef = doc(db, 'siteManagement', moduleId);
-      const payload = {
-        ...(typeof cleanModuleData === 'object' && cleanModuleData !== null ? cleanModuleData : { value: cleanModuleData }),
-        state: 'PUBLISHED',
-        updatedAt: serverTimestamp(),
-        updatedBy: adminUid || 'admin'
-      };
-      await setDoc(docRef, payload, { merge: true });
-
-      // Keep master_draft synchronized in Firestore so background pulls do not overwrite module
-      try {
+      if (moduleId === 'master_draft' && typeof cleanModuleData === 'object' && cleanModuleData !== null) {
+        const promises = Object.keys(cleanModuleData).map(mId => {
+          const mPayload = typeof cleanModuleData[mId] === 'object' && cleanModuleData[mId] !== null ? cleanModuleData[mId] : { value: cleanModuleData[mId] };
+          return setDoc(doc(db, 'siteManagement', mId), {
+            ...mPayload,
+            state: 'PUBLISHED',
+            updatedAt: serverTimestamp(),
+            updatedBy: adminUid || 'admin'
+          }, { merge: true }).catch(err => console.warn('Firestore draft note for ' + mId + ':', err.message));
+        });
+        await Promise.all(promises);
         const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
-        await setDoc(masterDraftRef, { [moduleId]: cleanModuleData }, { merge: true });
-      } catch (mdErr) {}
+        await setDoc(masterDraftRef, cleanModuleData, { merge: true });
+      } else {
+        const docRef = doc(db, 'siteManagement', moduleId);
+        const payload = {
+          ...(typeof cleanModuleData === 'object' && cleanModuleData !== null ? cleanModuleData : { value: cleanModuleData }),
+          state: 'PUBLISHED',
+          updatedAt: serverTimestamp(),
+          updatedBy: adminUid || 'admin'
+        };
+        await setDoc(docRef, payload, { merge: true });
+
+        // Keep master_draft synchronized in Firestore so background pulls do not overwrite module
+        try {
+          const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
+          await setDoc(masterDraftRef, { [moduleId]: cleanModuleData }, { merge: true });
+        } catch (mdErr) {}
+      }
     } catch (fsErr) {
       console.warn('Firestore draft save warning for ' + moduleId + ':', fsErr.message);
     }
@@ -255,11 +289,19 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         const stored = localStorage.getItem('easeland_site_config');
         if (stored) fullConfig = JSON.parse(stored) || {};
       } catch (e) {}
-      fullConfig[moduleId] = moduleData;
+
+      if (moduleId === 'master_draft' && typeof moduleData === 'object' && moduleData !== null) {
+        fullConfig = { ...fullConfig, ...moduleData, master_draft: { ...(fullConfig.master_draft || {}), ...moduleData } };
+      } else {
+        fullConfig[moduleId] = moduleData;
+        if (!fullConfig.master_draft) fullConfig.master_draft = {};
+        fullConfig.master_draft[moduleId] = moduleData;
+      }
+      const sanitized = sanitizeSiteConfig(fullConfig);
       try {
-        localStorage.setItem('easeland_site_config', JSON.stringify(fullConfig));
+        localStorage.setItem('easeland_site_config', JSON.stringify(sanitized));
       } catch (e) {}
-      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: fullConfig }));
+      window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: sanitized }));
     }
 
     return { success: true };
@@ -273,6 +315,9 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
  * Publish all site management modules live to PostgreSQL database and trigger broadcast.
  */
 export async function publishSiteConfigAdmin(fullConfig, adminUid) {
+  const cleanConfig = JSON.parse(JSON.stringify(fullConfig || {}, (k, v) => (v === undefined ? null : v)));
+  const publishPayload = { ...cleanConfig, master_draft: cleanConfig };
+
   // 1. Primary DB Storage: Save all site config modules to PostgreSQL
   try {
     let saved = false;
@@ -280,7 +325,7 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
       const res = await fetch('/api/site-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fullConfig || {})
+        body: JSON.stringify(publishPayload)
       });
       if (res && res.ok) saved = true;
     } catch (eLocal) {}
@@ -290,7 +335,7 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
         await fetch('https://easeland.in/api/site-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(fullConfig || {})
+          body: JSON.stringify(publishPayload)
         });
       } catch (eRemote) {}
     }
@@ -301,10 +346,9 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   // 2. Secondary Sync: Keep Firestore fallback in sync
   try {
     const promises = [];
-    Object.keys(fullConfig || {}).forEach((modId) => {
-      if (modId === 'master_draft') return;
+    Object.keys(cleanConfig).forEach((modId) => {
       const docRef = doc(db, 'siteManagement', modId);
-      const modData = fullConfig[modId];
+      const modData = cleanConfig[modId];
       const payload = typeof modData === 'object' && modData !== null ? modData : { value: modData };
 
       promises.push(
@@ -333,10 +377,11 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   }
 
   if (typeof window !== 'undefined') {
+    const sanitized = sanitizeSiteConfig(publishPayload);
     try {
-      localStorage.setItem('easeland_site_config', JSON.stringify(fullConfig));
+      localStorage.setItem('easeland_site_config', JSON.stringify(sanitized));
     } catch (e) {}
-    window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: fullConfig }));
+    window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: sanitized }));
   }
 
   return { success: true };

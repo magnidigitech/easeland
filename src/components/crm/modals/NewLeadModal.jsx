@@ -57,11 +57,11 @@ export default function NewLeadModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[92dvh] flex flex-col">
 
         {/* MODAL HEADER */}
-        <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
+        <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black">
               <Users className="w-4 h-4 text-slate-950 stroke-[2.5]" />
@@ -74,7 +74,7 @@ export default function NewLeadModal({
         </div>
 
         {/* MODAL FORM */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto">
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

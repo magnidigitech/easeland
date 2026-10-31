@@ -60,14 +60,14 @@ export default function CrmHeader({
           </div>
 
           {/* QUICK ACTIONS & REDIRECTIONS */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full md:w-auto shrink-0 whitespace-nowrap">
 
             {/* REFRESH LIVE DATA */}
             <button
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl transition-all cursor-pointer"
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl transition-all cursor-pointer shrink-0"
               title="Refresh live CRM data from PostgreSQL"
             >
               <RefreshCw className={'w-3.5 h-3.5 ' + (loading ? 'animate-spin text-amber-400' : '')} />
@@ -78,7 +78,7 @@ export default function CrmHeader({
               <button
                 type="button"
                 onClick={onQuickFilterFollowUps}
-                className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer animate-pulse"
+                className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer animate-pulse shrink-0"
                 title="Click to view deals with follow-ups due today"
               >
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
@@ -90,7 +90,7 @@ export default function CrmHeader({
             )}
 
             {/* AGENT FILTER SELECTOR */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
@@ -140,7 +140,7 @@ export default function CrmHeader({
             {/* ACTION: CREATE NEW LEAD */}
             <button
               onClick={onOpenNewLead}
-              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 cursor-pointer"
+              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all transform hover:scale-105 cursor-pointer shrink-0"
             >
               <PlusCircle className="w-4 h-4 text-slate-950 stroke-[2.5]" />
               <span>Add Lead</span>
@@ -149,7 +149,7 @@ export default function CrmHeader({
             {/* ACTION: SCHEDULE SITE VISIT */}
             <button
               onClick={onOpenScheduleVisit}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
             >
               <Calendar className="w-4 h-4 text-blue-100" />
               <span>Schedule Visit</span>
@@ -158,7 +158,7 @@ export default function CrmHeader({
             {/* REDIRECTION: ADMIN STUDIO */}
             <button
               onClick={onReturnToAdmin}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
               title="Return to Admin Governance Studio"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
@@ -168,7 +168,7 @@ export default function CrmHeader({
             {/* REDIRECTION: MARKETPLACE */}
             <button
               onClick={onNavigateToMarketplace}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
               title="View live marketplace portal"
             >
               <ExternalLink className="w-3.5 h-3.5 text-slate-400" />

@@ -48,11 +48,16 @@ export const applySiteTheme = (themeConfig) => {
   if (themeConfig.primaryColor) {
     root.style.setProperty('--brand-yellow', themeConfig.primaryColor);
     root.style.setProperty('--brand-yellow-hover', themeConfig.primaryColor);
+    root.style.setProperty('--metallic-gold', themeConfig.primaryColor);
   }
 
   if (themeConfig.darkBgColor) {
     root.style.setProperty('--brand-navy', themeConfig.darkBgColor);
     root.style.setProperty('--brand-navy-light', themeConfig.darkBgColor);
+    root.style.setProperty('--brand-charcoal', themeConfig.darkBgColor);
+    root.style.setProperty('--brand-charcoal-light', themeConfig.darkBgColor);
+    root.style.setProperty('--metallic-dark', themeConfig.darkBgColor);
+    root.style.setProperty('--metallic-steel', themeConfig.darkBgColor);
   }
 
   if (themeConfig.accentColor) {
@@ -513,38 +518,44 @@ export const sanitizeSiteConfig = (cfg) => {
 
 export const mergeSiteConfigWithDefaults = (userConfig = {}) => {
   if (!userConfig || typeof userConfig !== 'object') return { ...DEFAULT_SITE_CONFIG };
-  const incomingFeatured = userConfig.featuredListings || userConfig.master_draft?.featuredListings || {};
+  const draft = (userConfig.master_draft && typeof userConfig.master_draft === 'object') ? userConfig.master_draft : {};
+  const incomingFeatured = userConfig.featuredListings || draft.featuredListings || {};
   const rawCount = incomingFeatured.displayCount ?? DEFAULT_SITE_CONFIG.featuredListings.displayCount;
   const parsedCount = Number(rawCount);
   const safeDisplayCount = isNaN(parsedCount) ? 6 : Math.max(1, Math.min(24, Math.floor(parsedCount)));
 
   const merged = {
-    overview: { ...DEFAULT_SITE_CONFIG.overview, ...(userConfig.overview || {}) },
-    homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(userConfig.homepage || {}) },
+    overview: { ...DEFAULT_SITE_CONFIG.overview, ...(draft.overview || {}), ...(userConfig.overview || {}) },
+    homepage: { ...DEFAULT_SITE_CONFIG.homepage, ...(draft.homepage || {}), ...(userConfig.homepage || {}) },
     featuredListings: {
       ...DEFAULT_SITE_CONFIG.featuredListings,
+      ...(draft.featuredListings || {}),
       ...incomingFeatured,
       displayCount: safeDisplayCount,
       showOnlyFeatured: true
     },
-    navbar: { ...DEFAULT_SITE_CONFIG.navbar, ...(userConfig.navbar || {}) },
-    footer: { ...DEFAULT_SITE_CONFIG.footer, ...(userConfig.footer || {}) },
-    buyPage: { ...DEFAULT_SITE_CONFIG.buyPage, ...(userConfig.buyPage || {}) },
-    rentPage: { ...DEFAULT_SITE_CONFIG.rentPage, ...(userConfig.rentPage || {}) },
-    sellPage: { ...DEFAULT_SITE_CONFIG.sellPage, ...(userConfig.sellPage || {}) },
+    navbar: { ...DEFAULT_SITE_CONFIG.navbar, ...(draft.navbar || {}), ...(userConfig.navbar || {}) },
+    footer: { ...DEFAULT_SITE_CONFIG.footer, ...(draft.footer || {}), ...(userConfig.footer || {}) },
+    buyPage: { ...DEFAULT_SITE_CONFIG.buyPage, ...(draft.buyPage || {}), ...(userConfig.buyPage || {}) },
+    rentPage: { ...DEFAULT_SITE_CONFIG.rentPage, ...(draft.rentPage || {}), ...(userConfig.rentPage || {}) },
+    sellPage: { ...DEFAULT_SITE_CONFIG.sellPage, ...(draft.sellPage || {}), ...(userConfig.sellPage || {}) },
     categories: (Array.isArray(userConfig.categories) && userConfig.categories.length > 0)
       ? userConfig.categories
-      : DEFAULT_SITE_CONFIG.categories,
+      : ((Array.isArray(draft.categories) && draft.categories.length > 0) ? draft.categories : DEFAULT_SITE_CONFIG.categories),
     faqs: (Array.isArray(userConfig.faqs) && userConfig.faqs.length > 0)
       ? userConfig.faqs
-      : (Array.isArray(userConfig.faq) && userConfig.faq.length > 0 ? userConfig.faq : DEFAULT_SITE_CONFIG.faqs),
-    contact: { ...DEFAULT_SITE_CONFIG.contact, ...(userConfig.contact || {}) },
-    branding: { ...DEFAULT_SITE_CONFIG.branding, ...(userConfig.branding || {}) },
-    theme: { ...DEFAULT_SITE_CONFIG.theme, ...(userConfig.theme || {}) },
-    media: { ...DEFAULT_SITE_CONFIG.media, ...(userConfig.media || {}) },
-    mapsConfig: { ...DEFAULT_SITE_CONFIG.mapsConfig, ...(userConfig.mapsConfig || {}) },
-    seo: { ...DEFAULT_SITE_CONFIG.seo, ...(userConfig.seo || {}) },
-    publish: { ...DEFAULT_SITE_CONFIG.publish, ...(userConfig.publish || {}) }
+      : ((Array.isArray(userConfig.faq) && userConfig.faq.length > 0)
+        ? userConfig.faq
+        : ((Array.isArray(draft.faqs) && draft.faqs.length > 0)
+          ? draft.faqs
+          : ((Array.isArray(draft.faq) && draft.faq.length > 0) ? draft.faq : DEFAULT_SITE_CONFIG.faqs))),
+    contact: { ...DEFAULT_SITE_CONFIG.contact, ...(draft.contact || {}), ...(userConfig.contact || {}) },
+    branding: { ...DEFAULT_SITE_CONFIG.branding, ...(draft.branding || {}), ...(userConfig.branding || {}) },
+    theme: { ...DEFAULT_SITE_CONFIG.theme, ...(draft.theme || {}), ...(userConfig.theme || {}) },
+    media: { ...DEFAULT_SITE_CONFIG.media, ...(draft.media || {}), ...(userConfig.media || {}) },
+    mapsConfig: { ...DEFAULT_SITE_CONFIG.mapsConfig, ...(draft.mapsConfig || {}), ...(userConfig.mapsConfig || {}) },
+    seo: { ...DEFAULT_SITE_CONFIG.seo, ...(draft.seo || {}), ...(userConfig.seo || {}) },
+    publish: { ...DEFAULT_SITE_CONFIG.publish, ...(draft.publish || {}), ...(userConfig.publish || {}) }
   };
   return sanitizeSiteConfig(merged);
 };

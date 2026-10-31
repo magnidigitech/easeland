@@ -624,7 +624,7 @@ export default function EaseLandCRM({
         )}
 
         {/* NAVIGATION TABS BAR */}
-        <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1 border-b border-slate-200 custom-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 border-b border-slate-200 w-full shrink-0 -mx-4 px-4 sm:mx-0 sm:px-0">
           {[
             { id: 'pipeline', label: 'Deal Pipeline (Kanban)', icon: Layers, count: deals.length },
             { id: 'leads', label: 'Buyer Directory', icon: Users, count: leads.length },

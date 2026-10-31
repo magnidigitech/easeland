@@ -85,9 +85,9 @@ export default function CrmExecutiveReport({ analytics, agents }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto no-scrollbar py-1 w-full">
           {funnelStages.map((stage, idx) => (
-            <div key={stage.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 relative group hover:border-amber-400 transition-all">
+            <div key={stage.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 relative group hover:border-amber-400 transition-all shrink-0 min-w-[240px] sm:min-w-0">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase text-slate-400">Stage {idx + 1}</span>
                 <span className={'text-[10px] font-black px-2 py-0.5 rounded-full ' + stage.badgeColor}>

@@ -60,16 +60,16 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             className="flex items-center gap-3 cursor-pointer group select-none shrink-0"
           >
             <img
-              src={siteConfig?.navbar?.logoEmblemUrl || "/easeland_emblem_transparent.png"}
+              src={siteConfig?.navbar?.logoEmblemUrl || siteConfig?.branding?.emblemUrl || siteConfig?.branding?.logoUrl || "/easeland_emblem_transparent.png"}
               alt="EaseLand Logo"
               className="h-10 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform"
             />
             <div>
               <span className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 font-sans">
-                {siteConfig?.navbar?.logoTextPrefix || 'Ease'}<span className="text-amber-500">{siteConfig?.navbar?.logoTextSuffix || 'Land'}</span>
+                {siteConfig?.navbar?.logoTextPrefix || (siteConfig?.overview?.siteName ? siteConfig.overview.siteName : 'Ease')}<span className="text-amber-500">{siteConfig?.navbar?.logoTextSuffix || (siteConfig?.overview?.siteName ? '' : 'Land')}</span>
               </span>
               <span className="hidden sm:block text-[10px] uppercase tracking-widest text-slate-500 font-semibold whitespace-nowrap">
-                {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig?.navbar?.logoSubtext || 'Direct Property Platform')}
+                {user?.role === 'ADMIN' ? 'Admin Site Control Studio' : (siteConfig?.navbar?.logoSubtext || siteConfig?.branding?.brandTagline || 'Direct Property Platform')}
               </span>
             </div>
           </div>

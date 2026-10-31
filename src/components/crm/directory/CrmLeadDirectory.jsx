@@ -98,7 +98,7 @@ export default function CrmLeadDirectory({
         </div>
 
         {/* LEAD SCORE FILTER PILLS */}
-        <div className="flex items-center gap-1.5 overflow-x-auto">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 shrink-0">
           {['ALL', CrmLeadScores.HOT, CrmLeadScores.WARM, CrmLeadScores.COLD].map((score) => {
             const isSelected = leadScoreFilter === score;
             return (

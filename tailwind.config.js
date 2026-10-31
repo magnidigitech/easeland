@@ -19,18 +19,18 @@ export default {
           amber: '#f59e0b',
         },
         brand: {
-          yellow: '#FFE135', // Banana Yellow
-          yellowHover: '#F7D02C', // Banana Yellow Hover
-          navy: '#000080', // Deep Navy Blue
-          navyLight: '#1A1A99', // Navy Blue Accent
-          forest: '#000080',
-          forestLight: '#1A1A99',
+          yellow: 'var(--brand-yellow, #FFE135)',
+          yellowHover: 'var(--brand-yellow-hover, #F7D02C)',
+          navy: 'var(--brand-navy, #000080)',
+          navyLight: 'var(--brand-navy-light, #1A1A99)',
+          forest: 'var(--brand-navy, #000080)',
+          forestLight: 'var(--brand-navy-light, #1A1A99)',
           offwhite: '#ffffff',
           softgray: '#f8fafc',
           cardbg: '#ffffff',
           bordergray: '#e2e8f0',
-          charcoal: '#0b172a',
-          charcoalLight: '#1e293b'
+          charcoal: 'var(--brand-charcoal, #0b172a)',
+          charcoalLight: 'var(--brand-charcoal-light, #1e293b)'
         }
       },
       fontFamily: {

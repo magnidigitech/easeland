@@ -191,6 +191,69 @@ function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/v
   );
 }
 
+function CmsModuleActionBar({
+  moduleId,
+  moduleName,
+  hasUnsaved,
+  onSaveDraft,
+  onPublishLive,
+  onReset,
+  isProcessing
+}) {
+  return (
+    <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gray-50/80 -mx-6 -mb-6 p-4 rounded-b-2xl mt-6">
+      <div className="flex items-center gap-2">
+        {hasUnsaved ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            Unsaved Changes in {moduleName}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-gray-500 bg-gray-100 border border-gray-200">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            {moduleName} in Sync
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={isProcessing}
+          className="px-3.5 py-2 rounded-xl text-xs font-extrabold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 shadow-sm flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+          title={'Reset ' + moduleName + ' to factory defaults'}
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+          <span>Reset Module</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onSaveDraft}
+          disabled={isProcessing}
+          className="px-4 py-2 rounded-xl text-xs font-black text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+          title={'Save draft for ' + moduleName}
+        >
+          <Save className="w-3.5 h-3.5 text-blue-100" />
+          <span>Save Draft</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onPublishLive}
+          disabled={isProcessing}
+          className="px-4 py-2 rounded-xl text-xs font-black text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow-md flex items-center gap-1.5 transition-all cursor-pointer transform hover:scale-105 disabled:opacity-50"
+          title={'Publish ' + moduleName + ' live immediately'}
+        >
+          <Globe className="w-3.5 h-3.5 text-slate-950" />
+          <span>Publish Live</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const parseSafeDate = (val) => {
   if (!val) return 'Recent';
   if (val === 'Invalid Date') return 'Recent';
@@ -273,6 +336,14 @@ export default function AdminPortal({ onNavigate }) {
   // Master Site Management CMS State (All 16 Modules)
 
   const [siteConfig, setSiteConfig] = useState(mockApi.getSiteConfig());
+  const hasUnsavedCmsChangesRef = React.useRef(false);
+  const [hasUnsavedCmsChanges, setHasUnsavedCmsChanges] = useState(false);
+
+  const updateCmsConfig = React.useCallback((updater) => {
+    hasUnsavedCmsChangesRef.current = true;
+    setHasUnsavedCmsChanges(true);
+    setSiteConfig(updater);
+  }, []);
   const [cmsTab, setCmsTab] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -868,6 +939,84 @@ export default function AdminPortal({ onNavigate }) {
     setFollowUps(updated);
   };
 
+  const unifyAndDeduplicateUsers = (userList, isDeletedFn = () => false) => {
+    const canonicalUsers = new Map();
+    const keyToCanonical = new Map();
+
+    const mergeNonEmpty = (target, src) => {
+      const res = { ...target };
+      for (const [k, v] of Object.entries(src || {})) {
+        if (v !== undefined && v !== null && v !== '') {
+          res[k] = v;
+        } else if (res[k] === undefined || res[k] === null) {
+          res[k] = v;
+        }
+      }
+      return res;
+    };
+
+    (userList || []).forEach(u => {
+      if (!u || isDeletedFn(u)) return;
+      const emailKey = (u.email || '').toLowerCase().trim();
+      const rawUid = u.uid || u.id || '';
+      const uidKey = String(rawUid).toLowerCase().trim();
+      if (!emailKey && !uidKey) return;
+
+      const canonicalFromEmail = emailKey ? keyToCanonical.get(emailKey) : null;
+      const canonicalFromUid = uidKey ? keyToCanonical.get(uidKey) : null;
+
+      let canonicalKey = canonicalFromEmail || canonicalFromUid || (emailKey || uidKey);
+
+      let existing = canonicalUsers.get(canonicalKey) || {};
+      if (canonicalFromEmail && canonicalFromUid && canonicalFromEmail !== canonicalFromUid) {
+        const otherUser = canonicalUsers.get(canonicalFromUid) || {};
+        existing = mergeNonEmpty(otherUser, existing);
+        canonicalUsers.delete(canonicalFromUid);
+        for (const [k, v] of keyToCanonical.entries()) {
+          if (v === canonicalFromUid) keyToCanonical.set(k, canonicalKey);
+        }
+      }
+
+      const combined = mergeNonEmpty(existing, u);
+
+      const isSyntheticUid = (id) => !id || id === 'admin_uid_001' || String(id).startsWith('owner-');
+      const bestUid = (!isSyntheticUid(u.uid) ? u.uid : (!isSyntheticUid(existing.uid) ? existing.uid : (u.uid || existing.uid || u.id || existing.id || rawUid)));
+
+      const rawName = combined.name || combined.displayName || '';
+      const isScarlett = rawName.includes('Scarlett') || emailKey === 'admin@easeland.in';
+      const cleanName = isScarlett ? 'EaseLand Admin' : (rawName || (emailKey ? emailKey.split('@')[0] : 'Registered User'));
+
+      const cleanPhone = (combined.phone || combined.phoneNumber || '').trim();
+      const cleanCity = (combined.city || combined.location || '').trim();
+
+      const mergedUser = {
+        ...combined,
+        uid: bestUid,
+        id: bestUid,
+        email: combined.email || (emailKey || ''),
+        name: cleanName,
+        displayName: cleanName,
+        phone: cleanPhone,
+        phoneNumber: cleanPhone,
+        city: cleanCity,
+        location: cleanCity,
+        status: combined.status || combined.accountStatus || 'ACTIVE',
+        accountStatus: combined.accountStatus || combined.status || 'ACTIVE',
+        role: (emailKey === 'admin@easeland.in' || combined.role === 'ADMIN') ? 'ADMIN' : (combined.role || 'USER'),
+        adminRole: emailKey === 'admin@easeland.in' || Boolean(combined.adminRole || combined.role === 'ADMIN'),
+        suspension: combined.suspension || existing.suspension || null
+      };
+
+      canonicalUsers.set(canonicalKey, mergedUser);
+      if (emailKey) keyToCanonical.set(emailKey, canonicalKey);
+      if (uidKey) keyToCanonical.set(uidKey, canonicalKey);
+      if (existing.uid) keyToCanonical.set(String(existing.uid).toLowerCase().trim(), canonicalKey);
+      if (bestUid) keyToCanonical.set(String(bestUid).toLowerCase().trim(), canonicalKey);
+    });
+
+    return Array.from(canonicalUsers.values()).filter(u => !isDeletedFn(u));
+  };
+
   const enrichAndSyncLiveUsers = (incomingUsers, propertiesList = allProperties) => {
     let deletedUsers = [];
     try {
@@ -884,84 +1033,6 @@ export default function AdminPortal({ onNavigate }) {
       const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
       return rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
         (uUid && deletedUsers.includes(uUid)) || (uEmail && deletedUsers.includes(uEmail));
-    };
-
-    const unifyAndDeduplicateUsers = (userList, isDeletedFn = () => false) => {
-      const canonicalUsers = new Map();
-      const keyToCanonical = new Map();
-
-      const mergeNonEmpty = (target, src) => {
-        const res = { ...target };
-        for (const [k, v] of Object.entries(src || {})) {
-          if (v !== undefined && v !== null && v !== '') {
-            res[k] = v;
-          } else if (res[k] === undefined || res[k] === null) {
-            res[k] = v;
-          }
-        }
-        return res;
-      };
-
-      (userList || []).forEach(u => {
-        if (!u || isDeletedFn(u)) return;
-        const emailKey = (u.email || '').toLowerCase().trim();
-        const rawUid = u.uid || u.id || '';
-        const uidKey = String(rawUid).toLowerCase().trim();
-        if (!emailKey && !uidKey) return;
-
-        const canonicalFromEmail = emailKey ? keyToCanonical.get(emailKey) : null;
-        const canonicalFromUid = uidKey ? keyToCanonical.get(uidKey) : null;
-
-        let canonicalKey = canonicalFromEmail || canonicalFromUid || (emailKey || uidKey);
-
-        let existing = canonicalUsers.get(canonicalKey) || {};
-        if (canonicalFromEmail && canonicalFromUid && canonicalFromEmail !== canonicalFromUid) {
-          const otherUser = canonicalUsers.get(canonicalFromUid) || {};
-          existing = mergeNonEmpty(otherUser, existing);
-          canonicalUsers.delete(canonicalFromUid);
-          for (const [k, v] of keyToCanonical.entries()) {
-            if (v === canonicalFromUid) keyToCanonical.set(k, canonicalKey);
-          }
-        }
-
-        const combined = mergeNonEmpty(existing, u);
-
-        const isSyntheticUid = (id) => !id || id === 'admin_uid_001' || String(id).startsWith('owner-');
-        const bestUid = (!isSyntheticUid(u.uid) ? u.uid : (!isSyntheticUid(existing.uid) ? existing.uid : (u.uid || existing.uid || u.id || existing.id || rawUid)));
-
-        const rawName = combined.name || combined.displayName || '';
-        const isScarlett = rawName.includes('Scarlett') || emailKey === 'admin@easeland.in';
-        const cleanName = isScarlett ? 'EaseLand Admin' : (rawName || (emailKey ? emailKey.split('@')[0] : 'Registered User'));
-
-        const cleanPhone = (combined.phone || combined.phoneNumber || '').trim();
-        const cleanCity = (combined.city || combined.location || '').trim();
-
-        const mergedUser = {
-          ...combined,
-          uid: bestUid,
-          id: bestUid,
-          email: combined.email || (emailKey || ''),
-          name: cleanName,
-          displayName: cleanName,
-          phone: cleanPhone,
-          phoneNumber: cleanPhone,
-          city: cleanCity,
-          location: cleanCity,
-          status: combined.status || combined.accountStatus || 'ACTIVE',
-          accountStatus: combined.accountStatus || combined.status || 'ACTIVE',
-          role: (emailKey === 'admin@easeland.in' || combined.role === 'ADMIN') ? 'ADMIN' : (combined.role || 'USER'),
-          adminRole: emailKey === 'admin@easeland.in' || Boolean(combined.adminRole || combined.role === 'ADMIN'),
-          suspension: combined.suspension || existing.suspension || null
-        };
-
-        canonicalUsers.set(canonicalKey, mergedUser);
-        if (emailKey) keyToCanonical.set(emailKey, canonicalKey);
-        if (uidKey) keyToCanonical.set(uidKey, canonicalKey);
-        if (existing.uid) keyToCanonical.set(String(existing.uid).toLowerCase().trim(), canonicalKey);
-        if (bestUid) keyToCanonical.set(String(bestUid).toLowerCase().trim(), canonicalKey);
-      });
-
-      return Array.from(canonicalUsers.values()).filter(u => !isDeletedFn(u));
     };
 
     setRegisteredUsersList(prev => {
@@ -1451,7 +1522,9 @@ export default function AdminPortal({ onNavigate }) {
         cfg = mockApi.mergeSiteConfigWithDefaults(cfgSettled.value.config);
         mockApi.updateSiteConfig(cfg);
       }
-      setSiteConfig(cfg);
+      if (!hasUnsavedCmsChangesRef.current) {
+        setSiteConfig(cfg);
+      }
 
       // Synchronize live users
       enrichAndSyncLiveUsers(users, allMergedProps);
@@ -1471,7 +1544,9 @@ export default function AdminPortal({ onNavigate }) {
       if (syncRes && syncRes.config && Object.keys(syncRes.config).length > 0) {
         const merged = mockApi.mergeSiteConfigWithDefaults(syncRes.config);
         mockApi.updateSiteConfig(merged);
-        setSiteConfig(merged);
+        if (!hasUnsavedCmsChangesRef.current) {
+          setSiteConfig(merged);
+        }
       }
       if (!isDataLoadingRef.current) {
         loadData();
@@ -1483,7 +1558,11 @@ export default function AdminPortal({ onNavigate }) {
     const handleRefresh = () => {
       if (!isDataLoadingRef.current) loadData();
     };
-    const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
+    const handleConfigUpdated = (e) => {
+      if (!hasUnsavedCmsChangesRef.current) {
+        setSiteConfig(e.detail || mockApi.getSiteConfig());
+      }
+    };
     const handleVisitorRefresh = () => loadVisitorLeads();
 
     // Continuous live Firestore subscription for instant bidirectional synchronization
@@ -1716,12 +1795,16 @@ export default function AdminPortal({ onNavigate }) {
       try {
         await updateSiteModuleAdmin('master_draft', siteConfig, adminUid);
       } catch (e) { }
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
       logAdminActivity('saved CMS site configuration draft changes.');
       setPublishSuccessMessage('Draft changes saved successfully across all 16 modules!');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } catch (e) {
       const updated = mockApi.updateSiteConfig(siteConfig);
       if (updated) setSiteConfig({ ...updated });
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
       setPublishSuccessMessage('Draft saved locally.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
@@ -1739,17 +1822,114 @@ export default function AdminPortal({ onNavigate }) {
       try {
         await publishSiteConfigAdmin(siteConfig, adminUid);
       } catch (e) { }
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
       logAdminActivity('published site configuration changes live.');
       setPublishSuccessMessage('Website configuration published live! All 16 modules are active immediately on the public site.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } catch (e) {
       const updated = mockApi.updateSiteConfig(siteConfig);
       if (updated) setSiteConfig({ ...updated });
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
       setPublishSuccessMessage('Website configuration published locally.');
       setTimeout(() => setPublishSuccessMessage(''), 4000);
     } finally {
       setAdminActionProcessing(false);
     }
+  };
+
+  const handleSaveModuleDraft = async (moduleId) => {
+    if (adminActionProcessing || !moduleId) return;
+    setAdminActionProcessing(true);
+    try {
+      const adminUid = user?.uid || 'admin_auditor';
+      const updated = mockApi.updateSiteConfig(siteConfig);
+      if (updated) setSiteConfig({ ...updated });
+      const moduleData = siteConfig[moduleId] !== undefined
+        ? siteConfig[moduleId]
+        : (moduleId === 'categories' ? siteConfig.categories : (moduleId === 'faq' ? siteConfig.faqs : siteConfig));
+      try {
+        await updateSiteModuleAdmin(moduleId, moduleData, adminUid);
+      } catch (e) { }
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
+      logAdminActivity('saved CMS draft for module: ' + moduleId);
+      setPublishSuccessMessage('Draft adjustments saved for Module: ' + moduleId);
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } catch (e) {
+      console.warn('Save module draft error:', e);
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
+      setPublishSuccessMessage('Draft saved locally for Module: ' + moduleId);
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } finally {
+      setAdminActionProcessing(false);
+    }
+  };
+
+  const handlePublishModuleLive = async (moduleId) => {
+    if (adminActionProcessing || !moduleId) return;
+    setAdminActionProcessing(true);
+    try {
+      const adminUid = user?.uid || 'admin_auditor';
+      const updated = mockApi.updateSiteConfig(siteConfig);
+      if (updated) setSiteConfig({ ...updated });
+      try {
+        await publishSiteConfigAdmin(siteConfig, adminUid);
+      } catch (e) { }
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
+      logAdminActivity('published live changes for module: ' + moduleId);
+      setPublishSuccessMessage('Module ' + moduleId + ' published LIVE to marketplace!');
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } catch (e) {
+      console.warn('Publish module live error:', e);
+      hasUnsavedCmsChangesRef.current = false;
+      setHasUnsavedCmsChanges(false);
+      setPublishSuccessMessage('Module ' + moduleId + ' published locally.');
+      setTimeout(() => setPublishSuccessMessage(''), 4000);
+    } finally {
+      setAdminActionProcessing(false);
+    }
+  };
+
+  const handleResetModule = (moduleId) => {
+    if (!moduleId) return;
+    const defaultConfig = mockApi.getSiteConfig();
+    updateCmsConfig(prev => {
+      const next = { ...prev };
+      if (moduleId === 'faq') {
+        next.faqs = defaultConfig.faqs;
+      } else if (moduleId === 'categories') {
+        next.categories = defaultConfig.categories;
+      } else if (defaultConfig[moduleId] !== undefined) {
+        next[moduleId] = { ...defaultConfig[moduleId] };
+      }
+      return next;
+    });
+    setPublishSuccessMessage('Module ' + moduleId + ' reset to defaults. Click Save or Publish Live to persist.');
+    setTimeout(() => setPublishSuccessMessage(''), 4000);
+  };
+
+  const handleAddCategory = () => {
+    const newCat = {
+      id: 'cat-' + Date.now(),
+      title: 'New Property Category',
+      countText: '0 Properties',
+      imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80'
+    };
+    updateCmsConfig(prev => ({
+      ...prev,
+      categories: [...safeArray(prev.categories), newCat]
+    }));
+  };
+
+  const handleRemoveCategory = (catId) => {
+    updateCmsConfig(prev => ({
+      ...prev,
+      categories: safeArray(prev.categories).filter(c => c && c.id !== catId)
+    }));
   };
 
   const handleSyncCloudAndDb = async () => {
@@ -3007,20 +3187,20 @@ export default function AdminPortal({ onNavigate }) {
   // FAQ management helpers
   const handleAddFaq = () => {
     const newFaq = {
-      id: `faq-${Date.now()}`,
+      id: 'faq-' + Date.now(),
       question: 'New Frequently Asked Question',
       answer: 'Detailed answer provided by platform administrator.'
     };
-    setSiteConfig(prev => ({
+    updateCmsConfig(prev => ({
       ...prev,
-      faqs: [...(prev.faqs || []), newFaq]
+      faqs: [...safeArray(prev.faqs || prev.faq), newFaq]
     }));
   };
 
   const handleRemoveFaq = (id) => {
-    setSiteConfig(prev => ({
+    updateCmsConfig(prev => ({
       ...prev,
-      faqs: (prev.faqs || []).filter(f => f.id !== id)
+      faqs: safeArray(prev.faqs || prev.faq).filter(f => f && f.id !== id)
     }));
   };
 
@@ -3164,12 +3344,12 @@ export default function AdminPortal({ onNavigate }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto justify-start sm:justify-end shrink-0 whitespace-nowrap">
             <button
               type="button"
               onClick={() => setIsResetModalOpen(true)}
               disabled={adminActionProcessing}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-gray-600 cursor-pointer disabled:opacity-50"
+              className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-gray-600 cursor-pointer disabled:opacity-50 shrink-0"
               title="Reset all 16 CMS modules to factory default"
             >
               <RotateCcw className="w-3.5 h-3.5 text-brand-yellow" />
@@ -3180,7 +3360,7 @@ export default function AdminPortal({ onNavigate }) {
               type="button"
               onClick={handleSyncCloudAndDb}
               disabled={adminActionProcessing}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
               title="Run Authoritative 3-Way Synchronization across Cloud Firestore, PostgreSQL, and Local storage"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${adminActionProcessing ? 'animate-spin' : ''}`} />
@@ -3191,7 +3371,7 @@ export default function AdminPortal({ onNavigate }) {
               type="button"
               onClick={handleSaveDraftConfig}
               disabled={adminActionProcessing}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
             >
               <Archive className="w-3.5 h-3.5 text-blue-100" />
               <span>SAVE CHANGES</span>
@@ -3201,7 +3381,7 @@ export default function AdminPortal({ onNavigate }) {
               type="button"
               onClick={handlePublishSiteConfig}
               disabled={adminActionProcessing}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 cursor-pointer disabled:opacity-50"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 cursor-pointer disabled:opacity-50 shrink-0"
             >
               <Globe className="w-4 h-4 text-emerald-100 animate-pulse" />
               <span>PUBLISH TO LIVE SITE</span>
@@ -3221,10 +3401,50 @@ export default function AdminPortal({ onNavigate }) {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* MOBILE HORIZONTAL NAVIGATION STRIP (lg:hidden) */}
+        <div className="lg:hidden sticky top-14 sm:top-16 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 -mx-4 px-4 py-2.5 mb-6 shadow-md overflow-x-auto no-scrollbar flex items-center gap-2">
+          {[
+            { id: 'cms', label: 'Site CMS', icon: Sliders, badge: '16' },
+            { id: 'promotions', label: 'Promotions', icon: Sparkles, count: promotedPropertyIds.length },
+            { id: 'all-properties', label: 'All Properties', icon: Building2, count: allProperties.length },
+            { id: 'verification', label: 'Queue', icon: Clock, count: verificationQueue.length },
+            { id: 'workspace', label: 'Workspace', icon: ShieldCheck },
+            { id: 'users', label: 'Users', icon: Users },
+            { id: 'visitors', label: 'Visitors', icon: UserCheck, count: visitorLeads.filter(v => v.status === 'NEW').length },
+            { id: 'reports', label: 'Logs', icon: History },
+            { id: 'profile-settings', label: 'Profile', icon: User }
+          ].map((item) => {
+            const IconComponent = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'bg-brand-yellow text-brand-charcoal shadow-md scale-102 ring-2 ring-brand-yellow/30'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                <IconComponent className={`w-3.5 h-3.5 ${isActive ? 'text-brand-charcoal' : 'text-brand-yellow'}`} />
+                <span>{item.label}</span>
+                {(item.count !== undefined ? item.count > 0 : Boolean(item.badge)) && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    isActive ? 'bg-brand-charcoal text-white' : 'bg-amber-400 text-slate-950'
+                  }`}>
+                    {item.count ?? item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* SIDEBAR NAVIGATION */}
-          <div className="lg:col-span-3 space-y-4">
+          {/* SIDEBAR NAVIGATION - DESKTOP ONLY */}
+          <div className="hidden lg:block lg:col-span-3 space-y-4">
 
             {/* SECTION A: MASTER SITE CMS STUDIO (16 MODULES) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3 space-y-1">
@@ -3305,14 +3525,14 @@ export default function AdminPortal({ onNavigate }) {
                     <span className="text-[11px] font-bold text-gray-500">Live Editor Active</span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                  <div className="flex sm:grid sm:grid-cols-4 lg:grid-cols-8 gap-2 overflow-x-auto no-scrollbar py-1 w-full">
                     {cmsModules.map((mod) => {
                       const IconComp = mod.icon;
                       return (
                         <button
                           key={mod.id}
                           onClick={() => setCmsTab(mod.id)}
-                          className={`p-2.5 rounded-xl text-left border text-[11px] font-extrabold transition-all flex flex-col justify-between h-16 ${cmsTab === mod.id
+                          className={`p-2.5 rounded-xl text-left border text-[11px] font-extrabold transition-all flex flex-col justify-between h-16 shrink-0 min-w-[125px] sm:min-w-0 ${cmsTab === mod.id
                               ? 'bg-brand-charcoal text-white border-brand-charcoal shadow-md ring-2 ring-brand-yellow'
                               : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                             }`}
@@ -3344,7 +3564,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.overview?.siteName || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, overview: { ...prev.overview, siteName: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, overview: { ...prev.overview, siteName: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
@@ -3354,7 +3574,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.overview?.domain || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, overview: { ...prev.overview, domain: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, overview: { ...prev.overview, domain: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
@@ -3366,7 +3586,7 @@ export default function AdminPortal({ onNavigate }) {
                         <span className="block text-[11px] text-amber-700 font-medium">When enabled, public users see a maintenance banner while Admin retains studio access.</span>
                       </div>
                       <button
-                        onClick={() => setSiteConfig(prev => ({ ...prev, overview: { ...prev.overview, emergencyMaintenance: !prev.overview?.emergencyMaintenance } }))}
+                        onClick={() => updateCmsConfig(prev => ({ ...prev, overview: { ...prev.overview, emergencyMaintenance: !prev.overview?.emergencyMaintenance } }))}
                         className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${siteConfig.overview?.emergencyMaintenance
                             ? 'bg-red-600 text-white shadow'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -3375,6 +3595,16 @@ export default function AdminPortal({ onNavigate }) {
                         {siteConfig.overview?.emergencyMaintenance ? 'MAINTENANCE ACTIVE' : 'SYSTEM NORMAL'}
                       </button>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="overview"
+                      moduleName="Overview & Status"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('overview')}
+                      onPublishLive={() => handlePublishModuleLive('overview')}
+                      onReset={() => handleResetModule('overview')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3392,7 +3622,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.homepage?.heroTagline || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroTagline: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroTagline: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
@@ -3403,7 +3633,7 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="text"
                             value={siteConfig.homepage?.heroTitlePrefix || ''}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroTitlePrefix: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroTitlePrefix: e.target.value } }))}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                           />
                         </div>
@@ -3412,7 +3642,7 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="text"
                             value={siteConfig.homepage?.heroTitleHighlight || ''}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroTitleHighlight: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroTitleHighlight: e.target.value } }))}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                           />
                         </div>
@@ -3423,7 +3653,7 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={3}
                           value={siteConfig.homepage?.heroSubtitle || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroSubtitle: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroSubtitle: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
@@ -3431,7 +3661,7 @@ export default function AdminPortal({ onNavigate }) {
                       <MediaUploadInput
                         label="Hero Background Image Cover"
                         value={siteConfig.homepage?.heroBackgroundImage || ''}
-                        onChange={(val) => setSiteConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
+                        onChange={(val) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
                       />
 
                       <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
@@ -3456,6 +3686,16 @@ export default function AdminPortal({ onNavigate }) {
                         </button>
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="homepage"
+                      moduleName="Homepage Content & Hero Banner"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('homepage')}
+                      onPublishLive={() => handlePublishModuleLive('homepage')}
+                      onReset={() => handleResetModule('homepage')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3464,7 +3704,7 @@ export default function AdminPortal({ onNavigate }) {
                   <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
                     <div className="border-b border-gray-100 pb-4">
                       <h3 className="text-lg font-black text-brand-charcoal">3. Top Navbar & Navigation Bar</h3>
-                      <p className="text-xs text-gray-500 font-medium">Customize logo titles, subtext, and main navigation link names.</p>
+                      <p className="text-xs text-gray-500 font-medium">Customize logo titles, emblem, subtext, and main navigation link names.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3473,7 +3713,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.logoTextPrefix || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, logoTextPrefix: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, logoTextPrefix: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
@@ -3482,7 +3722,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.logoTextSuffix || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, logoTextSuffix: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, logoTextSuffix: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
@@ -3491,10 +3731,22 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.logoSubtext || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, logoSubtext: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, logoSubtext: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-yellow"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <MediaUploadInput
+                        label="Navbar Emblem Logo Asset"
+                        value={siteConfig.navbar?.logoEmblemUrl || siteConfig.branding?.emblemUrl || ''}
+                        onChange={(val) => updateCmsConfig(prev => ({
+                          ...prev,
+                          navbar: { ...prev.navbar, logoEmblemUrl: val },
+                          branding: { ...prev.branding, emblemUrl: val }
+                        }))}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -3503,7 +3755,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.buyLabel || 'BUY'}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, buyLabel: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, buyLabel: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3512,7 +3764,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.rentLabel || 'RENT'}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, rentLabel: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, rentLabel: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3521,7 +3773,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.sellLabel || 'SELL'}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, sellLabel: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, sellLabel: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3530,11 +3782,21 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.navbar?.postButtonLabel || 'POST PROPERTY'}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, navbar: { ...prev.navbar, postButtonLabel: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, navbar: { ...prev.navbar, postButtonLabel: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="navbar"
+                      moduleName="Top Navbar & Navigation Bar"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('navbar')}
+                      onPublishLive={() => handlePublishModuleLive('navbar')}
+                      onReset={() => handleResetModule('navbar')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3552,7 +3814,7 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={2}
                           value={siteConfig.footer?.tagline || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, footer: { ...prev.footer, tagline: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, tagline: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3562,7 +3824,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.footer?.officeAddress || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, footer: { ...prev.footer, officeAddress: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, officeAddress: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3573,7 +3835,7 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="text"
                             value={siteConfig.footer?.supportPhone || ''}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, footer: { ...prev.footer, supportPhone: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, supportPhone: e.target.value } }))}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                           />
                         </div>
@@ -3582,7 +3844,50 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="text"
                             value={siteConfig.footer?.supportEmail || ''}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, footer: { ...prev.footer, supportEmail: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, supportEmail: e.target.value } }))}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Twitter / X Profile Link</label>
+                          <input
+                            type="text"
+                            placeholder="https://x.com/easeland"
+                            value={siteConfig.footer?.socialTwitter || ''}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialTwitter: e.target.value } }))}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">LinkedIn Page Link</label>
+                          <input
+                            type="text"
+                            placeholder="https://linkedin.com/company/easeland"
+                            value={siteConfig.footer?.socialLinkedin || ''}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialLinkedin: e.target.value } }))}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">YouTube Channel Link</label>
+                          <input
+                            type="text"
+                            placeholder="https://youtube.com/@easeland"
+                            value={siteConfig.footer?.socialYoutube || ''}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialYoutube: e.target.value } }))}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Instagram Page Link</label>
+                          <input
+                            type="text"
+                            placeholder="https://instagram.com/easeland"
+                            value={siteConfig.footer?.socialInstagram || ''}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialInstagram: e.target.value } }))}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                           />
                         </div>
@@ -3593,11 +3898,21 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.footer?.copyrightText || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, footer: { ...prev.footer, copyrightText: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, copyrightText: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="footer"
+                      moduleName="Footer & Legal Details"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('footer')}
+                      onPublishLive={() => handlePublishModuleLive('footer')}
+                      onReset={() => handleResetModule('footer')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3615,7 +3930,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.buyPage?.title || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, buyPage: { ...prev.buyPage, title: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, buyPage: { ...prev.buyPage, title: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3624,7 +3939,7 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={3}
                           value={siteConfig.buyPage?.subtitle || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, buyPage: { ...prev.buyPage, subtitle: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, buyPage: { ...prev.buyPage, subtitle: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3633,11 +3948,21 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.buyPage?.badgeText || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, buyPage: { ...prev.buyPage, badgeText: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, buyPage: { ...prev.buyPage, badgeText: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="buyPage"
+                      moduleName="Buy Property Landing Page"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('buyPage')}
+                      onPublishLive={() => handlePublishModuleLive('buyPage')}
+                      onReset={() => handleResetModule('buyPage')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3655,7 +3980,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.rentPage?.title || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, rentPage: { ...prev.rentPage, title: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, rentPage: { ...prev.rentPage, title: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3664,7 +3989,7 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={3}
                           value={siteConfig.rentPage?.subtitle || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, rentPage: { ...prev.rentPage, subtitle: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, rentPage: { ...prev.rentPage, subtitle: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3673,11 +3998,21 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.rentPage?.badgeText || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, rentPage: { ...prev.rentPage, badgeText: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, rentPage: { ...prev.rentPage, badgeText: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="rentPage"
+                      moduleName="Rent Property Landing Page"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('rentPage')}
+                      onPublishLive={() => handlePublishModuleLive('rentPage')}
+                      onReset={() => handleResetModule('rentPage')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3695,7 +4030,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.sellPage?.title || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, sellPage: { ...prev.sellPage, title: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, sellPage: { ...prev.sellPage, title: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3704,7 +4039,7 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={3}
                           value={siteConfig.sellPage?.subtitle || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, sellPage: { ...prev.sellPage, subtitle: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, sellPage: { ...prev.sellPage, subtitle: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3713,20 +4048,40 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.sellPage?.badgeText || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, sellPage: { ...prev.sellPage, badgeText: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, sellPage: { ...prev.sellPage, badgeText: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="sellPage"
+                      moduleName="Sell Property & Listing Page"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('sellPage')}
+                      onPublishLive={() => handlePublishModuleLive('sellPage')}
+                      onReset={() => handleResetModule('sellPage')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
                 {/* MODULE 8: PROPERTY CATEGORIES */}
                 {cmsTab === 'categories' && (
                   <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-6">
-                    <div className="border-b border-gray-100 pb-4">
-                      <h3 className="text-lg font-black text-brand-charcoal">8. Property Category Cards Manager</h3>
-                      <p className="text-xs text-gray-500 font-medium">Manage titles, subtext, and cover images for homepage category cards.</p>
+                    <div className="border-b border-gray-100 pb-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-black text-brand-charcoal">8. Property Category Cards Manager</h3>
+                        <p className="text-xs text-gray-500 font-medium">Manage titles, subtext, cover images, and add/remove category cards.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        className="bg-brand-yellow text-brand-charcoal font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow"
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Add Category</span>
+                      </button>
                     </div>
 
                     <div className="space-y-4">
@@ -3734,7 +4089,17 @@ export default function AdminPortal({ onNavigate }) {
                         <div key={cat?.id || idx} className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-extrabold text-brand-charcoal uppercase">Category {idx + 1}: {cat?.title}</span>
-                            <span className="text-[10px] font-bold text-gray-400">ID: {cat?.id}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-gray-400">ID: {cat?.id}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCategory(cat?.id)}
+                                className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
@@ -3745,7 +4110,7 @@ export default function AdminPortal({ onNavigate }) {
                                 onChange={(e) => {
                                   const updatedCats = [...safeArray(siteConfig?.categories)];
                                   updatedCats[idx] = { ...cat, title: e.target.value };
-                                  setSiteConfig(prev => ({ ...prev, categories: updatedCats }));
+                                  updateCmsConfig(prev => ({ ...prev, categories: updatedCats }));
                                 }}
                                 className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-semibold"
                               />
@@ -3758,7 +4123,7 @@ export default function AdminPortal({ onNavigate }) {
                                 onChange={(e) => {
                                   const updatedCats = [...safeArray(siteConfig?.categories)];
                                   updatedCats[idx] = { ...cat, countText: e.target.value };
-                                  setSiteConfig(prev => ({ ...prev, categories: updatedCats }));
+                                  updateCmsConfig(prev => ({ ...prev, categories: updatedCats }));
                                 }}
                                 className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-semibold"
                               />
@@ -3770,7 +4135,7 @@ export default function AdminPortal({ onNavigate }) {
                                 onChange={(val) => {
                                   const updatedCats = [...safeArray(siteConfig?.categories)];
                                   updatedCats[idx] = { ...cat, imageUrl: val };
-                                  setSiteConfig(prev => ({ ...prev, categories: updatedCats }));
+                                  updateCmsConfig(prev => ({ ...prev, categories: updatedCats }));
                                 }}
                               />
                             </div>
@@ -3778,6 +4143,16 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
                       ))}
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="categories"
+                      moduleName="Property Category Cards"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('categories')}
+                      onPublishLive={() => handlePublishModuleLive('categories')}
+                      onReset={() => handleResetModule('categories')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3790,11 +4165,12 @@ export default function AdminPortal({ onNavigate }) {
                         <p className="text-xs text-gray-500 font-medium">Add, edit, or remove FAQ questions and answers.</p>
                       </div>
                       <button
+                        type="button"
                         onClick={handleAddFaq}
                         className="bg-brand-yellow text-brand-charcoal font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow"
                       >
                         <PlusCircle className="w-4 h-4" />
-                        Add Question
+                        <span>Add Question</span>
                       </button>
                     </div>
 
@@ -3816,7 +4192,7 @@ export default function AdminPortal({ onNavigate }) {
                               onChange={(e) => {
                                 const updatedFaqs = [...safeArray(siteConfig?.faqs || siteConfig?.faq)];
                                 updatedFaqs[idx] = { ...faq, question: e.target.value };
-                                setSiteConfig(prev => ({ ...prev, faqs: updatedFaqs }));
+                                updateCmsConfig(prev => ({ ...prev, faqs: updatedFaqs }));
                               }}
                               className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-bold"
                             />
@@ -3829,7 +4205,7 @@ export default function AdminPortal({ onNavigate }) {
                               onChange={(e) => {
                                 const updatedFaqs = [...safeArray(siteConfig?.faqs || siteConfig?.faq)];
                                 updatedFaqs[idx] = { ...faq, answer: e.target.value };
-                                setSiteConfig(prev => ({ ...prev, faqs: updatedFaqs }));
+                                updateCmsConfig(prev => ({ ...prev, faqs: updatedFaqs }));
                               }}
                               className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-medium"
                             />
@@ -3837,6 +4213,16 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
                       ))}
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="faq"
+                      moduleName="Frequently Asked Questions (FAQ)"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('faq')}
+                      onPublishLive={() => handlePublishModuleLive('faq')}
+                      onReset={() => handleResetModule('faq')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3854,7 +4240,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.contact?.heading || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, contact: { ...prev.contact, heading: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, contact: { ...prev.contact, heading: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3863,20 +4249,50 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={2}
                           value={siteConfig.contact?.subheading || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, contact: { ...prev.contact, subheading: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, contact: { ...prev.contact, subheading: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Support Phone Display</label>
+                          <input
+                            type="text"
+                            value={siteConfig.contact?.phoneDisplay || siteConfig.contact?.phone || '+91 98765 43210'}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, contact: { ...prev.contact, phoneDisplay: e.target.value } }))}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Support Email Display</label>
+                          <input
+                            type="text"
+                            value={siteConfig.contact?.emailDisplay || siteConfig.contact?.email || 'support@easeland.in'}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, contact: { ...prev.contact, emailDisplay: e.target.value } }))}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Lead Recipient Email (Inbound Enquiries)</label>
                         <input
                           type="text"
                           value={siteConfig.contact?.recipientEmail || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, contact: { ...prev.contact, recipientEmail: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, contact: { ...prev.contact, recipientEmail: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="contact"
+                      moduleName="Contact Us & Support"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('contact')}
+                      onPublishLive={() => handlePublishModuleLive('contact')}
+                      onReset={() => handleResetModule('contact')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3894,7 +4310,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.branding?.brandTagline || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, branding: { ...prev.branding, brandTagline: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, branding: { ...prev.branding, brandTagline: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3903,7 +4319,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.branding?.slogan || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, branding: { ...prev.branding, slogan: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, branding: { ...prev.branding, slogan: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -3911,15 +4327,25 @@ export default function AdminPortal({ onNavigate }) {
                         <MediaUploadInput
                           label="Transparent Emblem Asset"
                           value={siteConfig.branding?.emblemUrl || ''}
-                          onChange={(val) => setSiteConfig(prev => ({ ...prev, branding: { ...prev.branding, emblemUrl: val } }))}
+                          onChange={(val) => updateCmsConfig(prev => ({ ...prev, branding: { ...prev.branding, emblemUrl: val } }))}
                         />
                         <MediaUploadInput
                           label="Full Logo Asset"
                           value={siteConfig.branding?.logoUrl || ''}
-                          onChange={(val) => setSiteConfig(prev => ({ ...prev, branding: { ...prev.branding, logoUrl: val } }))}
+                          onChange={(val) => updateCmsConfig(prev => ({ ...prev, branding: { ...prev.branding, logoUrl: val } }))}
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="branding"
+                      moduleName="Brand Assets & Identity"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('branding')}
+                      onPublishLive={() => handlePublishModuleLive('branding')}
+                      onReset={() => handleResetModule('branding')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -3938,13 +4364,13 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="color"
                             value={siteConfig.theme?.primaryColor || '#F4C542'}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, primaryColor: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, primaryColor: e.target.value } }))}
                             className="w-10 h-10 rounded-xl border border-gray-200 cursor-pointer"
                           />
                           <input
                             type="text"
                             value={siteConfig.theme?.primaryColor || '#F4C542'}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, primaryColor: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, primaryColor: e.target.value } }))}
                             className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono"
                           />
                         </div>
@@ -3956,13 +4382,13 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="color"
                             value={siteConfig.theme?.darkBgColor || '#0B2545'}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, darkBgColor: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, darkBgColor: e.target.value } }))}
                             className="w-10 h-10 rounded-xl border border-gray-200 cursor-pointer"
                           />
                           <input
                             type="text"
                             value={siteConfig.theme?.darkBgColor || '#0B2545'}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, darkBgColor: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, darkBgColor: e.target.value } }))}
                             className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono"
                           />
                         </div>
@@ -3974,13 +4400,13 @@ export default function AdminPortal({ onNavigate }) {
                           <input
                             type="color"
                             value={siteConfig.theme?.accentColor || '#2563EB'}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, accentColor: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, accentColor: e.target.value } }))}
                             className="w-10 h-10 rounded-xl border border-gray-200 cursor-pointer"
                           />
                           <input
                             type="text"
                             value={siteConfig.theme?.accentColor || '#2563EB'}
-                            onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, accentColor: e.target.value } }))}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, accentColor: e.target.value } }))}
                             className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono"
                           />
                         </div>
@@ -3991,7 +4417,7 @@ export default function AdminPortal({ onNavigate }) {
                       <label className="block text-xs font-bold text-gray-700 mb-1">Font Family</label>
                       <select
                         value={siteConfig.theme?.fontFamily || 'Plus Jakarta Sans'}
-                        onChange={(e) => setSiteConfig(prev => ({ ...prev, theme: { ...prev.theme, fontFamily: e.target.value } }))}
+                        onChange={(e) => updateCmsConfig(prev => ({ ...prev, theme: { ...prev.theme, fontFamily: e.target.value } }))}
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                       >
                         <option value="Plus Jakarta Sans">Plus Jakarta Sans (Default)</option>
@@ -4000,6 +4426,16 @@ export default function AdminPortal({ onNavigate }) {
                         <option value="Roboto">Roboto (Classic Sans)</option>
                       </select>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="theme"
+                      moduleName="Color Themes & Typography"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('theme')}
+                      onPublishLive={() => handlePublishModuleLive('theme')}
+                      onReset={() => handleResetModule('theme')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -4015,15 +4451,25 @@ export default function AdminPortal({ onNavigate }) {
                       <MediaUploadInput
                         label="Fallback Property Image"
                         value={siteConfig.media?.fallbackPropertyImageUrl || ''}
-                        onChange={(val) => setSiteConfig(prev => ({ ...prev, media: { ...prev.media, fallbackPropertyImageUrl: val } }))}
+                        onChange={(val) => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, fallbackPropertyImageUrl: val } }))}
                       />
 
                       <MediaUploadInput
                         label="Hero Banner Custom Media Cover"
                         value={siteConfig.media?.heroBannerUrl || ''}
-                        onChange={(val) => setSiteConfig(prev => ({ ...prev, media: { ...prev.media, heroBannerUrl: val } }))}
+                        onChange={(val) => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, heroBannerUrl: val } }))}
                       />
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="media"
+                      moduleName="Media Library & Assets"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('media')}
+                      onPublishLive={() => handlePublishModuleLive('media')}
+                      onReset={() => handleResetModule('media')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -4042,7 +4488,7 @@ export default function AdminPortal({ onNavigate }) {
                           type="number"
                           step="0.0001"
                           value={siteConfig.mapsConfig?.defaultLat || 16.3124}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, defaultLat: Number(e.target.value) } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, defaultLat: Number(e.target.value) } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -4052,7 +4498,7 @@ export default function AdminPortal({ onNavigate }) {
                           type="number"
                           step="0.0001"
                           value={siteConfig.mapsConfig?.defaultLng || 80.4285}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, defaultLng: Number(e.target.value) } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, defaultLng: Number(e.target.value) } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -4071,7 +4517,7 @@ export default function AdminPortal({ onNavigate }) {
                           value={siteConfig.mapsConfig?.defaultZoom || 13}
                           onChange={(e) => {
                             const val = Math.min(22, Math.max(1, Number(e.target.value) || 13));
-                            setSiteConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, defaultZoom: val } }));
+                            updateCmsConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, defaultZoom: val } }));
                           }}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
@@ -4091,7 +4537,7 @@ export default function AdminPortal({ onNavigate }) {
                           value={siteConfig.mapsConfig?.locationZoom250 || 20}
                           onChange={(e) => {
                             const val = Math.min(22, Math.max(1, Number(e.target.value) || 20));
-                            setSiteConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, locationZoom250: val } }));
+                            updateCmsConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, locationZoom250: val } }));
                           }}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
@@ -4106,10 +4552,20 @@ export default function AdminPortal({ onNavigate }) {
                       <input
                         type="text"
                         value={siteConfig.mapsConfig?.googleMapsApiKey || ''}
-                        onChange={(e) => setSiteConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, googleMapsApiKey: e.target.value } }))}
+                        onChange={(e) => updateCmsConfig(prev => ({ ...prev, mapsConfig: { ...prev.mapsConfig, googleMapsApiKey: e.target.value } }))}
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold"
                       />
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="maps"
+                      moduleName="Maps Engine & Geolocation"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('maps')}
+                      onPublishLive={() => handlePublishModuleLive('maps')}
+                      onReset={() => handleResetModule('maps')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -4127,7 +4583,7 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.seo?.metaTitle || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, seo: { ...prev.seo, metaTitle: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, seo: { ...prev.seo, metaTitle: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -4136,7 +4592,7 @@ export default function AdminPortal({ onNavigate }) {
                         <textarea
                           rows={3}
                           value={siteConfig.seo?.metaDescription || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, seo: { ...prev.seo, metaDescription: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, seo: { ...prev.seo, metaDescription: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
@@ -4145,11 +4601,21 @@ export default function AdminPortal({ onNavigate }) {
                         <input
                           type="text"
                           value={siteConfig.seo?.keywords || ''}
-                          onChange={(e) => setSiteConfig(prev => ({ ...prev, seo: { ...prev.seo, keywords: e.target.value } }))}
+                          onChange={(e) => updateCmsConfig(prev => ({ ...prev, seo: { ...prev.seo, keywords: e.target.value } }))}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                         />
                       </div>
                     </div>
+
+                    <CmsModuleActionBar
+                      moduleId="seo"
+                      moduleName="Search Engine Optimization (SEO)"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={() => handleSaveModuleDraft('seo')}
+                      onPublishLive={() => handlePublishModuleLive('seo')}
+                      onReset={() => handleResetModule('seo')}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
 
@@ -4167,7 +4633,7 @@ export default function AdminPortal({ onNavigate }) {
                       </span>
                     </div>
 
-                    {/* CLEAN LIVE STATUS CARD WITH CHECK LIVE SITE BUTTON */}
+                    {/* LIVE STATUS BANNER */}
                     <div className="p-6 bg-gradient-to-r from-slate-900 to-brand-navy rounded-2xl text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-md border border-slate-800">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center shadow-inner shrink-0">
@@ -4175,7 +4641,7 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
                         <div>
                           <h4 className="font-extrabold text-base text-white">Live Site Sync Engine Active</h4>
-                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are validated and ready. Click "PUBLISH TO LIVE SITE" in the top bar above to broadcast updates instantly across all active user sessions.</p>
+                          <p className="text-xs text-slate-300 mt-0.5 font-medium">All 16 CMS module drafts are validated and ready. Use the controls below to publish changes live immediately or save drafts.</p>
                         </div>
                       </div>
 
@@ -4187,13 +4653,84 @@ export default function AdminPortal({ onNavigate }) {
                               window.open('/', '_blank');
                             }
                           }}
-                          className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 transition-all cursor-pointer transform hover:scale-105 shrink-0 whitespace-nowrap"
+                          className="bg-gray-800 hover:bg-gray-700 text-white font-extrabold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl border border-gray-600 shadow flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
                         >
-                          <Globe className="w-4.5 h-4.5 text-slate-950" />
-                          <span>CHECK LIVE SITE</span>
+                          <Globe className="w-4 h-4 text-brand-yellow" />
+                          <span>Check Live Public Site</span>
                         </button>
                       </div>
                     </div>
+
+                    {/* 16 MODULES READINESS GRID */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-brand-charcoal">
+                          All 16 CMS Modules Deployment Status
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-500">
+                          {hasUnsavedCmsChanges ? 'Unsaved Edits in Draft' : 'All Modules in Lockstep'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {cmsModules.map((m) => {
+                          const IconComp = m.icon;
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => setCmsTab(m.id)}
+                              className="p-3 bg-gray-50 hover:bg-amber-50/50 rounded-xl border border-gray-200 cursor-pointer transition-all flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <IconComp className="w-4 h-4 text-brand-charcoal shrink-0" />
+                                <span className="text-xs font-extrabold text-gray-800 truncate">{m.label}</span>
+                              </div>
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* PRIMARY ACTION CONTROLS */}
+                    <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-sm font-black text-amber-950">Publish All 16 Modules Live</h4>
+                        <p className="text-xs text-amber-800 font-medium">Broadcasts all current adjustments to Cloud Firestore, PostgreSQL, and Local Storage.</p>
+                      </div>
+
+                      <div className="flex items-center gap-3 w-full sm:w-auto justify-end flex-wrap">
+                        <button
+                          type="button"
+                          onClick={handleSaveDraftConfig}
+                          disabled={adminActionProcessing}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          <Archive className="w-4 h-4 text-blue-100" />
+                          <span>SAVE ALL AS DRAFT</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handlePublishSiteConfig}
+                          disabled={adminActionProcessing}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transform hover:scale-105 transition-all disabled:opacity-50"
+                        >
+                          <Globe className="w-4 h-4 text-emerald-100 animate-pulse" />
+                          <span>PUBLISH ALL 16 LIVE NOW</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <CmsModuleActionBar
+                      moduleId="publish"
+                      moduleName="Preview & Publish Live"
+                      hasUnsaved={hasUnsavedCmsChanges}
+                      onSaveDraft={handleSaveDraftConfig}
+                      onPublishLive={handlePublishSiteConfig}
+                      onReset={() => setIsResetModalOpen(true)}
+                      isProcessing={adminActionProcessing}
+                    />
                   </div>
                 )}
               </div>
@@ -4828,141 +5365,145 @@ export default function AdminPortal({ onNavigate }) {
 
                 {/* Master Table */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 bg-gray-50 font-extrabold text-xs text-gray-500 uppercase tracking-wider grid grid-cols-12 gap-3">
-                    <span className="col-span-3">Property Title & Location</span>
-                    <span className="col-span-3">Posted By / Owner</span>
-                    <span className="col-span-2">Submitted Date</span>
-                    <span className="col-span-2">Price & Details</span>
-                    <span className="col-span-2 text-right">Status & Action</span>
-                  </div>
+                  <div className="overflow-x-auto no-scrollbar">
+                    <div className="min-w-[760px]">
+                      <div className="p-4 border-b border-gray-100 bg-gray-50 font-extrabold text-xs text-gray-500 uppercase tracking-wider grid grid-cols-12 gap-3">
+                        <span className="col-span-3">Property Title & Location</span>
+                        <span className="col-span-3">Posted By / Owner</span>
+                        <span className="col-span-2">Submitted Date</span>
+                        <span className="col-span-2">Price & Details</span>
+                        <span className="col-span-2 text-right">Status & Action</span>
+                      </div>
 
-                  {filteredAllProperties.length === 0 ? (
-                    <div className="p-12 text-center text-gray-500 font-bold text-xs">
-                      No properties match your filter criteria.
-                    </div>
-                  ) : (
-                    filteredAllProperties.map((prop) => {
-                      const st = String(prop.status || prop.listingStatus || '').toUpperCase();
-                      const lst = String(prop.listingStatus || '').toUpperCase();
-                      const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || prop.isPlatformVerified;
-                      const isPending = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'PENDING';
-                      const isRejected = st === 'REJECTED' || lst === 'REJECTED';
-                      const isChanges = st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED';
-
-                      const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered User';
-                      const ownerEmail = prop.owner?.email || prop.ownerPrivateEmail || '';
-                      const ownerPhone = prop.owner?.phone || prop.ownerPrivatePhone || 'Number Not Updated';
-                      const isAdminPoster = ownerEmail.includes('admin') || ownerName.toLowerCase().includes('admin');
-
-                      const priceVal = Number(prop.price) || 0;
-                      const priceLabel = prop.priceDisplay || (priceVal >= 10000000
-                        ? `Rs. ${(priceVal / 10000000).toFixed(2)} Cr`
-                        : priceVal >= 100000
-                          ? `Rs. ${(priceVal / 100000).toFixed(2)} Lakhs`
-                          : `Rs. ${priceVal.toLocaleString()}`);
-
-                      const submittedDate = parseSafeDate(prop.submittedDate || prop.createdAt || prop.verifiedDate || prop.updatedAt);
-
-                      return (
-                        <div key={prop.id || prop.propertyId} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs hover:bg-gray-50 transition-colors">
-                          {/* TITLE & LOCATION */}
-                          <div className="col-span-3">
-                            <span className="font-extrabold text-brand-charcoal block line-clamp-1">{prop.title}</span>
-                            <span className="text-gray-500 text-[11px] block line-clamp-1">
-                              {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || 'India'}
-                            </span>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[10px] font-extrabold text-brand-charcoal bg-amber-100 px-2 py-0.5 rounded">
-                                {prop.purpose?.toUpperCase() || 'BUY'}
-                              </span>
-                              <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                                {prop.propertyType || prop.category || 'Plot'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* POSTED BY / OWNER */}
-                          <div className="col-span-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-extrabold text-slate-900 line-clamp-1">{ownerName}</span>
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isAdminPoster ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                                {isAdminPoster ? 'ADMIN' : 'USER'}
-                              </span>
-                            </div>
-                            {ownerEmail && (
-                              <span className="text-slate-500 text-[11px] block line-clamp-1 font-semibold">{ownerEmail}</span>
-                            )}
-                            <span className="text-slate-700 text-[11px] block font-bold mt-0.5">{ownerPhone}</span>
-                          </div>
-
-                          {/* SUBMITTED DATE */}
-                          <div className="col-span-2 text-gray-600 font-semibold text-[11px]">
-                            <Calendar className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
-                            {submittedDate}
-                          </div>
-
-                          {/* PRICE & DETAILS */}
-                          <div className="col-span-2">
-                            <span className="font-extrabold text-emerald-700 block">{priceLabel}</span>
-                            <span className="text-gray-500 text-[11px]">{prop.area ? `${prop.area} sq ft` : ''}</span>
-                          </div>
-
-                          {/* STATUS & ACTION */}
-                          <div className="col-span-2 text-right flex flex-col items-end gap-1.5">
-                            <span className={`font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider ${isLive ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                                isPending ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                                  isChanges ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                                    isRejected ? 'bg-red-100 text-red-800 border border-red-300' :
-                                      'bg-gray-100 text-gray-700 border border-gray-300'
-                              }`}>
-                              {isLive ? 'PLATFORM VERIFIED' : isPending ? 'PENDING AUDIT' : isChanges ? 'CHANGES REQD' : isRejected ? 'REJECTED' : 'DRAFT'}
-                            </span>
-
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap justify-end">
-                              {promotedPropertyIds.includes(String(prop.id || prop.propertyId)) ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemovePaidPromotion(prop.id || prop.propertyId)}
-                                  className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 shadow-xs transition-all"
-                                  title="Property is active in Paid Promotions. Click to remove."
-                                >
-                                  <Sparkles className="w-3 h-3 text-amber-600 fill-amber-500" />
-                                  <span>Promoted</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddPaidPromotion(prop.id || prop.propertyId)}
-                                  className="bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 transition-all"
-                                  title="Add customer property to Paid Promotions"
-                                >
-                                  <Sparkles className="w-3 h-3 text-gray-400" />
-                                  <span>Promote</span>
-                                </button>
-                              )}
-
-                              <button
-                                onClick={() => window.open('/property/' + (prop.propertyId || prop.id), '_blank')}
-                                className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1.5"
-                                title="View Property on Map"
-                              >
-                                <MapPin className="w-3 h-3 text-amber-400" />
-                                <span>View on Map</span>
-                              </button>
-
-                              <button
-                                onClick={() => handleDeletePropertyFromAdmin(prop.id || prop.propertyId, prop)}
-                                className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[11px] px-2 py-1 rounded-lg border border-red-200"
-                                title="Delete Listing"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
+                      {filteredAllProperties.length === 0 ? (
+                        <div className="p-12 text-center text-gray-500 font-bold text-xs">
+                          No properties match your filter criteria.
                         </div>
-                      );
-                    })
-                  )}
+                      ) : (
+                        filteredAllProperties.map((prop) => {
+                          const st = String(prop.status || prop.listingStatus || '').toUpperCase();
+                          const lst = String(prop.listingStatus || '').toUpperCase();
+                          const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || prop.isPlatformVerified;
+                          const isPending = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'PENDING';
+                          const isRejected = st === 'REJECTED' || lst === 'REJECTED';
+                          const isChanges = st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED';
+
+                          const ownerName = prop.owner?.name || prop.ownerPublicName || 'Registered User';
+                          const ownerEmail = prop.owner?.email || prop.ownerPrivateEmail || '';
+                          const ownerPhone = prop.owner?.phone || prop.ownerPrivatePhone || 'Number Not Updated';
+                          const isAdminPoster = ownerEmail.includes('admin') || ownerName.toLowerCase().includes('admin');
+
+                          const priceVal = Number(prop.price) || 0;
+                          const priceLabel = prop.priceDisplay || (priceVal >= 10000000
+                            ? `Rs. ${(priceVal / 10000000).toFixed(2)} Cr`
+                            : priceVal >= 100000
+                              ? `Rs. ${(priceVal / 100000).toFixed(2)} Lakhs`
+                              : `Rs. ${priceVal.toLocaleString()}`);
+
+                          const submittedDate = parseSafeDate(prop.submittedDate || prop.createdAt || prop.verifiedDate || prop.updatedAt);
+
+                          return (
+                            <div key={prop.id || prop.propertyId} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs hover:bg-gray-50 transition-colors">
+                              {/* TITLE & LOCATION */}
+                              <div className="col-span-3">
+                                <span className="font-extrabold text-brand-charcoal block line-clamp-1">{prop.title}</span>
+                                <span className="text-gray-500 text-[11px] block line-clamp-1">
+                                  {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || 'India'}
+                                </span>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-[10px] font-extrabold text-brand-charcoal bg-amber-100 px-2 py-0.5 rounded">
+                                    {prop.purpose?.toUpperCase() || 'BUY'}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                                    {prop.propertyType || prop.category || 'Plot'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* POSTED BY / OWNER */}
+                              <div className="col-span-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-extrabold text-slate-900 line-clamp-1">{ownerName}</span>
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isAdminPoster ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                    {isAdminPoster ? 'ADMIN' : 'USER'}
+                                  </span>
+                                </div>
+                                {ownerEmail && (
+                                  <span className="text-slate-500 text-[11px] block line-clamp-1 font-semibold">{ownerEmail}</span>
+                                )}
+                                <span className="text-slate-700 text-[11px] block font-bold mt-0.5">{ownerPhone}</span>
+                              </div>
+
+                              {/* SUBMITTED DATE */}
+                              <div className="col-span-2 text-gray-600 font-semibold text-[11px]">
+                                <Calendar className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+                                {submittedDate}
+                              </div>
+
+                              {/* PRICE & DETAILS */}
+                              <div className="col-span-2">
+                                <span className="font-extrabold text-emerald-700 block">{priceLabel}</span>
+                                <span className="text-gray-500 text-[11px]">{prop.area ? `${prop.area} sq ft` : ''}</span>
+                              </div>
+
+                              {/* STATUS & ACTION */}
+                              <div className="col-span-2 text-right flex flex-col items-end gap-1.5">
+                                <span className={`font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider ${isLive ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                    isPending ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                                      isChanges ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                                        isRejected ? 'bg-red-100 text-red-800 border border-red-300' :
+                                          'bg-gray-100 text-gray-700 border border-gray-300'
+                                  }`}>
+                                  {isLive ? 'PLATFORM VERIFIED' : isPending ? 'PENDING AUDIT' : isChanges ? 'CHANGES REQD' : isRejected ? 'REJECTED' : 'DRAFT'}
+                                </span>
+
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap justify-end">
+                                  {promotedPropertyIds.includes(String(prop.id || prop.propertyId)) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemovePaidPromotion(prop.id || prop.propertyId)}
+                                      className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 shadow-xs transition-all"
+                                      title="Property is active in Paid Promotions. Click to remove."
+                                    >
+                                      <Sparkles className="w-3 h-3 text-amber-600 fill-amber-500" />
+                                      <span>Promoted</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddPaidPromotion(prop.id || prop.propertyId)}
+                                      className="bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 transition-all"
+                                      title="Add customer property to Paid Promotions"
+                                    >
+                                      <Sparkles className="w-3 h-3 text-gray-400" />
+                                      <span>Promote</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => window.open('/property/' + (prop.propertyId || prop.id), '_blank')}
+                                    className="bg-brand-charcoal hover:bg-slate-800 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1.5"
+                                    title="View Property on Map"
+                                  >
+                                    <MapPin className="w-3 h-3 text-amber-400" />
+                                    <span>View on Map</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeletePropertyFromAdmin(prop.id || prop.propertyId, prop)}
+                                    className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[11px] px-2 py-1 rounded-lg border border-red-200"
+                                    title="Delete Listing"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -4981,100 +5522,104 @@ export default function AdminPortal({ onNavigate }) {
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 bg-gray-50 font-extrabold text-xs text-gray-500 uppercase tracking-wider grid grid-cols-12 gap-4">
-                    <span className="col-span-4">Property Title & Location</span>
-                    <span className="col-span-3">Owner Name</span>
-                    <span className="col-span-2">Owner Contact</span>
-                    <span className="col-span-1">Submitted</span>
-                    <span className="col-span-2 text-right">Action</span>
-                  </div>
-
-                  {verificationQueue.length === 0 ? (
-                    <div className="p-12 text-center bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2 my-4 mx-4">
-                      <div className="text-3xl">🎉</div>
-                      <h4 className="font-black text-lg text-emerald-800 uppercase tracking-wide">
-                        ALL VERIFICATIONS ARE CLEAR !!
-                      </h4>
-                      <p className="text-xs text-emerald-600 font-bold">
-                        No pending property audits or document approvals in queue. All properties processed!
-                      </p>
-                    </div>
-                  ) : (
-                    verificationQueue.map((prop) => (
-                      <div key={prop.id} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-4 items-center text-xs hover:bg-gray-50 transition-colors">
-                        {/* TITLE & LOCATION */}
-                        <div className="col-span-4">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <span className="font-bold text-brand-charcoal line-clamp-1">{prop.title}</span>
-                            {Boolean((prop.hasPendingEdits || prop.pendingReauditData) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
-                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300">
-                                Re-Verification Pending
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-gray-500 text-[11px]">
-                            {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || (typeof prop.location === 'string' ? prop.location : 'India')}
-                          </span>
-                        </div>
-
-                        {/* SEPARATE COLUMN: OWNER NAME */}
-                        <div className="col-span-3">
-                          <span className="font-extrabold text-slate-900 block line-clamp-1">
-                            {prop.owner?.name || 'Registered Account Owner'}
-                          </span>
-                          {prop.owner?.email && (
-                            <span className="text-slate-500 text-[10px] block line-clamp-1 font-semibold">
-                              {prop.owner.email}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* SEPARATE COLUMN: OWNER CONTACT */}
-                        <div className="col-span-2">
-                          <span className={`font-extrabold text-[11px] block line-clamp-1 ${prop.owner?.phone && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
-                              ? 'text-slate-900'
-                              : 'text-amber-700 font-semibold'
-                            }`}>
-                            {prop.owner?.phone && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
-                              ? prop.owner.phone
-                              : 'Number Not Updated'}
-                          </span>
-                        </div>
-
-                        {/* SUBMITTED */}
-                        <div className="col-span-1 text-gray-500 font-semibold">
-                          {prop.submittedDate || 'Recent'}
-                        </div>
-
-                        {/* ACTION */}
-                        <div className="col-span-2 text-right flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openWorkspace(prop);
-                            }}
-                            className="bg-slate-900 text-white font-extrabold px-3 py-1.5 rounded-xl hover:bg-amber-400 hover:text-slate-950 transition-all text-[11px] shadow-sm border border-transparent hover:border-amber-300 cursor-pointer"
-                          >
-                            Audit Now
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDeleteProperty(prop);
-                            }}
-                            className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white font-extrabold px-2.5 py-1.5 rounded-xl transition-all text-[11px] shadow-sm"
-                            title="Delete Property Listing"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                  <div className="overflow-x-auto no-scrollbar">
+                    <div className="min-w-[760px]">
+                      <div className="p-4 border-b border-gray-100 bg-gray-50 font-extrabold text-xs text-gray-500 uppercase tracking-wider grid grid-cols-12 gap-4">
+                        <span className="col-span-4">Property Title & Location</span>
+                        <span className="col-span-3">Owner Name</span>
+                        <span className="col-span-2">Owner Contact</span>
+                        <span className="col-span-1">Submitted</span>
+                        <span className="col-span-2 text-right">Action</span>
                       </div>
-                    ))
-                  )}
+
+                      {verificationQueue.length === 0 ? (
+                        <div className="p-12 text-center bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2 my-4 mx-4">
+                          <div className="text-3xl">🎉</div>
+                          <h4 className="font-black text-lg text-emerald-800 uppercase tracking-wide">
+                            ALL VERIFICATIONS ARE CLEAR !!
+                          </h4>
+                          <p className="text-xs text-emerald-600 font-bold">
+                            No pending property audits or document approvals in queue. All properties processed!
+                          </p>
+                        </div>
+                      ) : (
+                        verificationQueue.map((prop) => (
+                          <div key={prop.id} className="p-4 border-b border-gray-100 grid grid-cols-12 gap-4 items-center text-xs hover:bg-gray-50 transition-colors">
+                            {/* TITLE & LOCATION */}
+                            <div className="col-span-4">
+                              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                <span className="font-bold text-brand-charcoal line-clamp-1">{prop.title}</span>
+                                {Boolean((prop.hasPendingEdits || prop.pendingReauditData) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
+                                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300">
+                                    Re-Verification Pending
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-gray-500 text-[11px]">
+                                {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || (typeof prop.location === 'string' ? prop.location : 'India')}
+                              </span>
+                            </div>
+
+                            {/* SEPARATE COLUMN: OWNER NAME */}
+                            <div className="col-span-3">
+                              <span className="font-extrabold text-slate-900 block line-clamp-1">
+                                {prop.owner?.name || 'Registered Account Owner'}
+                              </span>
+                              {prop.owner?.email && (
+                                <span className="text-slate-500 text-[10px] block line-clamp-1 font-semibold">
+                                  {prop.owner.email}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* SEPARATE COLUMN: OWNER CONTACT */}
+                            <div className="col-span-2">
+                              <span className={`font-extrabold text-[11px] block line-clamp-1 ${prop.owner?.phone && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
+                                  ? 'text-slate-900'
+                                  : 'text-amber-700 font-semibold'
+                                }`}>
+                                {prop.owner?.phone && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
+                                  ? prop.owner.phone
+                                  : 'Number Not Updated'}
+                              </span>
+                            </div>
+
+                            {/* SUBMITTED */}
+                            <div className="col-span-1 text-gray-500 font-semibold">
+                              {prop.submittedDate || 'Recent'}
+                            </div>
+
+                            {/* ACTION */}
+                            <div className="col-span-2 text-right flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openWorkspace(prop);
+                                }}
+                                className="bg-slate-900 text-white font-extrabold px-3 py-1.5 rounded-xl hover:bg-amber-400 hover:text-slate-950 transition-all text-[11px] shadow-sm border border-transparent hover:border-amber-300 cursor-pointer"
+                              >
+                                Audit Now
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDeleteProperty(prop);
+                                }}
+                                className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white font-extrabold px-2.5 py-1.5 rounded-xl transition-all text-[11px] shadow-sm"
+                                title="Delete Property Listing"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -6176,11 +6721,11 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
 
                         {/* ACTION BUTTONS */}
-                        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto justify-start sm:justify-end shrink-0 whitespace-nowrap pt-2">
                           <button
                             onClick={() => handleReject(activeAuditProp.id || activeAuditProp.propertyId)}
                             disabled={adminActionProcessing}
-                            className="px-4 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300"
+                            className="px-4 py-2.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 font-extrabold text-xs transition-colors cursor-pointer border border-red-300 shrink-0"
                             title="Completely unpublish and reject this property listing"
                           >
                             Reject Entire Listing
@@ -6189,7 +6734,7 @@ export default function AdminPortal({ onNavigate }) {
                             <button
                               onClick={() => handleRejectEdits(activeAuditProp.id || activeAuditProp.propertyId)}
                               disabled={adminActionProcessing}
-                              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs transition-colors cursor-pointer shadow-sm"
+                              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs transition-colors cursor-pointer shadow-sm shrink-0"
                               title="Discard owner's proposed changes while keeping the previously approved listing live"
                             >
                               Reject Proposed Edits (Keep Approved Live)
@@ -6198,14 +6743,14 @@ export default function AdminPortal({ onNavigate }) {
                           <button
                             onClick={() => handleRequestChanges(activeAuditProp.id || activeAuditProp.propertyId)}
                             disabled={adminActionProcessing}
-                            className="px-5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs transition-colors cursor-pointer border border-amber-300"
+                            className="px-5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs transition-colors cursor-pointer border border-amber-300 shrink-0"
                           >
                             Request Document Changes
                           </button>
                           <button
                             onClick={() => handleApprove(activeAuditProp.id || activeAuditProp.propertyId)}
                             disabled={adminActionProcessing}
-                            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                           >
                             <CheckCircle2 className="w-4 h-4 text-emerald-100" />
                             <span>Approve & Publish Live</span>
@@ -6438,8 +6983,9 @@ export default function AdminPortal({ onNavigate }) {
 
                   return (
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                      <div className="w-full">
-                        <table className="w-full text-left border-collapse table-auto">
+                      <div className="w-full overflow-x-auto no-scrollbar">
+                        <div className="min-w-[680px]">
+                          <table className="w-full text-left border-collapse table-auto">
                           <thead>
                             <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
                               <th className="py-3 px-3">User & Auth Details</th>
@@ -6580,6 +7126,7 @@ export default function AdminPortal({ onNavigate }) {
                             )}
                           </tbody>
                         </table>
+                        </div>
                       </div>
 
                       {/* PAGINATION CONTROLS & PER PAGE SELECTOR */}

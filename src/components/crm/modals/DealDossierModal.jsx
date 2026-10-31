@@ -43,8 +43,8 @@ export default function DealDossierModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[90dvh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[92dvh] flex flex-col">
 
         {/* MODAL HEADER */}
         <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white shrink-0">
@@ -295,7 +295,7 @@ export default function DealDossierModal({
 
         {/* MODAL FOOTER */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 whitespace-nowrap">
             {deal.customerPhone && (
               <button
                 type="button"
@@ -306,7 +306,7 @@ export default function DealDossierModal({
                   }
                   onTriggerWhatsApp(deal.customerPhone, deal.customerName, deal.propertyTitle);
                 }}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>{isFieldExecutive ? 'Contact Desk' : 'WhatsApp Buyer'}</span>
@@ -315,7 +315,7 @@ export default function DealDossierModal({
 
             {/* INLINE STAGE ADVANCER */}
             {onAdvanceStage && kanbanStages.length > 0 && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <select
                   disabled={deal.isPropertyQuarantined}
                   value={deal.stage}
@@ -333,7 +333,7 @@ export default function DealDossierModal({
             <button
               type="button"
               onClick={(e) => onDeleteDeal(e, deal.id, deal.customerName)}
-              className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
               title="Delete deal completely"
             >
               <Trash2 className="w-4 h-4" />
