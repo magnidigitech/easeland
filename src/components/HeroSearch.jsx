@@ -448,11 +448,14 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
       
 
       {/* Dynamic CMS Hero Background Image */}
-      {(siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl) && (
-        <div
-          className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-25 transition-opacity duration-700"
-          style={{ backgroundImage: 'url(' + (siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl) + ')' }}
-        />
+      {(siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl || '/easeland_hero_bg.jpg') && (
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-40 transition-opacity duration-700"
+            style={{ backgroundImage: 'url(' + (siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl || '/easeland_hero_bg.jpg') + ')' }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/65 to-slate-950/90 pointer-events-none" />
+        </>
       )}
       
       <div className="max-w-5xl mx-auto text-center relative z-10">

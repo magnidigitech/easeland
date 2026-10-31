@@ -332,7 +332,7 @@ export const DEFAULT_SITE_CONFIG = {
     heroSubtitle: '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.',
     showSearchCard: true,
     showPopularSearches: true,
-    heroBackgroundImage: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80'
+    heroBackgroundImage: '/easeland_hero_bg.jpg'
   },
   navbar: {
     logoTextPrefix: 'Ease',
@@ -407,7 +407,7 @@ export const DEFAULT_SITE_CONFIG = {
     darkMode: false
   },
   media: {
-    heroBannerUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80',
+    heroBannerUrl: '/easeland_hero_bg.jpg',
     mapPlaceholderUrl: 'https://mt1.google.com/vt/lyrs=m&x=1468&y=948&z=11',
     fallbackPropertyImageUrl: NO_PHOTO_PLACEHOLDER
   },
@@ -545,6 +545,14 @@ export const sanitizeSiteConfig = (cfg) => {
       const num = Number(sanitized.featuredListings.displayCount);
       sanitized.featuredListings.displayCount = isNaN(num) ? 6 : Math.max(1, Math.min(24, Math.floor(num)));
     }
+  }
+
+  // 9. Upgrade legacy stock hero image to generated high-res landscape
+  if (sanitized.homepage?.heroBackgroundImage && sanitized.homepage.heroBackgroundImage.includes('photo-1500382017468-9049fed747ef')) {
+    sanitized.homepage.heroBackgroundImage = DEFAULT_SITE_CONFIG.homepage.heroBackgroundImage;
+  }
+  if (sanitized.media?.heroBannerUrl && sanitized.media.heroBannerUrl.includes('photo-1500382017468-9049fed747ef')) {
+    sanitized.media.heroBannerUrl = DEFAULT_SITE_CONFIG.media.heroBannerUrl;
   }
 
   return sanitized;
