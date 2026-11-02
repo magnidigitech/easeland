@@ -126,13 +126,16 @@ export default function UniversalMapEngine({
   const [internalSidePanelOpen, setInternalSidePanelOpen] = useState(!hideSidePanel);
   const isSidePanelOpen = controlledSidePanelOpen !== undefined ? controlledSidePanelOpen : internalSidePanelOpen;
   const setIsSidePanelOpen = setControlledSidePanelOpen || setInternalSidePanelOpen;
+  const [selectedPropertyId, setSelectedPropertyId] = useState(null);
   const [selectedPropertyPreview, setSelectedPropertyPreview] = useState(null);
   const [previewMediaIndex, setPreviewMediaIndex] = useState(0);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
-  // Smooth pan to property with standard zoom (level 17) without opening preview card
+  // Smooth pan to property with standard zoom (level 17) and highlight only this property on map without opening preview card
   const handlePanToProperty = (prop) => {
     if (!prop) return;
+    const propId = prop.id || prop.propertyId || prop.referenceId;
+    setSelectedPropertyId(propId);
     setSelectedPropertyPreview(null);
 
     const coords = extractCoordinates(prop);
@@ -152,9 +155,11 @@ export default function UniversalMapEngine({
     }
   };
 
-  // Smooth pan to property with standard zoom (level 17) and open preview card
+  // Smooth pan to property with standard zoom (level 17), highlight on map, and open preview card
   const handleSelectPropertyForPreview = (prop) => {
     if (!prop) return;
+    const propId = prop.id || prop.propertyId || prop.referenceId;
+    setSelectedPropertyId(propId);
     setSelectedPropertyPreview(prop);
     setPreviewMediaIndex(0);
 
@@ -178,9 +183,16 @@ export default function UniversalMapEngine({
   // Sync with focusedProperty if passed from parent
   useEffect(() => {
     if (focusedProperty) {
+      const propId = focusedProperty.id || focusedProperty.propertyId || focusedProperty.referenceId;
+      setSelectedPropertyId(propId);
       handleSelectPropertyForPreview(focusedProperty);
     }
   }, [focusedProperty]);
+
+  // Reset selected property when search filters change
+  useEffect(() => {
+    setSelectedPropertyId(null);
+  }, [filters]);
 
   // Google Maps Layers State
   const [mapType, setMapType] = useState('satellite'); // 'satellite' by default, 'default' (roadmap)
@@ -304,6 +316,13 @@ export default function UniversalMapEngine({
       }
     };
 
+    // Clicking empty map canvas deselects any highlighted property
+    const handleMapClick = () => {
+      setSelectedPropertyId(null);
+      setSelectedPropertyPreview(null);
+    };
+
+    map.on('click', handleMapClick);
     map.on('zoomend', handleZoomChange);
     map.on('zoom', handleZoomChange);
     setCurrentZoom(initialZoom);
@@ -326,6 +345,7 @@ export default function UniversalMapEngine({
     }, 250);
 
     return () => {
+      map.off('click', handleMapClick);
       map.off('zoomend', handleZoomChange);
       map.off('zoom', handleZoomChange);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
@@ -834,13 +854,50 @@ export default function UniversalMapEngine({
 
       bounds.push([lat, lng]);
 
+      const propId = prop.id || prop.propertyId || prop.referenceId;
+      const isSelected = Boolean(selectedPropertyId && String(propId) === String(selectedPropertyId));
+      const isAnySelected = Boolean(selectedPropertyId);
+      const isDimmed = isAnySelected && !isSelected;
+
       const { size, color, border } = getMarkerStyle(prop);
       const priceVal = Number(prop.price) || 0;
-      const priceLabel = prop.priceDisplay || (priceVal >= 10000000 
-        ? `Rs. ${(priceVal / 10000000).toFixed(2)} Cr` 
-        : priceVal >= 100000 
-          ? `Rs. ${(priceVal / 100000).toFixed(1)} L` 
-          : `Rs. ${priceVal.toLocaleString()}`);
+      let priceLabel = prop.priceDisplay;
+      if (!priceLabel) {
+        if (priceVal >= 10000000) {
+          priceLabel = 'Rs. ' + (priceVal / 10000000).toFixed(2) + ' Cr';
+        } else if (priceVal >= 100000) {
+          priceLabel = 'Rs. ' + (priceVal / 100000).toFixed(1) + ' L';
+        } else {
+          priceLabel = 'Rs. ' + priceVal.toLocaleString();
+        }
+      }
+
+      // Visual styling for Selected vs Dimmed vs Normal
+      let markerOpacity = '1';
+      let markerScale = 'scale(1)';
+      let markerZIndex = 0;
+      let badgeBorder = '2px solid ' + border;
+      let badgeShadow = '0 4px 12px rgba(0,0,0,0.35)';
+      let pinColor = color;
+      let pinStroke = border;
+      let pinStrokeWidth = '1.8';
+      let containerFilter = 'none';
+
+      if (isSelected) {
+        markerOpacity = '1';
+        markerScale = 'scale(1.18)';
+        markerZIndex = 1000;
+        badgeBorder = '2.5px solid #FFE135';
+        badgeShadow = '0 0 0 3.5px rgba(254, 224, 71, 0.8), 0 8px 24px rgba(0,0,0,0.5)';
+        pinStroke = '#FFE135';
+        pinStrokeWidth = '2.8';
+        containerFilter = 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.8))';
+      } else if (isDimmed) {
+        markerOpacity = '0.35';
+        markerScale = 'scale(0.92)';
+        containerFilter = 'grayscale(40%)';
+        badgeShadow = '0 2px 6px rgba(0,0,0,0.2)';
+      }
 
       // Custom HTML Price Color Marker Pin with Price Pill Badge (100% Fixed Icon Anchor, Zero Drift on Zoom)
       const totalWidth = 140;
@@ -849,47 +906,53 @@ export default function UniversalMapEngine({
       const gap = 2;
       const totalHeight = badgeHeight + gap + dotSize;
 
+      const badgeTextColor = (priceVal > 6000000 && priceVal <= 15000000) ? '#0B2545' : '#ffffff';
+
       const customIcon = L.divIcon({
         className: 'custom-map-marker-container',
-        html: `
-          <div style="
-            width: ${totalWidth}px;
-            height: ${totalHeight}px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-end;
-            cursor: pointer;
-            pointer-events: auto;
-          ">
-            <div style="
-              background-color: ${color};
-              color: ${priceVal > 6000000 && priceVal <= 15000000 ? '#0B2545' : '#ffffff'};
-              border: 2px solid ${border};
-              font-family: 'Plus Jakarta Sans', sans-serif;
-              font-size: 11px;
-              font-weight: 800;
-              padding: 2.5px 8px;
-              border-radius: 12px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-              white-space: nowrap;
-              letter-spacing: 0.2px;
-              margin-bottom: ${gap}px;
-            ">
-              <span>${priceLabel}</span>
-            </div>
-            <svg width="28" height="34" viewBox="0 0 40 48" style="filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.35)); flex-shrink: 0;" class="custom-map-marker">
-              <path d="M 20 2 C 11.16 2 4 9.16 4 18 C 4 29 20 46 20 46 C 20 46 36 29 36 18 C 36 9.16 28.84 2 20 2 Z" fill="${color}" stroke="${border}" stroke-width="1.8"/>
-              <circle cx="20" cy="17.5" r="7" fill="#ffffff"/>
-            </svg>
-          </div>
-        `,
+        html: 
+          '<div style="' +
+            'width: ' + totalWidth + 'px; ' +
+            'height: ' + totalHeight + 'px; ' +
+            'display: flex; ' +
+            'flex-direction: column; ' +
+            'align-items: center; ' +
+            'justify-content: flex-end; ' +
+            'cursor: pointer; ' +
+            'pointer-events: auto; ' +
+            'opacity: ' + markerOpacity + '; ' +
+            'transform: ' + markerScale + '; ' +
+            'transform-origin: bottom center; ' +
+            'transition: transform 0.25s ease-out, opacity 0.25s ease-out; ' +
+            'filter: ' + containerFilter + '; ' +
+          '">' +
+            '<div style="' +
+              'background-color: ' + color + '; ' +
+              'color: ' + badgeTextColor + '; ' +
+              'border: ' + badgeBorder + '; ' +
+              'font-family: \'Plus Jakarta Sans\', sans-serif; ' +
+              'font-size: 11px; ' +
+              'font-weight: 800; ' +
+              'padding: 2.5px 8px; ' +
+              'border-radius: 12px; ' +
+              'box-shadow: ' + badgeShadow + '; ' +
+              'white-space: nowrap; ' +
+              'letter-spacing: 0.2px; ' +
+              'margin-bottom: ' + gap + 'px; ' +
+            '">' +
+              '<span>' + priceLabel + '</span>' +
+            '</div>' +
+            '<svg width="28" height="34" viewBox="0 0 40 48" style="filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.35)); flex-shrink: 0;" class="custom-map-marker">' +
+              '<path d="M 20 2 C 11.16 2 4 9.16 4 18 C 4 29 20 46 20 46 C 20 46 36 29 36 18 C 36 9.16 28.84 2 20 2 Z" fill="' + pinColor + '" stroke="' + pinStroke + '" stroke-width="' + pinStrokeWidth + '"/>' +
+              '<circle cx="20" cy="17.5" r="7" fill="#ffffff"/>' +
+            '</svg>' +
+          '</div>',
         iconSize: [totalWidth, totalHeight],
         iconAnchor: [totalWidth / 2, totalHeight],
         popupAnchor: [0, -totalHeight]
       });
 
-      const marker = L.marker([lat, lng], { icon: customIcon });
+      const marker = L.marker([lat, lng], { icon: customIcon, zIndexOffset: markerZIndex });
 
       // Clean High-Contrast Hover/Click Popup Card (Modern White Card)
       const popupContent = 
@@ -914,26 +977,45 @@ export default function UniversalMapEngine({
 
       marker.bindPopup(popupContent, { offset: [0, -45] });
 
-      // Marker Click -> Standard Zoom (Level 17) + Open Preview Card Modal
-      marker.on('click', () => {
+      // Marker Click -> Standard Zoom (Level 17) + Select property + Open Preview Card Modal
+      marker.on('click', (e) => {
+        if (e && e.originalEvent) {
+          e.originalEvent.stopPropagation();
+        }
+        setSelectedPropertyId(propId);
         handleSelectPropertyForPreview(prop);
       });
 
       markersToAdd.push(marker);
 
       // Render Approved GeoJSON Boundary Polygon with Purpose-Differentiated Colors (Sale vs Rent vs Lease)
-      if (formattedPoly.length >= 3) {
+      // When a property is selected, only that property's boundary is highlighted; rest of properties' boundaries are hidden
+      if (formattedPoly.length >= 3 && (!isAnySelected || isSelected)) {
         const polyStyle = getBoundaryStyle(prop);
+        const polygonColor = isSelected ? '#FFE135' : polyStyle.color;
+        const polygonFillColor = isSelected ? '#F59E0B' : polyStyle.fillColor;
+        const polygonFillOpacity = isSelected ? 0.55 : polyStyle.fillOpacity;
+        const polygonWeight = isSelected ? 4.5 : polyStyle.weight;
+
         const polygon = L.polygon(formattedPoly, {
-          color: polyStyle.color,
-          fillColor: polyStyle.fillColor,
-          fillOpacity: polyStyle.fillOpacity,
-          weight: polyStyle.weight,
+          color: polygonColor,
+          fillColor: polygonFillColor,
+          fillOpacity: polygonFillOpacity,
+          weight: polygonWeight,
           dashArray: polyStyle.dashArray,
           lineJoin: polyStyle.lineJoin || 'round'
         });
-        polygon.bindTooltip(`Approved Plot Boundary [${polyStyle.typeLabel}] (${prop.title || 'Plot'})`, { sticky: true });
-        polygon.on('click', () => {
+
+        const tooltipText = isSelected
+          ? 'Selected Property Boundary [' + polyStyle.typeLabel + '] (' + (prop.title || 'Plot') + ')'
+          : 'Approved Plot Boundary [' + polyStyle.typeLabel + '] (' + (prop.title || 'Plot') + ')';
+
+        polygon.bindTooltip(tooltipText, { sticky: true });
+        polygon.on('click', (e) => {
+          if (e && e.originalEvent) {
+            e.originalEvent.stopPropagation();
+          }
+          setSelectedPropertyId(propId);
           handleSelectPropertyForPreview(prop);
         });
         if (polygonLayerRef.current) {
@@ -968,10 +1050,10 @@ export default function UniversalMapEngine({
                             (filters?.referenceLat != null && filters?.referenceLng != null) ||
                             Boolean(filters?.query && filters?.query.trim().length >= 2 && filters?.query.trim().toLowerCase() !== 'near me');
 
-    if (!focusedProperty && !filters?.userLat && !hasSearchCoords && bounds.length > 0) {
+    if (!selectedPropertyId && !focusedProperty && !filters?.userLat && !hasSearchCoords && bounds.length > 0) {
       mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
-  }, [displayProperties, filters?.userLat, filters?.searchLat, filters?.searchLng, filters?.referenceLat, filters?.referenceLng, filters?.query]);
+  }, [displayProperties, selectedPropertyId, filters?.userLat, filters?.searchLat, filters?.searchLng, filters?.referenceLat, filters?.referenceLng, filters?.query]);
 
   // Memoized photo list for pop-up preview card (strictly genuine photos, zero dummy fallback padding)
   const previewPhotos = useMemo(() => {
@@ -1102,7 +1184,7 @@ export default function UniversalMapEngine({
                 <span>Universal Map Discovery</span>
               </div>
               <h2 className="text-lg font-extrabold text-white">
-                {filters?.cleared ? '0 Properties (Filters Cleared)' : `${displayProperties.length} Properties Found`}
+                {filters?.cleared ? '0 Properties (Filters Cleared)' : (displayProperties.length + ' Properties Found')}
               </h2>
             </div>
 
@@ -1138,137 +1220,158 @@ export default function UniversalMapEngine({
                 </button>
               </div>
             ) : (
-              displayProperties.map((prop) => (
-                <div
-                  key={prop.id}
-                  onClick={() => handlePanToProperty(prop)}
-                  className={`group bg-white rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col mx-0.5 sm:mx-0 shadow-sm hover:shadow-md ${
-                    selectedPropertyPreview?.id === prop.id
-                      ? 'border-brand-yellow ring-2 ring-brand-yellow/30 shadow-lg'
-                      : 'border-gray-200 hover:border-brand-yellow'
-                  }`}
-                >
-                  <div className="relative h-44 bg-gray-100 overflow-hidden">
-                    <img
-                      src={getFirstUploadedImage(prop)}
-                      alt={prop.title}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = getCategoryFallbackImage(prop);
-                      }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    
-                    <div className="absolute top-3 left-3 bg-slate-950 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md border border-amber-400/40">
-                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-metallic-gold font-black">
-                        {prop.verificationStatus || 'PLATFORM VERIFIED'}
-                      </span>
-                    </div>
+              displayProperties.map((prop) => {
+                const propId = prop.id || prop.propertyId || prop.referenceId;
+                const isPropSelected = Boolean(selectedPropertyId && String(propId) === String(selectedPropertyId));
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (typeof setFilters === 'function') {
-                          const cat = getCategoryBadgeLabel(prop);
-                          setFilters(prev => ({
-                            ...prev,
-                            category: (prev.category === cat ? 'All' : cat)
-                          }));
-                        }
-                      }}
-                      className="absolute top-3 right-3 bg-slate-900/90 hover:bg-slate-800 text-amber-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md backdrop-blur-sm cursor-pointer transition-colors"
-                      title={`Filter by ${getCategoryBadgeLabel(prop)}`}
-                    >
-                      {getCategoryBadgeLabel(prop)}
-                    </button>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onWishlistToggle(prop.id);
-                      }}
-                      className={`absolute bottom-3 right-3 p-2 rounded-full shadow-md transition-colors ${
-                        (typeof isWishlisted === 'function' ? isWishlisted(prop.id) : Boolean(isWishlisted))
-                          ? 'bg-red-500 text-white'
-                          : 'bg-white/80 text-gray-600 hover:bg-white'
-                      }`}
-                    >
-                      <Heart className="w-4 h-4 fill-current" />
-                    </button>
-                  </div>
-
-                  <div className="p-3.5 flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold mb-1">
-                        <span>{prop.location?.locality || prop.location?.city || 'India'}</span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {prop.distKm != null && prop.distKm < Infinity && (
-                            <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-amber-200">
-                              {prop.distKm} km away
-                            </span>
-                          )}
-                          <span className={`px-2 py-0.5 rounded font-extrabold text-[10px] border ${getBoundaryStyle(prop).badgeClass}`}>
-                            {getBoundaryStyle(prop).typeLabel}
-                          </span>
-                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-emerald-200/60">
-                            Direct Owner
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (typeof setFilters === 'function') {
-                                const cat = getCategoryBadgeLabel(prop);
-                                setFilters(prev => ({
-                                  ...prev,
-                                  category: (prev.category === cat ? 'All' : cat)
-                                }));
-                              }
-                            }}
-                            className="text-sky-800 bg-sky-50 hover:bg-sky-100 hover:border-sky-300 transition-colors px-2 py-0.5 rounded font-extrabold text-[10px] border border-sky-200 cursor-pointer"
-                            title={`Filter by ${getCategoryBadgeLabel(prop)}`}
-                          >
-                            {getCategoryBadgeLabel(prop)}
-                          </button>
-                        </div>
+                return (
+                  <div
+                    key={prop.id}
+                    onClick={() => handlePanToProperty(prop)}
+                    className={'group bg-white rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col mx-0.5 sm:mx-0 shadow-sm hover:shadow-md ' + (
+                      isPropSelected
+                        ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-xl bg-amber-50/20'
+                        : selectedPropertyPreview?.id === prop.id
+                          ? 'border-brand-yellow ring-2 ring-brand-yellow/30 shadow-lg'
+                          : 'border-gray-200 hover:border-brand-yellow'
+                    )}
+                  >
+                    <div className="relative h-44 bg-gray-100 overflow-hidden">
+                      <img
+                        src={getFirstUploadedImage(prop)}
+                        alt={prop.title}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = getCategoryFallbackImage(prop);
+                        }}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      
+                      <div className="absolute top-3 left-3 bg-slate-950 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md border border-amber-400/40">
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-metallic-gold font-black">
+                          {prop.verificationStatus || 'PLATFORM VERIFIED'}
+                        </span>
                       </div>
 
-                      <h3 className="text-sm font-bold text-brand-charcoal line-clamp-1 group-hover:text-black mb-2">
-                        {prop.title}
-                      </h3>
-
-                      <div className="flex items-baseline justify-between pt-2 border-t border-gray-100">
-                        <div>
-                          <span className="text-xs text-gray-400 font-medium block">Listed Price</span>
-                          <span className="text-base font-extrabold text-emerald-700">
-                            {prop.priceDisplay}
-                          </span>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-xs text-gray-400 font-medium block">Property Area</span>
-                          <span className="text-xs font-extrabold text-brand-charcoal">
-                            {prop.areaDisplay || prop.area + ' sq ft'}
-                          </span>
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (typeof setFilters === 'function') {
+                            const cat = getCategoryBadgeLabel(prop);
+                            setFilters(prev => ({
+                              ...prev,
+                              category: (prev.category === cat ? 'All' : cat)
+                            }));
+                          }
+                        }}
+                        className="absolute top-3 right-3 bg-slate-900/90 hover:bg-slate-800 text-amber-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md backdrop-blur-sm cursor-pointer transition-colors"
+                        title={'Filter by ' + getCategoryBadgeLabel(prop)}
+                      >
+                        {getCategoryBadgeLabel(prop)}
+                      </button>
 
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handlePanToProperty(prop);
+                          onWishlistToggle(prop.id);
                         }}
-                        className="w-full mt-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer group"
+                        className={'absolute bottom-3 right-3 p-2 rounded-full shadow-md transition-colors ' + (
+                          (typeof isWishlisted === 'function' ? isWishlisted(prop.id) : Boolean(isWishlisted))
+                            ? 'bg-red-500 text-white'
+                            : 'bg-white/80 text-gray-600 hover:bg-white'
+                        )}
                       >
-                        <span className="font-bold tracking-wide">View on Map</span>
-                        <ChevronRight className="w-4 h-4 shrink-0 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+                        <Heart className="w-4 h-4 fill-current" />
                       </button>
                     </div>
+
+                    <div className="p-3.5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold mb-1">
+                          <span>{prop.location?.locality || prop.location?.city || 'India'}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {prop.distKm != null && prop.distKm < Infinity && (
+                              <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-amber-200">
+                                {prop.distKm} km away
+                              </span>
+                            )}
+                            <span className={'px-2 py-0.5 rounded font-extrabold text-[10px] border ' + getBoundaryStyle(prop).badgeClass}>
+                              {getBoundaryStyle(prop).typeLabel}
+                            </span>
+                            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold text-[10px] border border-emerald-200/60">
+                              Direct Owner
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (typeof setFilters === 'function') {
+                                  const cat = getCategoryBadgeLabel(prop);
+                                  setFilters(prev => ({
+                                    ...prev,
+                                    category: (prev.category === cat ? 'All' : cat)
+                                  }));
+                                }
+                              }}
+                              className="text-sky-800 bg-sky-50 hover:bg-sky-100 hover:border-sky-300 transition-colors px-2 py-0.5 rounded font-extrabold text-[10px] border border-sky-200 cursor-pointer"
+                              title={'Filter by ' + getCategoryBadgeLabel(prop)}
+                            >
+                              {getCategoryBadgeLabel(prop)}
+                            </button>
+                          </div>
+                        </div>
+
+                        <h3 className="text-sm font-bold text-brand-charcoal line-clamp-1 group-hover:text-black mb-2">
+                          {prop.title}
+                        </h3>
+
+                        <div className="flex items-baseline justify-between pt-2 border-t border-gray-100">
+                          <div>
+                            <span className="text-xs text-gray-400 font-medium block">Listed Price</span>
+                            <span className="text-base font-extrabold text-emerald-700">
+                              {prop.priceDisplay}
+                            </span>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-xs text-gray-400 font-medium block">Property Area</span>
+                            <span className="text-xs font-extrabold text-brand-charcoal">
+                              {prop.areaDisplay || prop.area + ' sq ft'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePanToProperty(prop);
+                          }}
+                          className={'w-full mt-3 font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer group ' + (
+                            isPropSelected
+                              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 border border-amber-300 shadow-md ring-2 ring-amber-400/30 font-black'
+                              : 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-800'
+                          )}
+                        >
+                          {isPropSelected ? (
+                            <>
+                              <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping mr-0.5"></span>
+                              <span className="font-black tracking-wide">Selected on Map</span>
+                              <Check className="w-4 h-4 shrink-0 text-slate-950 ml-0.5" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-bold tracking-wide">View on Map</span>
+                              <ChevronRight className="w-4 h-4 shrink-0 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
