@@ -3921,32 +3921,12 @@ export default function AdminPortal({ onNavigate }) {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Twitter / X Profile Link</label>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Facebook Page Link</label>
                           <input
                             type="text"
-                            placeholder="https://x.com/easeland"
-                            value={siteConfig.footer?.socialTwitter || ''}
-                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialTwitter: e.target.value } }))}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">LinkedIn Page Link</label>
-                          <input
-                            type="text"
-                            placeholder="https://linkedin.com/company/easeland"
-                            value={siteConfig.footer?.socialLinkedin || ''}
-                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialLinkedin: e.target.value } }))}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">YouTube Channel Link</label>
-                          <input
-                            type="text"
-                            placeholder="https://youtube.com/@easeland"
-                            value={siteConfig.footer?.socialYoutube || ''}
-                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialYoutube: e.target.value } }))}
+                            placeholder="https://www.facebook.com/easeland.in"
+                            value={siteConfig.footer?.socialFacebook || ''}
+                            onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialFacebook: e.target.value } }))}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
                           />
                         </div>
@@ -3954,7 +3934,7 @@ export default function AdminPortal({ onNavigate }) {
                           <label className="block text-xs font-bold text-gray-700 mb-1">Instagram Page Link</label>
                           <input
                             type="text"
-                            placeholder="https://instagram.com/easeland"
+                            placeholder="https://www.instagram.com/easeland.in"
                             value={siteConfig.footer?.socialInstagram || ''}
                             onChange={(e) => updateCmsConfig(prev => ({ ...prev, footer: { ...prev.footer, socialInstagram: e.target.value } }))}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold"

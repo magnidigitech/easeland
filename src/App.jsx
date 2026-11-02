@@ -31,7 +31,7 @@ import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wi
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
 import { trackPageView } from './utils/metaPixel.js';
 import { parseRouteFromUrl } from './utils/routeUtils.js';
-import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles, PlusCircle } from 'lucide-react';
+import { ShieldCheck, Search, Building2, MapPin, Heart, ChevronRight, Send, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, X, Settings, User, Sparkles, PlusCircle, Facebook, Instagram } from 'lucide-react';
 import { DEFAULT_SHOWCASE_PROPERTIES } from './services/showcaseProperties.js';
 import AnimatedPromotionBanner from './components/AnimatedPromotionBanner.jsx';
 import RegionalHubsSection from './components/RegionalHubsSection.jsx';
@@ -1592,16 +1592,31 @@ export default function App() {
             </div>
           </div>
 
-          {(siteConfig?.footer?.socialTwitter || siteConfig?.footer?.socialLinkedin || siteConfig?.footer?.socialYoutube) && (
-            <div className="flex items-center justify-center gap-4 mb-4 text-xs font-bold text-gray-400">
-              {siteConfig?.footer?.socialTwitter && (
-                <a href={siteConfig.footer.socialTwitter} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">Twitter / X</a>
+          {((siteConfig?.footer?.socialFacebook ?? 'https://www.facebook.com/easeland.in') || (siteConfig?.footer?.socialInstagram ?? 'https://www.instagram.com/easeland.in')) && (
+            <div className="flex items-center justify-center gap-6 mb-4 text-xs font-bold text-gray-400">
+              {(siteConfig?.footer?.socialFacebook || 'https://www.facebook.com/easeland.in') && (
+                <a
+                  href={siteConfig?.footer?.socialFacebook || 'https://www.facebook.com/easeland.in'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 hover:text-white transition-colors"
+                  aria-label="EaseLand on Facebook"
+                >
+                  <Facebook className="w-4 h-4 text-[#1877F2]" />
+                  <span>Facebook</span>
+                </a>
               )}
-              {siteConfig?.footer?.socialLinkedin && (
-                <a href={siteConfig.footer.socialLinkedin} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">LinkedIn</a>
-              )}
-              {siteConfig?.footer?.socialYoutube && (
-                <a href={siteConfig.footer.socialYoutube} target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 transition-colors">YouTube</a>
+              {(siteConfig?.footer?.socialInstagram || 'https://www.instagram.com/easeland.in') && (
+                <a
+                  href={siteConfig?.footer?.socialInstagram || 'https://www.instagram.com/easeland.in'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 hover:text-white transition-colors"
+                  aria-label="EaseLand on Instagram"
+                >
+                  <Instagram className="w-4 h-4 text-[#E1306C]" />
+                  <span>Instagram</span>
+                </a>
               )}
             </div>
           )}

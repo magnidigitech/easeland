@@ -351,9 +351,8 @@ export const DEFAULT_SITE_CONFIG = {
     supportPhone: '+91 98765 43210',
     supportEmail: 'support@easeland.in',
     copyrightText: '© 2026 EaseLand Platform India Private Limited. All Rights Reserved.',
-    socialTwitter: 'https://twitter.com/easeland_in',
-    socialLinkedin: 'https://linkedin.com/company/easeland-india',
-    socialYoutube: 'https://youtube.com/@easeland_official'
+    socialFacebook: 'https://www.facebook.com/easeland.in',
+    socialInstagram: 'https://www.instagram.com/easeland.in'
   },
   buyPage: {
     title: 'Buy Verified Land Plots & Properties Across India',
@@ -465,7 +464,7 @@ export const sanitizeSiteConfig = (cfg) => {
     sanitized.homepage.heroSubtitle = DEFAULT_SITE_CONFIG.homepage.heroSubtitle;
   }
 
-  // 2. Scrub footer tagline
+  // 2. Scrub footer tagline & social links
   const footerTag = sanitized.footer?.tagline;
   if (
     footerTag &&
@@ -473,6 +472,17 @@ export const sanitizeSiteConfig = (cfg) => {
   ) {
     if (!sanitized.footer) sanitized.footer = {};
     sanitized.footer.tagline = DEFAULT_SITE_CONFIG.footer.tagline;
+  }
+  if (sanitized.footer) {
+    delete sanitized.footer.socialTwitter;
+    delete sanitized.footer.socialLinkedin;
+    delete sanitized.footer.socialYoutube;
+    if (!sanitized.footer.socialFacebook) {
+      sanitized.footer.socialFacebook = DEFAULT_SITE_CONFIG.footer.socialFacebook;
+    }
+    if (!sanitized.footer.socialInstagram) {
+      sanitized.footer.socialInstagram = DEFAULT_SITE_CONFIG.footer.socialInstagram;
+    }
   }
 
   // 3. Scrub rent page

@@ -76,4 +76,27 @@ describe('EaseLand Site Config Sanitization & Zero-Claims Scrubbing Suite', () =
     assert.strictEqual(merged.homepage.heroTitlePrefix, 'Explore Verified Properties ');
     assert.strictEqual(merged.homepage.heroSubtitle, DEFAULT_SITE_CONFIG.homepage.heroSubtitle);
   });
+
+  it('removes extra social media links and guarantees only Facebook and Instagram are present', () => {
+    assert.strictEqual(DEFAULT_SITE_CONFIG.footer.socialFacebook, 'https://www.facebook.com/easeland.in');
+    assert.strictEqual(DEFAULT_SITE_CONFIG.footer.socialInstagram, 'https://www.instagram.com/easeland.in');
+    assert.strictEqual(DEFAULT_SITE_CONFIG.footer.socialTwitter, undefined);
+    assert.strictEqual(DEFAULT_SITE_CONFIG.footer.socialLinkedin, undefined);
+    assert.strictEqual(DEFAULT_SITE_CONFIG.footer.socialYoutube, undefined);
+
+    const staleConfigWithExtraSocials = {
+      footer: {
+        socialTwitter: 'https://twitter.com/stale_handle',
+        socialLinkedin: 'https://linkedin.com/company/stale_page',
+        socialYoutube: 'https://youtube.com/@stale_channel'
+      }
+    };
+
+    const sanitized = sanitizeSiteConfig(staleConfigWithExtraSocials);
+    assert.strictEqual(sanitized.footer.socialTwitter, undefined);
+    assert.strictEqual(sanitized.footer.socialLinkedin, undefined);
+    assert.strictEqual(sanitized.footer.socialYoutube, undefined);
+    assert.strictEqual(sanitized.footer.socialFacebook, 'https://www.facebook.com/easeland.in');
+    assert.strictEqual(sanitized.footer.socialInstagram, 'https://www.instagram.com/easeland.in');
+  });
 });
