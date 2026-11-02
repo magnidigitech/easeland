@@ -23,8 +23,8 @@ export default function PwaUpdatePrompt() {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-sm w-full animate-in slide-in-from-top-4 duration-300">
-      <div className="bg-slate-950 text-white border-2 border-amber-400 p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-3">
+    <div className="fixed top-20 sm:top-24 left-4 right-4 sm:left-auto sm:right-6 z-[100] max-w-sm mx-auto sm:mx-0 animate-in slide-in-from-top-4 duration-300">
+      <div className="bg-slate-950 text-white border-2 border-amber-400 p-3.5 sm:p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center shrink-0">
             <Sparkles className="w-5 h-5" />

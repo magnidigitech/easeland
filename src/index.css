@@ -685,6 +685,82 @@ textarea,
   }
 }
 
+/* Dynamic Mobile Viewport Hero Container:
+   Ensures that across ALL mobile & tablet screen heights and aspect ratios (< 1024px),
+   the informational page hero section (title, badges, CTA button, AND 3D building visual stage)
+   fits precisely in the first visible viewport between the top navbar and the mobile bottom app bar
+   without extra white spacing below showing the next section, and without any element getting cut off.
+*/
+.info-hero-dynamic {
+  height: calc(100vh - 8rem);
+  height: calc(100dvh - 8rem);
+  min-height: calc(100vh - 8rem);
+  min-height: calc(100dvh - 8rem);
+  max-height: calc(100vh - 8rem);
+  max-height: calc(100dvh - 8rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .info-hero-dynamic {
+    height: calc(100dvh - 8rem - env(safe-area-inset-bottom, 0px));
+    min-height: calc(100dvh - 8rem - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 8rem - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Tablet (sm: >= 640px to < 768px): Top navbar is 5rem (h-20), bottom nav is 4rem (total 9rem) */
+@media (min-width: 640px) and (max-width: 767px) {
+  .info-hero-dynamic {
+    height: calc(100vh - 9rem);
+    height: calc(100dvh - 9rem);
+    min-height: calc(100vh - 9rem);
+    min-height: calc(100dvh - 9rem);
+    max-height: calc(100vh - 9rem);
+    max-height: calc(100dvh - 9rem);
+  }
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .info-hero-dynamic {
+      height: calc(100dvh - 9rem - env(safe-area-inset-bottom, 0px));
+      min-height: calc(100dvh - 9rem - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom, 0px));
+    }
+  }
+}
+
+/* Medium Tablets & Laptops without bottom nav (md: >= 768px to < 1024px): Bottom nav is hidden on md, top navbar is 5rem */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .info-hero-dynamic {
+    height: calc(100vh - 5rem);
+    height: calc(100dvh - 5rem);
+    min-height: calc(100vh - 5rem);
+    min-height: calc(100dvh - 5rem);
+    max-height: calc(100vh - 5rem);
+    max-height: calc(100dvh - 5rem);
+  }
+}
+
+/* Desktop (lg: >= 1024px): Natural auto height multi-column stage */
+@media (min-width: 1024px) {
+  .info-hero-dynamic {
+    height: auto;
+    min-height: auto;
+    max-height: none;
+    display: block;
+  }
+}
+
+/* Landscape Mobile safeguard */
+@media (max-height: 500px) and (orientation: landscape) {
+  .info-hero-dynamic {
+    height: auto;
+    min-height: auto;
+    max-height: none;
+  }
+}
+
 /* High-End Edge-to-Edge / Gesture Navigation Mobile Devices (Samsung Galaxy S25 Ultra, modern flagships with tall aspect ratio >= 19:9) */
 @media screen and (max-width: 767px) and (min-aspect-ratio: 9/19) {
   .mobile-bottom-nav-edge {

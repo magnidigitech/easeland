@@ -15,24 +15,24 @@ export default function RentInfoPage({ onExploreClick }) {
     <div className="min-h-screen bg-brand-offwhite pb-20">
 
       {/* HERO SECTION */}
-      <div className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-950 text-white pt-4 pb-6 sm:py-16 lg:py-20 px-3.5 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl border-b border-purple-900/50">
+      <div className="info-hero-dynamic bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-950 text-white pt-2 pb-2 sm:pt-6 sm:pb-8 lg:py-20 px-3.5 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl border-b border-purple-900/50">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_55%)] pointer-events-none"></div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 lg:gap-8 items-center">
+        <div className="max-w-7xl mx-auto relative z-10 w-full flex-1 flex flex-col justify-between items-center lg:block">
+          <div className="flex-1 w-full flex flex-col justify-between lg:grid lg:grid-cols-12 gap-2 sm:gap-6 lg:gap-8 items-center">
             
             {/* Left Content Column */}
-            <div className="lg:col-span-7 text-center lg:text-left">
-              <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest text-purple-300 bg-purple-900/70 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full border border-purple-500/40 shadow-sm mb-2 sm:mb-5">
+            <div className="lg:col-span-7 text-center lg:text-left shrink-0 w-full">
+              <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest text-purple-300 bg-purple-900/70 backdrop-blur-md px-2.5 py-0.5 sm:px-4 sm:py-1.5 rounded-full border border-purple-500/40 shadow-sm mb-1 sm:mb-4">
                 <Key className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400" />
                 <span>{siteConfig?.rentPage?.badgeText || 'DIRECT TENANT CONNECT'}</span>
               </div>
 
-              <h1 className="text-xl xs:text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white mb-1.5 sm:mb-6 leading-tight">
+              <h1 className="text-lg xs:text-xl sm:text-3xl lg:text-5xl font-extrabold tracking-tight text-white mb-1 sm:mb-4 leading-tight">
                 {siteConfig?.rentPage?.title || 'Rent Verified Apartments & Independent Houses'}
               </h1>
 
-              <p className="text-xs sm:text-base lg:text-lg text-purple-100/90 max-w-2xl mx-auto lg:mx-0 mb-2.5 sm:mb-8 font-medium leading-normal sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
+              <p className="text-[11px] xs:text-xs sm:text-base lg:text-lg text-purple-100/90 max-w-2xl mx-auto lg:mx-0 mb-1.5 sm:mb-6 font-medium leading-normal sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
                 {(() => {
                   const sub = siteConfig?.rentPage?.subtitle;
                   if (!sub || sub.includes('brokerage') || sub.includes('commission') || sub.includes('middleman')) {
@@ -43,26 +43,26 @@ export default function RentInfoPage({ onExploreClick }) {
               </p>
 
               {/* Trust Badges */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-1.5 sm:gap-2.5 mb-3 sm:mb-8">
-                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-semibold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-purple-900/50 border border-purple-500/30 text-purple-200 whitespace-nowrap">
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-1 sm:gap-2.5 mb-2 sm:mb-6">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[9px] xs:text-[10px] sm:text-xs font-semibold px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-lg bg-purple-900/50 border border-purple-500/30 text-purple-200 whitespace-nowrap">
                   <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-400" /> Verified Landlords
                 </span>
-                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-semibold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-purple-900/50 border border-purple-500/30 text-purple-200 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[9px] xs:text-[10px] sm:text-xs font-semibold px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-lg bg-purple-900/50 border border-purple-500/30 text-purple-200 whitespace-nowrap">
                   <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-400" /> Clear Rental Agreements
                 </span>
-                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-semibold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-purple-900/50 border border-purple-500/30 text-purple-200 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[9px] xs:text-[10px] sm:text-xs font-semibold px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-lg bg-purple-900/50 border border-purple-500/30 text-purple-200 whitespace-nowrap">
                   <Key className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-400" /> Fast Move-in Ready
                 </span>
               </div>
 
               {/* CTA Action */}
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-2.5 sm:gap-4">
                 <button
                   onClick={() => {
                     if (onExploreClick) onExploreClick({ purpose: 'RENT' });
                     else window.location.href = '/properties?purpose=RENT';
                   }}
-                  className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs sm:text-sm px-6 py-2.5 sm:px-8 sm:py-4 rounded-xl shadow-xl inline-flex items-center justify-center gap-2 transition-all cursor-pointer animate-smooth-zoom"
+                  className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-extrabold text-xs sm:text-sm px-5 py-2 sm:px-8 sm:py-3.5 rounded-xl shadow-xl inline-flex items-center justify-center gap-2 transition-all cursor-pointer animate-smooth-zoom"
                 >
                   <Search className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
                   <span>Explore Rental Listings on Map</span>
@@ -71,30 +71,30 @@ export default function RentInfoPage({ onExploreClick }) {
             </div>
 
             {/* Right Visual Stage Column */}
-            <div className="lg:col-span-5 relative flex items-center justify-center pt-1 sm:pt-4 lg:pt-0">
+            <div className="lg:col-span-5 relative flex-1 min-h-0 w-full flex items-center justify-center pt-0.5 sm:pt-4 lg:pt-0">
               {/* Ambient Glowing Aura */}
-              <div className="absolute w-52 h-52 sm:w-80 sm:h-80 bg-purple-500/25 rounded-full blur-3xl pointer-events-none -z-0"></div>
-              <div className="absolute w-40 h-40 sm:w-60 sm:h-60 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none -z-0"></div>
+              <div className="absolute w-44 h-44 sm:w-80 sm:h-80 bg-purple-500/25 rounded-full blur-3xl pointer-events-none -z-0"></div>
+              <div className="absolute w-36 h-36 sm:w-60 sm:h-60 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none -z-0"></div>
 
               {/* Transparent Hero Image Stage */}
-              <div className="relative z-10 w-full max-w-[270px] xs:max-w-xs sm:max-w-md lg:max-w-none flex items-center justify-center">
+              <div className="relative z-10 w-full max-w-[260px] xs:max-w-xs sm:max-w-md lg:max-w-none h-full flex items-center justify-center">
                 <img
                   src="/images/heroes/rent_hero_transparent.png"
                   alt="Verified Rental Apartments and Residences"
-                  className="w-full h-auto max-h-[190px] xs:max-h-[230px] sm:max-h-[380px] lg:max-h-[440px] object-contain drop-shadow-[0_25px_35px_rgba(0,0,0,0.7)] animate-gentle-float select-none"
+                  className="w-auto h-full max-h-[22dvh] xs:max-h-[25dvh] sm:max-h-[35dvh] lg:max-h-[440px] object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.7)] animate-gentle-float select-none"
                   loading="eager"
                 />
 
                 {/* Floating Micro-Badge Top Right */}
-                <div className="absolute -top-2 sm:-top-3 right-0 sm:right-4 bg-slate-900/90 backdrop-blur-md border border-purple-500/50 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl shadow-2xl flex items-center gap-1.5 sm:gap-2">
+                <div className="absolute -top-1 sm:-top-3 right-0 sm:right-4 bg-slate-900/90 backdrop-blur-md border border-purple-500/50 px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl shadow-2xl flex items-center gap-1.5 sm:gap-2">
                   <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-purple-400 animate-pulse"></span>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-purple-200 tracking-wide">Direct Tenant Connect</span>
+                  <span className="text-[9px] sm:text-[11px] font-bold text-purple-200 tracking-wide">Direct Tenant Connect</span>
                 </div>
 
                 {/* Floating Micro-Badge Bottom Left */}
-                <div className="absolute -bottom-2 sm:-bottom-3 left-0 sm:left-4 bg-slate-900/90 backdrop-blur-md border border-purple-500/50 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl shadow-2xl flex items-center gap-1.5 sm:gap-2">
+                <div className="absolute -bottom-1 sm:-bottom-3 left-0 sm:left-4 bg-slate-900/90 backdrop-blur-md border border-purple-500/50 px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl shadow-2xl flex items-center gap-1.5 sm:gap-2">
                   <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400" />
-                  <span className="text-[10px] sm:text-[11px] font-bold text-white tracking-wide">Verified Landlord</span>
+                  <span className="text-[9px] sm:text-[11px] font-bold text-white tracking-wide">Verified Landlord</span>
                 </div>
               </div>
             </div>

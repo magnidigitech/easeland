@@ -83,7 +83,7 @@ export default function PwaInstallBanner() {
   return (
     <>
       {/* Sleek Floating Install Card for Mobile & Tablet */}
-      <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 animate-in slide-in-from-bottom duration-300">
+      <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-[45] animate-in slide-in-from-bottom duration-300">
         <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-amber-400/40 backdrop-blur-xl relative overflow-hidden">
           {/* Subtle Golden Radial Glow */}
           <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
