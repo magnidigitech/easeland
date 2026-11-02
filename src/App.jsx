@@ -542,6 +542,23 @@ export default function App() {
   // Scroll To Top (Arrow Head Button) state & listeners
   const [showScrollTop, setShowScrollTop] = useState(false);
 
+  // Detection for modern flagship edge-to-edge mobile devices (e.g. Galaxy S25 Ultra, S24 Ultra, Pixel 8/9 Pro without 3-button nav)
+  const [isHighEndEdgeDevice, setIsHighEndEdgeDevice] = useState(false);
+
+  useEffect(() => {
+    const checkEdgeDevice = () => {
+      if (typeof window === 'undefined' || !window.screen) return;
+      const isMobileWidth = window.innerWidth < 768;
+      const screenRatio = Math.max(window.screen.height, window.screen.width) / Math.min(window.screen.height, window.screen.width);
+      // Tall aspect ratio (>= 2.05:1, e.g. 19.5:9 or 20:9) on mobile screens indicates edge-to-edge flagship
+      setIsHighEndEdgeDevice(isMobileWidth && screenRatio >= 2.05);
+    };
+
+    checkEdgeDevice();
+    window.addEventListener('resize', checkEdgeDevice);
+    return () => window.removeEventListener('resize', checkEdgeDevice);
+  }, []);
+
   const scrollToTop = () => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
@@ -841,7 +858,7 @@ export default function App() {
 
   return (
     <div className={'bg-brand-offwhite text-brand-charcoal font-sans flex flex-col w-full max-w-full overflow-x-hidden ' + (
-      (activePage === 'map' || activePage === 'properties') ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen pb-16 md:pb-0'
+      (activePage === 'map' || activePage === 'properties') ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : `min-h-screen ${isHighEndEdgeDevice ? 'pb-20' : 'pb-16'} md:pb-0`
     )}>
       
       {/* PWA STATUS & PROMPTS */}
@@ -890,7 +907,7 @@ export default function App() {
 
       {/* PAGE ROUTING BODY */}
       <main className={'w-full max-w-full min-w-0 ' + (
-        (activePage === 'map' || activePage === 'properties') ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1'
+        (activePage === 'map' || activePage === 'properties') ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-5rem)] flex flex-col'
       )}>
 
         {/* PAGE 1: HOME */}
@@ -1423,10 +1440,10 @@ export default function App() {
 
         {/* WISHLIST VIEW */}
         {activePage === 'wishlist' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <h2 className="text-2xl font-extrabold text-brand-charcoal mb-6">My Saved Wishlist Properties ({wishlistProperties.length})</h2>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12 min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-5rem)] flex-1 flex flex-col w-full page-viewport-fill">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-brand-charcoal mb-4 sm:mb-6">My Saved Wishlist Properties ({wishlistProperties.length})</h2>
             {wishlistProperties.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 text-gray-500 shadow-sm">
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-12 sm:py-16 px-4 bg-white rounded-2xl border border-gray-200 text-gray-500 shadow-sm w-full my-auto">
                 <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="text-base font-bold text-brand-charcoal">No saved properties yet</h3>
                 <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">Explore verified properties on our interactive map and tap the heart icon to save your favorites.</p>
@@ -1708,7 +1725,7 @@ export default function App() {
           onClick={scrollToTop}
           aria-label="Scroll to top of current page"
           title="Scroll to top of page"
-          className={`fixed ${(activePage === 'admin' || activePage === 'crm') ? 'bottom-5' : 'bottom-20'} sm:bottom-6 right-4 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
+          className={`fixed ${(activePage === 'admin' || activePage === 'crm') ? 'bottom-5' : (isHighEndEdgeDevice ? 'bottom-24' : 'bottom-20')} sm:bottom-6 right-4 sm:right-6 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 border border-amber-200/90 flex items-center justify-center transition-all duration-300 transform group cursor-pointer ${
             showScrollTop
               ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
               : 'opacity-0 translate-y-8 scale-75 pointer-events-none'
@@ -1722,46 +1739,50 @@ export default function App() {
       {activePage !== 'post-property' && activePage !== 'property-detail' && activePage !== 'admin' && activePage !== 'crm' && (
         <nav
           aria-label="Mobile Bottom App Bar"
-          className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 pb-[calc(0.45rem+env(safe-area-inset-bottom))] flex items-center justify-around"
+          className={`md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 transition-all flex items-center justify-around mobile-bottom-nav-edge ${
+            isHighEndEdgeDevice
+              ? 'py-2 pb-[max(1.15rem,calc(0.65rem+env(safe-area-inset-bottom)))] min-h-[4.15rem]'
+              : 'py-1.5 pb-[calc(0.45rem+env(safe-area-inset-bottom))]'
+          }`}
         >
           {/* HOME */}
           <button
             onClick={() => changeActivePage('home')}
-            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer mobile-nav-btn ${
               activePage === 'home' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
             <Building2 className={`w-5 h-5 ${activePage === 'home' ? 'stroke-[2.5] text-amber-500' : 'text-slate-500'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Home</span>
+            <span className="text-[10px] mt-0.5 tracking-tight mobile-nav-label">Home</span>
           </button>
 
           {/* EXPLORE / MAP */}
           <button
             onClick={() => changeActivePage('map')}
-            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer mobile-nav-btn ${
               activePage === 'map' || activePage === 'properties' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
             <Search className={`w-5 h-5 ${activePage === 'map' || activePage === 'properties' ? 'stroke-[2.5] text-amber-500' : 'text-slate-500'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Explore</span>
+            <span className="text-[10px] mt-0.5 tracking-tight mobile-nav-label">Explore</span>
           </button>
 
           {/* POST (+ CTA) */}
           <button
             onClick={handlePostPropertyClick}
-            className="flex flex-col items-center justify-center -mt-3.5 group cursor-pointer"
+            className="flex flex-col items-center justify-center -mt-3.5 group cursor-pointer mobile-nav-btn mobile-nav-post-btn"
             aria-label="Post Property"
           >
             <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/35 border-2 border-white group-active:scale-95 transition-transform">
               <PlusCircle className="w-6 h-6 stroke-[2.5]" />
             </div>
-            <span className="text-[10px] font-black text-slate-900 mt-0.5">Post</span>
+            <span className="text-[10px] font-black text-slate-900 mt-0.5 mobile-nav-label">Post</span>
           </button>
 
           {/* SAVED WISHLIST */}
           <button
             onClick={() => changeActivePage('wishlist')}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer mobile-nav-btn ${
               activePage === 'wishlist' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
@@ -1773,7 +1794,7 @@ export default function App() {
                 </span>
               )}
             </div>
-            <span className="text-[10px] mt-0.5 tracking-tight">Saved</span>
+            <span className="text-[10px] mt-0.5 tracking-tight mobile-nav-label">Saved</span>
           </button>
 
           {/* DASHBOARD / ACCOUNT */}
@@ -1786,12 +1807,12 @@ export default function App() {
                 setIsAuthModalOpen(true);
               }
             }}
-            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer mobile-nav-btn ${
               activePage === 'dashboard' ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
             <User className={`w-5 h-5 ${activePage === 'dashboard' ? 'stroke-[2.5] text-amber-500' : 'text-slate-500'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">{currentUser ? 'Account' : 'Login'}</span>
+            <span className="text-[10px] mt-0.5 tracking-tight mobile-nav-label">{currentUser ? 'Account' : 'Login'}</span>
           </button>
         </nav>
       )}

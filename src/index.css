@@ -674,3 +674,32 @@ textarea,
 .animate-marquee-infinite:hover {
   animation-play-state: paused;
 }
+
+/* Dynamic Viewport Page Content Fill: Ensures page content fills the screen so the footer is never visible on initial load without scrolling down */
+.page-viewport-fill {
+  min-height: calc(100dvh - 4rem);
+}
+@media (min-width: 640px) {
+  .page-viewport-fill {
+    min-height: calc(100dvh - 5rem);
+  }
+}
+
+/* High-End Edge-to-Edge / Gesture Navigation Mobile Devices (Samsung Galaxy S25 Ultra, modern flagships with tall aspect ratio >= 19:9) */
+@media screen and (max-width: 767px) and (min-aspect-ratio: 9/19) {
+  .mobile-bottom-nav-edge {
+    padding-bottom: max(1.15rem, calc(0.65rem + env(safe-area-inset-bottom, 0px))) !important;
+    min-height: 4.15rem !important;
+  }
+  .mobile-bottom-nav-edge .mobile-nav-btn {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+  .mobile-bottom-nav-edge .mobile-nav-label {
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    margin-top: 2px !important;
+    display: block !important;
+    font-weight: 700 !important;
+  }
+}
