@@ -54,7 +54,13 @@ export default function PropertyCard({
       className={`group bg-metallic-card rounded-2xl border border-slate-700/60 hover:border-amber-400/50 shadow-lg hover:shadow-[0_10px_30px_rgba(212,175,55,0.15)] transition-all duration-300 overflow-hidden flex flex-col cursor-pointer ${className}`}
     >
       {/* Image Container */}
-      <div className="relative aspect-[16/10] w-full bg-slate-950 overflow-hidden">
+      <div className="relative aspect-[16/10] w-full bg-slate-950 overflow-hidden flex items-center justify-center">
+        <img
+          src={thumbnail}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-30 scale-110 pointer-events-none"
+        />
         <img
           src={thumbnail}
           alt={title}
@@ -62,7 +68,7 @@ export default function PropertyCard({
             e.target.onerror = null;
             e.target.src = getCategoryFallbackImage(property);
           }}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+          className="relative z-1 w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500 opacity-95 group-hover:opacity-100"
           loading="lazy"
         />
 

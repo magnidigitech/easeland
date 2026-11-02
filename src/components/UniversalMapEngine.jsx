@@ -1236,7 +1236,13 @@ export default function UniversalMapEngine({
                           : 'border-gray-200 hover:border-brand-yellow'
                     )}
                   >
-                    <div className="relative h-44 bg-gray-100 overflow-hidden">
+                    <div className="relative h-48 bg-slate-50 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={getFirstUploadedImage(prop)}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-20 scale-110 pointer-events-none"
+                      />
                       <img
                         src={getFirstUploadedImage(prop)}
                         alt={prop.title}
@@ -1244,7 +1250,7 @@ export default function UniversalMapEngine({
                           e.target.onerror = null;
                           e.target.src = getCategoryFallbackImage(prop);
                         }}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="relative z-1 w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
                       />
                       
                       <div className="absolute top-3 left-3 bg-slate-950 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md border border-amber-400/40">
@@ -1617,7 +1623,13 @@ export default function UniversalMapEngine({
             <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain">
               
               {/* 1. PHOTO GALLERY CAROUSEL */}
-              <div className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden bg-slate-950 shrink-0 select-none shadow-inner">
+              <div className="relative h-52 sm:h-56 w-full rounded-2xl overflow-hidden bg-slate-950 shrink-0 select-none shadow-inner flex items-center justify-center">
+                <img
+                  src={activePhotoUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-30 scale-110 pointer-events-none"
+                />
                 <img
                   src={activePhotoUrl}
                   alt={selectedPropertyPreview.title}
@@ -1625,7 +1637,7 @@ export default function UniversalMapEngine({
                     e.target.onerror = null;
                     e.target.src = getCategoryFallbackImage(selectedPropertyPreview);
                   }}
-                  className="w-full h-full object-cover transition-opacity duration-200"
+                  className="relative z-1 w-full h-full object-contain p-2 transition-opacity duration-200"
                 />
 
                 {/* Category Badge overlay on image */}
