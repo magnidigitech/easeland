@@ -393,8 +393,9 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-brand-charcoal hover:text-slate-950 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               aria-label="Toggle navigation menu"
+              aria-expanded={mobileMenuOpen}
             >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={'w-6 h-6 transition-transform duration-300 ' + (mobileMenuOpen ? 'rotate-90' : 'rotate-0')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {mobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 ) : (
@@ -407,9 +408,14 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
         </div>
       </div>
 
-      {/* MOBILE MENU DRAWER */}
-      {mobileMenuOpen && (
-        <div ref={drawerRef} className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3">
+      {/* MOBILE MENU DRAWER (SMOOTH ACCORDION EXIT & ENTRANCE) */}
+      <div
+        ref={drawerRef}
+        aria-hidden={!mobileMenuOpen}
+        className={'md:hidden mobile-nav-drawer' + (mobileMenuOpen ? ' open' : '')}
+      >
+        <div className="mobile-nav-drawer-inner">
+          <div className="mobile-nav-drawer-content bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3">
           {/* PWA INSTALL BUTTON (MOBILE) */}
           {canInstallPwa && !isPwaRunning && (
             <button
@@ -518,8 +524,9 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
               Login / Register Account
             </button>
           )}
+          </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }

@@ -110,4 +110,24 @@ describe('EaseLand Navbar Hamburger Menu Auto-Close on Scroll Suite', () => {
     handleScroll(326);
     assert.strictEqual(mobileMenuOpen, false, 'Scrolling down past lowestScrollY + 25 must close the menu');
   });
+
+  it('5. Verifies smooth accordion animation classes in Navbar.jsx and index.css for exit and entrance transitions', () => {
+    const navbarPath = path.join(rootDir, 'src', 'components', 'Navbar.jsx');
+    const cssPath = path.join(rootDir, 'src', 'index.css');
+
+    const navbarContent = fs.readFileSync(navbarPath, 'utf8');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+    // Verify smooth accordion classes in Navbar.jsx
+    assert.ok(navbarContent.includes('mobile-nav-drawer'), 'Navbar.jsx must use mobile-nav-drawer class');
+    assert.ok(navbarContent.includes('mobile-nav-drawer-inner'), 'Navbar.jsx must use mobile-nav-drawer-inner for clipping');
+    assert.ok(navbarContent.includes('mobile-nav-drawer-content'), 'Navbar.jsx must use mobile-nav-drawer-content for translateY transform');
+
+    // Verify CSS grid-template-rows transition in index.css
+    assert.ok(cssContent.includes('.mobile-nav-drawer'), 'index.css must define .mobile-nav-drawer');
+    assert.ok(cssContent.includes('grid-template-rows: 0fr;'), 'index.css must transition to 0fr when closed');
+    assert.ok(cssContent.includes('grid-template-rows: 1fr;'), 'index.css must transition to 1fr when open');
+    assert.ok(cssContent.includes('.mobile-nav-drawer-inner'), 'index.css must define .mobile-nav-drawer-inner');
+    assert.ok(cssContent.includes('.mobile-nav-drawer-content'), 'index.css must define .mobile-nav-drawer-content');
+  });
 });
