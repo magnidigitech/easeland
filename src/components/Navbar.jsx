@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Building2, Heart, PlusCircle, User, ShieldCheck, LogOut, Settings, Briefcase, Search, Key, Tag, Sparkles, CheckCircle2, ArrowRight, Download } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { promptPwaInstall, isPwaInstalled, isIOSDevice, hasDeferredPrompt } from '../utils/pwaManager';
@@ -9,6 +9,43 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
   const [hoveredNav, setHoveredNav] = useState(null);
   const [canInstallPwa, setCanInstallPwa] = useState(false);
   const [isPwaRunning, setIsPwaRunning] = useState(false);
+  const drawerRef = useRef(null);
+
+  // Auto-close mobile menu when scrolling past down it
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const getScrollY = () => window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+    const openScrollY = getScrollY();
+    let lowestScrollY = openScrollY;
+
+    const handleScroll = (e) => {
+      // If scrolling inside the drawer itself, allow normal browsing of drawer content
+      if (e && e.target && drawerRef.current && drawerRef.current.contains(e.target)) {
+        return;
+      }
+
+      const currentScrollY = getScrollY();
+      if (currentScrollY < lowestScrollY) {
+        lowestScrollY = currentScrollY;
+      }
+
+      // Close automatically when user scrolls down past the opening position (with 25px jitter buffer)
+      if (currentScrollY > lowestScrollY + 25) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+    };
+  }, [mobileMenuOpen]);
+
+  // Auto-close mobile menu on active page change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [activePage]);
 
   useEffect(() => {
     const handleConfigUpdated = (e) => setSiteConfig(e.detail || mockApi.getSiteConfig());
@@ -372,7 +409,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
 
       {/* MOBILE MENU DRAWER */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3">
+        <div ref={drawerRef} className="md:hidden bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3">
           {/* PWA INSTALL BUTTON (MOBILE) */}
           {canInstallPwa && !isPwaRunning && (
             <button
