@@ -558,10 +558,12 @@ export const sanitizeSiteConfig = (cfg) => {
   }
 
   // 9. Upgrade legacy stock hero image to generated high-res landscape
-  if (sanitized.homepage?.heroBackgroundImage && sanitized.homepage.heroBackgroundImage.includes('photo-1500382017468-9049fed747ef')) {
+  if (!sanitized.homepage?.heroBackgroundImage || (typeof sanitized.homepage.heroBackgroundImage === 'string' && sanitized.homepage.heroBackgroundImage.includes('photo-1500382017468-9049fed747ef'))) {
+    if (!sanitized.homepage) sanitized.homepage = {};
     sanitized.homepage.heroBackgroundImage = DEFAULT_SITE_CONFIG.homepage.heroBackgroundImage;
   }
-  if (sanitized.media?.heroBannerUrl && sanitized.media.heroBannerUrl.includes('photo-1500382017468-9049fed747ef')) {
+  if (!sanitized.media?.heroBannerUrl || (typeof sanitized.media.heroBannerUrl === 'string' && sanitized.media.heroBannerUrl.includes('photo-1500382017468-9049fed747ef'))) {
+    if (!sanitized.media) sanitized.media = {};
     sanitized.media.heroBannerUrl = DEFAULT_SITE_CONFIG.media.heroBannerUrl;
   }
 

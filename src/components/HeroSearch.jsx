@@ -450,14 +450,15 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
       {/* Dynamic CMS Hero Background Image */}
       {(() => {
         const raw = siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl;
-        const heroSrc = (!raw || raw.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : raw;
+        const clean = (typeof raw === 'string') ? raw.trim() : '';
+        const heroSrc = (!clean || clean.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : clean;
         return (
           <>
             <div
-              className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-40 transition-opacity duration-700"
-              style={{ backgroundImage: 'url(' + heroSrc + ')' }}
+              className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-95 transition-opacity duration-700"
+              style={{ backgroundImage: 'url("' + heroSrc + '")' }}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/65 to-slate-950/90 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/15 to-black/45 pointer-events-none" />
           </>
         );
       })()}
@@ -471,12 +472,12 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         </div>
 
         {/* Hero Title */}
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-100 leading-tight mb-4">
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
           {siteConfig?.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
-          <span className="text-metallic-gold">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
+          <span className="text-metallic-gold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
         </h1>
         
-        <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-8 font-medium">
+        <p className="text-base sm:text-lg text-slate-100 max-w-2xl mx-auto mb-8 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
           {(() => {
             const sub = siteConfig?.homepage?.heroSubtitle;
             if (

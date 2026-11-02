@@ -108,17 +108,64 @@ import { getFirstUploadedImage, getPropertyCoverOrFirstImage, NO_PHOTO_PLACEHOLD
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
   const fileInputRef = React.useRef(null);
+  const [isProcessingFile, setIsProcessingFile] = React.useState(false);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const dataUrl = uploadEvent.target.result;
-      onChange(dataUrl);
-    };
-    reader.readAsDataURL(file);
+    if (file.type && file.type.startsWith('image/')) {
+      setIsProcessingFile(true);
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const rawDataUrl = uploadEvent.target.result;
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const MAX_WIDTH = 1920;
+            const MAX_HEIGHT = 1080;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+              if (width / height > MAX_WIDTH / MAX_HEIGHT) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              } else {
+                width = Math.round((width * MAX_HEIGHT) / height);
+                height = MAX_HEIGHT;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to web-optimized JPEG under 150KB for smooth Firestore and LocalStorage persistence
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            onChange(compressedDataUrl);
+          } catch (err) {
+            onChange(rawDataUrl);
+          } finally {
+            setIsProcessingFile(false);
+          }
+        };
+        img.onerror = () => {
+          setIsProcessingFile(false);
+          onChange(rawDataUrl);
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        onChange(uploadEvent.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -155,11 +202,12 @@ function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/v
         />
         <button
           type="button"
+          disabled={isProcessingFile}
           onClick={() => fileInputRef.current?.click()}
-          className="bg-brand-charcoal hover:bg-brand-charcoalLight text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap"
+          className="bg-brand-charcoal hover:bg-brand-charcoalLight text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer disabled:opacity-50"
         >
           <Upload className="w-3.5 h-3.5 text-brand-yellow" />
-          <span>Upload File</span>
+          <span>{isProcessingFile ? 'Optimizing Image...' : 'Upload File'}</span>
         </button>
       </div>
 
@@ -346,6 +394,9 @@ export default function AdminPortal({ onNavigate }) {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       if (next && next.theme) {
         applySiteTheme(next.theme);
+      }
+      if (typeof window !== 'undefined' && next) {
+        window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: next }));
       }
       return next;
     });
@@ -3727,11 +3778,30 @@ export default function AdminPortal({ onNavigate }) {
                         />
                       </div>
 
-                      <MediaUploadInput
-                        label="Hero Background Image Cover"
-                        value={siteConfig.homepage?.heroBackgroundImage || ''}
-                        onChange={(val) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
-                      />
+                      <div>
+                        <MediaUploadInput
+                          label="Hero Background Image Cover"
+                          value={siteConfig.homepage?.heroBackgroundImage || ''}
+                          onChange={(val) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
+                        />
+                        <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-[11px] font-bold text-gray-500">Quick Presets:</span>
+                          <button
+                            type="button"
+                            onClick={() => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: '/easeland_hero_bg.jpg' } }))}
+                            className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                          >
+                            Generated Township Banner
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: '/easeland_hero_landscape.jpg' } }))}
+                            className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                          >
+                            High-Res Plotted Landscape
+                          </button>
+                        </div>
+                      </div>
 
                       <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
                         <div>
@@ -4587,11 +4657,30 @@ export default function AdminPortal({ onNavigate }) {
                         onChange={(val) => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, fallbackPropertyImageUrl: val } }))}
                       />
 
-                      <MediaUploadInput
-                        label="Hero Banner Custom Media Cover"
-                        value={siteConfig.media?.heroBannerUrl || ''}
-                        onChange={(val) => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, heroBannerUrl: val } }))}
-                      />
+                      <div>
+                        <MediaUploadInput
+                          label="Hero Banner Custom Media Cover"
+                          value={siteConfig.media?.heroBannerUrl || ''}
+                          onChange={(val) => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, heroBannerUrl: val } }))}
+                        />
+                        <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-[11px] font-bold text-gray-500">Quick Presets:</span>
+                          <button
+                            type="button"
+                            onClick={() => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, heroBannerUrl: '/easeland_hero_bg.jpg' } }))}
+                            className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                          >
+                            Generated Township Banner
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateCmsConfig(prev => ({ ...prev, media: { ...prev.media, heroBannerUrl: '/easeland_hero_landscape.jpg' } }))}
+                            className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                          >
+                            High-Res Plotted Landscape
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <CmsModuleActionBar

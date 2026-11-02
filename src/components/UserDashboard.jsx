@@ -1358,37 +1358,60 @@ export default function UserDashboard({
 
                 {/* METRICS CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                  <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPropertyFilter('ALL');
+                      handleTabChange('properties');
+                    }}
+                    className="w-full bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between hover:shadow-md hover:border-amber-400 hover:-translate-y-0.5 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    title="View All Active Listings"
+                  >
                     <div>
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Active Listings</span>
+                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block group-hover:text-amber-600 transition-colors">Active Listings</span>
                       <span className="text-xl sm:text-2xl font-black text-brand-charcoal mt-0.5 sm:mt-1 block">{activeUserProperties.length}</span>
                     </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black shrink-0">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand-yellow/20 text-brand-charcoal flex items-center justify-center font-black shrink-0 group-hover:scale-105 group-hover:bg-brand-yellow/30 transition-all">
                       <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-brand-charcoal" />
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPropertyFilter('LIVE');
+                      handleTabChange('verification');
+                    }}
+                    className="w-full bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between hover:shadow-md hover:border-emerald-400 hover:-translate-y-0.5 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    title="View Verified Live Listings"
+                  >
                     <div>
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Verified Live</span>
+                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block group-hover:text-emerald-700 transition-colors">Verified Live</span>
                       <span className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5 sm:mt-1 block">
                         {activeUserProperties.filter(p => (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished)).length}
                       </span>
                     </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black shrink-0">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black shrink-0 group-hover:scale-105 group-hover:bg-emerald-200 transition-all">
                       <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTabChange('wishlist');
+                    }}
+                    className="w-full bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 shadow-sm flex items-center justify-between hover:shadow-md hover:border-pink-400 hover:-translate-y-0.5 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-pink-400"
+                    title="View Saved Wishlist"
+                  >
                     <div>
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block">Saved Wishlist</span>
+                      <span className="text-gray-500 text-xs font-bold uppercase tracking-wider block group-hover:text-pink-600 transition-colors">Saved Wishlist</span>
                       <span className="text-xl sm:text-2xl font-black text-brand-charcoal mt-0.5 sm:mt-1 block">{wishlistProperties.length}</span>
                     </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-black shrink-0">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-black shrink-0 group-hover:scale-105 group-hover:bg-pink-200 transition-all">
                       <Heart className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
-                  </div>
+                  </button>
                 </div>
 
                 {/* ADMIN REMOVED LISTINGS NOTICES BANNER */}
