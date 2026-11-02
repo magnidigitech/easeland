@@ -131,6 +131,33 @@ export default function UniversalMapEngine({
   const [previewMediaIndex, setPreviewMediaIndex] = useState(0);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
+  // Helper to center the map directly on a property with accurate viewport measurement
+  const centerMapOnTarget = (targetProp, zoom = 17) => {
+    if (!targetProp || !mapInstanceRef.current) return [];
+    const coords = extractCoordinates(targetProp);
+    const lat = coords?.lat;
+    const lng = coords?.lng;
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return [];
+
+    const doCenter = () => {
+      if (!mapInstanceRef.current) return;
+      try {
+        mapInstanceRef.current.invalidateSize({ animate: false });
+        mapInstanceRef.current.setView([lat, lng], zoom, { animate: true });
+      } catch (e) {}
+    };
+
+    // Staggered centering across drawer transition frames (0ms, 60ms, 160ms, 320ms, 450ms)
+    doCenter();
+    const timers = [
+      setTimeout(doCenter, 60),
+      setTimeout(doCenter, 160),
+      setTimeout(doCenter, 320),
+      setTimeout(doCenter, 450)
+    ];
+    return timers;
+  };
+
   // Smooth pan to property with standard zoom (level 17) and highlight only this property on map without opening preview card
   const handlePanToProperty = (prop) => {
     if (!prop) return;
@@ -138,21 +165,12 @@ export default function UniversalMapEngine({
     setSelectedPropertyId(propId);
     setSelectedPropertyPreview(null);
 
-    const coords = extractCoordinates(prop);
-    const lat = coords?.lat;
-    const lng = coords?.lng;
-
-    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-      if (mapInstanceRef.current) {
-        // Standard Zoom (level 17): High resolution view of plot, boundary and street context without tile distortion
-        mapInstanceRef.current.setView([lat, lng], 17, { animate: true });
-      }
-    }
-
     // On mobile screens (< 768px), collapse side panel drawer so the user immediately sees the map
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidePanelOpen(false);
     }
+
+    centerMapOnTarget(prop, 17);
   };
 
   // Smooth pan to property with standard zoom (level 17), highlight on map, and open preview card
@@ -163,22 +181,30 @@ export default function UniversalMapEngine({
     setSelectedPropertyPreview(prop);
     setPreviewMediaIndex(0);
 
-    const coords = extractCoordinates(prop);
-    const lat = coords?.lat;
-    const lng = coords?.lng;
-
-    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-      if (mapInstanceRef.current) {
-        // Standard Zoom (level 17): High resolution view of plot, boundary and street context without tile distortion
-        mapInstanceRef.current.setView([lat, lng], 17, { animate: true });
-      }
-    }
-
     // On mobile screens (< 768px), collapse side panel drawer so the user immediately sees the map and details pop up card
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidePanelOpen(false);
     }
+
+    centerMapOnTarget(prop, 17);
   };
+
+  // Whenever selectedPropertyId or isSidePanelOpen changes, guarantee the selected property is dead-centered
+  useEffect(() => {
+    if (!selectedPropertyId || !mapInstanceRef.current) return;
+    const prop = displayProperties.find(p => {
+      const pid = p.id || p.propertyId || p.referenceId;
+      return String(pid) === String(selectedPropertyId);
+    });
+    if (prop) {
+      const timers = centerMapOnTarget(prop, 17);
+      return () => {
+        if (Array.isArray(timers)) {
+          timers.forEach(t => clearTimeout(t));
+        }
+      };
+    }
+  }, [selectedPropertyId, isSidePanelOpen, displayProperties]);
 
   // Sync with focusedProperty if passed from parent
   useEffect(() => {

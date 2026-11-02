@@ -128,4 +128,21 @@ describe('EaseLand Map Property Single-Selection & Highlighting Suite', () => {
     // Verify fitBounds is suppressed when a property is selected so it preserves pan zoom level 17
     assert.ok(content.includes('!selectedPropertyId && !focusedProperty'), 'fitBounds must be guarded by !selectedPropertyId');
   });
+
+  it('5. Evaluates map centering: verifies centerMapOnTarget helper and drawer transition recentering', () => {
+    const mapEnginePath = path.join(rootDir, 'src', 'components', 'UniversalMapEngine.jsx');
+    const content = fs.readFileSync(mapEnginePath, 'utf8');
+
+    // Verify centerMapOnTarget helper definition
+    assert.ok(content.includes('const centerMapOnTarget = (targetProp, zoom = 17) =>'), 'Must define centerMapOnTarget helper');
+
+    // Verify invalidateSize is called before setView
+    assert.ok(content.includes('mapInstanceRef.current.invalidateSize({ animate: false });'), 'centerMapOnTarget must invalidate size before setView');
+
+    // Verify handlePanToProperty invokes centerMapOnTarget
+    assert.ok(content.includes('centerMapOnTarget(prop, 17);'), 'handlePanToProperty must invoke centerMapOnTarget');
+
+    // Verify useEffect re-centers when isSidePanelOpen changes while selectedPropertyId is active
+    assert.ok(content.includes('[selectedPropertyId, isSidePanelOpen, displayProperties]'), 'useEffect must sync centering with isSidePanelOpen');
+  });
 });
