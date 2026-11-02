@@ -2083,7 +2083,16 @@ app.get('/api/site-config', async (req, res) => {
 
     // Unpack and merge master_draft if present so draft edits are exposed and merged with authoritative configuration
     if (config.master_draft && typeof config.master_draft === 'object') {
+      delete config.master_draft.master_draft; // Never allow recursive nesting
       Object.keys(config.master_draft).forEach(modKey => {
+        if (modKey === 'master_draft') return;
+        if (modKey === 'featuredListings') {
+          // Published featuredListings in site_config is authoritative for public viewers
+          if (!config.featuredListings) {
+            config.featuredListings = config.master_draft.featuredListings;
+          }
+          return;
+        }
         if (!config[modKey]) {
           config[modKey] = config.master_draft[modKey];
         } else if (typeof config[modKey] === 'object' && typeof config.master_draft[modKey] === 'object' && config.master_draft[modKey] !== null) {
@@ -2119,14 +2128,31 @@ app.post('/api/site-config', async (req, res) => {
 
     // Merge master_draft with existing PostgreSQL master_draft to prevent partial module saves from erasing other modules
     if (fullConfig.master_draft && typeof fullConfig.master_draft === 'object') {
+      delete fullConfig.master_draft.master_draft;
       try {
         const draftRes = await pgPool.query("SELECT config_data FROM site_config WHERE module_id = 'master_draft';");
         if (draftRes.rows.length > 0 && draftRes.rows[0].config_data && typeof draftRes.rows[0].config_data === 'object') {
-          fullConfig.master_draft = { ...draftRes.rows[0].config_data, ...fullConfig.master_draft };
+          const currentDbDraft = { ...draftRes.rows[0].config_data };
+          delete currentDbDraft.master_draft;
+          fullConfig.master_draft = { ...currentDbDraft, ...fullConfig.master_draft };
         }
       } catch (eDraftMerge) {
         console.warn('Draft merge note:', eDraftMerge.message);
       }
+    }
+
+    // Keep master_draft synchronized whenever featuredListings is updated
+    if (fullConfig.featuredListings) {
+      if (!fullConfig.master_draft || typeof fullConfig.master_draft !== 'object') {
+        try {
+          const draftRes = await pgPool.query("SELECT config_data FROM site_config WHERE module_id = 'master_draft';");
+          fullConfig.master_draft = draftRes.rows.length > 0 ? (draftRes.rows[0].config_data || {}) : {};
+          delete fullConfig.master_draft.master_draft;
+        } catch (eDraft) {
+          fullConfig.master_draft = {};
+        }
+      }
+      fullConfig.master_draft.featuredListings = fullConfig.featuredListings;
     }
 
     const P = String.fromCharCode(36);
@@ -2141,20 +2167,6 @@ app.post('/api/site-config', async (req, res) => {
       return pgPool.query(queryText, [modId, JSON.stringify(fullConfig[modId])]);
     });
     await Promise.all(promises);
-
-    // Keep master_draft in sync when featuredListings is updated directly
-    if (fullConfig.featuredListings && !fullConfig.master_draft) {
-      try {
-        const draftRes = await pgPool.query("SELECT config_data FROM site_config WHERE module_id = 'master_draft';");
-        if (draftRes.rows.length > 0) {
-          const currentDraft = draftRes.rows[0].config_data || {};
-          currentDraft.featuredListings = fullConfig.featuredListings;
-          await pgPool.query(queryText, ['master_draft', JSON.stringify(currentDraft)]);
-        }
-      } catch (eDraft) {
-        console.warn('Syncing featuredListings to master_draft notice:', eDraft.message);
-      }
-    }
 
     Object.keys(fullConfig).forEach(modId => {
       localSiteConfigMap.set(modId, fullConfig[modId]);

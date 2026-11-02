@@ -25,7 +25,7 @@ import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 import { mockApi, applySiteTheme, safeArray, deduplicateProperties, isFakeProperty } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams, createDefaultFilterState } from './firebase/searchUrl.js';
-import { getSiteConfigAdmin } from './firebase/siteManagementService.js';
+import { getSiteConfigAdmin, subscribeToSitePromotions } from './firebase/siteManagementService.js';
 import { searchPublicProperties } from './firebase/searchService.js';
 import { getUserWishlistProperties, removeWishlistProperty } from './firebase/wishlistService.js';
 import { getFirstUploadedImage, getCategoryFallbackImage } from './utils/categoryUtils.js';
@@ -605,6 +605,27 @@ export default function App() {
       }
     }).catch(err => console.warn('Live CMS config fetch warning:', err));
 
+    // Real-time synchronization of active promoted properties across all users and accounts
+    const unsubscribePromos = subscribeToSitePromotions((featuredData) => {
+      if (!featuredData || !Array.isArray(featuredData.featuredPropertyIds)) return;
+      setSiteConfig((prev) => {
+        const updated = {
+          ...(prev || {}),
+          featuredListings: {
+            ...(prev?.featuredListings || {}),
+            ...featuredData,
+            showOnlyFeatured: true
+          }
+        };
+        const merged = mockApi.mergeSiteConfigWithDefaults(updated);
+        try {
+          localStorage.setItem('easeland_site_config', JSON.stringify(merged));
+        } catch (e) {}
+        return merged;
+      });
+      loadProperties();
+    });
+
     if (siteConfig && siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
     }
@@ -667,11 +688,12 @@ export default function App() {
     window.addEventListener('storage', handleStorageUpdate);
 
     return () => {
+      if (typeof unsubscribePromos === 'function') unsubscribePromos();
       window.removeEventListener('easeland-property-approved', handleApproved);
       window.removeEventListener('easeland-site-config-updated', handleConfigUpdated);
       window.removeEventListener('storage', handleStorageUpdate);
     };
-  }, [filters, activePage]);
+  }, [filters, activePage, currentUser?.uid]);
 
   const handleHeroSearch = (searchPayload) => {
     let propType = searchPayload?.propertyType || 'ALL';

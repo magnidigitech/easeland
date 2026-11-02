@@ -6,7 +6,8 @@ import {
   collection,
   query,
   where,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from './config.js';
 import { logAdminActivity } from './verificationService.js';
@@ -48,6 +49,7 @@ export async function getSiteConfigAdmin() {
         Object.assign(mergedConfig, json.config);
         if (json.config.master_draft && typeof json.config.master_draft === 'object') {
           Object.keys(json.config.master_draft).forEach((k) => {
+            if (k === 'master_draft' || k === 'featuredListings') return;
             if (!mergedConfig[k]) {
               mergedConfig[k] = json.config.master_draft[k];
             } else if (typeof mergedConfig[k] === 'object' && typeof json.config.master_draft[k] === 'object') {
@@ -97,6 +99,7 @@ export async function getSiteConfigAdmin() {
         const draftData = docSnap.data();
         if (draftData && typeof draftData === 'object') {
           Object.keys(draftData).forEach((k) => {
+            if (k === 'master_draft' || k === 'featuredListings') return;
             if (!mergedConfig[k]) {
               mergedConfig[k] = draftData[k];
             } else if (typeof mergedConfig[k] === 'object' && typeof draftData[k] === 'object') {
@@ -112,34 +115,30 @@ export async function getSiteConfigAdmin() {
           const fsData = docSnap.data() || {};
           if (docSnap.id === 'featuredListings') {
             const pgFeatured = existing || {};
-            // PostgreSQL is the authoritative central store. Never let older Firestore data override PostgreSQL broadcast!
-            if (existing && typeof existing === 'object') {
-              const pgIds = Array.isArray(pgFeatured.featuredPropertyIds) ? pgFeatured.featuredPropertyIds : [];
-              mergedConfig[docSnap.id] = {
-                ...fsData,
-                ...pgFeatured,
-                featuredPropertyIds: pgIds,
-                promotedProperties: pgIds.length === 0
-                  ? []
-                  : (Array.isArray(pgFeatured.promotedProperties) && pgFeatured.promotedProperties.length > 0)
-                    ? pgFeatured.promotedProperties
-                    : [],
-                displayCount: pgFeatured.displayCount !== undefined ? pgFeatured.displayCount : (fsData.displayCount ?? 6),
-                sectionTitle: pgFeatured.sectionTitle || fsData.sectionTitle || 'Featured & Recent Verified Properties',
-                badgeText: pgFeatured.badgeText || fsData.badgeText || 'VERIFIED LISTINGS',
-                showOnlyFeatured: true
-              };
-            } else if (fsIds.length > 0) {
-              mergedConfig[docSnap.id] = {
-                ...fsData,
-                featuredPropertyIds: fsIds,
-                promotedProperties: Array.isArray(fsData.promotedProperties) ? fsData.promotedProperties : [],
-                displayCount: fsData.displayCount ?? 6,
-                sectionTitle: fsData.sectionTitle || 'Featured & Recent Verified Properties',
-                badgeText: fsData.badgeText || 'VERIFIED LISTINGS',
-                showOnlyFeatured: true
-              };
-            }
+            const pgIds = Array.isArray(pgFeatured.featuredPropertyIds) ? pgFeatured.featuredPropertyIds : [];
+            const fsIds = Array.isArray(fsData.featuredPropertyIds) ? fsData.featuredPropertyIds : [];
+
+            // Authoritative promotion priority:
+            // If Firestore has a newer or larger list saved by admin, prefer it; otherwise preserve PostgreSQL.
+            const preferred = (fsIds.length >= pgIds.length && fsIds.length > 0) ? fsData : (pgIds.length > 0 ? pgFeatured : fsData);
+            const activeIds = (Array.isArray(preferred.featuredPropertyIds) ? preferred.featuredPropertyIds : []).map(String).filter(Boolean);
+            const activePromos = (Array.isArray(preferred.promotedProperties) && preferred.promotedProperties.length > 0)
+              ? preferred.promotedProperties
+              : ((Array.isArray(fsData.promotedProperties) && fsData.promotedProperties.length > 0)
+                ? fsData.promotedProperties
+                : (Array.isArray(pgFeatured.promotedProperties) ? pgFeatured.promotedProperties : []));
+
+            mergedConfig[docSnap.id] = {
+              ...fsData,
+              ...pgFeatured,
+              ...preferred,
+              featuredPropertyIds: activeIds,
+              promotedProperties: activePromos,
+              displayCount: preferred.displayCount !== undefined ? preferred.displayCount : (pgFeatured.displayCount ?? fsData.displayCount ?? 6),
+              sectionTitle: preferred.sectionTitle || pgFeatured.sectionTitle || fsData.sectionTitle || 'Featured & Recent Verified Properties',
+              badgeText: preferred.badgeText || pgFeatured.badgeText || fsData.badgeText || 'VERIFIED LISTINGS',
+              showOnlyFeatured: true
+            };
           } else {
             // PostgreSQL is authoritative for all other modules
             mergedConfig[docSnap.id] = { ...fsData, ...existing };
@@ -161,12 +160,16 @@ export async function getSiteConfigAdmin() {
           Object.keys(parsed).forEach((k) => {
             if (k === 'master_draft' && parsed.master_draft && typeof parsed.master_draft === 'object') {
               Object.keys(parsed.master_draft).forEach((mk) => {
+                if (mk === 'master_draft' || mk === 'featuredListings') return;
                 if (!mergedConfig[mk]) {
                   mergedConfig[mk] = parsed.master_draft[mk];
                 } else if (typeof mergedConfig[mk] === 'object' && typeof parsed.master_draft[mk] === 'object') {
                   mergedConfig[mk] = { ...parsed.master_draft[mk], ...mergedConfig[mk] };
                 }
               });
+            } else if (k === 'featuredListings') {
+              // Never allow stale local storage to overwrite active remote broadcast
+              return;
             } else if (!mergedConfig[k]) {
               mergedConfig[k] = parsed[k];
             } else if (typeof mergedConfig[k] === 'object' && typeof parsed[k] === 'object') {
@@ -175,22 +178,21 @@ export async function getSiteConfigAdmin() {
           });
 
           // Authoritative Broadcast for featuredListings:
-          // The central database (PostgreSQL) is the TV broadcast station.
-          // Stale local storage cache must NEVER override the active server broadcast!
+          // The central database and cloud store are authoritative.
+          // Stale local storage cache must NEVER override active broadcast!
           const localFeatured = parsed.featuredListings;
           if (localFeatured && typeof localFeatured === 'object') {
             const remoteFeatured = mergedConfig.featuredListings;
             if (remoteFeatured && typeof remoteFeatured === 'object') {
-              // Remote broadcast is 100% authoritative for all accounts and viewers
               const remoteIds = Array.isArray(remoteFeatured.featuredPropertyIds) ? remoteFeatured.featuredPropertyIds : [];
               mergedConfig.featuredListings = {
                 ...remoteFeatured,
                 featuredPropertyIds: remoteIds,
                 promotedProperties: remoteIds.length === 0
                   ? []
-                  : (Array.isArray(remoteFeatured.promotedProperties) && remoteFeatured.promotedProperties.length > 0)
+                  : ((Array.isArray(remoteFeatured.promotedProperties) && remoteFeatured.promotedProperties.length > 0)
                     ? remoteFeatured.promotedProperties
-                    : [],
+                    : []),
                 displayCount: remoteFeatured.displayCount !== undefined ? remoteFeatured.displayCount : (localFeatured.displayCount ?? 6),
                 sectionTitle: remoteFeatured.sectionTitle || localFeatured.sectionTitle || 'Featured & Recent Verified Properties',
                 badgeText: remoteFeatured.badgeText || localFeatured.badgeText || 'VERIFIED LISTINGS',
@@ -234,7 +236,9 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
     try {
       let payload = {};
       if (moduleId === 'master_draft' && typeof cleanModuleData === 'object' && cleanModuleData !== null) {
-        payload = { ...cleanModuleData, master_draft: cleanModuleData };
+        const cleanDraft = { ...cleanModuleData };
+        delete cleanDraft.master_draft;
+        payload = { ...cleanDraft, master_draft: cleanDraft };
       } else {
         payload = { [moduleId]: cleanModuleData, master_draft: { [moduleId]: cleanModuleData } };
       }
@@ -264,8 +268,10 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
 
     try {
       if (moduleId === 'master_draft' && typeof cleanModuleData === 'object' && cleanModuleData !== null) {
-        const promises = Object.keys(cleanModuleData).map(mId => {
-          const mPayload = typeof cleanModuleData[mId] === 'object' && cleanModuleData[mId] !== null ? cleanModuleData[mId] : { value: cleanModuleData[mId] };
+        const cleanDraft = { ...cleanModuleData };
+        delete cleanDraft.master_draft;
+        const promises = Object.keys(cleanDraft).map(mId => {
+          const mPayload = typeof cleanDraft[mId] === 'object' && cleanDraft[mId] !== null ? cleanDraft[mId] : { value: cleanDraft[mId] };
           return setDoc(doc(db, 'siteManagement', mId), {
             ...mPayload,
             state: 'PUBLISHED',
@@ -275,7 +281,7 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         });
         await Promise.all(promises);
         const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
-        await setDoc(masterDraftRef, cleanModuleData, { merge: true });
+        await setDoc(masterDraftRef, cleanDraft, { merge: true });
       } else {
         const docRef = doc(db, 'siteManagement', moduleId);
         const payload = {
@@ -304,11 +310,16 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
       } catch (e) {}
 
       if (moduleId === 'master_draft' && typeof moduleData === 'object' && moduleData !== null) {
-        fullConfig = { ...fullConfig, ...moduleData, master_draft: { ...(fullConfig.master_draft || {}), ...moduleData } };
+        const cleanDraft = { ...moduleData };
+        delete cleanDraft.master_draft;
+        fullConfig = { ...fullConfig, ...cleanDraft, master_draft: { ...(fullConfig.master_draft || {}), ...cleanDraft } };
       } else {
         fullConfig[moduleId] = moduleData;
         if (!fullConfig.master_draft) fullConfig.master_draft = {};
         fullConfig.master_draft[moduleId] = moduleData;
+      }
+      if (fullConfig.master_draft) {
+        delete fullConfig.master_draft.master_draft;
       }
       const sanitized = sanitizeSiteConfig(fullConfig);
       if (sanitized && sanitized.theme) {
@@ -336,6 +347,7 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
  */
 export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   const cleanConfig = JSON.parse(JSON.stringify(fullConfig || {}, (k, v) => (v === undefined ? null : v)));
+  delete cleanConfig.master_draft;
   const publishPayload = { ...cleanConfig, master_draft: cleanConfig };
 
   // 1. Primary DB Storage: Save all site config modules to PostgreSQL
@@ -377,7 +389,7 @@ export async function publishSiteConfigAdmin(fullConfig, adminUid) {
           state: 'PUBLISHED',
           publishedAt: serverTimestamp(),
           publishedBy: adminUid || 'admin'
-        }, { merge: true }).catch(err => console.warn(`Firestore sync note for ${modId}:`, err.message))
+        }, { merge: true }).catch(err => console.warn('Firestore sync note for ' + modId + ':', err.message))
       );
     });
 
@@ -424,3 +436,28 @@ export async function syncSiteConfigAndUsers() {
   }
   return { success: false };
 }
+
+/**
+ * Real-time listener for live promoted customer properties.
+ * Emits whenever admin updates promoted properties in Firestore so all user sessions update instantly.
+ */
+export function subscribeToSitePromotions(onPromotionsUpdated) {
+  if (typeof window === 'undefined') return () => {};
+  try {
+    const featRef = doc(db, 'siteManagement', 'featuredListings');
+    const unsubscribe = onSnapshot(featRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && typeof data === 'object') {
+          onPromotionsUpdated(data);
+        }
+      }
+    }, (err) => {
+      console.warn('Real-time promotions listener notice:', err.message);
+    });
+    return unsubscribe;
+  } catch (e) {
+    return () => {};
+  }
+}
+
