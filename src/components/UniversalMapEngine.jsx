@@ -130,6 +130,28 @@ export default function UniversalMapEngine({
   const [previewMediaIndex, setPreviewMediaIndex] = useState(0);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
+  // Smooth pan to property with standard zoom (level 17) without opening preview card
+  const handlePanToProperty = (prop) => {
+    if (!prop) return;
+    setSelectedPropertyPreview(null);
+
+    const coords = extractCoordinates(prop);
+    const lat = coords?.lat;
+    const lng = coords?.lng;
+
+    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+      if (mapInstanceRef.current) {
+        // Standard Zoom (level 17): High resolution view of plot, boundary and street context without tile distortion
+        mapInstanceRef.current.setView([lat, lng], 17, { animate: true });
+      }
+    }
+
+    // On mobile screens (< 768px), collapse side panel drawer so the user immediately sees the map
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidePanelOpen(false);
+    }
+  };
+
   // Smooth pan to property with standard zoom (level 17) and open preview card
   const handleSelectPropertyForPreview = (prop) => {
     if (!prop) return;
@@ -1119,7 +1141,7 @@ export default function UniversalMapEngine({
               displayProperties.map((prop) => (
                 <div
                   key={prop.id}
-                  onClick={() => handleSelectPropertyForPreview(prop)}
+                  onClick={() => handlePanToProperty(prop)}
                   className={`group bg-white rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col mx-0.5 sm:mx-0 shadow-sm hover:shadow-md ${
                     selectedPropertyPreview?.id === prop.id
                       ? 'border-brand-yellow ring-2 ring-brand-yellow/30 shadow-lg'
@@ -1236,11 +1258,11 @@ export default function UniversalMapEngine({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSelectPropertyForPreview(prop);
+                          handlePanToProperty(prop);
                         }}
                         className="w-full mt-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer group"
                       >
-                        <span className="font-bold tracking-wide">View Property Details</span>
+                        <span className="font-bold tracking-wide">View on Map</span>
                         <ChevronRight className="w-4 h-4 shrink-0 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
                       </button>
                     </div>
