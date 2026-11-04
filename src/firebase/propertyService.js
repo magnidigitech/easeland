@@ -939,10 +939,12 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
     let publicPayload = {};
 
     if (isAlreadyLive && formData) {
-      // Re-Audit Workflow: Keep existing live data published on site while staging new edits for Admin verification
+      // Re-Audit Submission: Update property details and gate from public live marketplace until Admin verifies & approves
       const derived = computeDerivedPropertyFields({ ...propData, ...formData });
       publicPayload = {
         ...propData,
+        ...formData,
+        ...derived,
         hasPendingEdits: true,
         reAuditStatus: ListingStatus.PENDING_VERIFICATION,
         reAuditRequestedAt: new Date().toISOString(),
@@ -952,12 +954,20 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           submittedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         },
-        listingStatus: ListingStatus.LIVE,
-        status: ListingStatus.LIVE,
-        isPublished: true,
-        isPlatformVerified: true,
+        listingStatus: ListingStatus.PENDING_VERIFICATION,
+        status: ListingStatus.PENDING_VERIFICATION,
+        listing_status: ListingStatus.PENDING_VERIFICATION,
+        verificationStatus: 'Pending Verification',
+        isPublished: false,
+        is_published: false,
+        isPlatformVerified: false,
+        isAdmin: false,
+        isAdminApproval: false,
+        adminVerified: false,
+        verifiedBy: null,
         updatedAt: new Date().toISOString(),
-        isOwnerDraftEdit: true
+        isOwnerDraftEdit: true,
+        isOwnerSubmission: true
       };
     } else {
       const mergedData = {
@@ -1029,24 +1039,17 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           const parsed = JSON.parse(rawUserProps);
           const updated = parsed.map(p => {
             if (p && String(p.id || p.propertyId) === pIdStr) {
-              if (isAlreadyLive) {
-                return {
-                  ...p,
-                  hasPendingEdits: true,
-                  reAuditStatus: ListingStatus.PENDING_VERIFICATION,
-                  pendingReauditData: publicPayload.pendingReauditData,
-                  listingStatus: ListingStatus.LIVE,
-                  status: ListingStatus.LIVE,
-                  isPublished: true,
-                  isPlatformVerified: true
-                };
-              }
               return {
                 ...p,
+                ...publicPayload,
                 listingStatus: ListingStatus.PENDING_VERIFICATION,
                 status: ListingStatus.PENDING_VERIFICATION,
                 verificationStatus: 'Pending Verification',
-                isPublished: false
+                isPublished: false,
+                isPlatformVerified: false,
+                hasPendingEdits: true,
+                reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+                pendingReauditData: publicPayload.pendingReauditData
               };
             }
             return p;
@@ -1059,24 +1062,17 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           const parsedAll = JSON.parse(rawAllProps);
           const updatedAll = parsedAll.map(p => {
             if (p && String(p.id || p.propertyId) === pIdStr) {
-              if (isAlreadyLive) {
-                return {
-                  ...p,
-                  hasPendingEdits: true,
-                  reAuditStatus: ListingStatus.PENDING_VERIFICATION,
-                  pendingReauditData: publicPayload.pendingReauditData,
-                  listingStatus: ListingStatus.LIVE,
-                  status: ListingStatus.LIVE,
-                  isPublished: true,
-                  isPlatformVerified: true
-                };
-              }
               return {
                 ...p,
+                ...publicPayload,
                 listingStatus: ListingStatus.PENDING_VERIFICATION,
                 status: ListingStatus.PENDING_VERIFICATION,
                 verificationStatus: 'Pending Verification',
-                isPublished: false
+                isPublished: false,
+                isPlatformVerified: false,
+                hasPendingEdits: true,
+                reAuditStatus: ListingStatus.PENDING_VERIFICATION,
+                pendingReauditData: publicPayload.pendingReauditData
               };
             }
             return p;
@@ -1728,20 +1724,27 @@ export async function getPublicPropertyById(propertyId) {
 
     const isArchivedOrDeleted = statusVal === 'ARCHIVED' || statusVal === 'DELETED' || statusVal === 'DELETED_BY_ADMIN' || statusVal === 'REJECTED' || data.isDeleted === true || data.deletedByAdmin === true || isInAdminDelLedger;
 
-    const isLive = statusVal === 'LIVE' ||
-                   statusVal === 'APPROVED_LIVE' ||
-                   statusVal === 'APPROVED' ||
-                   statusVal === 'PLATFORM VERIFIED' ||
-                   statusVal === 'VERIFIED' ||
-                   verVal === 'PLATFORM VERIFIED' ||
-                   verVal === 'VERIFIED' ||
-                   verVal === 'APPROVED' ||
-                   data.isPlatformVerified === true ||
-                   data.isPublished === true ||
-                   (!isArchivedOrDeleted && data.isPublished !== false);
+    const isPendingOrUnderAudit = (
+      statusVal === 'PENDING_VERIFICATION' ||
+      statusVal === 'UNDER_REVIEW' ||
+      statusVal === 'UNDER_AUDIT' ||
+      statusVal === 'DRAFT' ||
+      statusVal === 'CHANGES_REQUIRED' ||
+      statusVal === 'CHANGES_REQUESTED' ||
+      data.hasPendingEdits === true ||
+      data.reAuditStatus === 'PENDING_VERIFICATION' ||
+      data.reAuditStatus === 'UNDER_REVIEW'
+    );
 
-    if (isArchivedOrDeleted || !isLive) {
-      return { success: false, error: 'This property listing was removed by Admin and is no longer available on EaseLand.' };
+    const isLive = !isPendingOrUnderAudit && (
+      statusVal === 'LIVE' ||
+      statusVal === 'APPROVED_LIVE' ||
+      statusVal === 'APPROVED'
+    ) && (data.isPlatformVerified === true || verVal === 'PLATFORM VERIFIED' || verVal === 'VERIFIED') &&
+    (data.isPublished === true);
+
+    if (isArchivedOrDeleted || isPendingOrUnderAudit || !isLive) {
+      return { success: false, error: 'This property listing is currently undergoing verification audit and is not yet available to the public.' };
     }
 
     // Expose APPROVED public media items from publicApprovedMedia, media, photos, images, or single URLs

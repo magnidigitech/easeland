@@ -678,26 +678,34 @@ export default function UserDashboard({
       p.listingStatus === 'DELETED_BY_ADMIN'
     );
 
-    const isLiveProp = !isAdminDeleted && Boolean(
-      p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.listing_status === 'LIVE' ||
-      p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED' ||
-      p.isPlatformVerified === true || p.isPublished === true ||
-      p.verificationStatus === 'Platform Verified' || p.verificationStatus === 'PLATFORM VERIFIED' ||
-      p.verificationStatus === 'Approved' || p.verificationStatus === 'VERIFIED'
-    );
-
-    const isPendingAudit = !isAdminDeleted && !isLiveProp && (
+    const isUnderAudit = !isAdminDeleted && (
       propSt === 'PENDING_VERIFICATION' || propLst === 'PENDING_VERIFICATION' ||
       propSt === 'UNDER_REVIEW' || propLst === 'UNDER_REVIEW' ||
-      propSt === 'PENDING' || propLst === 'PENDING'
+      propSt === 'UNDER_AUDIT' || propLst === 'UNDER_AUDIT' ||
+      propSt === 'PENDING' || propLst === 'PENDING' ||
+      p.reAuditStatus === 'PENDING_VERIFICATION' ||
+      p.reAuditStatus === 'UNDER_REVIEW' ||
+      p.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' ||
+      p.rawProperty?.reAuditStatus === 'UNDER_REVIEW' ||
+      p.hasPendingEdits === true ||
+      p.rawProperty?.hasPendingEdits === true
     );
+
+    const isLiveProp = !isAdminDeleted && !isUnderAudit && Boolean(
+      (p.status === 'LIVE' || p.listingStatus === 'LIVE' || p.listing_status === 'LIVE' ||
+      p.status === 'APPROVED_LIVE' || p.status === 'APPROVED' || p.listingStatus === 'APPROVED') &&
+      p.isPlatformVerified === true &&
+      p.isPublished === true
+    );
+
+    const isPendingAudit = isUnderAudit;
 
     const statusVal = isAdminDeleted
       ? 'DELETED_BY_ADMIN'
-      : isLiveProp
-      ? 'LIVE'
       : isPendingAudit
       ? 'PENDING_VERIFICATION'
+      : isLiveProp
+      ? 'LIVE'
       : (p.status === 'REJECTED' || p.listingStatus === 'REJECTED')
       ? 'REJECTED'
       : (p.status === 'CHANGES_REQUIRED' || p.listingStatus === 'CHANGES_REQUIRED')
@@ -1551,20 +1559,15 @@ export default function UserDashboard({
                                   <span>Dismiss</span>
                                 </button>
                               </>
-                            ) : (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW') ? (
-                              <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-amber-300 shadow-sm animate-pulse">
-                                <Clock className="w-3 h-3 text-amber-600" />
-                                Live (Under Re-Audit)
+                            ) : (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING' || prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW' || (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits)) ? (
+                              <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-blue-200">
+                                <Clock className="w-3 h-3 text-blue-600" />
+                                Under Audit
                               </span>
-                            ) : (prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) ? (
+                            ) : (prop.status === 'APPROVED' || prop.status === 'LIVE') && (prop.isPlatformVerified && prop.isPublished) ? (
                               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 Live & Verified
-                              </span>
-                            ) : !(prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING' || prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW') ? (
-                              <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-blue-600" />
-                                Under Review
                               </span>
                             ) : prop.status === 'CHANGES_REQUIRED' ? (
                               <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
@@ -1750,20 +1753,15 @@ export default function UserDashboard({
                                 <XCircle className="w-4 h-4 text-red-400" />
                                 <span>Deleted by Admin</span>
                               </span>
-                            ) : (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW') ? (
-                              <span className="bg-amber-100 text-amber-900 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-300 shadow-sm animate-pulse">
-                                <Clock className="w-4 h-4 text-amber-600" />
-                                Live (Under Re-Audit)
-                              </span>
-                            ) : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) ? (
-                              <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                Live & Verified
-                              </span>
-                            ) : !(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING') ? (
+                            ) : (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING' || prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW' || (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits)) ? (
                               <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-blue-200">
                                 <Clock className="w-4 h-4 text-blue-600" />
                                 Under Audit
+                              </span>
+                            ) : (prop.status === 'LIVE' || prop.status === 'APPROVED') && (prop.isPlatformVerified && prop.isPublished) ? (
+                              <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                Live & Verified
                               </span>
                             ) : null}
                             {!isDeletedByAdmin && !((prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW')) && (

@@ -722,8 +722,18 @@ export const mockApi = {
           const isNewLive = newSt === 'LIVE' || newSt === 'APPROVED_LIVE' || newSt === 'APPROVED' || newSt === 'PLATFORM VERIFIED' || newVst === 'PLATFORM VERIFIED' || newVst === 'VERIFIED' || p.isPlatformVerified === true || p.isPublished === true;
           const isExLive = exSt === 'LIVE' || exSt === 'APPROVED_LIVE' || exSt === 'APPROVED' || exSt === 'PLATFORM VERIFIED' || exVst === 'PLATFORM VERIFIED' || exVst === 'VERIFIED' || existing.isPlatformVerified === true || existing.isPublished === true;
 
+          const isPending = newSt === 'PENDING_VERIFICATION' || exSt === 'PENDING_VERIFICATION' ||
+                            p.hasPendingEdits === true || existing.hasPendingEdits === true ||
+                            p.reAuditStatus === 'PENDING_VERIFICATION' || existing.reAuditStatus === 'PENDING_VERIFICATION';
+
           const merged = { ...existing, ...p };
-          if (isExLive || isNewLive) {
+          if (isPending) {
+            merged.status = 'PENDING_VERIFICATION';
+            merged.listingStatus = 'PENDING_VERIFICATION';
+            merged.isPlatformVerified = false;
+            merged.isPublished = false;
+            merged.verificationStatus = 'Pending Verification';
+          } else if (isExLive || isNewLive) {
             merged.status = 'LIVE';
             merged.listingStatus = 'LIVE';
             merged.isPlatformVerified = true;
@@ -742,13 +752,18 @@ export const mockApi = {
       const lst = String(p.listingStatus || '').toUpperCase();
       const vst = String(p.verificationStatus || '').toUpperCase();
 
-      const isLive = (st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || p.isPublished === true);
+      const isLive = (st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED');
       const isVerified = (p.isPlatformVerified === true || vst === 'PLATFORM VERIFIED' || vst === 'VERIFIED' || vst === 'APPROVED');
-      const isBlocked = (st === 'REJECTED' || st === 'DRAFT' || st === 'PENDING' || st === 'PENDING_VERIFICATION' || lst === 'REJECTED' || lst === 'DRAFT' || lst === 'PENDING' || lst === 'PENDING_VERIFICATION' || st === 'CHANGES_REQUIRED');
+      const isBlocked = (
+        st === 'REJECTED' || st === 'DRAFT' || st === 'PENDING' || st === 'PENDING_VERIFICATION' ||
+        lst === 'REJECTED' || lst === 'DRAFT' || lst === 'PENDING' || lst === 'PENDING_VERIFICATION' ||
+        st === 'CHANGES_REQUIRED' || p.hasPendingEdits === true || p.reAuditStatus === 'PENDING_VERIFICATION'
+      );
 
       // Strict Enforcement: Exclude unverified drafts or pending submissions from public verified listings
-      if (isBlocked && !p.isPlatformVerified) return false;
-      if (!isLive && !isVerified) return false;
+      if (isBlocked) return false;
+      if (!isLive || !isVerified) return false;
+      if (p.isPublished === false) return false;
       return true;
     });
     result = deduplicateProperties(result);

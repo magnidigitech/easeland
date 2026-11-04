@@ -1230,15 +1230,15 @@ export default function AdminPortal({ onNavigate }) {
             ...p,
             id: pId,
             propertyId: pId,
-            status: p.status || p.listingStatus || prev.status,
-            listingStatus: p.listingStatus || p.status || prev.listingStatus,
-            listing_status: p.listing_status || p.listingStatus || p.status || prev.listing_status,
-            isPublished: Boolean(p.isPublished || p.is_published),
-            is_published: Boolean(p.is_published || p.isPublished),
-            isPlatformVerified: Boolean(p.isPlatformVerified),
-            hasPendingEdits: Boolean(p.hasPendingEdits),
-            pendingReauditData: p.pendingReauditData || null,
-            reAuditStatus: p.reAuditStatus || null,
+            status: prev.hasPendingEdits || prev.reAuditStatus === 'PENDING_VERIFICATION' ? prev.status : (p.status || p.listingStatus || prev.status),
+            listingStatus: prev.hasPendingEdits || prev.reAuditStatus === 'PENDING_VERIFICATION' ? prev.listingStatus : (p.listingStatus || p.status || prev.listingStatus),
+            listing_status: prev.hasPendingEdits || prev.reAuditStatus === 'PENDING_VERIFICATION' ? prev.listing_status : (p.listing_status || p.listingStatus || p.status || prev.listing_status),
+            isPublished: (prev.hasPendingEdits || prev.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'PENDING_VERIFICATION' || p.status === 'PENDING_VERIFICATION') ? false : Boolean(p.isPublished || p.is_published),
+            is_published: (prev.hasPendingEdits || prev.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'PENDING_VERIFICATION' || p.status === 'PENDING_VERIFICATION') ? false : Boolean(p.is_published || p.isPublished),
+            isPlatformVerified: (prev.hasPendingEdits || prev.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'PENDING_VERIFICATION' || p.status === 'PENDING_VERIFICATION') ? false : Boolean(p.isPlatformVerified),
+            hasPendingEdits: Boolean(p.hasPendingEdits ?? prev.hasPendingEdits ?? false),
+            pendingReauditData: p.pendingReauditData || prev.pendingReauditData || null,
+            reAuditStatus: p.reAuditStatus || prev.reAuditStatus || null,
             deletedByAdmin: Boolean(p.deletedByAdmin || p.status === 'DELETED_BY_ADMIN' || p.listingStatus === 'DELETED_BY_ADMIN'),
             isDeleted: Boolean(p.isDeleted || p.deletedByAdmin || p.status === 'DELETED_BY_ADMIN'),
             media: (Array.isArray(p.media) && p.media.length > 0) ? p.media : (mergedMedia.length > 0 ? mergedMedia : prev.media || []),
@@ -1334,27 +1334,34 @@ export default function AdminPortal({ onNavigate }) {
         const st = String(p.status || p.listingStatus || '').toUpperCase();
         const lst = String(p.listingStatus || '').toUpperCase();
 
-        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
         const isClosed = st === 'REJECTED' || st === 'DELETED' || st === 'REJECTED_CLOSED' || st === 'CLOSED' || st === 'ARCHIVED' || lst === 'REJECTED' || lst === 'DELETED' || lst === 'REJECTED_CLOSED' || lst === 'CLOSED' || lst === 'ARCHIVED';
+        if (isClosed) return false;
+
         const isChangesRequired = st === 'CHANGES_REQUIRED' || st === 'CHANGES_REQUESTED' || st === 'REVISION_REQUESTED' || lst === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUESTED' || lst === 'REVISION_REQUESTED';
         const isDraft = st === 'DRAFT' || lst === 'DRAFT' || p.isDraft === true;
 
-        // Check if property has pending edits submitted for re-audit
-        const hasPendingReaudit = Boolean(
-          (p.hasPendingEdits === true || Boolean(p.pendingReauditData)) &&
-          (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW' || !p.reAuditStatus || p.reAuditStatus === 'PENDING') &&
-          p.reAuditStatus !== 'EDITS_REJECTED'
-        );
+        // Check if property is actively pending verification audit or re-audit
+        const isPendingAudit = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' ||
+                               st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' ||
+                               st === 'UNDER_AUDIT' || lst === 'UNDER_AUDIT' ||
+                               st === 'SUBMITTED' || lst === 'SUBMITTED' ||
+                               p.auditStatus === 'pending' ||
+                               p.verificationStatus === 'Pending Verification' ||
+                               p.verificationStatus === 'Under Review' ||
+                               p.reAuditStatus === 'PENDING_VERIFICATION' ||
+                               p.reAuditStatus === 'UNDER_REVIEW' ||
+                               p.reAuditStatus === 'PENDING' ||
+                               ((p.hasPendingEdits === true || Boolean(p.pendingReauditData)) && p.reAuditStatus !== 'EDITS_REJECTED') ||
+                               submittedIds.includes(pId);
 
-        if (hasPendingReaudit) return true;
+        if (isPendingAudit) return true;
 
-        // CRITICAL RULE: If ANY of the 3 actions took place (Live/Approved, Rejected, or Changes Requested), or if it's draft, NEVER show in Verification Queue!
-        if (isLive || isClosed || isChangesRequired || isDraft) return false;
+        const isLive = st === 'LIVE' || st === 'APPROVED_LIVE' || st === 'APPROVED' || lst === 'LIVE' || lst === 'APPROVED_LIVE' || lst === 'APPROVED' || (p.isPlatformVerified === true && p.isPublished === true);
 
-        // ONLY visible if actively in pending verification audit state (first submission or resubmission after changes)
-        const isPendingAudit = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' || st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' || st === 'SUBMITTED' || lst === 'SUBMITTED';
+        // If verified Live, rejected, changes requested, or draft, never show in queue
+        if (isLive || isChangesRequired || isDraft) return false;
 
-        return isPendingAudit || (submittedIds.includes(pId) && !isDraft && !isChangesRequired && !isClosed && !isLive);
+        return false;
       });
 
       // PROGRESSIVE STEP 1: Immediately render properties and verification queue without waiting for users or config!

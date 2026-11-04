@@ -81,16 +81,16 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     assert.strictEqual(updated.pendingReauditData.price, 9500000);
   });
 
-  it('2. UserDashboard property mapping includes hasPendingEdits and reAuditStatus to render Under Re-Audit badge', () => {
+  it('2. UserDashboard property mapping includes hasPendingEdits and reAuditStatus to render Under Audit badge', () => {
     const rawPropFromServer = {
       propertyId: 'el-prop-2001',
       id: 'el-prop-2001',
       title: 'Original Live Farmland in Amaravati',
       price: 8000000,
-      status: 'LIVE',
-      listingStatus: 'LIVE',
-      isPublished: true,
-      isPlatformVerified: true,
+      status: 'PENDING_VERIFICATION',
+      listingStatus: 'PENDING_VERIFICATION',
+      isPublished: false,
+      isPlatformVerified: false,
       hasPendingEdits: true,
       reAuditStatus: 'PENDING_VERIFICATION',
       pendingReauditData: {
@@ -116,13 +116,13 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
 
     // Replicate badge selection
     let badgeText = '';
-    if (mapped.hasPendingEdits && (mapped.reAuditStatus === 'PENDING_VERIFICATION' || mapped.reAuditStatus === 'UNDER_REVIEW')) {
-      badgeText = 'Live (Under Re-Audit)';
-    } else if (mapped.status === 'LIVE' && mapped.isPlatformVerified) {
+    if (mapped.status === 'PENDING_VERIFICATION' || (mapped.hasPendingEdits && (mapped.reAuditStatus === 'PENDING_VERIFICATION' || mapped.reAuditStatus === 'UNDER_REVIEW'))) {
+      badgeText = 'Under Audit';
+    } else if (mapped.status === 'LIVE' && mapped.isPlatformVerified && mapped.isPublished) {
       badgeText = 'Live & Verified';
     }
 
-    assert.strictEqual(badgeText, 'Live (Under Re-Audit)', 'Badge must show Live (Under Re-Audit) and NOT Live & Verified when edits are pending');
+    assert.strictEqual(badgeText, 'Under Audit', 'Badge must show Under Audit and NOT Live & Verified when edits are pending');
   });
 
   it('3. Admin Portal verification queue includes property with pending re-audit and approval applies edits live', () => {
@@ -200,6 +200,38 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     handleSubmissionResult(failedRes);
     assert.strictEqual(submittedSuccess, false, 'UI must NEVER mark submission as successful when server or service reports failure');
     assert.strictEqual(errorMsg, 'PostgreSQL rejected property sync', 'UI must expose real error to user instead of silent failure');
+  });
+
+  it('5. Public visibility gate strictly blocks properties under audit from live marketplace view', async () => {
+    const { isPropertyPubliclyVisible } = await import('../utils/filterMatchingUtils.js');
+
+    const underAuditProperty = {
+      id: 'prop_test_under_audit',
+      title: 'Amaravati Plot Under Verification Audit',
+      status: 'PENDING_VERIFICATION',
+      listingStatus: 'PENDING_VERIFICATION',
+      isPublished: true, // Erroneously set or stale flag
+      isPlatformVerified: true, // Erroneously set or stale flag
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION'
+    };
+
+    const isVisible = isPropertyPubliclyVisible(underAuditProperty);
+    assert.strictEqual(isVisible, false, 'Property under verification audit MUST NEVER be publicly visible on the live site');
+
+    const liveApprovedProperty = {
+      id: 'prop_test_approved_live',
+      title: 'Amaravati Plot Approved and Live',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      hasPendingEdits: false,
+      reAuditStatus: null
+    };
+
+    const isLiveVisible = isPropertyPubliclyVisible(liveApprovedProperty);
+    assert.strictEqual(isLiveVisible, true, 'Platform verified and approved LIVE property must be publicly visible');
   });
 });
 

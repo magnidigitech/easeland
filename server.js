@@ -371,10 +371,21 @@ function saveLocalProperty(p, existingOverride = null) {
   const existingListingStatusUpper = String(existing.listing_status || existing.listingStatus || '').toUpperCase();
   const incomingStatusUpper = String(p.status || p.listing_status || p.listingStatus || '').toUpperCase();
 
-  const isAdminAction = Boolean(
-    p.isAdmin === true ||
-    p.isAdminApproval === true ||
-    p.adminVerified === true ||
+  const isExplicitOwnerSubmission = Boolean(
+    p.isOwnerSubmission === true ||
+    p.isOwnerDraftEdit === true ||
+    incomingStatusUpper === 'PENDING_VERIFICATION' ||
+    incomingStatusUpper === 'UNDER_REVIEW' ||
+    incomingStatusUpper === 'UNDER_AUDIT' ||
+    p.reAuditStatus === 'PENDING_VERIFICATION' ||
+    p.reAuditStatus === 'UNDER_REVIEW'
+  );
+
+  const isAdminAction = !isExplicitOwnerSubmission && Boolean(
+    p.isAdminAction === true ||
+    (p.isAdmin === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED' || incomingStatusUpper === 'CHANGES_REQUIRED' || incomingStatusUpper === 'REJECTED' || isExplicitDeleteByAdmin)) ||
+    (p.isAdminApproval === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED')) ||
+    (p.adminVerified === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED')) ||
     p.verifiedBy
   );
 
@@ -470,18 +481,25 @@ function saveLocalProperty(p, existingOverride = null) {
 
     updated = {
       ...existing,
+      ...cleanProposed,
       hasPendingEdits: true,
       reAuditStatus: targetReAuditStatus,
       reAuditRequestedAt: existing.reAuditRequestedAt || p.reAuditRequestedAt || new Date().toISOString(),
       pendingReauditData: mergedPending,
-      listing_status: 'LIVE',
-      listingStatus: 'LIVE',
-      status: 'LIVE',
-      is_published: true,
-      isPublished: true,
-      isPlatformVerified: true,
-      verificationStatus: existing.verificationStatus || 'Platform Verified',
+      listing_status: 'PENDING_VERIFICATION',
+      listingStatus: 'PENDING_VERIFICATION',
+      status: 'PENDING_VERIFICATION',
+      is_published: false,
+      isPublished: false,
+      isPlatformVerified: false,
+      verificationStatus: 'Pending Verification',
+      isAdmin: false,
+      isAdminApproval: false,
+      adminVerified: false,
+      verifiedBy: null,
       documents: cleanDocs,
+      media: cleanMedia,
+      photos: finalPhotos,
       updatedAt: new Date().toISOString()
     };
   }
@@ -491,7 +509,11 @@ function saveLocalProperty(p, existingOverride = null) {
     let finalIsPublished = false;
     let finalIsVerified = false;
 
-    if (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED' || p.isAdminApproval === true || p.adminVerified === true) {
+    if (incomingStatusUpper === 'PENDING_VERIFICATION' || incomingStatusUpper === 'UNDER_REVIEW' || incomingStatusUpper === 'UNDER_AUDIT' || isExplicitOwnerSubmission) {
+      finalStatus = 'PENDING_VERIFICATION';
+      finalIsPublished = false;
+      finalIsVerified = false;
+    } else if (isAdminAction && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED' || p.isAdminApproval === true || p.adminVerified === true)) {
       finalStatus = 'LIVE';
       finalIsPublished = true;
       finalIsVerified = true;
@@ -501,10 +523,6 @@ function saveLocalProperty(p, existingOverride = null) {
       finalIsVerified = false;
     } else if (incomingStatusUpper === 'REJECTED') {
       finalStatus = 'REJECTED';
-      finalIsPublished = false;
-      finalIsVerified = false;
-    } else if (incomingStatusUpper === 'PENDING_VERIFICATION' || incomingStatusUpper === 'UNDER_REVIEW' || incomingStatusUpper === 'UNDER_AUDIT') {
-      finalStatus = 'PENDING_VERIFICATION';
       finalIsPublished = false;
       finalIsVerified = false;
     } else if (incomingStatusUpper) {
@@ -528,15 +546,19 @@ function saveLocalProperty(p, existingOverride = null) {
       isPublished: finalIsPublished,
       is_published: finalIsPublished,
       isPlatformVerified: finalIsVerified,
+      isAdmin: isAdminAction ? Boolean(p.isAdmin) : false,
+      isAdminApproval: isAdminAction ? Boolean(p.isAdminApproval) : false,
+      adminVerified: isAdminAction ? Boolean(p.adminVerified) : false,
+      verifiedBy: isAdminAction ? (p.verifiedBy || existing.verifiedBy || null) : null,
       hasPendingEdits: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
         ? false
-        : (p.hasPendingEdits ?? existing.hasPendingEdits ?? false),
+        : (isExplicitOwnerSubmission ? true : (p.hasPendingEdits ?? existing.hasPendingEdits ?? false)),
       pendingReauditData: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
         ? null
         : (p.pendingReauditData ?? existing.pendingReauditData ?? null),
       reAuditStatus: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
         ? null
-        : (p.reAuditStatus ?? existing.reAuditStatus ?? null),
+        : (isExplicitOwnerSubmission ? (p.reAuditStatus || 'PENDING_VERIFICATION') : (p.reAuditStatus ?? existing.reAuditStatus ?? null)),
       location: p.location || existing.location || null,
       boundary: p.boundary || p.ownerSubmittedBoundary || existing.boundary || existing.ownerSubmittedBoundary || null,
       ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || existing.ownerSubmittedBoundary || existing.boundary || null,
@@ -1400,6 +1422,24 @@ app.get('/api/properties', async (req, res) => {
         const isDel = p.deletedByAdmin === true || p.isDeleted === true || st === 'DELETED_BY_ADMIN' || lst === 'DELETED_BY_ADMIN' || st === 'DELETED' || lst === 'DELETED';
         const isPub = p.isPublished === true || p.is_published === true;
         if (isDel || !isPub) return false;
+
+        // Strict Marketplace Public Visibility Gate: Gated from public until explicitly verified and LIVE
+        const isPendingOrBlocked = (
+          st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' ||
+          st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' ||
+          st === 'UNDER_AUDIT' || lst === 'UNDER_AUDIT' ||
+          st === 'DRAFT' || lst === 'DRAFT' ||
+          st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED' ||
+          st === 'REJECTED' || lst === 'REJECTED' ||
+          p.hasPendingEdits === true ||
+          p.reAuditStatus === 'PENDING_VERIFICATION' ||
+          p.reAuditStatus === 'UNDER_REVIEW'
+        );
+        if (isPendingOrBlocked) return false;
+
+        const isLive = (st === 'LIVE' || lst === 'LIVE' || st === 'APPROVED' || lst === 'APPROVED' || st === 'APPROVED_LIVE' || lst === 'APPROVED_LIVE');
+        const isVerified = (p.isPlatformVerified === true || p.is_platform_verified === true);
+        if (!isLive || !isVerified) return false;
 
         const pid1 = String(p.id || '').toLowerCase().trim();
         const pid2 = String(p.propertyId || '').toLowerCase().trim();
