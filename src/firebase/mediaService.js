@@ -43,6 +43,18 @@ export function parseVideoLink(url) {
   return null;
 }
 
+function isPropertyCurrentlyLive(propData) {
+  if (!propData) return false;
+  return Boolean(
+    propData.isAlreadyLive === true ||
+    String(propData.status || propData.listingStatus || propData.listing_status || '').toUpperCase() === 'LIVE' ||
+    (propData.isPublished && propData.isPlatformVerified) ||
+    propData.hasPendingEdits === true ||
+    Boolean(propData.reAuditStatus) ||
+    Boolean(propData.pendingReauditData)
+  );
+}
+
 /**
  * Add external YouTube or Google Drive video link to property media
  */
@@ -67,14 +79,29 @@ export async function addPropertyVideoLink(
 
     const propRef = doc(db, 'properties', propertyId);
     let masterMedia = [];
+    let propData = {};
     try {
       const snap = await getDoc(propRef);
       if (snap.exists()) {
-        masterMedia = sanitizeMediaArray(snap.data().media);
+        propData = snap.data() || {};
+        masterMedia = sanitizeMediaArray(propData.media);
       }
     } catch (fsReadErr) {
       console.warn('Firestore property read note prior to video link:', fsReadErr.message);
     }
+
+    if (!propData || Object.keys(propData).length === 0) {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) {
+          propData = pObj;
+          if (Array.isArray(pObj.media)) masterMedia = sanitizeMediaArray(pObj.media);
+        }
+      } catch (e) {}
+    }
+
+    const isAlreadyLive = isPropertyCurrentlyLive(propData);
 
     const mediaId = `med-link-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
@@ -98,14 +125,66 @@ export async function addPropertyVideoLink(
       uploadedAt: new Date().toISOString()
     };
 
+    const vUrl = parsed.publicUrl || parsed.embedUrl || parsed.url;
+
+    if (isAlreadyLive) {
+      const existingPending = propData.pendingReauditData || propData.pendingEdits || {};
+      const basePendingMedia = Array.isArray(existingPending.media)
+        ? existingPending.media
+        : sanitizeMediaArray(masterMedia);
+      const updatedPendingMedia = sanitizeMediaArray([...basePendingMedia, newMediaObj]);
+
+      const pendingPayload = {
+        ...existingPending,
+        media: updatedPendingMedia,
+        videoUrl: vUrl,
+        videoLink: vUrl,
+        embeddedVideoUrl: parsed.embedUrl || vUrl,
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(propRef, {
+          hasPendingEdits: true,
+          reAuditStatus: 'PENDING_VERIFICATION',
+          pendingReauditData: pendingPayload,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (fsErr) {
+        console.warn('Firestore video link live staging note:', fsErr.message);
+      }
+
+      try {
+        const { syncPropertyToPostgres } = await import('./propertyService.js');
+        syncPropertyToPostgres({
+          propertyId,
+          id: propertyId,
+          isOwnerDraftEdit: true,
+          hasPendingEdits: true,
+          reAuditStatus: 'PENDING_VERIFICATION',
+          pendingReauditData: pendingPayload
+        });
+      } catch (e) {}
+
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) {
+          pObj.hasPendingEdits = true;
+          pObj.reAuditStatus = 'PENDING_VERIFICATION';
+          pObj.pendingReauditData = pendingPayload;
+        }
+      } catch (e) {}
+
+      return { success: true, mediaItem: newMediaObj, stagedForReaudit: true };
+    }
+
     masterMedia.push(newMediaObj);
     masterMedia = sanitizeMediaArray(masterMedia);
 
     const publicApprovedMedia = masterMedia.filter(
       item => item && item.verificationStatus === MediaStatus.APPROVED
     );
-
-    const vUrl = parsed.publicUrl || parsed.embedUrl || parsed.url;
 
     // 1. Update Firestore (non-blocking)
     try {
@@ -307,16 +386,30 @@ export async function uploadPropertyMediaFile(
 
     const propRef = doc(db, 'properties', propertyId);
     let masterMedia = [];
+    let propData = {};
 
     try {
       const snap = await getDoc(propRef);
       if (snap.exists()) {
-        const data = snap.data();
-        masterMedia = sanitizeMediaArray(data.media);
+        propData = snap.data() || {};
+        masterMedia = sanitizeMediaArray(propData.media);
       }
     } catch (fsErr) {
       console.warn('Firestore property read note prior to upload:', fsErr.message);
     }
+
+    if (!propData || Object.keys(propData).length === 0) {
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) {
+          propData = pObj;
+          if (Array.isArray(pObj.media)) masterMedia = sanitizeMediaArray(pObj.media);
+        }
+      } catch (e) {}
+    }
+
+    const isAlreadyLive = isPropertyCurrentlyLive(propData);
 
     if (masterMedia.length >= 30) {
       return { success: false, error: 'Maximum 30 media items allowed per property.' };
@@ -403,6 +496,91 @@ export async function uploadPropertyMediaFile(
       verificationStatus: MediaStatus.PENDING_REVIEW,
       uploadedAt: new Date().toISOString()
     };
+
+    if (isAlreadyLive) {
+      // LIVE listing undergoing re-audit edit:
+      // STRICT ISOLATION: Root live media and photos MUST NOT be modified!
+      // All proposed new photos/videos must be staged ONLY in pendingReauditData.
+      const existingPending = propData.pendingReauditData || propData.pendingEdits || {};
+      const basePendingMedia = Array.isArray(existingPending.media)
+        ? existingPending.media
+        : sanitizeMediaArray(masterMedia);
+
+      let updatedPendingMedia = basePendingMedia.map(item => {
+        if (isPrimary && item.type === MediaType.PHOTO) {
+          return { ...item, isPrimary: false };
+        }
+        return item;
+      });
+      updatedPendingMedia.push(newMediaObj);
+      updatedPendingMedia = sanitizeMediaArray(updatedPendingMedia);
+
+      const basePendingPhotos = Array.isArray(existingPending.photos)
+        ? [...existingPending.photos]
+        : (Array.isArray(propData.photos) ? [...propData.photos] : []);
+
+      let updatedPendingPhotos = [...basePendingPhotos];
+      if (mediaType === MediaType.PHOTO) {
+        const hasIt = updatedPendingPhotos.some(p => {
+          const u = typeof p === 'string' ? p : (p.publicUrl || p.url || p.storagePath);
+          return u === downloadUrl;
+        });
+        if (!hasIt) {
+          updatedPendingPhotos.push(downloadUrl);
+        }
+      }
+
+      const pendingPayload = {
+        ...existingPending,
+        media: updatedPendingMedia,
+        photos: updatedPendingPhotos,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (mediaType === MediaType.WALKTHROUGH_VIDEO || mediaType === MediaType.DRONE_VIDEO) {
+        pendingPayload.videoUrl = downloadUrl;
+        pendingPayload.videoLink = downloadUrl;
+        pendingPayload.embeddedVideoUrl = downloadUrl;
+      }
+
+      // Update Firestore staging (does NOT touch root media or root photos)
+      try {
+        await setDoc(propRef, {
+          hasPendingEdits: true,
+          reAuditStatus: 'PENDING_VERIFICATION',
+          pendingReauditData: pendingPayload,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (fsErr) {
+        console.warn('Firestore live reaudit media staging note:', fsErr.message);
+      }
+
+      // Sync to PostgreSQL backend
+      try {
+        const { syncPropertyToPostgres } = await import('./propertyService.js');
+        syncPropertyToPostgres({
+          propertyId,
+          id: propertyId,
+          isOwnerDraftEdit: true,
+          hasPendingEdits: true,
+          reAuditStatus: 'PENDING_VERIFICATION',
+          pendingReauditData: pendingPayload
+        });
+      } catch (e) {}
+
+      // Sync to mockApi
+      try {
+        const { mockApi } = await import('../services/mockApi.js');
+        const pObj = mockApi.getPropertyById(propertyId);
+        if (pObj) {
+          pObj.hasPendingEdits = true;
+          pObj.reAuditStatus = 'PENDING_VERIFICATION';
+          pObj.pendingReauditData = pendingPayload;
+        }
+      } catch (e) {}
+
+      return { success: true, mediaItem: newMediaObj, stagedForReaudit: true };
+    }
 
     updatedMasterMedia.push(newMediaObj);
     updatedMasterMedia = sanitizeMediaArray(updatedMasterMedia);

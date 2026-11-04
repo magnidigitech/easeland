@@ -502,6 +502,36 @@ function saveLocalProperty(p, existingOverride = null) {
       isOwnerSubmission: true,
       updatedAt: new Date().toISOString()
     };
+
+    // Ensure root media & photos strictly retain ONLY verified baseline photos
+    const baseMedia = Array.isArray(existing.media) ? existing.media : [];
+    const sanitizedLiveMedia = baseMedia.filter(m => {
+      if (!m || typeof m !== 'object') return true;
+      const st = String(m.verificationStatus || m.status || '').toUpperCase();
+      return st !== 'PENDING_REVIEW' && st !== 'PENDING';
+    });
+    const pendingMediaList = Array.isArray(mergedPending.media) ? mergedPending.media : [];
+    const pendingUnapprovedUrls = new Set(
+      pendingMediaList
+        .filter(m => m && typeof m === 'object' && (String(m.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW' || String(m.verificationStatus || '').toUpperCase() === 'PENDING'))
+        .map(m => String(m.publicUrl || m.url || m.storagePath || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    const basePhotos = Array.isArray(existing.photos) ? existing.photos : [];
+    const sanitizedLivePhotos = basePhotos.filter(p => {
+      if (!p) return false;
+      const u = typeof p === 'string' ? p : (p.publicUrl || p.url || p.storagePath);
+      if (!u) return false;
+      const lower = String(u).trim().toLowerCase();
+      if (pendingUnapprovedUrls.has(lower)) return false;
+      const base = lower.split('/').pop()?.split('?')[0];
+      if (base && pendingUnapprovedUrls.has(base)) return false;
+      return true;
+    });
+
+    updated.media = sanitizedLiveMedia;
+    updated.photos = sanitizedLivePhotos.length > 0 ? sanitizedLivePhotos : basePhotos;
   }
   // 3. Direct Status Changes and Updates across all data fields
   else {
@@ -1101,6 +1131,15 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     try {
       if (propertyId && propertyId !== 'common') {
         const existingProp = localPropsMap.get(propertyId) || { propertyId, id: propertyId };
+        const isLiveProp = Boolean(
+          existingProp.isAlreadyLive === true ||
+          String(existingProp.status || existingProp.listingStatus || existingProp.listing_status || '').toUpperCase() === 'LIVE' ||
+          (existingProp.isPublished && existingProp.isPlatformVerified) ||
+          existingProp.hasPendingEdits === true ||
+          Boolean(existingProp.reAuditStatus) ||
+          Boolean(existingProp.pendingReauditData)
+        );
+
         if (isDocument) {
           const docType = req.body.documentType || 'TITLE_DEED';
           const docTitle = req.body.documentName || req.file.originalname;
@@ -1118,15 +1157,27 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             isDocument: true,
             verificationStatus: 'PENDING'
           };
-          const existingDocs = Array.isArray(existingProp.documents) ? existingProp.documents : [];
-          const normNew = docTitle.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
-          const filteredDocs = existingDocs.filter(d => {
-            if (!d) return false;
-            const dName = String(d.name || d.documentName || d.fileName || '');
-            const normD = dName.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
-            return normD !== normNew && (d.docId || d.id || d.mediaId) !== mediaId;
-          });
-          existingProp.documents = [...filteredDocs, docObj];
+
+          if (isLiveProp) {
+            existingProp.pendingReauditData = existingProp.pendingReauditData || {};
+            const basePendingDocs = Array.isArray(existingProp.pendingReauditData.documents)
+              ? existingProp.pendingReauditData.documents
+              : (Array.isArray(existingProp.documents) ? [...existingProp.documents] : []);
+            existingProp.pendingReauditData.documents = [...basePendingDocs, docObj];
+            existingProp.hasPendingEdits = true;
+            existingProp.reAuditStatus = existingProp.reAuditStatus || 'PENDING_VERIFICATION';
+            existingProp.isOwnerDraftEdit = true;
+          } else {
+            const existingDocs = Array.isArray(existingProp.documents) ? existingProp.documents : [];
+            const normNew = docTitle.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+            const filteredDocs = existingDocs.filter(d => {
+              if (!d) return false;
+              const dName = String(d.name || d.documentName || d.fileName || '');
+              const normD = dName.toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]/g, '');
+              return normD !== normNew && (d.docId || d.id || d.mediaId) !== mediaId;
+            });
+            existingProp.documents = [...filteredDocs, docObj];
+          }
         } else {
           const mediaObj = {
             mediaId,
@@ -1135,14 +1186,41 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             fileName: req.file.originalname,
             type: mediaType,
             fileSize: req.file.size,
-            contentType: req.file.mimetype
+            contentType: req.file.mimetype,
+            verificationStatus: 'PENDING_REVIEW'
           };
-          const existingMedia = Array.isArray(existingProp.media) ? existingProp.media : [];
-          existingProp.media = [...existingMedia, mediaObj];
-          if (mediaType === 'WALKTHROUGH_VIDEO' || mediaType === 'DRONE_VIDEO' || mediaType === 'VIDEO') {
-            existingProp.videoUrl = publicUrl;
-            existingProp.videoLink = publicUrl;
-            existingProp.embeddedVideoUrl = publicUrl;
+
+          if (isLiveProp) {
+            existingProp.pendingReauditData = existingProp.pendingReauditData || {};
+            const basePendingMedia = Array.isArray(existingProp.pendingReauditData.media)
+              ? existingProp.pendingReauditData.media
+              : (Array.isArray(existingProp.media) ? [...existingProp.media] : []);
+            existingProp.pendingReauditData.media = [...basePendingMedia, mediaObj];
+
+            if (mediaType === 'PHOTO' || (req.file.mimetype && req.file.mimetype.startsWith('image/'))) {
+              const basePendingPhotos = Array.isArray(existingProp.pendingReauditData.photos)
+                ? existingProp.pendingReauditData.photos
+                : (Array.isArray(existingProp.photos) ? [...existingProp.photos] : []);
+              existingProp.pendingReauditData.photos = [...basePendingPhotos, publicUrl];
+            }
+
+            if (mediaType === 'WALKTHROUGH_VIDEO' || mediaType === 'DRONE_VIDEO' || mediaType === 'VIDEO') {
+              existingProp.pendingReauditData.videoUrl = publicUrl;
+              existingProp.pendingReauditData.videoLink = publicUrl;
+              existingProp.pendingReauditData.embeddedVideoUrl = publicUrl;
+            }
+
+            existingProp.hasPendingEdits = true;
+            existingProp.reAuditStatus = existingProp.reAuditStatus || 'PENDING_VERIFICATION';
+            existingProp.isOwnerDraftEdit = true;
+          } else {
+            const existingMedia = Array.isArray(existingProp.media) ? existingProp.media : [];
+            existingProp.media = [...existingMedia, mediaObj];
+            if (mediaType === 'WALKTHROUGH_VIDEO' || mediaType === 'DRONE_VIDEO' || mediaType === 'VIDEO') {
+              existingProp.videoUrl = publicUrl;
+              existingProp.videoLink = publicUrl;
+              existingProp.embeddedVideoUrl = publicUrl;
+            }
           }
         }
         saveLocalProperty(existingProp);

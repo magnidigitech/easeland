@@ -283,6 +283,103 @@ function extractValidPhotoUrl(item) {
 }
 
 /**
+ * Identifies unapproved media and photo URLs on live properties under re-audit or awaiting verification.
+ * Guarantees proposed photos awaiting admin approval are NEVER displayed to public marketplace visitors.
+ */
+export function getUnapprovedMediaUrls(property) {
+  if (!property) return new Set();
+  const unapproved = new Set();
+
+  const isLive = Boolean(
+    property.isAlreadyLive === true ||
+    property.status === 'LIVE' ||
+    property.listingStatus === 'LIVE' ||
+    property.listing_status === 'LIVE' ||
+    property.isPublished === true
+  );
+
+  const hasPending = Boolean(
+    property.hasPendingEdits === true ||
+    property.reAuditStatus === 'PENDING_VERIFICATION' ||
+    property.reAuditStatus === 'UNDER_REVIEW' ||
+    (property.pendingReauditData && Object.keys(property.pendingReauditData).length > 0)
+  );
+
+  if (isLive || hasPending) {
+    const checkItem = (m) => {
+      if (!m || typeof m !== 'object') return;
+      const st = String(m.verificationStatus || m.status || '').toUpperCase();
+      if (st === 'PENDING_REVIEW' || st === 'PENDING') {
+        const u = m.publicUrl || m.url || m.mediaUrl || m.storagePath;
+        if (u) {
+          const s = String(u).trim().toLowerCase();
+          unapproved.add(s);
+          const base = s.split('/').pop()?.split('?')[0];
+          if (base) unapproved.add(base);
+        }
+        if (m.fileName) {
+          unapproved.add(String(m.fileName).trim().toLowerCase());
+        }
+      }
+    };
+
+    if (Array.isArray(property.media)) property.media.forEach(checkItem);
+
+    const pending = property.pendingReauditData || property.pendingEdits;
+    if (pending) {
+      if (Array.isArray(pending.media)) pending.media.forEach(checkItem);
+
+      // Baseline approved photo urls
+      const liveUrls = new Set();
+      const gatherBaseUrls = (arr) => {
+        if (!Array.isArray(arr)) return;
+        arr.forEach(p => {
+          if (!p) return;
+          const u = typeof p === 'string' ? p : (p.publicUrl || p.url || p.storagePath);
+          if (u) {
+            const s = String(u).trim().toLowerCase();
+            liveUrls.add(s);
+            const base = s.split('/').pop()?.split('?')[0];
+            if (base) liveUrls.add(base);
+          }
+        });
+      };
+
+      gatherBaseUrls(property.photos);
+      gatherBaseUrls(property.publicApprovedMedia);
+
+      // Check pending photos against live baseline
+      const checkPendingPhoto = (p) => {
+        if (!p) return;
+        const u = typeof p === 'string' ? p : (p.publicUrl || p.url || p.storagePath);
+        if (u) {
+          const s = String(u).trim().toLowerCase();
+          const base = s.split('/').pop()?.split('?')[0];
+          // If not part of base approved photos, it is unapproved
+          if (!liveUrls.has(s) && (!base || !liveUrls.has(base))) {
+            unapproved.add(s);
+            if (base) unapproved.add(base);
+          }
+        }
+      };
+
+      if (Array.isArray(pending.photos)) pending.photos.forEach(checkPendingPhoto);
+    }
+  }
+
+  return unapproved;
+}
+
+function isApprovedMediaUrl(url, unapprovedSet) {
+  if (!url || typeof url !== 'string' || !unapprovedSet || unapprovedSet.size === 0) return true;
+  const s = url.trim().toLowerCase();
+  if (unapprovedSet.has(s)) return false;
+  const base = s.split('/').pop()?.split('?')[0];
+  if (base && unapprovedSet.has(base)) return false;
+  return true;
+}
+
+/**
  * Returns neutral SVG placeholder if no uploaded photos exist.
  * Stock images (Unsplash) are strictly never used as property fallbacks.
  */
@@ -300,6 +397,8 @@ export function getCategoryFallbackImage(property) {
 export function getPropertyCoverOrFirstImage(property) {
   if (!property) return NO_PHOTO_PLACEHOLDER;
 
+  const unapprovedUrls = getUnapprovedMediaUrls(property);
+
   const mediaArrays = [
     property.media,
     property.photos,
@@ -313,7 +412,7 @@ export function getPropertyCoverOrFirstImage(property) {
       for (const item of arr) {
         if (isItemCoverPhoto(item)) {
           const u = extractValidPhotoUrl(item);
-          if (u) return u;
+          if (u && isApprovedMediaUrl(u, unapprovedUrls)) return u;
         }
       }
     }
@@ -329,7 +428,7 @@ export function getPropertyCoverOrFirstImage(property) {
   ];
   for (const field of coverCandidates) {
     const u = extractValidPhotoUrl(field);
-    if (u) return u;
+    if (u && isApprovedMediaUrl(u, unapprovedUrls)) return u;
   }
 
   // 2. Priority 2: First Photo from user-uploaded images
@@ -337,7 +436,7 @@ export function getPropertyCoverOrFirstImage(property) {
     if (Array.isArray(arr) && arr.length > 0) {
       for (const item of arr) {
         const u = extractValidPhotoUrl(item);
-        if (u) return u;
+        if (u && isApprovedMediaUrl(u, unapprovedUrls)) return u;
       }
     }
   }
@@ -352,7 +451,7 @@ export function getPropertyCoverOrFirstImage(property) {
   ];
   for (const field of singleImageCandidates) {
     const u = extractValidPhotoUrl(field);
-    if (u) return u;
+    if (u && isApprovedMediaUrl(u, unapprovedUrls)) return u;
   }
 
   // Check uploaded documents for valid images
@@ -361,7 +460,7 @@ export function getPropertyCoverOrFirstImage(property) {
     : (Array.isArray(property.propertyDocuments) ? property.propertyDocuments : []);
   for (const d of docs) {
     const u = extractValidPhotoUrl(d);
-    if (u && /\.(jpg|jpeg|png|webp|svg)/i.test(u)) return u;
+    if (u && /\.(jpg|jpeg|png|webp|svg)/i.test(u) && isApprovedMediaUrl(u, unapprovedUrls)) return u;
   }
 
   // 3. Fallback: No user photo uploaded -> return neutral placeholder, NEVER default stock image
@@ -387,6 +486,7 @@ export function getPropertyPhotosList(property) {
     return [{ url: NO_PHOTO_PLACEHOLDER, publicUrl: NO_PHOTO_PLACEHOLDER, mediaType: 'PHOTO', caption: 'No Photo Uploaded' }];
   }
 
+  const unapprovedUrls = getUnapprovedMediaUrls(property);
   const title = property.title || 'Property Photo';
   const seenUrls = new Set();
   const photosList = [];
@@ -394,7 +494,7 @@ export function getPropertyPhotosList(property) {
   const addPhotoItem = (item, isCover = false) => {
     if (!item) return;
     const url = extractValidPhotoUrl(item);
-    if (!url) return;
+    if (!url || !isApprovedMediaUrl(url, unapprovedUrls)) return;
 
     let caption = title;
     if (typeof item === 'object') {
@@ -496,6 +596,7 @@ export function getPropertyMediaList(property) {
     return [{ url: NO_PHOTO_PLACEHOLDER, publicUrl: NO_PHOTO_PLACEHOLDER, mediaType: 'PHOTO', caption: 'No Media Uploaded' }];
   }
 
+  const unapprovedUrls = getUnapprovedMediaUrls(property);
   const title = property.title || 'Property Media';
   const seenUrls = new Set();
   const mediaList = [];
@@ -518,7 +619,7 @@ export function getPropertyMediaList(property) {
 
     if (!url || typeof url !== 'string') return;
     url = url.trim();
-    if (!url || isDefaultStockImageUrl(url)) return;
+    if (!url || isDefaultStockImageUrl(url) || !isApprovedMediaUrl(url, unapprovedUrls)) return;
 
     const lowerUrl = url.toLowerCase();
     if (
