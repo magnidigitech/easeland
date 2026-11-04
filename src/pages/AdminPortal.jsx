@@ -5811,7 +5811,15 @@ export default function AdminPortal({ onNavigate }) {
                                   const diff = computeReauditDiff(prop);
                                   const changes = [];
                                   if (diff.diffs.price) changes.push('Price');
-                                  if (diff.diffs.photos) changes.push((diff.diffs.photos.newCount || 1) + ' New Photo' + ((diff.diffs.photos.newCount || 1) > 1 ? 's' : ''));
+                                  if (diff.diffs.photos) {
+                                    if (diff.diffs.photos.newCount > 0) {
+                                      changes.push(diff.diffs.photos.newCount + ' New Photo' + (diff.diffs.photos.newCount > 1 ? 's' : ''));
+                                    } else if (diff.diffs.photos.removedCount > 0) {
+                                      changes.push(diff.diffs.photos.removedCount + ' Photo' + (diff.diffs.photos.removedCount > 1 ? 's' : '') + ' Removed');
+                                    } else {
+                                      changes.push('Photos Modified');
+                                    }
+                                  }
                                   if (diff.diffs.title) changes.push('Title');
                                   if (diff.diffs.location || diff.diffs.boundary) changes.push('Location/Map');
                                   if (diff.diffs.documents) changes.push('Docs');
@@ -6259,7 +6267,11 @@ export default function AdminPortal({ onNavigate }) {
                                   <div className="p-3 bg-white border border-purple-200 rounded-xl space-y-1">
                                     <span className="text-[10px] uppercase font-bold text-purple-800 block">Submitted Photos:</span>
                                     <div className="text-purple-950 font-extrabold text-xs">
-                                      {diffs.photos.newCount + ' New Photo' + (diffs.photos.newCount > 1 ? 's' : '') + ' Uploaded by Owner'}
+                                      {diffs.photos.newCount > 0
+                                        ? (diffs.photos.newCount + ' New Photo' + (diffs.photos.newCount > 1 ? 's' : '') + ' Uploaded by Owner')
+                                        : (diffs.photos.removedCount > 0
+                                            ? (diffs.photos.removedCount + ' Photo' + (diffs.photos.removedCount > 1 ? 's' : '') + ' Removed by Owner')
+                                            : 'Photos Modified by Owner')}
                                     </div>
                                   </div>
                                 )}
@@ -6526,15 +6538,22 @@ export default function AdminPortal({ onNavigate }) {
                             }
                           } catch (e) { }
 
+                          const pendingAuditData = activeAuditProp.pendingReauditData || activeAuditProp.pendingEdits || {};
                           const rawItems = [
                             ...(Array.isArray(activeAuditProp.documents) ? activeAuditProp.documents : []),
                             ...(Array.isArray(activeAuditProp.propertyDocuments) ? activeAuditProp.propertyDocuments : []),
                             ...(Array.isArray(activeAuditProp.confidentialDocuments) ? activeAuditProp.confidentialDocuments : []),
+                            ...(Array.isArray(pendingAuditData.documents) ? pendingAuditData.documents : []),
+                            ...(Array.isArray(pendingAuditData.propertyDocuments) ? pendingAuditData.propertyDocuments : []),
+                            ...(Array.isArray(pendingAuditData.confidentialDocuments) ? pendingAuditData.confidentialDocuments : []),
                             ...extraDocs,
                             ...extraMedia,
                             ...(Array.isArray(activeAuditProp.media) ? activeAuditProp.media : []),
                             ...(Array.isArray(activeAuditProp.photos) ? activeAuditProp.photos : []),
                             ...(Array.isArray(activeAuditProp.images) ? activeAuditProp.images : []),
+                            ...(Array.isArray(pendingAuditData.media) ? pendingAuditData.media : []),
+                            ...(Array.isArray(pendingAuditData.photos) ? pendingAuditData.photos : []),
+                            ...(Array.isArray(pendingAuditData.images) ? pendingAuditData.images : []),
                             ...(Array.isArray(activeAuditProp.publicApprovedMedia) ? activeAuditProp.publicApprovedMedia : [])
                           ];
 
@@ -6542,6 +6561,10 @@ export default function AdminPortal({ onNavigate }) {
                           if (activeAuditProp.videoLink) rawItems.push(activeAuditProp.videoLink);
                           if (activeAuditProp.embeddedVideoUrl) rawItems.push(activeAuditProp.embeddedVideoUrl);
                           if (activeAuditProp.droneVideoUrl) rawItems.push(activeAuditProp.droneVideoUrl);
+                          if (pendingAuditData.videoUrl) rawItems.push(pendingAuditData.videoUrl);
+                          if (pendingAuditData.videoLink) rawItems.push(pendingAuditData.videoLink);
+                          if (pendingAuditData.embeddedVideoUrl) rawItems.push(pendingAuditData.embeddedVideoUrl);
+                          if (pendingAuditData.droneVideoUrl) rawItems.push(pendingAuditData.droneVideoUrl);
 
                           const photos = [];
                           const videos = [];
@@ -6731,35 +6754,45 @@ export default function AdminPortal({ onNavigate }) {
                                   </div>
                                 ) : (
                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                    {photos.map((imgUrl, idx) => (
-                                      <div
-                                        key={idx}
-                                        className={'group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition-all ' +
-                                          (diffs.photos?.newPhotos?.includes(imgUrl) ? 'border-2 border-purple-400 ring-2 ring-purple-200' : 'border-slate-300')}
-                                      >
-                                        <img
-                                          src={imgUrl}
-                                          alt={'User property photo ' + (idx + 1)}
-                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
-                                          onClick={() => setEnlargedMediaUrl(imgUrl)}
-                                          onError={(e) => {
-                                            if (e.currentTarget && e.currentTarget.parentElement) {
-                                              e.currentTarget.parentElement.style.display = 'none';
-                                            }
-                                          }}
-                                        />
+                                    {photos.map((imgUrl, idx) => {
+                                      const isProposedEdit = Boolean(
+                                        diffs.photos?.newPhotos?.some(u => {
+                                          if (!u || !imgUrl) return false;
+                                          const cleanA = String(u).trim().toLowerCase();
+                                          const cleanB = String(imgUrl).trim().toLowerCase();
+                                          return cleanA === cleanB || cleanA.endsWith(cleanB) || cleanB.endsWith(cleanA);
+                                        })
+                                      );
 
-                                        {/* Status / Policy Badge */}
-                                        {diffs.photos?.newPhotos?.includes(imgUrl) ? (
-                                          <span className="absolute top-1.5 left-1.5 z-10 bg-purple-700 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none flex items-center gap-0.5">
-                                            <Sparkles className="w-2.5 h-2.5" />
-                                            <span>Proposed Edit</span>
-                                          </span>
-                                        ) : (
-                                          <span className="absolute top-1.5 left-1.5 z-10 bg-emerald-700/90 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none">
-                                            Eligible
-                                          </span>
-                                        )}
+                                      return (
+                                        <div
+                                          key={idx}
+                                          className={'group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition-all ' +
+                                            (isProposedEdit ? 'border-2 border-purple-500 ring-2 ring-purple-300 shadow-purple-100' : 'border-slate-300')}
+                                        >
+                                          <img
+                                            src={imgUrl}
+                                            alt={'User property photo ' + (idx + 1)}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
+                                            onClick={() => setEnlargedMediaUrl(imgUrl)}
+                                            onError={(e) => {
+                                              if (e.currentTarget && e.currentTarget.parentElement) {
+                                                e.currentTarget.parentElement.style.display = 'none';
+                                              }
+                                            }}
+                                          />
+
+                                          {/* Status / Policy Badge */}
+                                          {isProposedEdit ? (
+                                            <span className="absolute top-1.5 left-1.5 z-10 bg-purple-700 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none flex items-center gap-0.5">
+                                              <Sparkles className="w-2.5 h-2.5" />
+                                              <span>Proposed Edit</span>
+                                            </span>
+                                          ) : (
+                                            <span className="absolute top-1.5 left-1.5 z-10 bg-emerald-700/90 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow pointer-events-none">
+                                              Eligible
+                                            </span>
+                                          )}
 
                                         {/* Admin Remove Button */}
                                         <button
@@ -6784,7 +6817,8 @@ export default function AdminPortal({ onNavigate }) {
                                           <span>Click to Enlarge</span>
                                         </div>
                                       </div>
-                                    ))}
+                                    );
+                                  })}
                                   </div>
                                 )}
                               </div>

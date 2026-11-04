@@ -193,4 +193,111 @@ describe('Verification Workspace Re-Audit Diff & Boundary Detection Suite', () =
     assert.strictEqual(diffResult.diffs.documents.changed, true);
     assert.strictEqual(diffResult.diffs.documents.newCount, 1);
   });
+
+  it('7. Strictly excludes video media items (walkthrough, mp4, youtube) from photo count and accurately counts 1 new photo', () => {
+    const liveProp = {
+      id: 'prop-1793271065918',
+      photos: [
+        {
+          url: 'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg',
+          uploadedAt: '2026-10-29T10:52:52.579Z',
+          verificationStatus: 'PENDING_REVIEW'
+        },
+        {
+          url: 'https://easeland.in/uploads/properties/prop/med-2_HRO_BKG.jpg',
+          uploadedAt: '2026-11-04T11:22:23.339Z',
+          verificationStatus: 'PENDING_REVIEW'
+        }
+      ],
+      media: [
+        {
+          type: 'PHOTO',
+          url: 'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg',
+          uploadedAt: '2026-10-29T10:52:52.579Z',
+          verificationStatus: 'PENDING_REVIEW'
+        },
+        {
+          type: 'WALKTHROUGH_VIDEO',
+          url: 'https://easeland.in/uploads/properties/prop/walkthrough.mp4',
+          uploadedAt: '2026-10-29T10:53:03.756Z',
+          verificationStatus: 'PENDING_REVIEW'
+        },
+        {
+          type: 'WALKTHROUGH_VIDEO',
+          url: 'https://youtu.be/9zOIUpJLVps',
+          uploadedAt: '2026-10-29T10:53:43.851Z',
+          verificationStatus: 'PENDING_REVIEW'
+        },
+        {
+          type: 'PHOTO',
+          url: 'https://easeland.in/uploads/properties/prop/med-2_HRO_BKG.jpg',
+          uploadedAt: '2026-11-04T11:22:23.339Z',
+          verificationStatus: 'PENDING_REVIEW'
+        }
+      ],
+      reAuditRequestedAt: '2026-11-04T11:22:23.339Z',
+      hasPendingEdits: true,
+      pendingReauditData: {
+        photos: [
+          {
+            url: 'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg',
+            uploadedAt: '2026-10-29T10:52:52.579Z'
+          },
+          {
+            url: 'https://easeland.in/uploads/properties/prop/med-2_HRO_BKG.jpg',
+            uploadedAt: '2026-11-04T11:22:23.339Z'
+          }
+        ]
+      }
+    };
+
+    const diffResult = computeReauditDiff(liveProp);
+    assert.strictEqual(diffResult.diffs.photos.changed, true);
+    assert.strictEqual(diffResult.diffs.photos.liveCount, 2);
+    // Crucial: Must be exactly 1 new photo, NOT 4!
+    assert.strictEqual(diffResult.diffs.photos.newCount, 1);
+    assert.strictEqual(diffResult.diffs.photos.newPhotos.length, 1);
+    assert.strictEqual(diffResult.diffs.photos.newPhotos[0], 'https://easeland.in/uploads/properties/prop/med-2_HRO_BKG.jpg');
+  });
+
+  it('8. Accurately reports 1 new photo when pendingReauditData has new photo not in baseline', () => {
+    const liveProp = {
+      id: 'prop-1793362311411',
+      photos: [
+        {
+          url: 'https://easeland.in/uploads/properties/prop/med-photo1.jpg',
+          uploadedAt: '2026-11-02T12:43:53.972Z',
+          verificationStatus: 'PENDING_REVIEW'
+        }
+      ],
+      media: [
+        {
+          type: 'PHOTO',
+          url: 'https://easeland.in/uploads/properties/prop/med-photo1.jpg',
+          uploadedAt: '2026-11-02T12:43:53.972Z'
+        }
+      ],
+      reAuditRequestedAt: '2026-11-04T10:34:16.062Z',
+      hasPendingEdits: true,
+      pendingReauditData: {
+        photos: [
+          {
+            url: 'https://easeland.in/uploads/properties/prop/med-photo1.jpg',
+            uploadedAt: '2026-11-02T12:43:53.972Z'
+          },
+          {
+            url: 'https://easeland.in/uploads/properties/prop/med-photo2_new.jpg',
+            uploadedAt: '2026-11-04T10:34:16.062Z'
+          }
+        ]
+      }
+    };
+
+    const diffResult = computeReauditDiff(liveProp);
+    assert.strictEqual(diffResult.diffs.photos.changed, true);
+    // Crucial: Must be exactly 1 new photo, NOT 2!
+    assert.strictEqual(diffResult.diffs.photos.newCount, 1);
+    assert.strictEqual(diffResult.diffs.photos.newPhotos.length, 1);
+    assert.strictEqual(diffResult.diffs.photos.newPhotos[0], 'https://easeland.in/uploads/properties/prop/med-photo2_new.jpg');
+  });
 });

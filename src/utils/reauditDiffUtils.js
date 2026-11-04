@@ -283,48 +283,84 @@ export function computeReauditDiff(property) {
   }
 
   // 13. Photos / Media
-  const extractPhotoUrls = (item) => {
+  const extractPhotoItems = (item) => {
+    if (!item) return [];
     const raw = [
-      ...(Array.isArray(item?.photos) ? item.photos : []),
-      ...(Array.isArray(item?.media) ? item.media : []),
-      ...(Array.isArray(item?.images) ? item.images : [])
+      ...(Array.isArray(item.photos) ? item.photos : []),
+      ...(Array.isArray(item.media) ? item.media : []),
+      ...(Array.isArray(item.images) ? item.images : [])
     ];
-    const urls = [];
+    const items = [];
+    const seen = new Set();
     raw.forEach(m => {
-      let u = '';
-      if (typeof m === 'string') u = m.trim();
-      else if (typeof m === 'object' && m) u = (m.url || m.publicUrl || m.path || '').trim();
-      if (u && !urls.includes(u)) urls.push(u);
+      if (!m) return;
+      if (typeof m === 'object') {
+        const typeUpper = String(m.type || m.mediaType || m.documentType || '').toUpperCase();
+        if (typeUpper.includes('VIDEO')) return;
+        if (typeUpper.includes('DOCUMENT') || typeUpper.includes('DEED') || m.isDocument === true || m.docId) return;
+        const u = cleanStr(m.publicUrl || m.url || m.mediaUrl || m.storagePath);
+        if (!u) return;
+        const low = u.toLowerCase();
+        if (low.includes('youtube.com') || low.includes('youtu.be') || low.includes('drive.google.com') ||
+            low.endsWith('.mp4') || low.endsWith('.webm') || low.endsWith('.mov') || low.endsWith('.avi') ||
+            low.endsWith('.pdf') || low.endsWith('.doc') || low.endsWith('.docx')) {
+          return;
+        }
+        if (!seen.has(low)) {
+          seen.add(low);
+          items.push({
+            url: u,
+            uploadedAt: m.uploadedAt ? new Date(m.uploadedAt).getTime() : 0,
+            verificationStatus: m.verificationStatus
+          });
+        }
+      } else if (typeof m === 'string') {
+        const u = m.trim();
+        const low = u.toLowerCase();
+        if (low.includes('youtube.com') || low.includes('youtu.be') || low.includes('drive.google.com') ||
+            low.endsWith('.mp4') || low.endsWith('.webm') || low.endsWith('.mov') || low.endsWith('.avi') ||
+            low.endsWith('.pdf') || low.endsWith('.doc') || low.endsWith('.docx')) {
+          return;
+        }
+        if (u && !seen.has(low)) {
+          seen.add(low);
+          items.push({ url: u, uploadedAt: 0, verificationStatus: null });
+        }
+      }
     });
-    return urls;
+    return items;
   };
 
-  const livePhotos = extractPhotoUrls(property);
-  const pendingPhotos = pending ? extractPhotoUrls(pending) : [];
-  const newPhotos = pendingPhotos.filter(u => !livePhotos.includes(u));
+  const livePhotoItems = extractPhotoItems(property);
+  const pendingPhotoItems = pending ? extractPhotoItems(pending) : [];
 
-  // Double guard: Also flag any photos with verificationStatus === 'PENDING_REVIEW' as proposed items
-  const unverifiedPhotos = [
-    ...(Array.isArray(property?.photos) ? property.photos : []),
-    ...(Array.isArray(property?.media) ? property.media : []),
-    ...(Array.isArray(pending?.photos) ? pending.photos : []),
-    ...(Array.isArray(pending?.media) ? pending.media : [])
-  ].filter(m => m && typeof m === 'object' && String(m.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW')
-   .map(m => (m.publicUrl || m.url || m.mediaUrl || '').trim())
-   .filter(Boolean);
+  const livePhotoUrls = new Set(livePhotoItems.map(p => p.url.toLowerCase()));
+  let newPhotoUrls = pendingPhotoItems.map(p => p.url).filter(u => !livePhotoUrls.has(u.toLowerCase()));
 
-  unverifiedPhotos.forEach(u => {
-    if (!newPhotos.includes(u)) newPhotos.push(u);
-  });
+  // Fallback: If pendingPhotos and livePhotos both contain the new photos (e.g. state already synced into property),
+  // identify photos uploaded during the re-audit edit session
+  if (newPhotoUrls.length === 0 && property.reAuditRequestedAt) {
+    const reAuditTime = new Date(property.reAuditRequestedAt).getTime();
+    const editSessionStart = reAuditTime - (60 * 60 * 1000);
+    const sessionPhotos = livePhotoItems.filter(p => p.uploadedAt >= editSessionStart);
+    if (sessionPhotos.length > 0 && sessionPhotos.length < livePhotoItems.length) {
+      newPhotoUrls = sessionPhotos.map(p => p.url);
+    }
+  }
 
-  if (newPhotos.length > 0) {
+  const pendingPhotoUrls = new Set(pendingPhotoItems.map(p => p.url.toLowerCase()));
+  const removedPhotoUrls = pendingPhotoItems.length > 0 ? livePhotoItems.map(p => p.url).filter(u => !pendingPhotoUrls.has(u.toLowerCase())) : [];
+
+  if (newPhotoUrls.length > 0 || removedPhotoUrls.length > 0) {
     changedKeys.add('photos');
     diffs.photos = {
       changed: true,
-      liveCount: livePhotos.length,
-      proposedCount: pendingPhotos.length || (livePhotos.length + newPhotos.length),
-      newCount: newPhotos.length,
-      newPhotos
+      liveCount: livePhotoItems.length,
+      proposedCount: Math.max(pendingPhotoItems.length, livePhotoItems.length),
+      newCount: newPhotoUrls.length,
+      newPhotos: newPhotoUrls,
+      removedCount: removedPhotoUrls.length,
+      removedPhotos: removedPhotoUrls
     };
   }
 
@@ -341,47 +377,59 @@ export function computeReauditDiff(property) {
   }
 
   // 15. Documents
-  const extractDocKeys = (item) => {
+  const extractDocItems = (item) => {
+    if (!item) return [];
     const raw = [
-      ...(Array.isArray(item?.documents) ? item.documents : []),
-      ...(Array.isArray(item?.propertyDocuments) ? item.propertyDocuments : [])
+      ...(Array.isArray(item.documents) ? item.documents : []),
+      ...(Array.isArray(item.propertyDocuments) ? item.propertyDocuments : []),
+      ...(Array.isArray(item.confidentialDocuments) ? item.confidentialDocuments : [])
     ];
-    const keys = [];
+    const items = [];
+    const seen = new Set();
     raw.forEach(d => {
+      if (!d) return;
       let k = '';
-      if (typeof d === 'string') k = d.trim();
-      else if (typeof d === 'object' && d) k = (d.url || d.name || d.docId || '').trim();
-      if (k && !keys.includes(k)) keys.push(k);
+      let url = '';
+      let name = '';
+      if (typeof d === 'string') {
+        k = d.trim().toLowerCase();
+        url = d.trim();
+        name = d.trim();
+      } else if (typeof d === 'object') {
+        url = cleanStr(d.url || d.publicUrl || d.path);
+        name = cleanStr(d.name || d.fileName || d.documentName || d.title);
+        k = (url || name || d.docId || '').toLowerCase();
+      }
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        items.push({ key: k, url, name, uploadedAt: d.uploadedAt ? new Date(d.uploadedAt).getTime() : 0 });
+      }
     });
-    return keys;
+    return items;
   };
 
-  const liveDocs = extractDocKeys(property);
-  const pendingDocs = pending ? extractDocKeys(pending) : [];
-  const newDocs = pendingDocs.filter(k => !liveDocs.includes(k));
+  const liveDocItems = extractDocItems(property);
+  const pendingDocItems = pending ? extractDocItems(pending) : [];
+  const liveDocKeys = new Set(liveDocItems.map(d => d.key));
+  let newDocs = pendingDocItems.filter(d => !liveDocKeys.has(d.key));
 
-  // Double guard: Also flag any documents with verificationStatus === 'PENDING_REVIEW' as proposed items
-  const unverifiedDocs = [
-    ...(Array.isArray(property?.documents) ? property.documents : []),
-    ...(Array.isArray(property?.propertyDocuments) ? property.propertyDocuments : []),
-    ...(Array.isArray(pending?.documents) ? pending.documents : []),
-    ...(Array.isArray(pending?.propertyDocuments) ? pending.propertyDocuments : [])
-  ].filter(d => d && typeof d === 'object' && String(d.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW')
-   .map(d => (d.url || d.name || d.docId || '').trim())
-   .filter(Boolean);
-
-  unverifiedDocs.forEach(k => {
-    if (!newDocs.includes(k)) newDocs.push(k);
-  });
+  if (newDocs.length === 0 && property.reAuditRequestedAt) {
+    const reAuditTime = new Date(property.reAuditRequestedAt).getTime();
+    const editSessionStart = reAuditTime - (60 * 60 * 1000);
+    const sessionDocs = liveDocItems.filter(d => d.uploadedAt >= editSessionStart);
+    if (sessionDocs.length > 0 && sessionDocs.length < liveDocItems.length) {
+      newDocs = sessionDocs;
+    }
+  }
 
   if (newDocs.length > 0) {
     changedKeys.add('documents');
     diffs.documents = {
       changed: true,
-      liveCount: liveDocs.length,
-      proposedCount: pendingDocs.length || (liveDocs.length + newDocs.length),
+      liveCount: liveDocItems.length,
+      proposedCount: Math.max(pendingDocItems.length, liveDocItems.length),
       newCount: newDocs.length,
-      newDocs
+      newDocs: newDocs.map(d => d.name || d.url || d.key)
     };
   }
 
