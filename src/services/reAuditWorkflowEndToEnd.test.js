@@ -81,16 +81,16 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     assert.strictEqual(updated.pendingReauditData.price, 9500000);
   });
 
-  it('2. UserDashboard property mapping includes hasPendingEdits and reAuditStatus to render Under Audit badge', () => {
+  it('2. UserDashboard property mapping includes hasPendingEdits and reAuditStatus to render Live (Re-Audit Pending) badge', () => {
     const rawPropFromServer = {
       propertyId: 'el-prop-2001',
       id: 'el-prop-2001',
       title: 'Original Live Farmland in Amaravati',
       price: 8000000,
-      status: 'PENDING_VERIFICATION',
-      listingStatus: 'PENDING_VERIFICATION',
-      isPublished: false,
-      isPlatformVerified: false,
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
       hasPendingEdits: true,
       reAuditStatus: 'PENDING_VERIFICATION',
       pendingReauditData: {
@@ -116,13 +116,15 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
 
     // Replicate badge selection
     let badgeText = '';
-    if (mapped.status === 'PENDING_VERIFICATION' || (mapped.hasPendingEdits && (mapped.reAuditStatus === 'PENDING_VERIFICATION' || mapped.reAuditStatus === 'UNDER_REVIEW'))) {
+    if ((mapped.status === 'LIVE' || mapped.status === 'APPROVED') && mapped.hasPendingEdits && (mapped.reAuditStatus === 'PENDING_VERIFICATION' || mapped.reAuditStatus === 'UNDER_REVIEW')) {
+      badgeText = 'Live (Re-Audit Pending)';
+    } else if (mapped.status === 'PENDING_VERIFICATION' || (mapped.hasPendingEdits && (mapped.reAuditStatus === 'PENDING_VERIFICATION' || mapped.reAuditStatus === 'UNDER_REVIEW'))) {
       badgeText = 'Under Audit';
     } else if (mapped.status === 'LIVE' && mapped.isPlatformVerified && mapped.isPublished) {
       badgeText = 'Live & Verified';
     }
 
-    assert.strictEqual(badgeText, 'Under Audit', 'Badge must show Under Audit and NOT Live & Verified when edits are pending');
+    assert.strictEqual(badgeText, 'Live (Re-Audit Pending)', 'Badge must show Live (Re-Audit Pending) for live properties under re-audit');
   });
 
   it('3. Admin Portal verification queue includes property with pending re-audit and approval applies edits live', () => {
@@ -202,36 +204,36 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     assert.strictEqual(errorMsg, 'PostgreSQL rejected property sync', 'UI must expose real error to user instead of silent failure');
   });
 
-  it('5. Public visibility gate strictly blocks properties under audit from live marketplace view', async () => {
+  it('5. Public visibility gate blocks fresh unapproved properties but keeps approved live properties visible during re-audit', async () => {
     const { isPropertyPubliclyVisible } = await import('../utils/filterMatchingUtils.js');
 
-    const underAuditProperty = {
-      id: 'prop_test_under_audit',
-      title: 'Amaravati Plot Under Verification Audit',
+    const freshUnderAuditProperty = {
+      id: 'prop_test_fresh_audit',
+      title: 'Amaravati Plot Under Initial Verification Audit',
       status: 'PENDING_VERIFICATION',
       listingStatus: 'PENDING_VERIFICATION',
-      isPublished: true, // Erroneously set or stale flag
-      isPlatformVerified: true, // Erroneously set or stale flag
-      hasPendingEdits: true,
-      reAuditStatus: 'PENDING_VERIFICATION'
-    };
-
-    const isVisible = isPropertyPubliclyVisible(underAuditProperty);
-    assert.strictEqual(isVisible, false, 'Property under verification audit MUST NEVER be publicly visible on the live site');
-
-    const liveApprovedProperty = {
-      id: 'prop_test_approved_live',
-      title: 'Amaravati Plot Approved and Live',
-      status: 'LIVE',
-      listingStatus: 'LIVE',
-      isPublished: true,
-      isPlatformVerified: true,
+      isPublished: false,
+      isPlatformVerified: false,
       hasPendingEdits: false,
       reAuditStatus: null
     };
 
-    const isLiveVisible = isPropertyPubliclyVisible(liveApprovedProperty);
-    assert.strictEqual(isLiveVisible, true, 'Platform verified and approved LIVE property must be publicly visible');
+    const isFreshVisible = isPropertyPubliclyVisible(freshUnderAuditProperty);
+    assert.strictEqual(isFreshVisible, false, 'Fresh property under verification audit MUST NEVER be publicly visible on live site');
+
+    const liveWithReauditProperty = {
+      id: 'prop_test_live_reaudit',
+      title: 'Amaravati Plot Live with Proposed Edits in Staging',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION'
+    };
+
+    const isReauditVisible = isPropertyPubliclyVisible(liveWithReauditProperty);
+    assert.strictEqual(isReauditVisible, true, 'Approved live property with pending re-audit must remain publicly visible with baseline details');
   });
 });
 

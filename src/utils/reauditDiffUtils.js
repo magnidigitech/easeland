@@ -50,10 +50,10 @@ export function computeReauditDiff(property) {
     };
   }
 
-  const pending = property.pendingReauditData || property.pendingEdits || null;
-  const isReaudit = Boolean((property.hasPendingEdits || pending) && pending);
+  const pending = property.pendingReauditData || property.pendingEdits || {};
+  const isReaudit = Boolean(property.hasPendingEdits || property.reAuditStatus === 'PENDING_VERIFICATION' || property.reAuditStatus === 'UNDER_REVIEW' || (pending && Object.keys(pending).length > 0));
 
-  if (!isReaudit || !pending) {
+  if (!isReaudit) {
     return {
       isReaudit: false,
       hasChanges: false,
@@ -300,15 +300,29 @@ export function computeReauditDiff(property) {
   };
 
   const livePhotos = extractPhotoUrls(property);
-  const pendingPhotos = extractPhotoUrls(pending);
+  const pendingPhotos = pending ? extractPhotoUrls(pending) : [];
   const newPhotos = pendingPhotos.filter(u => !livePhotos.includes(u));
+
+  // Double guard: Also flag any photos with verificationStatus === 'PENDING_REVIEW' as proposed items
+  const unverifiedPhotos = [
+    ...(Array.isArray(property?.photos) ? property.photos : []),
+    ...(Array.isArray(property?.media) ? property.media : []),
+    ...(Array.isArray(pending?.photos) ? pending.photos : []),
+    ...(Array.isArray(pending?.media) ? pending.media : [])
+  ].filter(m => m && typeof m === 'object' && String(m.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW')
+   .map(m => (m.publicUrl || m.url || m.mediaUrl || '').trim())
+   .filter(Boolean);
+
+  unverifiedPhotos.forEach(u => {
+    if (!newPhotos.includes(u)) newPhotos.push(u);
+  });
 
   if (newPhotos.length > 0) {
     changedKeys.add('photos');
     diffs.photos = {
       changed: true,
       liveCount: livePhotos.length,
-      proposedCount: pendingPhotos.length,
+      proposedCount: pendingPhotos.length || (livePhotos.length + newPhotos.length),
       newCount: newPhotos.length,
       newPhotos
     };
@@ -343,15 +357,29 @@ export function computeReauditDiff(property) {
   };
 
   const liveDocs = extractDocKeys(property);
-  const pendingDocs = extractDocKeys(pending);
+  const pendingDocs = pending ? extractDocKeys(pending) : [];
   const newDocs = pendingDocs.filter(k => !liveDocs.includes(k));
+
+  // Double guard: Also flag any documents with verificationStatus === 'PENDING_REVIEW' as proposed items
+  const unverifiedDocs = [
+    ...(Array.isArray(property?.documents) ? property.documents : []),
+    ...(Array.isArray(property?.propertyDocuments) ? property.propertyDocuments : []),
+    ...(Array.isArray(pending?.documents) ? pending.documents : []),
+    ...(Array.isArray(pending?.propertyDocuments) ? pending.propertyDocuments : [])
+  ].filter(d => d && typeof d === 'object' && String(d.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW')
+   .map(d => (d.url || d.name || d.docId || '').trim())
+   .filter(Boolean);
+
+  unverifiedDocs.forEach(k => {
+    if (!newDocs.includes(k)) newDocs.push(k);
+  });
 
   if (newDocs.length > 0) {
     changedKeys.add('documents');
     diffs.documents = {
       changed: true,
       liveCount: liveDocs.length,
-      proposedCount: pendingDocs.length,
+      proposedCount: pendingDocs.length || (liveDocs.length + newDocs.length),
       newCount: newDocs.length,
       newDocs
     };

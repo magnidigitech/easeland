@@ -371,7 +371,21 @@ function saveLocalProperty(p, existingOverride = null) {
   const existingListingStatusUpper = String(existing.listing_status || existing.listingStatus || '').toUpperCase();
   const incomingStatusUpper = String(p.status || p.listing_status || p.listingStatus || '').toUpperCase();
 
-  const isExplicitOwnerSubmission = Boolean(
+  const isExplicitDeleteByAdmin = Boolean(
+    p.deletedByAdmin === true ||
+    incomingStatusUpper === 'DELETED_BY_ADMIN' ||
+    existing.deletedByAdmin === true
+  );
+
+  const isAdminAction = Boolean(
+    p.isAdminAction === true ||
+    p.isAdminApproval === true ||
+    p.adminVerified === true ||
+    (p.isAdmin === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED' || incomingStatusUpper === 'CHANGES_REQUIRED' || incomingStatusUpper === 'REJECTED' || isExplicitDeleteByAdmin)) ||
+    (p.verifiedBy && incomingStatusUpper !== 'PENDING_VERIFICATION')
+  );
+
+  const isExplicitOwnerSubmission = !isAdminAction && Boolean(
     p.isOwnerSubmission === true ||
     p.isOwnerDraftEdit === true ||
     incomingStatusUpper === 'PENDING_VERIFICATION' ||
@@ -379,20 +393,6 @@ function saveLocalProperty(p, existingOverride = null) {
     incomingStatusUpper === 'UNDER_AUDIT' ||
     p.reAuditStatus === 'PENDING_VERIFICATION' ||
     p.reAuditStatus === 'UNDER_REVIEW'
-  );
-
-  const isAdminAction = !isExplicitOwnerSubmission && Boolean(
-    p.isAdminAction === true ||
-    (p.isAdmin === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED' || incomingStatusUpper === 'CHANGES_REQUIRED' || incomingStatusUpper === 'REJECTED' || isExplicitDeleteByAdmin)) ||
-    (p.isAdminApproval === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED')) ||
-    (p.adminVerified === true && (incomingStatusUpper === 'LIVE' || incomingStatusUpper === 'APPROVED')) ||
-    p.verifiedBy
-  );
-
-  const isExplicitDeleteByAdmin = Boolean(
-    p.deletedByAdmin === true ||
-    incomingStatusUpper === 'DELETED_BY_ADMIN' ||
-    existing.deletedByAdmin === true
   );
 
   const finalMedia = Array.isArray(p.media)
@@ -455,7 +455,7 @@ function saveLocalProperty(p, existingOverride = null) {
     };
   }
   // 2. Owner Draft Staging for verified LIVE properties when submitting/saving pending edits
-  else if ((p.isOwnerDraftEdit === true || p.hasPendingEdits === true || Boolean(p.pendingReauditData)) && !isAdminAction && (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE')) {
+  else if ((p.isOwnerDraftEdit === true || p.hasPendingEdits === true || Boolean(p.pendingReauditData) || isExplicitOwnerSubmission) && !isAdminAction && (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE' || (existing.isPublished && existing.isPlatformVerified))) {
     const incomingProposed = p.pendingReauditData || p.pendingEdits || p;
     const existingPending = existing.pendingReauditData || existing.pendingEdits || {};
     const cleanProposed = {};
@@ -463,7 +463,8 @@ function saveLocalProperty(p, existingOverride = null) {
       'id', 'propertyId', 'property_id', 'referenceId', 'reference_id',
       'ownerId', 'owner_id', 'listingStatus', 'listing_status', 'status',
       'isPublished', 'is_published', 'isPlatformVerified', 'verificationStatus',
-      'createdAt', 'created_at', 'views', 'enquiriesCount', 'isAlreadyLive'
+      'createdAt', 'created_at', 'views', 'enquiriesCount', 'isAlreadyLive',
+      'isAdmin', 'isAdminApproval', 'adminVerified', 'verifiedBy'
     ];
     for (const [k, v] of Object.entries(incomingProposed)) {
       if (!protectedKeys.includes(k) && v !== undefined && v !== null && v !== '') {
@@ -477,29 +478,25 @@ function saveLocalProperty(p, existingOverride = null) {
       updatedAt: new Date().toISOString()
     };
 
-    const targetReAuditStatus = p.reAuditStatus || (incomingProposed && incomingProposed.reAuditStatus) || existing.reAuditStatus || 'PENDING_VERIFICATION';
+    const targetReAuditStatus = p.reAuditStatus || (incomingProposed && incomingProposed.reAuditStatus) || 'PENDING_VERIFICATION';
 
+    // RETAIN LIVE BASELINE: Existing property details stay LIVE on marketplace!
+    // Proposed edits are saved ONLY in pendingReauditData.
     updated = {
       ...existing,
-      ...cleanProposed,
       hasPendingEdits: true,
       reAuditStatus: targetReAuditStatus,
       reAuditRequestedAt: existing.reAuditRequestedAt || p.reAuditRequestedAt || new Date().toISOString(),
       pendingReauditData: mergedPending,
-      listing_status: 'PENDING_VERIFICATION',
-      listingStatus: 'PENDING_VERIFICATION',
-      status: 'PENDING_VERIFICATION',
-      is_published: false,
-      isPublished: false,
-      isPlatformVerified: false,
-      verificationStatus: 'Pending Verification',
-      isAdmin: false,
-      isAdminApproval: false,
-      adminVerified: false,
-      verifiedBy: null,
-      documents: cleanDocs,
-      media: cleanMedia,
-      photos: finalPhotos,
+      listing_status: 'LIVE',
+      listingStatus: 'LIVE',
+      status: 'LIVE',
+      is_published: true,
+      isPublished: true,
+      isPlatformVerified: true,
+      verificationStatus: existing.verificationStatus || 'Platform Verified',
+      isOwnerDraftEdit: true,
+      isOwnerSubmission: true,
       updatedAt: new Date().toISOString()
     };
   }
@@ -550,6 +547,8 @@ function saveLocalProperty(p, existingOverride = null) {
       isAdminApproval: isAdminAction ? Boolean(p.isAdminApproval) : false,
       adminVerified: isAdminAction ? Boolean(p.adminVerified) : false,
       verifiedBy: isAdminAction ? (p.verifiedBy || existing.verifiedBy || null) : null,
+      isOwnerDraftEdit: isAdminAction ? false : Boolean(p.isOwnerDraftEdit ?? existing.isOwnerDraftEdit),
+      isOwnerSubmission: isAdminAction ? false : Boolean(p.isOwnerSubmission ?? existing.isOwnerSubmission),
       hasPendingEdits: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
         ? false
         : (isExplicitOwnerSubmission ? true : (p.hasPendingEdits ?? existing.hasPendingEdits ?? false)),
@@ -1430,10 +1429,7 @@ app.get('/api/properties', async (req, res) => {
           st === 'UNDER_AUDIT' || lst === 'UNDER_AUDIT' ||
           st === 'DRAFT' || lst === 'DRAFT' ||
           st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED' ||
-          st === 'REJECTED' || lst === 'REJECTED' ||
-          p.hasPendingEdits === true ||
-          p.reAuditStatus === 'PENDING_VERIFICATION' ||
-          p.reAuditStatus === 'UNDER_REVIEW'
+          st === 'REJECTED' || lst === 'REJECTED'
         );
         if (isPendingOrBlocked) return false;
 

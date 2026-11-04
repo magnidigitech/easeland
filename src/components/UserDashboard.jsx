@@ -1559,6 +1559,11 @@ export default function UserDashboard({
                                   <span>Dismiss</span>
                                 </button>
                               </>
+                            ) : (prop.status === 'LIVE' || prop.status === 'APPROVED') && (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW') ? (
+                              <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-purple-300">
+                                <Clock className="w-3 h-3 text-purple-700" />
+                                Live (Re-Audit Pending)
+                              </span>
                             ) : (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING' || prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW' || (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits)) ? (
                               <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-blue-200">
                                 <Clock className="w-3 h-3 text-blue-600" />
@@ -1752,6 +1757,11 @@ export default function UserDashboard({
                               <span className="bg-slate-900 text-white dark:bg-red-950/80 dark:text-red-300 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-slate-800 dark:border-red-900/60 shadow-md">
                                 <XCircle className="w-4 h-4 text-red-400" />
                                 <span>Deleted by Admin</span>
+                              </span>
+                            ) : (prop.status === 'LIVE' || prop.status === 'APPROVED') && (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW') ? (
+                              <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-purple-300">
+                                <Clock className="w-3 h-3 text-purple-700" />
+                                Live (Re-Audit Pending)
                               </span>
                             ) : (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW' || prop.status === 'PENDING' || prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW' || (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits)) ? (
                               <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-blue-200">

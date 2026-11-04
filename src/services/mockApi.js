@@ -757,7 +757,7 @@ export const mockApi = {
       const isBlocked = (
         st === 'REJECTED' || st === 'DRAFT' || st === 'PENDING' || st === 'PENDING_VERIFICATION' ||
         lst === 'REJECTED' || lst === 'DRAFT' || lst === 'PENDING' || lst === 'PENDING_VERIFICATION' ||
-        st === 'CHANGES_REQUIRED' || p.hasPendingEdits === true || p.reAuditStatus === 'PENDING_VERIFICATION'
+        st === 'CHANGES_REQUIRED' || lst === 'CHANGES_REQUIRED'
       );
 
       // Strict Enforcement: Exclude unverified drafts or pending submissions from public verified listings

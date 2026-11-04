@@ -939,12 +939,11 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
     let publicPayload = {};
 
     if (isAlreadyLive && formData) {
-      // Re-Audit Submission: Update property details and gate from public live marketplace until Admin verifies & approves
+      // Re-Audit Submission: Existing property details stay LIVE on public marketplace.
+      // Proposed modifications are staged ONLY inside pendingReauditData until Admin verifies & approves.
       const derived = computeDerivedPropertyFields({ ...propData, ...formData });
       publicPayload = {
         ...propData,
-        ...formData,
-        ...derived,
         hasPendingEdits: true,
         reAuditStatus: ListingStatus.PENDING_VERIFICATION,
         reAuditRequestedAt: new Date().toISOString(),
@@ -954,13 +953,13 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
           submittedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         },
-        listingStatus: ListingStatus.PENDING_VERIFICATION,
-        status: ListingStatus.PENDING_VERIFICATION,
-        listing_status: ListingStatus.PENDING_VERIFICATION,
-        verificationStatus: 'Pending Verification',
-        isPublished: false,
-        is_published: false,
-        isPlatformVerified: false,
+        listingStatus: ListingStatus.LIVE,
+        status: ListingStatus.LIVE,
+        listing_status: ListingStatus.LIVE,
+        verificationStatus: propData.verificationStatus || 'Platform Verified',
+        isPublished: true,
+        is_published: true,
+        isPlatformVerified: true,
         isAdmin: false,
         isAdminApproval: false,
         adminVerified: false,
@@ -1730,10 +1729,7 @@ export async function getPublicPropertyById(propertyId) {
       statusVal === 'UNDER_AUDIT' ||
       statusVal === 'DRAFT' ||
       statusVal === 'CHANGES_REQUIRED' ||
-      statusVal === 'CHANGES_REQUESTED' ||
-      data.hasPendingEdits === true ||
-      data.reAuditStatus === 'PENDING_VERIFICATION' ||
-      data.reAuditStatus === 'UNDER_REVIEW'
+      statusVal === 'CHANGES_REQUESTED'
     );
 
     const isLive = !isPendingOrUnderAudit && (

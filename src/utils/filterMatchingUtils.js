@@ -115,7 +115,7 @@ export function isPropertyPubliclyVisible(p) {
     return false;
   }
 
-  // Strict Gate: Properties under audit or with pending verification edits MUST NEVER be publicly visible
+  // Strict Gate: Properties unverified or with non-live statuses are blocked
   const isBlocked = st === 'CHANGES_REQUIRED' ||
                     st === 'CHANGES_REQUESTED' ||
                     st === 'PENDING_VERIFICATION' ||
@@ -135,10 +135,7 @@ export function isPropertyPubliclyVisible(p) {
                     lst === 'SUBMITTED' ||
                     lst === 'IN_AUDIT' ||
                     plst === 'PENDING_VERIFICATION' ||
-                    plst === 'UNDER_REVIEW' ||
-                    p.hasPendingEdits === true ||
-                    p.reAuditStatus === 'PENDING_VERIFICATION' ||
-                    p.reAuditStatus === 'UNDER_REVIEW';
+                    plst === 'UNDER_REVIEW';
 
   if (isBlocked) return false;
 

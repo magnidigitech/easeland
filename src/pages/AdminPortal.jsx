@@ -2095,9 +2095,12 @@ export default function AdminPortal({ onNavigate }) {
       const note = feedbackNote || 'Verified & Approved by EaseLand Senior Admin Auditor.';
 
       // 1. PostgreSQL database save FIRST (Authoritative Primary Source)
-      const pendingEdits = selectedProperty?.pendingReauditData || selectedProperty?.pendingEdits || {};
+      const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            selectedProperty || {};
+      const pendingEdits = currentTarget.pendingReauditData || currentTarget.pendingEdits || selectedProperty?.pendingReauditData || selectedProperty?.pendingEdits || {};
       const payload = {
-        ...(selectedProperty || {}),
+        ...currentTarget,
         ...pendingEdits,
         propertyId: propId,
         id: propId,
@@ -2112,8 +2115,11 @@ export default function AdminPortal({ onNavigate }) {
         isPublished: true,
         is_published: true,
         isAdmin: true,
+        isAdminAction: true,
         isAdminApproval: true,
         adminVerified: true,
+        isOwnerDraftEdit: false,
+        isOwnerSubmission: false,
         verifiedDate: new Date().toISOString(),
         verificationNotes: note,
         verificationStatus: 'Platform Verified'
@@ -2249,8 +2255,11 @@ export default function AdminPortal({ onNavigate }) {
       const note = feedbackNote || 'Proposed modifications rejected by Admin auditor. The previously approved listing details remain live.';
 
       // 1. PostgreSQL Authoritative Update FIRST
+      const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            selectedProperty || {};
       const payload = {
-        ...(selectedProperty || {}),
+        ...currentTarget,
         propertyId: propId,
         id: propId,
         hasPendingEdits: false,
@@ -2264,6 +2273,9 @@ export default function AdminPortal({ onNavigate }) {
         isPublished: true,
         is_published: true,
         isAdmin: true,
+        isAdminAction: true,
+        isOwnerDraftEdit: false,
+        isOwnerSubmission: false,
         verificationNotes: note,
         adminFeedback: note,
         ownerFacingNotes: note
@@ -2402,8 +2414,11 @@ export default function AdminPortal({ onNavigate }) {
       const note = feedbackNote;
 
       // 1. PostgreSQL Authoritative Rejection FIRST
+      const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            selectedProperty || {};
       const payload = {
-        ...(selectedProperty || {}),
+        ...currentTarget,
         propertyId: propId,
         id: propId,
         listingStatus: 'REJECTED',
@@ -2413,6 +2428,12 @@ export default function AdminPortal({ onNavigate }) {
         isPublished: false,
         is_published: false,
         isAdmin: true,
+        isAdminAction: true,
+        isOwnerDraftEdit: false,
+        isOwnerSubmission: false,
+        hasPendingEdits: false,
+        pendingReauditData: null,
+        reAuditStatus: null,
         verificationNotes: note,
         ownerFacingNotes: note,
         adminNotes: note,
@@ -2549,8 +2570,11 @@ export default function AdminPortal({ onNavigate }) {
       const note = feedbackNote;
 
       // 1. PostgreSQL Authoritative Changes Requested Save FIRST
+      const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+                            selectedProperty || {};
       const payload = {
-        ...(selectedProperty || {}),
+        ...currentTarget,
         propertyId: propId,
         id: propId,
         listingStatus: 'CHANGES_REQUIRED',
@@ -2560,6 +2584,9 @@ export default function AdminPortal({ onNavigate }) {
         is_published: false,
         isPlatformVerified: false,
         isAdmin: true,
+        isAdminAction: true,
+        isOwnerDraftEdit: false,
+        isOwnerSubmission: false,
         hasPendingEdits: false,
         pendingReauditData: null,
         reAuditStatus: null,
@@ -5780,11 +5807,24 @@ export default function AdminPortal({ onNavigate }) {
                             <div className="col-span-4">
                               <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                                 <span className="font-bold text-brand-charcoal line-clamp-1">{prop.title}</span>
-                                {Boolean((prop.hasPendingEdits || prop.pendingReauditData) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
-                                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300">
-                                    Re-Verification Pending
-                                  </span>
-                                )}
+                                {Boolean((prop.hasPendingEdits || prop.pendingReauditData) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (() => {
+                                  const diff = computeReauditDiff(prop);
+                                  const changes = [];
+                                  if (diff.diffs.price) changes.push('Price');
+                                  if (diff.diffs.photos) changes.push((diff.diffs.photos.newCount || 1) + ' New Photo' + ((diff.diffs.photos.newCount || 1) > 1 ? 's' : ''));
+                                  if (diff.diffs.title) changes.push('Title');
+                                  if (diff.diffs.location || diff.diffs.boundary) changes.push('Location/Map');
+                                  if (diff.diffs.documents) changes.push('Docs');
+                                  if (diff.diffs.amenities) changes.push('Amenities');
+                                  const summaryText = changes.length > 0 ? changes.slice(0, 2).join(' • ') : 'Modified';
+
+                                  return (
+                                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 inline-flex items-center gap-1 shadow-sm">
+                                      <Sparkles className="w-2.5 h-2.5 text-purple-700" />
+                                      <span>Re-Audit: {summaryText}</span>
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <span className="text-gray-500 text-[11px]">
                                 {[prop.location?.locality || prop.locality, prop.location?.city || prop.city, prop.location?.state || prop.state].filter(Boolean).join(', ') || (typeof prop.location === 'string' ? prop.location : 'India')}
