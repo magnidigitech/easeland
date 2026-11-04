@@ -21,10 +21,11 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
     const cssContent = fs.readFileSync(cssPath, 'utf8');
 
     assert.ok(cssContent.includes('.info-hero-dynamic'), 'index.css must define .info-hero-dynamic class');
-    assert.ok(cssContent.includes('height: calc(100dvh - 8rem)'), 'info-hero-dynamic must calculate height minus 8rem (top 4rem + bottom 4rem)');
+    assert.ok(cssContent.includes('min-height: calc(100dvh - 8rem)'), 'info-hero-dynamic must calculate min-height minus 8rem (top 4rem + bottom 4rem)');
     assert.ok(cssContent.includes('env(safe-area-inset-bottom'), 'info-hero-dynamic must support safe-area-inset-bottom');
-    assert.ok(cssContent.includes('height: calc(100dvh - 9rem)'), 'info-hero-dynamic must support sm tablet at 9rem offset');
-    assert.ok(cssContent.includes('height: calc(100dvh - 5rem)'), 'info-hero-dynamic must support md tablet where bottom nav is hidden');
+    assert.ok(cssContent.includes('min-height: calc(100dvh - 9rem)'), 'info-hero-dynamic must support sm tablet at 9rem offset');
+    assert.ok(cssContent.includes('min-height: calc(100dvh - 5rem)'), 'info-hero-dynamic must support md tablet where bottom nav is hidden');
+    assert.ok(cssContent.includes('justify-content: center'), 'info-hero-dynamic must center content to prevent excessive padding');
     assert.ok(cssContent.includes('min-height: auto'), 'info-hero-dynamic must revert to auto height on desktop');
   });
 
@@ -39,7 +40,7 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
   });
 
   pages.forEach(({ name, file, image }) => {
-    it('3. Verifies ' + name + ' uses dynamic viewport hero container and responsive dvh image sizing', () => {
+    it('3. Verifies ' + name + ' uses dynamic viewport hero container and balanced image sizing', () => {
       const filePath = path.join(rootDir, 'src', 'pages', file);
       assert.ok(fs.existsSync(filePath), file + ' must exist');
       const content = fs.readFileSync(filePath, 'utf8');
@@ -47,22 +48,25 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
       // Check dynamic viewport hero container class
       assert.ok(content.includes('info-hero-dynamic'), file + ' must use info-hero-dynamic class');
 
-      // Check inner flex layout for dynamic viewport vertical space distribution
-      assert.ok(content.includes('flex-1 w-full flex flex-col justify-between lg:grid lg:grid-cols-12'), file + ' must distribute height dynamically with flexbox on mobile');
+      // Check balanced flex layout
+      assert.ok(content.includes('w-full flex flex-col items-center justify-center lg:grid lg:grid-cols-12'), file + ' must distribute space with balanced flex layout');
 
-      // Check responsive headline size
-      assert.ok(content.includes('text-lg xs:text-xl sm:text-3xl lg:text-5xl'), file + ' must use responsive headline on mobile');
+      // Check clean, uncrushed headline size
+      assert.ok(content.includes('text-2xl sm:text-3xl lg:text-5xl font-extrabold'), file + ' must use clean uncrushed headline on mobile');
 
-      // Check subtitle mobile line-clamp
-      assert.ok(content.includes('line-clamp-2 sm:line-clamp-none'), file + ' must use line-clamp-2 on mobile for subtitle');
+      // Check subtitle is readable and not truncated
+      assert.ok(content.includes('leading-relaxed'), file + ' must have relaxed leading for subtitle');
 
-      // Check visual stage column has flex-1 min-h-0 to take remaining viewport space
-      assert.ok(content.includes('flex-1 min-h-0'), file + ' must give visual stage flex-1 min-h-0');
+      // Check visual stage column uses clean w-fit centering without excess padding
+      assert.ok(content.includes('w-fit mx-auto flex items-center justify-center'), file + ' must wrap image with w-fit mx-auto');
 
-      // Check image source and dynamic viewport dvh max-height
+      // Check image source and responsive max-height
       assert.ok(content.includes(image), file + ' must render ' + image);
-      assert.ok(content.includes('max-h-[22dvh] xs:max-h-[25dvh] sm:max-h-[35dvh] lg:max-h-[440px]'), file + ' must scale image height dynamically with dvh units');
+      assert.ok(content.includes('max-h-[220px] xs:max-h-[250px] sm:max-h-[350px] lg:max-h-[440px]'), file + ' must scale image height gracefully');
       assert.ok(content.includes('object-contain'), file + ' must use object-contain for 3D building visual');
+
+      // Check floating badges are hidden on mobile to avoid clutter and clipping
+      assert.ok(content.includes('hidden sm:flex absolute'), file + ' must hide floating micro-badges on mobile');
     });
   });
 });

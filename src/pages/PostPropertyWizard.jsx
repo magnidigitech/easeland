@@ -686,13 +686,21 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
           pId = res.propertyId;
           setPropertyId(res.propertyId);
           setReferenceId(res.referenceId);
-          await savePropertyDraftStep(res.propertyId, user.uid, draftData, targetStep);
+          const stepRes = await savePropertyDraftStep(res.propertyId, user.uid, draftData, targetStep);
+          if (stepRes && stepRes.error) {
+            setErrorMsg(stepRes.error);
+            return;
+          }
         } else if (res.error) {
           setErrorMsg(res.error);
           return;
         }
       } else {
-        await savePropertyDraftStep(pId, user.uid, draftData, targetStep);
+        const stepRes = await savePropertyDraftStep(pId, user.uid, draftData, targetStep);
+        if (stepRes && stepRes.error) {
+          setErrorMsg(stepRes.error);
+          return;
+        }
       }
 
       if (effectiveBoundary && pId) {

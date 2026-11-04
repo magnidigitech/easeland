@@ -350,10 +350,8 @@ export async function createPropertyDraft(ownerId, propertyData) {
 
     return { success: true, propertyId, referenceId: refId };
   } catch (error) {
-    console.warn('Property draft create fallback:', error);
-    const fallbackId = 'prop_' + Date.now();
-    const fallbackRef = generateReferenceId();
-    return { success: true, propertyId: fallbackId, referenceId: fallbackRef };
+    console.error('Property draft create failed:', error);
+    return { success: false, error: error.message || 'Failed to create property draft.' };
   }
 }
 
@@ -831,7 +829,8 @@ export async function updateOwnerProperty(propertyId, ownerId, updates) {
         status: ListingStatus.LIVE,
         isPublished: true,
         isPlatformVerified: true,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        isOwnerDraftEdit: true
       };
 
       await syncPropertyToPostgres(payload);
@@ -957,7 +956,8 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
         status: ListingStatus.LIVE,
         isPublished: true,
         isPlatformVerified: true,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        isOwnerDraftEdit: true
       };
     } else {
       const mergedData = {
@@ -1107,8 +1107,8 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
 
     return { success: true };
   } catch (error) {
-    console.warn('Property submission fallback:', error);
-    return { success: true };
+    console.error('Property submission failed:', error);
+    return { success: false, error: error.message || 'Failed to submit property for verification.' };
   }
 }
 
@@ -1429,7 +1429,8 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
         status: ListingStatus.LIVE,
         isPublished: true,
         isPlatformVerified: true,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        isOwnerDraftEdit: true
       };
 
       await syncPropertyToPostgres(publicPayload);
@@ -1509,8 +1510,8 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
 
     return { success: true };
   } catch (error) {
-    console.warn('Property draft step update fallback:', error);
-    return { success: true };
+    console.error('Property draft step update failed:', error);
+    return { success: false, error: error.message || 'Failed to save property draft step.' };
   }
 }
 

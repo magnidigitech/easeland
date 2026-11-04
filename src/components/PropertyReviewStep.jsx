@@ -231,18 +231,17 @@ export default function PropertyReviewStep({
       setSubmitting(false);
       setShowConfirmModal(false);
 
-      if (res && res.success !== false) {
+      if (res && res.success === true) {
         setSubmittedSuccess(true);
         if (onSubmissionComplete) onSubmissionComplete();
       } else {
         setErrorMsg(res?.error || 'Failed to submit property for verification.');
       }
     } catch (err) {
-      console.warn('Submission error fallback:', err);
+      console.error('Submission failed:', err);
       setSubmitting(false);
       setShowConfirmModal(false);
-      setSubmittedSuccess(true);
-      if (onSubmissionComplete) onSubmissionComplete();
+      setErrorMsg(err?.message || 'Failed to submit property for verification. Please try again.');
     }
   };
 

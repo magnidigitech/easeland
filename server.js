@@ -443,8 +443,8 @@ function saveLocalProperty(p, existingOverride = null) {
       updatedAt: new Date().toISOString()
     };
   }
-  // 2. Owner Draft Staging ONLY if explicitly specified via isOwnerDraftEdit on a verified LIVE property
-  else if (p.isOwnerDraftEdit === true && !isAdminAction && (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE')) {
+  // 2. Owner Draft Staging for verified LIVE properties when submitting/saving pending edits
+  else if ((p.isOwnerDraftEdit === true || p.hasPendingEdits === true || Boolean(p.pendingReauditData)) && !isAdminAction && (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE')) {
     const incomingProposed = p.pendingReauditData || p.pendingEdits || p;
     const existingPending = existing.pendingReauditData || existing.pendingEdits || {};
     const cleanProposed = {};
@@ -466,11 +466,13 @@ function saveLocalProperty(p, existingOverride = null) {
       updatedAt: new Date().toISOString()
     };
 
+    const targetReAuditStatus = p.reAuditStatus || (incomingProposed && incomingProposed.reAuditStatus) || existing.reAuditStatus || 'PENDING_VERIFICATION';
+
     updated = {
       ...existing,
       hasPendingEdits: true,
-      reAuditStatus: 'PENDING_VERIFICATION',
-      reAuditRequestedAt: existing.reAuditRequestedAt || new Date().toISOString(),
+      reAuditStatus: targetReAuditStatus,
+      reAuditRequestedAt: existing.reAuditRequestedAt || p.reAuditRequestedAt || new Date().toISOString(),
       pendingReauditData: mergedPending,
       listing_status: 'LIVE',
       listingStatus: 'LIVE',
@@ -526,9 +528,15 @@ function saveLocalProperty(p, existingOverride = null) {
       isPublished: finalIsPublished,
       is_published: finalIsPublished,
       isPlatformVerified: finalIsVerified,
-      hasPendingEdits: (finalStatus === 'LIVE' || finalStatus === 'REJECTED' || finalStatus === 'CHANGES_REQUIRED') ? false : (p.hasPendingEdits ?? existing.hasPendingEdits ?? false),
-      pendingReauditData: (finalStatus === 'LIVE' || finalStatus === 'REJECTED' || finalStatus === 'CHANGES_REQUIRED') ? null : (p.pendingReauditData ?? existing.pendingReauditData ?? null),
-      reAuditStatus: (finalStatus === 'LIVE' || finalStatus === 'REJECTED' || finalStatus === 'CHANGES_REQUIRED') ? null : (p.reAuditStatus ?? existing.reAuditStatus ?? null),
+      hasPendingEdits: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
+        ? false
+        : (p.hasPendingEdits ?? existing.hasPendingEdits ?? false),
+      pendingReauditData: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
+        ? null
+        : (p.pendingReauditData ?? existing.pendingReauditData ?? null),
+      reAuditStatus: (isAdminAction && (p.hasPendingEdits === false || p.isAdminApproval))
+        ? null
+        : (p.reAuditStatus ?? existing.reAuditStatus ?? null),
       location: p.location || existing.location || null,
       boundary: p.boundary || p.ownerSubmittedBoundary || existing.boundary || existing.ownerSubmittedBoundary || null,
       ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || existing.ownerSubmittedBoundary || existing.boundary || null,
@@ -589,7 +597,7 @@ pgPool.on('error', (err) => {
 async function initPgDb() {
   try {
     const client = await pgPool.connect();
-    
+
     // 1. Properties Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS properties (
@@ -636,6 +644,7 @@ async function initPgDb() {
         config_data JSONB,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      
     `);
 
     // 4. Enquiries Table
@@ -1457,7 +1466,7 @@ app.post('/api/properties/sync-deleted', async (req, res) => {
           "  deleted_at = NOW();",
           [pId, refId, title, ownerId, feedback, JSON.stringify(recorded)]
         );
-      } catch (dbErr) {}
+      } catch (dbErr) { }
     }
 
     return res.json({ success: true, count: recordedList.length, ledger: getAdminDeletedLedger() });
@@ -1672,34 +1681,34 @@ app.delete('/api/properties/:id', async (req, res) => {
             extraRef
           ].filter(Boolean)));
 
-        for (const cid of idsToPurge) {
-          // Direct doc deletions across collections
-          try { await adminDb.collection('properties').doc(cid).delete(); } catch (e) {}
-          try { await adminDb.collection('propertyPrivate').doc(cid).delete(); } catch (e) {}
-          try { await adminDb.collection('propertyMediaPrivate').doc(cid).delete(); } catch (e) {}
-          try { await adminDb.collection('verificationRecords').doc(cid).delete(); } catch (e) {}
+          for (const cid of idsToPurge) {
+            // Direct doc deletions across collections
+            try { await adminDb.collection('properties').doc(cid).delete(); } catch (e) { }
+            try { await adminDb.collection('propertyPrivate').doc(cid).delete(); } catch (e) { }
+            try { await adminDb.collection('propertyMediaPrivate').doc(cid).delete(); } catch (e) { }
+            try { await adminDb.collection('verificationRecords').doc(cid).delete(); } catch (e) { }
 
-          // Query matching properties by propertyId or referenceId
-          try {
-            const pSnap = await adminDb.collection('properties').where('propertyId', '==', cid).get();
-            for (const d of pSnap.docs) { await d.ref.delete(); }
-          } catch (e) {}
+            // Query matching properties by propertyId or referenceId
+            try {
+              const pSnap = await adminDb.collection('properties').where('propertyId', '==', cid).get();
+              for (const d of pSnap.docs) { await d.ref.delete(); }
+            } catch (e) { }
 
-          // Query matching confidential documents
-          try {
-            const docSnap = await adminDb.collection('propertyDocuments').where('propertyId', '==', cid).get();
-            for (const d of docSnap.docs) { await d.ref.delete(); }
-          } catch (e) {}
+            // Query matching confidential documents
+            try {
+              const docSnap = await adminDb.collection('propertyDocuments').where('propertyId', '==', cid).get();
+              for (const d of docSnap.docs) { await d.ref.delete(); }
+            } catch (e) { }
 
-          // Query matching enquiries
-          try {
-            const enqSnap = await adminDb.collection('enquiries').where('propertyId', '==', cid).get();
-            for (const d of enqSnap.docs) { await d.ref.delete(); }
-          } catch (e) {}
+            // Query matching enquiries
+            try {
+              const enqSnap = await adminDb.collection('enquiries').where('propertyId', '==', cid).get();
+              for (const d of enqSnap.docs) { await d.ref.delete(); }
+            } catch (e) { }
+          }
         }
       }
-    }
-  } catch (adminFsErr) {
+    } catch (adminFsErr) {
       console.warn('Firebase Admin Firestore purge note:', adminFsErr.message);
     }
 
@@ -1860,25 +1869,25 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
     localAdminDeletedMap.clear();
     localVisitorsMap.clear();
 
-      // Clean uploads folders on disk
-      try {
-        if (fs.existsSync(propertiesDir)) {
-          const propEntries = fs.readdirSync(propertiesDir);
-          for (const entry of propEntries) {
-            const entryPath = path.join(propertiesDir, entry);
-            try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch (e) {}
-          }
+    // Clean uploads folders on disk
+    try {
+      if (fs.existsSync(propertiesDir)) {
+        const propEntries = fs.readdirSync(propertiesDir);
+        for (const entry of propEntries) {
+          const entryPath = path.join(propertiesDir, entry);
+          try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch (e) { }
         }
-        if (fs.existsSync(documentsDir)) {
-          const docEntries = fs.readdirSync(documentsDir);
-          for (const entry of docEntries) {
-            const entryPath = path.join(documentsDir, entry);
-            try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch (e) {}
-          }
-        }
-      } catch (rmErr) {
-        console.warn('Uploads directory clean note:', rmErr.message);
       }
+      if (fs.existsSync(documentsDir)) {
+        const docEntries = fs.readdirSync(documentsDir);
+        for (const entry of docEntries) {
+          const entryPath = path.join(documentsDir, entry);
+          try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch (e) { }
+        }
+      }
+    } catch (rmErr) {
+      console.warn('Uploads directory clean note:', rmErr.message);
+    }
 
 
     return res.json({
@@ -1988,7 +1997,7 @@ app.get('/api/properties/:id/documents', async (req, res) => {
       if (pgRes.rows.length > 0 && Array.isArray(pgRes.rows[0].raw_data?.documents)) {
         docs.push(...pgRes.rows[0].raw_data.documents);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const seen = new Set();
     const uniqueDocs = [];
@@ -2212,7 +2221,7 @@ app.post('/api/enquiries', async (req, res) => {
     const phs = [];
     for (let i = 1; i <= 19; i++) { phs.push(P + i); }
 
-    const queryText = 
+    const queryText =
       'INSERT INTO enquiries (' +
       '  enquiry_id, property_id, property_title, property_reference_id, ' +
       '  owner_id, owner_name, owner_email, ' +
@@ -2574,7 +2583,7 @@ app.post('/api/visitors', async (req, res) => {
     const phs = [];
     for (let i = 1; i <= 11; i++) { phs.push(P + i); }
 
-    const queryText = 
+    const queryText =
       'INSERT INTO site_visitors (' +
       '  visitor_id, name, phone, email, preferred_property_type, ' +
       '  preferred_location, stay_duration_seconds, source, status, ' +
@@ -2673,7 +2682,7 @@ app.patch('/api/visitors/:id', async (req, res) => {
     if (assignedAgent !== undefined) currentVis.assignedAgent = assignedAgent;
     currentVis.updatedAt = nowIso;
 
-    const updateSql = 
+    const updateSql =
       'UPDATE site_visitors SET ' +
       '  status = COALESCE(' + P + '1, status), ' +
       '  notes = COALESCE(' + P + '2, notes), ' +
@@ -2871,7 +2880,7 @@ app.get('/api/admin/firebase-users', async (req, res) => {
         if (r.uid) deletedUsersSet.add(String(r.uid).toLowerCase().trim());
         if (r.email) deletedUsersSet.add(String(r.email).toLowerCase().trim());
       });
-    } catch (eDelFetch) {}
+    } catch (eDelFetch) { }
 
     const allUsers = unifyServerUsers([...authUsers, ...fsUsers, ...pgUsers], deletedUsersSet);
 
@@ -2900,7 +2909,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
         if (r.uid) deletedUsersSet.add(String(r.uid).toLowerCase().trim());
         if (r.email) deletedUsersSet.add(String(r.email).toLowerCase().trim());
       });
-    } catch (eDelFetch) {}
+    } catch (eDelFetch) { }
 
     // 1a. Firebase Auth
     try {
@@ -3003,7 +3012,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
     const syncP9 = String.fromCharCode(36) + '9';
     const syncP10 = String.fromCharCode(36) + '10';
 
-    const syncUpsertQuery = 
+    const syncUpsertQuery =
       "INSERT INTO users (" +
       "  uid, email, display_name, phone, city, location, role, account_status, email_verified, raw_data, created_at, updated_at" +
       ") VALUES (" +
@@ -3034,12 +3043,12 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
           Boolean(u.emailVerified),
           JSON.stringify(u)
         ]);
-      } catch (errPg) {}
+      } catch (errPg) { }
 
       if (adminDb) {
         try {
           await adminDb.collection('users').doc(u.uid).set(u, { merge: true });
-        } catch (errFs) {}
+        } catch (errFs) { }
       }
     }
 
@@ -3058,7 +3067,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
           cmsMap.set(row.module_id, { ...existing, ...row.config_data });
         }
       });
-    } catch (ePgCfg) {}
+    } catch (ePgCfg) { }
 
     // 2c. Firestore siteManagement collection
     if (adminDb) {
@@ -3092,7 +3101,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
             cmsMap.set(modId, { ...existing, ...d });
           }
         });
-      } catch (eFsCms) {}
+      } catch (eFsCms) { }
     }
 
     const unifiedConfig = {};
@@ -3121,7 +3130,7 @@ app.post('/api/admin/sync-users-and-config', async (req, res) => {
             state: 'PUBLISHED',
             updatedAt: new Date().toISOString()
           }, { merge: !isFeatured });
-        } catch (eFsSave) {}
+        } catch (eFsSave) { }
       }
     }
 
@@ -3196,7 +3205,7 @@ app.post('/api/users', async (req, res) => {
       if (pgUserCheck.rows.length > 0) {
         existingPg = pgUserCheck.rows[0];
       }
-    } catch (eCheck) {}
+    } catch (eCheck) { }
 
     const incomingPhone = (userData.phone || userData.phoneNumber || '').trim();
     const incomingCity = (userData.city || userData.location || '').trim();
@@ -3238,7 +3247,7 @@ app.post('/api/users', async (req, res) => {
         "DELETE FROM admin_deleted_users WHERE LOWER(uid) = LOWER(" + unbP1 + ") OR (" + unbP2 + " <> '' AND LOWER(COALESCE(email, '')) = LOWER(" + unbP2 + "));",
         [uUid, (fullPayload.email || '').toLowerCase().trim()]
       );
-    } catch (eUnb) {}
+    } catch (eUnb) { }
     removeLocalDeletedUser(uUid);
     if (fullPayload.email) removeLocalDeletedUser(fullPayload.email);
 
@@ -3254,7 +3263,7 @@ app.post('/api/users', async (req, res) => {
       const p9 = String.fromCharCode(36) + '9';
       const p10 = String.fromCharCode(36) + '10';
 
-      const queryText = 
+      const queryText =
         "INSERT INTO users (" +
         "  uid, email, display_name, phone, city, location, role, account_status, email_verified, raw_data, created_at, updated_at" +
         ") VALUES (" +
@@ -3316,7 +3325,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         if (uRes.rows.length && uRes.rows[0].email) {
           targetEmail = String(uRes.rows[0].email).trim().toLowerCase();
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Record in persistent admin_deleted_users ledger so no background sync can ever resurrect this user
@@ -3327,7 +3336,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         "ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email, deleted_at = NOW();",
         [uUid, targetEmail || '', 'Account deleted']
       );
-    } catch (eLedger) {}
+    } catch (eLedger) { }
     addLocalDeletedUser(uUid);
     if (targetEmail) addLocalDeletedUser(targetEmail);
 
@@ -3359,7 +3368,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         (userPropIds.length ? " OR property_id = ANY(" + ph2 + ")" : "") + ";",
         userPropIds.length ? [uUid, userPropIds] : [uUid]
       );
-    } catch (eMedia) {}
+    } catch (eMedia) { }
 
     try {
       // 2b. Delete from enquiries
@@ -3372,7 +3381,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         (userPropIds.length ? " OR property_id = ANY(" + ph3 + ")" : "") + ";",
         userPropIds.length ? [uUid, targetEmail || '', userPropIds] : [uUid, targetEmail || '']
       );
-    } catch (eEnq) {}
+    } catch (eEnq) { }
 
     try {
       // 2c. Delete from admin_deleted_properties
@@ -3382,7 +3391,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         (userPropIds.length ? " OR property_id = ANY(" + ph2 + ")" : "") + ";",
         userPropIds.length ? [uUid, userPropIds] : [uUid]
       );
-    } catch (eAdm) {}
+    } catch (eAdm) { }
 
     try {
       // 2d. Delete from properties
@@ -3397,7 +3406,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         "   ));",
         [uUid, targetEmail || '']
       );
-    } catch (eProp) {}
+    } catch (eProp) { }
 
     try {
       // 2e. Delete from users table
@@ -3407,7 +3416,7 @@ app.delete('/api/users/:uid', async (req, res) => {
         "   OR (" + ph2 + " <> '' AND LOWER(COALESCE(email, '')) = LOWER(" + ph2 + "));",
         [uUid, targetEmail || '']
       );
-    } catch (eUser) {}
+    } catch (eUser) { }
 
     // 3. Cascade delete from Local Disk Stores (localPropsMap and localUsersMap)
     const propIdsSet = new Set(userPropIds.map(id => String(id).toLowerCase().trim()));
@@ -3437,58 +3446,58 @@ app.delete('/api/users/:uid', async (req, res) => {
         try {
           const snap1 = await adminDb.collection('properties').where('ownerId', '==', uUid).get();
           snap1.docs.forEach(d => firestorePropIds.add(d.id));
-        } catch (e) {}
+        } catch (e) { }
         try {
           const snap2 = await adminDb.collection('properties').where('userId', '==', uUid).get();
           snap2.docs.forEach(d => firestorePropIds.add(d.id));
-        } catch (e) {}
+        } catch (e) { }
         if (targetEmail) {
           try {
             const snap3 = await adminDb.collection('properties').where('ownerEmail', '==', targetEmail).get();
             snap3.docs.forEach(d => firestorePropIds.add(d.id));
-          } catch (e) {}
+          } catch (e) { }
           try {
             const snap4 = await adminDb.collection('properties').where('ownerPrivateEmail', '==', targetEmail).get();
             snap4.docs.forEach(d => firestorePropIds.add(d.id));
-          } catch (e) {}
+          } catch (e) { }
         }
 
         for (const pid of firestorePropIds) {
-          try { await adminDb.collection('properties').doc(pid).delete(); } catch (e) {}
-          try { await adminDb.collection('propertyPrivate').doc(pid).delete(); } catch (e) {}
-          try { await adminDb.collection('propertyMediaPrivate').doc(pid).delete(); } catch (e) {}
-          try { await adminDb.collection('verificationRecords').doc(pid).delete(); } catch (e) {}
+          try { await adminDb.collection('properties').doc(pid).delete(); } catch (e) { }
+          try { await adminDb.collection('propertyPrivate').doc(pid).delete(); } catch (e) { }
+          try { await adminDb.collection('propertyMediaPrivate').doc(pid).delete(); } catch (e) { }
+          try { await adminDb.collection('verificationRecords').doc(pid).delete(); } catch (e) { }
           try {
             const docSnap = await adminDb.collection('propertyDocuments').where('propertyId', '==', pid).get();
             for (const d of docSnap.docs) { await d.ref.delete(); }
-          } catch (e) {}
+          } catch (e) { }
           try {
             const enqSnap = await adminDb.collection('enquiries').where('propertyId', '==', pid).get();
             for (const d of enqSnap.docs) { await d.ref.delete(); }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         // Delete direct user enquiries
         try {
           const enqSnap1 = await adminDb.collection('enquiries').where('ownerId', '==', uUid).get();
           for (const d of enqSnap1.docs) { await d.ref.delete(); }
-        } catch (e) {}
+        } catch (e) { }
         try {
           const enqSnap2 = await adminDb.collection('enquiries').where('buyerId', '==', uUid).get();
           for (const d of enqSnap2.docs) { await d.ref.delete(); }
-        } catch (e) {}
+        } catch (e) { }
         try {
           const enqSnap3 = await adminDb.collection('enquiries').where('userId', '==', uUid).get();
           for (const d of enqSnap3.docs) { await d.ref.delete(); }
-        } catch (e) {}
+        } catch (e) { }
 
         // Delete user document
-        try { await adminDb.collection('users').doc(uUid).delete(); } catch (e) {}
+        try { await adminDb.collection('users').doc(uUid).delete(); } catch (e) { }
         if (targetEmail) {
           try {
             const uSnap = await adminDb.collection('users').where('email', '==', targetEmail).get();
             for (const d of uSnap.docs) { await d.ref.delete(); }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     } catch (adminFsErr) {
@@ -3508,7 +3517,7 @@ app.delete('/api/users/:uid', async (req, res) => {
               try {
                 const uRec = await auth.getUserByEmail(targetEmail);
                 if (uRec?.uid) await auth.deleteUser(uRec.uid);
-              } catch (e) {}
+              } catch (e) { }
             }
           }
         }
@@ -3553,7 +3562,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
     try {
       const bannedRes = await pgPool.query('SELECT property_id, reference_id FROM admin_deleted_properties;');
       bannedPropertyIds = bannedRes.rows.flatMap(r => [r.property_id, r.reference_id].filter(Boolean));
-    } catch (eBanned) {}
+    } catch (eBanned) { }
 
     const [leadsRes, dealsRes, visitsRes] = await Promise.all([
       pgPool.query('SELECT * FROM crm_leads ORDER BY updated_at DESC;'),
@@ -3695,7 +3704,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
           phone: u.phone_number || raw.phone || ''
         };
       });
-    } catch (uErr) {}
+    } catch (uErr) { }
 
     if (agents.length === 0) {
       agents = [
@@ -3712,7 +3721,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       dynamicLocations = Array.from(new Set(
         locRes.rows.flatMap(r => [r.location_name, r.city, r.district]).filter(Boolean)
       ));
-    } catch (locErr) {}
+    } catch (locErr) { }
 
     return res.json({
       success: true,
@@ -3793,7 +3802,7 @@ app.get('/api/locations/autocomplete', async (req, res) => {
           propertyId: p.property_id || p.id
         });
       });
-    } catch (eProp) {}
+    } catch (eProp) { }
 
     // 2. Match Pan-India Administrative States & Districts
     const adminMatches = matchStatesAndDistricts(queryStr);
@@ -3869,7 +3878,7 @@ app.get('/api/locations/autocomplete', async (req, res) => {
           });
         });
       }
-    } catch (ePhoton) {}
+    } catch (ePhoton) { }
 
     const finalResults = results.slice(0, limit);
 
@@ -4188,7 +4197,7 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
             error: 'Transaction frozen: Referenced property has been quarantined or removed by Admin Compliance.'
           });
         }
-      } catch (eBanned) {}
+      } catch (eBanned) { }
     }
 
     const nowIso = new Date().toISOString();
@@ -4496,7 +4505,7 @@ app.post('/api/crm/visits', async (req, res) => {
           "UPDATE crm_deals SET stage = 'SITE_VISIT', probability = 50, updated_at = NOW() WHERE deal_id = " + P + "1 AND stage IN ('NEW', 'CONTACTED');",
           [data.dealId]
         );
-      } catch (dErr) {}
+      } catch (dErr) { }
     }
 
     broadcastCrmEvent('VISIT_SCHEDULED', {

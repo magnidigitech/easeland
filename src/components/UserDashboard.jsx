@@ -637,6 +637,9 @@ export default function UserDashboard({
         verificationStatus: isLive ? 'Platform Verified' : (p.verificationStatus || existing.verificationStatus || 'Pending Verification'),
         isPlatformVerified: Boolean(isLive),
         isPublished: Boolean(isLive),
+        hasPendingEdits: Boolean(p.hasPendingEdits ?? existing.hasPendingEdits ?? false),
+        reAuditStatus: p.reAuditStatus || existing.reAuditStatus || null,
+        pendingReauditData: p.pendingReauditData || existing.pendingReauditData || null,
         verificationNotes: noteCandidate,
         ownerFacingNotes: noteCandidate,
         adminNotes: noteCandidate,
@@ -725,6 +728,9 @@ export default function UserDashboard({
       status: statusVal,
       isPlatformVerified: !isAdminDeleted && Boolean(p.isPlatformVerified || statusVal === 'LIVE'),
       isPublished: !isAdminDeleted && Boolean(p.isPublished || statusVal === 'LIVE'),
+      hasPendingEdits: Boolean(p.hasPendingEdits ?? p.rawProperty?.hasPendingEdits ?? false),
+      reAuditStatus: p.reAuditStatus || p.rawProperty?.reAuditStatus || null,
+      pendingReauditData: p.pendingReauditData || p.rawProperty?.pendingReauditData || null,
       adminNote: adminNoteVal,
       dateListed: p.createdAt ? (p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toISOString().split('T')[0] : (typeof p.createdAt === 'string' ? p.createdAt.split('T')[0] : 'Recent')) : 'Recent',
       views: p.views || 0,
@@ -1545,6 +1551,11 @@ export default function UserDashboard({
                                   <span>Dismiss</span>
                                 </button>
                               </>
+                            ) : (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW') ? (
+                              <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-amber-300 shadow-sm animate-pulse">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Live (Under Re-Audit)
+                              </span>
                             ) : (prop.status === 'APPROVED' || prop.status === 'LIVE' || prop.isPlatformVerified || prop.isPublished) ? (
                               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -1627,7 +1638,10 @@ export default function UserDashboard({
                   if (propertyFilter === 'ALL') return true;
                   if (p.status === 'DELETED_BY_ADMIN') return propertyFilter === 'SOLD_RENTED';
                   if (propertyFilter === 'LIVE') return (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished) && p.status !== 'DELETED_BY_ADMIN';
-                  if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED' && p.status !== 'DELETED_BY_ADMIN';
+                  if (propertyFilter === 'PENDING_VERIFICATION') return (
+                    ((p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED' && p.status !== 'DELETED_BY_ADMIN') ||
+                    Boolean((p.hasPendingEdits || p.rawProperty?.hasPendingEdits) && (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW' || p.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || p.rawProperty?.reAuditStatus === 'UNDER_REVIEW'))
+                  );
                   if (propertyFilter === 'CHANGES_REQUIRED') return p.status === 'CHANGES_REQUIRED';
                   if (propertyFilter === 'UNAVAILABLE') return p.status === 'UNAVAILABLE';
                   if (propertyFilter === 'DRAFT') return p.status === 'DRAFT';
@@ -1656,7 +1670,10 @@ export default function UserDashboard({
                       if (propertyFilter === 'ALL') return true;
                       if (p.status === 'DELETED_BY_ADMIN') return propertyFilter === 'SOLD_RENTED';
                       if (propertyFilter === 'LIVE') return (p.status === 'LIVE' || p.status === 'APPROVED' || p.isPlatformVerified || p.isPublished) && p.status !== 'DELETED_BY_ADMIN';
-                      if (propertyFilter === 'PENDING_VERIFICATION') return (p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED' && p.status !== 'DELETED_BY_ADMIN';
+                      if (propertyFilter === 'PENDING_VERIFICATION') return (
+                        ((p.status === 'PENDING_VERIFICATION' || p.status === 'UNDER_REVIEW' || p.status === 'PENDING') && !p.isPlatformVerified && !p.isPublished && p.status !== 'LIVE' && p.status !== 'APPROVED' && p.status !== 'DELETED_BY_ADMIN') ||
+                        Boolean((p.hasPendingEdits || p.rawProperty?.hasPendingEdits) && (p.reAuditStatus === 'PENDING_VERIFICATION' || p.reAuditStatus === 'UNDER_REVIEW' || p.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || p.rawProperty?.reAuditStatus === 'UNDER_REVIEW'))
+                      );
                       if (propertyFilter === 'CHANGES_REQUIRED') return p.status === 'CHANGES_REQUIRED';
                       if (propertyFilter === 'UNAVAILABLE') return p.status === 'UNAVAILABLE';
                       if (propertyFilter === 'DRAFT') return p.status === 'DRAFT';
@@ -1733,10 +1750,10 @@ export default function UserDashboard({
                                 <XCircle className="w-4 h-4 text-red-400" />
                                 <span>Deleted by Admin</span>
                               </span>
-                            ) : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW') ? (
+                            ) : (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW') ? (
                               <span className="bg-amber-100 text-amber-900 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-300 shadow-sm animate-pulse">
                                 <Clock className="w-4 h-4 text-amber-600" />
-                                Live (Re-Verification Pending)
+                                Live (Under Re-Audit)
                               </span>
                             ) : (prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) ? (
                               <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200">
@@ -1749,7 +1766,7 @@ export default function UserDashboard({
                                 Under Audit
                               </span>
                             ) : null}
-                            {!isDeletedByAdmin && !(prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')) && (
+                            {!isDeletedByAdmin && !((prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW')) && (
                               <>
                                 {prop.status === 'CHANGES_REQUIRED' && (
                                   <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-200">
@@ -1803,7 +1820,7 @@ export default function UserDashboard({
                           'p-3 sm:p-4 rounded-xl border text-xs font-medium ' +
                           (isDeletedByAdmin
                             ? 'bg-slate-900/10 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-800 shadow-inner'
-                            : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
+                            : (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW')
                               ? 'bg-amber-50 text-amber-950 border-amber-300 shadow-sm'
                               : prop.status === 'CHANGES_REQUIRED'
                                 ? 'bg-amber-50 text-amber-900 border-amber-200'
@@ -1824,8 +1841,8 @@ export default function UserDashboard({
                           <p className={`leading-relaxed text-xs ${isDeletedByAdmin ? 'text-slate-600 dark:text-slate-400 font-medium' : ''}`}>
                             {isDeletedByAdmin
                               ? (prop.adminNote || 'Notification: Deleted by Admin. This property listing was removed from the marketplace by an EaseLand Admin. Map pins, search index listings, and buyer inquiry channels have been permanently closed.')
-                              : prop.hasPendingEdits && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW')
-                                ? 'Your recently modified details have been submitted for Admin Re-Audit. Your previously approved details remain active & LIVE to buyers on the marketplace without interruption. Once verified, the changes will automatically appear on the live listing.'
+                              : (prop.hasPendingEdits || prop.rawProperty?.hasPendingEdits) && (prop.reAuditStatus === 'PENDING_VERIFICATION' || prop.reAuditStatus === 'UNDER_REVIEW' || prop.rawProperty?.reAuditStatus === 'PENDING_VERIFICATION' || prop.rawProperty?.reAuditStatus === 'UNDER_REVIEW')
+                                ? 'Your recently modified details have been submitted for Admin Re-Audit. Your previously approved details remain active & LIVE to buyers on the marketplace without interruption. Once verified by the Admin, the updated changes will automatically reflect on the live listing.'
                                 : prop.adminNote || (
                                 (!(prop.status === 'LIVE' || prop.status === 'APPROVED' || prop.isPlatformVerified || prop.isPublished) && (prop.status === 'PENDING_VERIFICATION' || prop.status === 'UNDER_REVIEW'))
                                   ? 'Listing is submitted for Admin audit. You can edit property details, files, or media anytime before the audit completes.'
