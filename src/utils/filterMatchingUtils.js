@@ -116,30 +116,34 @@ export function isPropertyPubliclyVisible(p) {
   }
 
   // Strict Gate: Properties unverified or with non-live statuses are blocked
-  const isBlocked = st === 'CHANGES_REQUIRED' ||
-                    st === 'CHANGES_REQUESTED' ||
-                    st === 'PENDING_VERIFICATION' ||
-                    st === 'UNDER_REVIEW' ||
-                    st === 'PENDING_AUDIT' ||
-                    st === 'UNDER_AUDIT' ||
-                    st === 'PENDING' ||
-                    st === 'SUBMITTED' ||
-                    st === 'IN_AUDIT' ||
-                    lst === 'CHANGES_REQUIRED' ||
-                    lst === 'CHANGES_REQUESTED' ||
-                    lst === 'PENDING_VERIFICATION' ||
-                    lst === 'UNDER_REVIEW' ||
-                    lst === 'PENDING_AUDIT' ||
-                    lst === 'UNDER_AUDIT' ||
-                    lst === 'PENDING' ||
-                    lst === 'SUBMITTED' ||
-                    lst === 'IN_AUDIT' ||
-                    plst === 'PENDING_VERIFICATION' ||
-                    plst === 'UNDER_REVIEW';
+  // Exception: Re-Audit properties with hasPendingEdits remain LIVE with their existing approved data
+  const isReauditLive = Boolean(p.isAlreadyLive === true || p.hasPendingEdits === true || p.reAuditStatus);
+  const isBlocked = !isReauditLive && (
+    st === 'CHANGES_REQUIRED' ||
+    st === 'CHANGES_REQUESTED' ||
+    st === 'PENDING_VERIFICATION' ||
+    st === 'UNDER_REVIEW' ||
+    st === 'PENDING_AUDIT' ||
+    st === 'UNDER_AUDIT' ||
+    st === 'PENDING' ||
+    st === 'SUBMITTED' ||
+    st === 'IN_AUDIT' ||
+    lst === 'CHANGES_REQUIRED' ||
+    lst === 'CHANGES_REQUESTED' ||
+    lst === 'PENDING_VERIFICATION' ||
+    lst === 'UNDER_REVIEW' ||
+    lst === 'PENDING_AUDIT' ||
+    lst === 'UNDER_AUDIT' ||
+    lst === 'PENDING' ||
+    lst === 'SUBMITTED' ||
+    lst === 'IN_AUDIT' ||
+    plst === 'PENDING_VERIFICATION' ||
+    plst === 'UNDER_REVIEW'
+  );
 
   if (isBlocked) return false;
 
-  if (isLive || isApproved) {
+  if (isLive || isApproved || isReauditLive) {
     return true;
   }
 

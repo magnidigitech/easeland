@@ -455,7 +455,10 @@ function saveLocalProperty(p, existingOverride = null) {
     };
   }
   // 2. Owner Draft Staging for verified LIVE properties when submitting/saving pending edits
-  else if ((p.isOwnerDraftEdit === true || p.hasPendingEdits === true || Boolean(p.pendingReauditData) || isExplicitOwnerSubmission) && !isAdminAction && (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE' || (existing.isPublished && existing.isPlatformVerified))) {
+  else if (!isAdminAction && (
+    (p.isOwnerDraftEdit === true || p.hasPendingEdits === true || Boolean(p.pendingReauditData) || isExplicitOwnerSubmission) &&
+    (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE' || (existing.isPublished && existing.isPlatformVerified) || existing.isAlreadyLive === true || p.isAlreadyLive === true || existing.hasPendingEdits === true || Boolean(existing.reAuditStatus) || Boolean(existing.pendingReauditData))
+  )) {
     const incomingProposed = p.pendingReauditData || p.pendingEdits || p;
     const existingPending = existing.pendingReauditData || existing.pendingEdits || {};
     const cleanProposed = {};
@@ -1423,7 +1426,9 @@ app.get('/api/properties', async (req, res) => {
         if (isDel || !isPub) return false;
 
         // Strict Marketplace Public Visibility Gate: Gated from public until explicitly verified and LIVE
-        const isPendingOrBlocked = (
+        // Exception: Re-Audit properties with hasPendingEdits remain LIVE with their existing approved data
+        const isReauditLive = Boolean(p.isAlreadyLive === true || p.hasPendingEdits === true || p.reAuditStatus);
+        const isPendingOrBlocked = !isReauditLive && (
           st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' ||
           st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' ||
           st === 'UNDER_AUDIT' || lst === 'UNDER_AUDIT' ||
@@ -1433,8 +1438,8 @@ app.get('/api/properties', async (req, res) => {
         );
         if (isPendingOrBlocked) return false;
 
-        const isLive = (st === 'LIVE' || lst === 'LIVE' || st === 'APPROVED' || lst === 'APPROVED' || st === 'APPROVED_LIVE' || lst === 'APPROVED_LIVE');
-        const isVerified = (p.isPlatformVerified === true || p.is_platform_verified === true);
+        const isLive = (st === 'LIVE' || lst === 'LIVE' || st === 'APPROVED' || lst === 'APPROVED' || st === 'APPROVED_LIVE' || lst === 'APPROVED_LIVE' || isReauditLive);
+        const isVerified = (p.isPlatformVerified === true || p.is_platform_verified === true || isReauditLive);
         if (!isLive || !isVerified) return false;
 
         const pid1 = String(p.id || '').toLowerCase().trim();

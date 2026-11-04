@@ -926,14 +926,20 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
       propListingStatusUpper === 'DRAFT'
     );
 
-    const isAlreadyLive = !isExplicitNonLive && Boolean(
+    const isAlreadyLive = Boolean(
       formData?.isAlreadyLive ||
-      propStatusUpper === 'LIVE' ||
-      propStatusUpper === 'APPROVED' ||
-      propStatusUpper === 'APPROVED_LIVE' ||
-      propListingStatusUpper === 'LIVE' ||
-      propListingStatusUpper === 'APPROVED' ||
-      (propData.isPlatformVerified === true && propData.isPublished === true)
+      propData?.isAlreadyLive ||
+      propData?.hasPendingEdits ||
+      Boolean(propData?.reAuditStatus) ||
+      Boolean(propData?.pendingReauditData) ||
+      (!isExplicitNonLive && (
+        propStatusUpper === 'LIVE' ||
+        propStatusUpper === 'APPROVED' ||
+        propStatusUpper === 'APPROVED_LIVE' ||
+        propListingStatusUpper === 'LIVE' ||
+        propListingStatusUpper === 'APPROVED' ||
+        (propData.isPlatformVerified === true && propData.isPublished === true)
+      ))
     );
 
     let publicPayload = {};
@@ -1392,6 +1398,10 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
     // Check if the property is already LIVE / VERIFIED
     let isAlreadyLive = Boolean(
       stepData.isAlreadyLive ||
+      currentData.isAlreadyLive ||
+      currentData.hasPendingEdits ||
+      Boolean(currentData.reAuditStatus) ||
+      Boolean(currentData.pendingReauditData) ||
       currentData.listingStatus === ListingStatus.LIVE ||
       currentData.status === ListingStatus.LIVE ||
       currentData.listingStatus === 'LIVE' ||

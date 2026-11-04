@@ -234,7 +234,13 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
       baseP.status === 'LIVE' ||
       baseP.isPublished ||
       baseP.isPlatformVerified ||
-      propCandidate.isAlreadyLive
+      baseP.hasPendingEdits ||
+      Boolean(baseP.reAuditStatus) ||
+      Boolean(baseP.pendingReauditData) ||
+      propCandidate.isAlreadyLive ||
+      propCandidate.hasPendingEdits ||
+      Boolean(propCandidate.reAuditStatus) ||
+      Boolean(propCandidate.pendingReauditData)
     );
 
     setFormData({

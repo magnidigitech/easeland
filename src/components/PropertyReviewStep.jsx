@@ -38,7 +38,14 @@ export default function PropertyReviewStep({
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
   const [isExistingLive, setIsExistingLive] = useState(() => {
+    // 1. Re-audit flag check: If property has isAlreadyLive or has pending reaudit, it is an existing live listing!
+    if (formData?.isAlreadyLive === true || formData?.hasPendingEdits === true || Boolean(formData?.reAuditStatus) || Boolean(formData?.pendingReauditData)) {
+      return true;
+    }
     const fStatus = String(formData?.status || formData?.listingStatus || '').toUpperCase();
+    if (fStatus === 'LIVE' || fStatus === 'APPROVED' || fStatus === 'APPROVED_LIVE') {
+      return true;
+    }
     const isNonLive = (
       fStatus === 'CHANGES_REQUIRED' ||
       fStatus === 'CHANGES_REQUESTED' ||
@@ -47,9 +54,6 @@ export default function PropertyReviewStep({
       fStatus === 'PENDING_VERIFICATION'
     );
     if (isNonLive) return false;
-    if (formData?.isAlreadyLive || fStatus === 'LIVE' || fStatus === 'APPROVED' || fStatus === 'APPROVED_LIVE') {
-      return true;
-    }
     if (typeof window !== 'undefined' && propertyId) {
       try {
         const stored = localStorage.getItem('easeland_properties');
@@ -57,12 +61,15 @@ export default function PropertyReviewStep({
           const list = JSON.parse(stored);
           const match = Array.isArray(list) && list.find(p => (p.propertyId || p.id) === propertyId);
           if (match) {
-            const mStatus = String(match.status || match.listingStatus || '').toUpperCase();
-            if (mStatus === 'CHANGES_REQUIRED' || mStatus === 'REJECTED' || mStatus === 'DRAFT' || mStatus === 'PENDING_VERIFICATION') {
-              return false;
+            if (match.isAlreadyLive === true || match.hasPendingEdits === true || Boolean(match.reAuditStatus) || Boolean(match.pendingReauditData)) {
+              return true;
             }
+            const mStatus = String(match.status || match.listingStatus || '').toUpperCase();
             if (mStatus === 'LIVE' || mStatus === 'APPROVED' || mStatus === 'APPROVED_LIVE' || (match.isPublished && match.isPlatformVerified)) {
               return true;
+            }
+            if (mStatus === 'CHANGES_REQUIRED' || mStatus === 'REJECTED' || mStatus === 'DRAFT' || mStatus === 'PENDING_VERIFICATION') {
+              return false;
             }
           }
         }
@@ -79,11 +86,15 @@ export default function PropertyReviewStep({
           .then(d => {
             if (d.success && d.property) {
               const p = d.property;
-              const pSt = String(p.status || p.listingStatus || p.listing_status || '').toUpperCase();
-              if (pSt === 'CHANGES_REQUIRED' || pSt === 'REJECTED' || pSt === 'DRAFT' || pSt === 'PENDING_VERIFICATION') {
-                setIsExistingLive(false);
-              } else if (pSt === 'LIVE' || pSt === 'APPROVED' || pSt === 'APPROVED_LIVE' || (p.isPublished && p.isPlatformVerified)) {
+              if (p.isAlreadyLive === true || p.hasPendingEdits === true || Boolean(p.reAuditStatus) || Boolean(p.pendingReauditData)) {
                 setIsExistingLive(true);
+                return;
+              }
+              const pSt = String(p.status || p.listingStatus || p.listing_status || '').toUpperCase();
+              if (pSt === 'LIVE' || pSt === 'APPROVED' || pSt === 'APPROVED_LIVE' || (p.isPublished && p.isPlatformVerified)) {
+                setIsExistingLive(true);
+              } else if (pSt === 'CHANGES_REQUIRED' || pSt === 'REJECTED' || pSt === 'DRAFT' || pSt === 'PENDING_VERIFICATION') {
+                setIsExistingLive(false);
               }
             }
           })
@@ -92,11 +103,15 @@ export default function PropertyReviewStep({
       import('../services/mockApi.js').then(({ mockApi }) => {
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj) {
-          const pSt = String(pObj.status || pObj.listingStatus || '').toUpperCase();
-          if (pSt === 'CHANGES_REQUIRED' || pSt === 'REJECTED' || pSt === 'DRAFT' || pSt === 'PENDING_VERIFICATION') {
-            setIsExistingLive(false);
-          } else if (pSt === 'LIVE' || pSt === 'APPROVED' || pSt === 'APPROVED_LIVE' || (pObj.isPublished && pObj.isPlatformVerified)) {
+          if (pObj.isAlreadyLive === true || pObj.hasPendingEdits === true || Boolean(pObj.reAuditStatus) || Boolean(pObj.pendingReauditData)) {
             setIsExistingLive(true);
+            return;
+          }
+          const pSt = String(pObj.status || pObj.listingStatus || '').toUpperCase();
+          if (pSt === 'LIVE' || pSt === 'APPROVED' || pSt === 'APPROVED_LIVE' || (pObj.isPublished && pObj.isPlatformVerified)) {
+            setIsExistingLive(true);
+          } else if (pSt === 'CHANGES_REQUIRED' || pSt === 'REJECTED' || pSt === 'DRAFT' || pSt === 'PENDING_VERIFICATION') {
+            setIsExistingLive(false);
           }
         }
       }).catch(() => {});

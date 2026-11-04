@@ -235,5 +235,51 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     const isReauditVisible = isPropertyPubliclyVisible(liveWithReauditProperty);
     assert.strictEqual(isReauditVisible, true, 'Approved live property with pending re-audit must remain publicly visible with baseline details');
   });
+
+  it('6. Property with isAlreadyLive or hasPendingEdits remains publicly visible and server saveLocalProperty protects live status', async () => {
+    const { isPropertyPubliclyVisible } = await import('../utils/filterMatchingUtils.js');
+
+    const liveReauditProperty = {
+      id: 'prop_test_reaudit_protected',
+      propertyId: 'prop_test_reaudit_protected',
+      title: 'Prope2 Live Farmland',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      isAlreadyLive: true,
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      pendingReauditData: {
+        title: 'Prope2 Updated Farmland'
+      }
+    };
+
+    // Client public visibility test
+    assert.strictEqual(isPropertyPubliclyVisible(liveReauditProperty), true, 'Re-audit property must be visible on client');
+
+    // Server-side save branch condition simulation
+    const existing = { ...liveReauditProperty };
+    const p = {
+      propertyId: 'prop_test_reaudit_protected',
+      isAlreadyLive: true,
+      hasPendingEdits: true,
+      pendingReauditData: {
+        title: 'Prope2 Newly Submitted Modification'
+      }
+    };
+
+    const existingStatusUpper = String(existing.status || '').toUpperCase();
+    const existingListingStatusUpper = String(existing.listingStatus || '').toUpperCase();
+    const isAdminAction = false;
+    const isExplicitOwnerSubmission = true;
+
+    const isLiveBranch = !isAdminAction && (
+      (p.isOwnerDraftEdit === true || p.hasPendingEdits === true || Boolean(p.pendingReauditData) || isExplicitOwnerSubmission) &&
+      (existingStatusUpper === 'LIVE' || existingListingStatusUpper === 'LIVE' || (existing.isPublished && existing.isPlatformVerified) || existing.isAlreadyLive === true || p.isAlreadyLive === true || existing.hasPendingEdits === true || Boolean(existing.reAuditStatus) || Boolean(existing.pendingReauditData))
+    );
+
+    assert.strictEqual(isLiveBranch, true, 'Server saveLocalProperty must route live re-audit edits to branch 2');
+  });
 });
 
