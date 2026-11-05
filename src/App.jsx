@@ -21,6 +21,7 @@ import PropertiesSearchPage, { matchesSearchFilters, isPropertyPubliclyVisible, 
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import OfflineIndicator from './components/OfflineIndicator';
+import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 import { mockApi, applySiteTheme, safeArray, deduplicateProperties, isFakeProperty } from './services/mockApi';
 import { useAuth } from './context/AuthContext';
 import { urlParamsToSearchState, searchStateToUrlParams, createDefaultFilterState } from './firebase/searchUrl.js';
@@ -884,6 +885,7 @@ export default function App() {
       
       {/* PWA STATUS & PROMPTS */}
       <OfflineIndicator />
+      <PwaUpdatePrompt />
       <PwaInstallBanner />
 
       {/* EMERGENCY MAINTENANCE BANNER */}

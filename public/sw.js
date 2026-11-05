@@ -35,6 +35,7 @@ const PRECACHE_ASSETS = [
 
 // Install Event: pre-cache application shell and skip waiting
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       // Use allSettled so a single missing asset does not abort SW installation

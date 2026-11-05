@@ -82,8 +82,11 @@ export function registerServiceWorker() {
           });
         }
 
-        // Check if there is an updated worker already waiting
+        // Check if there is an updated worker already waiting - trigger skip waiting immediately
         if (reg.waiting) {
+          if (typeof reg.waiting.postMessage === 'function') {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
           window.dispatchEvent(
             new CustomEvent('easeland-pwa-update-available', {
               detail: { registration: reg, waitingWorker: reg.waiting }
@@ -98,6 +101,10 @@ export function registerServiceWorker() {
 
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Immediately activate the new worker so it takes over without requiring popup action
+              if (typeof newWorker.postMessage === 'function') {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
               window.dispatchEvent(
                 new CustomEvent('easeland-pwa-update-available', {
                   detail: { registration: reg, waitingWorker: newWorker }
@@ -146,10 +153,23 @@ export async function promptPwaInstall() {
  * Tell the waiting Service Worker to skip waiting and activate immediately
  */
 export function skipWaitingAndReload() {
+  if (typeof window === 'undefined' || !navigator.serviceWorker) return;
+
   if (swRegistration && swRegistration.waiting) {
     swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-  } else if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+  } else if (swRegistration && swRegistration.installing) {
+    swRegistration.installing.postMessage({ type: 'SKIP_WAITING' });
+  } else if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+  }
+
+  // Also query registrations directly from navigator to catch any unreferenced workers
+  if (typeof navigator.serviceWorker.getRegistration === 'function') {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    }).catch(() => {});
   }
 }
 
