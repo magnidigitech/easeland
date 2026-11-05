@@ -503,35 +503,9 @@ function saveLocalProperty(p, existingOverride = null) {
       updatedAt: new Date().toISOString()
     };
 
-    // Ensure root media & photos strictly retain ONLY verified baseline photos
-    const baseMedia = Array.isArray(existing.media) ? existing.media : [];
-    const sanitizedLiveMedia = baseMedia.filter(m => {
-      if (!m || typeof m !== 'object') return true;
-      const st = String(m.verificationStatus || m.status || '').toUpperCase();
-      return st !== 'PENDING_REVIEW' && st !== 'PENDING';
-    });
-    const pendingMediaList = Array.isArray(mergedPending.media) ? mergedPending.media : [];
-    const pendingUnapprovedUrls = new Set(
-      pendingMediaList
-        .filter(m => m && typeof m === 'object' && (String(m.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW' || String(m.verificationStatus || '').toUpperCase() === 'PENDING'))
-        .map(m => String(m.publicUrl || m.url || m.storagePath || '').trim().toLowerCase())
-        .filter(Boolean)
-    );
-
-    const basePhotos = Array.isArray(existing.photos) ? existing.photos : [];
-    const sanitizedLivePhotos = basePhotos.filter(p => {
-      if (!p) return false;
-      const u = typeof p === 'string' ? p : (p.publicUrl || p.url || p.storagePath);
-      if (!u) return false;
-      const lower = String(u).trim().toLowerCase();
-      if (pendingUnapprovedUrls.has(lower)) return false;
-      const base = lower.split('/').pop()?.split('?')[0];
-      if (base && pendingUnapprovedUrls.has(base)) return false;
-      return true;
-    });
-
-    updated.media = sanitizedLiveMedia;
-    updated.photos = sanitizedLivePhotos.length > 0 ? sanitizedLivePhotos : basePhotos;
+    // Retain approved baseline media and photos on the live property
+    updated.media = Array.isArray(existing.media) ? existing.media : [];
+    updated.photos = Array.isArray(existing.photos) ? existing.photos : [];
   }
   // 3. Direct Status Changes and Updates across all data fields
   else {

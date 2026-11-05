@@ -815,38 +815,8 @@ export async function updateOwnerProperty(propertyId, ownerId, updates) {
       const mergedPending = { ...existingPending, ...permittedUpdates };
       const derived = computeDerivedPropertyFields({ ...currentData, ...mergedPending });
 
-      // Ensure root media & photos retain only verified baseline photos
-      const baseMedia = Array.isArray(currentData.media) ? currentData.media : [];
-      const sanitizedLiveMedia = baseMedia.filter(m => {
-        if (!m || typeof m !== 'object') return true;
-        const st = String(m.verificationStatus || m.status || '').toUpperCase();
-        return st !== 'PENDING_REVIEW' && st !== 'PENDING';
-      });
-
-      const pendingMediaList = Array.isArray(mergedPending.media) ? mergedPending.media : [];
-      const pendingUnapprovedUrls = new Set(
-        pendingMediaList
-          .filter(m => m && typeof m === 'object' && (String(m.verificationStatus || '').toUpperCase() === 'PENDING_REVIEW' || String(m.verificationStatus || '').toUpperCase() === 'PENDING'))
-          .map(m => String(m.publicUrl || m.url || m.storagePath || '').trim().toLowerCase())
-          .filter(Boolean)
-      );
-
-      const basePhotos = Array.isArray(currentData.photos) ? currentData.photos : [];
-      const sanitizedLivePhotos = basePhotos.filter(p => {
-        if (!p) return false;
-        const u = typeof p === 'string' ? p : (p.publicUrl || p.url || p.storagePath);
-        if (!u) return false;
-        const lower = String(u).trim().toLowerCase();
-        if (pendingUnapprovedUrls.has(lower)) return false;
-        const base = lower.split('/').pop()?.split('?')[0];
-        if (base && pendingUnapprovedUrls.has(base)) return false;
-        return true;
-      });
-
       const payload = {
         ...currentData, // Retains all existing approved data visible to public!
-        media: sanitizedLiveMedia,
-        photos: sanitizedLivePhotos.length > 0 ? sanitizedLivePhotos : basePhotos,
         hasPendingEdits: true,
         reAuditStatus: ListingStatus.PENDING_VERIFICATION,
         reAuditRequestedAt: new Date().toISOString(),
