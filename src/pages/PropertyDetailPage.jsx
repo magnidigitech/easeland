@@ -530,6 +530,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
   const mediaList = getPropertyMediaList(property);
   const activeMedia = mediaList[activeMediaIndex] || mediaList[0] || null;
+  const defaultCategoryFallback = getCategoryFallbackImage(property);
 
   // Applicable specs
   const specFlags = getApplicableSpecificationFields(property.propertyType, property.purpose);
