@@ -192,6 +192,7 @@ export function filterApprovedPublicMedia(mediaArray = []) {
       if (!item) return false;
       if (typeof item === 'string') return item.trim().length > 0;
       if (item.verificationStatus === MediaStatus.REJECTED || item.status === 'REJECTED') return false;
+      if (item.verificationStatus === 'PENDING_REVIEW' || item.verificationStatus === 'PENDING' || item.status === 'PENDING_REVIEW' || item.status === 'PENDING') return false;
       return true;
     })
     .map(item => {
@@ -948,8 +949,23 @@ export async function submitPropertyForVerification(propertyId, ownerId, formDat
       // Re-Audit Submission: Existing property details stay LIVE on public marketplace.
       // Proposed modifications are staged ONLY inside pendingReauditData until Admin verifies & approves.
       const derived = computeDerivedPropertyFields({ ...propData, ...formData });
+
+      // Establish and protect publicApprovedMedia baseline
+      const approvedBaseline = (Array.isArray(propData.publicApprovedMedia) && propData.publicApprovedMedia.length > 0)
+        ? propData.publicApprovedMedia
+        : (Array.isArray(propData.media) ? propData.media.filter(m => m && (m.verificationStatus === 'APPROVED' || !m.verificationStatus || m.verificationStatus !== 'PENDING_REVIEW')) : []);
+
       publicPayload = {
         ...propData,
+        publicApprovedMedia: approvedBaseline,
+        media: approvedBaseline.length > 0 ? approvedBaseline : (Array.isArray(propData.media) ? propData.media : []),
+        photos: (Array.isArray(propData.photos) && approvedBaseline.length > 0) ? propData.photos.filter(p => {
+          const u = typeof p === 'string' ? p : (p.publicUrl || p.url);
+          return approvedBaseline.some(ab => {
+            const abUrl = typeof ab === 'string' ? ab : (ab.publicUrl || ab.url || ab.mediaUrl || ab.storagePath);
+            return abUrl === u;
+          });
+        }) : (Array.isArray(propData.photos) ? propData.photos : []),
         hasPendingEdits: true,
         reAuditStatus: ListingStatus.PENDING_VERIFICATION,
         reAuditRequestedAt: new Date().toISOString(),
@@ -1420,8 +1436,21 @@ export async function savePropertyDraftStep(propertyId, ownerId, stepData, lastS
       const mergedPending = { ...existingPending, ...permittedUpdates };
       const derived = computeDerivedPropertyFields({ ...currentData, ...mergedPending });
 
+      const approvedBaseline = (Array.isArray(currentData.publicApprovedMedia) && currentData.publicApprovedMedia.length > 0)
+        ? currentData.publicApprovedMedia
+        : (Array.isArray(currentData.media) ? currentData.media.filter(m => m && (m.verificationStatus === 'APPROVED' || !m.verificationStatus || m.verificationStatus !== 'PENDING_REVIEW')) : []);
+
       const publicPayload = {
         ...currentData, // Retains live approved fields for public users!
+        publicApprovedMedia: approvedBaseline,
+        media: approvedBaseline.length > 0 ? approvedBaseline : (Array.isArray(currentData.media) ? currentData.media : []),
+        photos: (Array.isArray(currentData.photos) && approvedBaseline.length > 0) ? currentData.photos.filter(p => {
+          const u = typeof p === 'string' ? p : (p.publicUrl || p.url);
+          return approvedBaseline.some(ab => {
+            const abUrl = typeof ab === 'string' ? ab : (ab.publicUrl || ab.url || ab.mediaUrl || ab.storagePath);
+            return abUrl === u;
+          });
+        }) : (Array.isArray(currentData.photos) ? currentData.photos : []),
         hasPendingEdits: true,
         reAuditStatus: currentData.reAuditStatus === ListingStatus.PENDING_VERIFICATION ? ListingStatus.PENDING_VERIFICATION : 'DRAFT',
         pendingReauditData: {

@@ -504,8 +504,13 @@ function saveLocalProperty(p, existingOverride = null) {
     };
 
     // Retain approved baseline media and photos on the live property
-    updated.media = Array.isArray(existing.media) ? existing.media : [];
-    updated.photos = Array.isArray(existing.photos) ? existing.photos : [];
+    const approvedBaseMedia = (Array.isArray(existing.publicApprovedMedia) && existing.publicApprovedMedia.length > 0)
+      ? existing.publicApprovedMedia
+      : (Array.isArray(existing.media) ? existing.media.filter(m => m && (m.verificationStatus === 'APPROVED' || !m.verificationStatus || m.verificationStatus !== 'PENDING_REVIEW')) : []);
+
+    updated.publicApprovedMedia = approvedBaseMedia;
+    updated.media = approvedBaseMedia.length > 0 ? approvedBaseMedia : (Array.isArray(existing.media) ? existing.media : []);
+    updated.photos = Array.isArray(existing.photos) && existing.photos.length > 0 ? existing.photos : [];
   }
   // 3. Direct Status Changes and Updates across all data fields
   else {
@@ -1104,11 +1109,48 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     // 3. Immediately attach uploaded file to property record in local store
     try {
       if (propertyId && propertyId !== 'common') {
-        const existingProp = localPropsMap.get(propertyId) || { propertyId, id: propertyId };
+        let existingProp = localPropsMap.get(propertyId);
+        if (!existingProp) {
+          for (const p of localPropsMap.values()) {
+            if (p && (p.propertyId === propertyId || p.id === propertyId || p.referenceId === propertyId)) {
+              existingProp = p;
+              break;
+            }
+          }
+        }
+
+        // Query authoritative PostgreSQL database if not present in memory cache
+        if (!existingProp) {
+          try {
+            const P = String.fromCharCode(36);
+            const p1 = P + '1';
+            const checkRes = await pgPool.query(
+              "SELECT raw_data, listing_status, is_published FROM properties WHERE property_id = " + p1 + " OR reference_id = " + p1 + " OR raw_data->>'id' = " + p1 + " OR raw_data->>'propertyId' = " + p1 + " LIMIT 1;",
+              [propertyId]
+            );
+            if (checkRes.rows.length > 0) {
+              const row = checkRes.rows[0];
+              existingProp = { ...(row.raw_data || {}), propertyId, id: propertyId };
+              if (row.listing_status) existingProp.listingStatus = row.listing_status;
+              if (row.is_published !== null && row.is_published !== undefined) existingProp.isPublished = row.is_published;
+              localPropsMap.set(propertyId, existingProp);
+            }
+          } catch (dbErr) {
+            console.warn('PostgreSQL property lookup in /api/upload note:', dbErr.message);
+          }
+        }
+
+        if (!existingProp) {
+          existingProp = { propertyId, id: propertyId };
+        }
+
+        const existingStatusUpper = String(existingProp.status || existingProp.listingStatus || existingProp.listing_status || '').toUpperCase();
         const isLiveProp = Boolean(
           existingProp.isAlreadyLive === true ||
-          String(existingProp.status || existingProp.listingStatus || existingProp.listing_status || '').toUpperCase() === 'LIVE' ||
-          (existingProp.isPublished && existingProp.isPlatformVerified) ||
+          existingStatusUpper === 'LIVE' ||
+          existingStatusUpper === 'APPROVED' ||
+          existingStatusUpper === 'APPROVED_LIVE' ||
+          (existingProp.isPublished && (existingProp.isPlatformVerified || String(existingProp.verificationStatus || '').toUpperCase() === 'PLATFORM VERIFIED')) ||
           existingProp.hasPendingEdits === true ||
           Boolean(existingProp.reAuditStatus) ||
           Boolean(existingProp.pendingReauditData)
@@ -1165,6 +1207,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
           };
 
           if (isLiveProp) {
+            // Establish frozen public approved baseline if not already present
+            if (!Array.isArray(existingProp.publicApprovedMedia) || existingProp.publicApprovedMedia.length === 0) {
+              existingProp.publicApprovedMedia = Array.isArray(existingProp.media) ? [...existingProp.media] : [];
+            }
+
             existingProp.pendingReauditData = existingProp.pendingReauditData || {};
             const basePendingMedia = Array.isArray(existingProp.pendingReauditData.media)
               ? existingProp.pendingReauditData.media
@@ -1187,9 +1234,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             existingProp.hasPendingEdits = true;
             existingProp.reAuditStatus = existingProp.reAuditStatus || 'PENDING_VERIFICATION';
             existingProp.isOwnerDraftEdit = true;
+            // STRICT ISOLATION: Root media and photos MUST NOT include the new unapproved upload!
           } else {
             const existingMedia = Array.isArray(existingProp.media) ? existingProp.media : [];
             existingProp.media = [...existingMedia, mediaObj];
+            if (mediaType === 'PHOTO' || (req.file.mimetype && req.file.mimetype.startsWith('image/'))) {
+              const existingPhotos = Array.isArray(existingProp.photos) ? existingProp.photos : [];
+              existingProp.photos = [...existingPhotos, publicUrl];
+            }
             if (mediaType === 'WALKTHROUGH_VIDEO' || mediaType === 'DRONE_VIDEO' || mediaType === 'VIDEO') {
               existingProp.videoUrl = publicUrl;
               existingProp.videoLink = publicUrl;

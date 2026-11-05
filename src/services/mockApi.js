@@ -1182,7 +1182,10 @@ export const mockApi = {
           listingStatus: 'LIVE',
           isPublished: true,
           isPlatformVerified: true,
-          verificationStatus: existing.verificationStatus || 'Platform Verified'
+          verificationStatus: existing.verificationStatus || 'Platform Verified',
+          publicApprovedMedia: (Array.isArray(existing.publicApprovedMedia) && existing.publicApprovedMedia.length > 0)
+            ? existing.publicApprovedMedia
+            : (Array.isArray(existing.media) ? [...existing.media] : [])
         };
 
         freshProps[existingIndex] = preservedLiveProp;

@@ -300,4 +300,140 @@ describe('Verification Workspace Re-Audit Diff & Boundary Detection Suite', () =
     assert.strictEqual(diffResult.diffs.photos.newPhotos.length, 1);
     assert.strictEqual(diffResult.diffs.photos.newPhotos[0], 'https://easeland.in/uploads/properties/prop/med-photo2_new.jpg');
   });
+
+  it('9. DEFECT REGRESSION: Adding photos only must NOT produce a false-positive location diff when location is string vs object', () => {
+    const liveProp = {
+      id: 'prop-prop1',
+      title: 'Prop1',
+      price: 5000000,
+      area: 2400,
+      location: 'Near NH16, Mangalagiri, Guntur',
+      lat: 16.507,
+      lng: 80.649,
+      photos: [
+        'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg'
+      ],
+      media: [
+        {
+          mediaId: 'm1',
+          type: 'PHOTO',
+          url: 'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg',
+          publicUrl: 'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg',
+          verificationStatus: 'APPROVED'
+        }
+      ],
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      pendingReauditData: {
+        title: 'Prop1',
+        price: 5000000,
+        area: 2400,
+        location: {
+          lat: 16.507,
+          lng: 80.649,
+          address: 'Near NH16, Mangalagiri, Guntur',
+          locality: 'Mangalagiri',
+          city: 'Guntur',
+          state: 'Andhra Pradesh'
+        },
+        photos: [
+          'https://easeland.in/uploads/properties/prop/med-1_Cursor_Marker.jpg',
+          'https://easeland.in/uploads/properties/prop/med-2_HRO_BKG.jpg',
+          'https://easeland.in/uploads/properties/prop/med-3_New_Photo.jpg'
+        ]
+      }
+    };
+
+    const diffResult = computeReauditDiff(liveProp);
+    assert.strictEqual(diffResult.isReaudit, true);
+    assert.strictEqual(diffResult.hasChanges, true);
+    assert.strictEqual(diffResult.changedKeys.has('photos'), true);
+    assert.strictEqual(diffResult.diffs.photos.newCount, 2);
+    // CRITICAL: Location was NOT modified by the user, only parsed into structured object
+    assert.strictEqual(diffResult.changedKeys.has('location'), false, 'Location must NOT be flagged as changed');
+    assert.strictEqual(diffResult.diffs.location, undefined);
+  });
+
+  it('10. DEFECT REGRESSION: Adding photos only must NOT produce a false-positive boundary diff', () => {
+    const liveProp = {
+      id: 'prop-prop2',
+      title: 'Prop2',
+      price: 5000000,
+      area: 2400,
+      location: {
+        lat: 16.507,
+        lng: 80.649,
+        address: 'Mangalagiri, Guntur'
+      },
+      boundary: [
+        { lat: 16.506, lng: 80.648 },
+        { lat: 16.508, lng: 80.648 },
+        { lat: 16.508, lng: 80.650 },
+        { lat: 16.506, lng: 80.650 }
+      ],
+      photos: [
+        'https://easeland.in/uploads/properties/prop/med-1.jpg'
+      ],
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      pendingReauditData: {
+        title: 'Prop2',
+        price: 5000000,
+        area: 2400,
+        location: {
+          lat: 16.507,
+          lng: 80.649,
+          address: 'Mangalagiri, Guntur'
+        },
+        boundary: [
+          [16.506, 80.648],
+          [16.508, 80.648],
+          [16.508, 80.650],
+          [16.506, 80.650]
+        ],
+        photos: [
+          'https://easeland.in/uploads/properties/prop/med-1.jpg',
+          'https://easeland.in/uploads/properties/prop/med-2.jpg'
+        ]
+      }
+    };
+
+    const diffResult = computeReauditDiff(liveProp);
+    assert.strictEqual(diffResult.changedKeys.has('photos'), true);
+    assert.strictEqual(diffResult.changedKeys.has('boundary'), false, 'Boundary must NOT be flagged as changed');
+    assert.strictEqual(diffResult.changedKeys.has('location'), false, 'Location must NOT be flagged as changed');
+  });
+
+  it('11. DEFECT REGRESSION: Coordinates diff must NOT trigger when property has polygon centroid differing from pin marker', () => {
+    const liveProp = {
+      id: 'prop-prop3',
+      title: 'Prop3',
+      location: {
+        lat: 16.5075,
+        lng: 80.6495,
+        address: 'Vijayawada Highway'
+      },
+      boundary: [
+        { lat: 16.506, lng: 80.648 },
+        { lat: 16.508, lng: 80.648 },
+        { lat: 16.508, lng: 80.650 },
+        { lat: 16.506, lng: 80.650 }
+      ],
+      photos: ['https://easeland.in/photo1.jpg'],
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      pendingReauditData: {
+        title: 'Prop3',
+        location: {
+          lat: 16.5075,
+          lng: 80.6495,
+          address: 'Vijayawada Highway'
+        },
+        photos: ['https://easeland.in/photo1.jpg', 'https://easeland.in/photo2.jpg']
+      }
+    };
+
+    const diffResult = computeReauditDiff(liveProp);
+    assert.strictEqual(diffResult.changedKeys.has('location'), false, 'Location must NOT be flagged as changed due to polygon centroid vs pin');
+  });
 });

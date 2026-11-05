@@ -203,31 +203,95 @@ export function computeReauditDiff(property) {
   }
 
   // 11. Location & Address & Pin Coordinates
-  const liveLoc = property.location || {};
-  const pendingLoc = pending.location || {};
+  const normalizeLocText = (str) => {
+    if (!str) return '';
+    return String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+  };
 
-  const liveAddress = cleanStr(liveLoc.address || property.address);
-  const pendingAddress = cleanStr(pendingLoc.address || pending.address);
+  const rawLiveLoc = property.location;
+  const rawPendingLoc = pending.location;
 
-  const liveCoords = extractCoordinates(property);
-  const pendingCoords = extractCoordinates(pending);
+  let liveLocObj = {};
+  if (typeof rawLiveLoc === 'string') {
+    try {
+      liveLocObj = JSON.parse(rawLiveLoc);
+    } catch (e) {
+      liveLocObj = { address: rawLiveLoc, locality: rawLiveLoc, city: rawLiveLoc };
+    }
+  } else if (rawLiveLoc && typeof rawLiveLoc === 'object') {
+    liveLocObj = rawLiveLoc;
+  }
 
-  const addressDiff = Boolean(pendingAddress && pendingAddress !== liveAddress);
-  const coordsDiff = Boolean(
-    !isNaN(pendingCoords.lat) &&
-    !isNaN(pendingCoords.lng) &&
-    (isNaN(liveCoords.lat) ||
-      Math.abs(pendingCoords.lat - liveCoords.lat) > 0.0001 ||
-      Math.abs(pendingCoords.lng - liveCoords.lng) > 0.0001)
+  let pendingLocObj = {};
+  if (typeof rawPendingLoc === 'string') {
+    try {
+      pendingLocObj = JSON.parse(rawPendingLoc);
+    } catch (e) {
+      pendingLocObj = { address: rawPendingLoc, locality: rawPendingLoc, city: rawPendingLoc };
+    }
+  } else if (rawPendingLoc && typeof rawPendingLoc === 'object') {
+    pendingLocObj = rawPendingLoc;
+  }
+
+  const liveAddress = cleanStr(liveLocObj.address || property.address || (typeof rawLiveLoc === 'string' ? rawLiveLoc : ''));
+  const pendingAddress = cleanStr(pendingLocObj.address || pending.address || (typeof rawPendingLoc === 'string' ? rawPendingLoc : ''));
+
+  const normLiveAddr = normalizeLocText(liveAddress);
+  const normPendingAddr = normalizeLocText(pendingAddress);
+
+  // Address changed only if both are non-empty and neither encompasses the other, or newly supplied on edited location
+  const addressDiff = Boolean(
+    pendingAddress &&
+    (
+      (!liveAddress && (!Array.isArray(pending.modifiedSteps) || pending.modifiedSteps.includes(3))) ||
+      (liveAddress && normLiveAddr !== normPendingAddr && !normLiveAddr.includes(normPendingAddr) && !normPendingAddr.includes(normLiveAddr))
+    )
   );
 
-  const localityDiff = Boolean(cleanStr(pendingLoc.locality) && cleanStr(pendingLoc.locality) !== cleanStr(liveLoc.locality));
-  const cityDiff = Boolean(cleanStr(pendingLoc.city) && cleanStr(pendingLoc.city) !== cleanStr(liveLoc.city));
-  const districtDiff = Boolean(cleanStr(pendingLoc.district) && cleanStr(pendingLoc.district) !== cleanStr(liveLoc.district));
-  const stateDiff = Boolean(cleanStr(pendingLoc.state) && cleanStr(pendingLoc.state) !== cleanStr(liveLoc.state));
-  const pincodeDiff = Boolean(cleanStr(pendingLoc.pincode) && cleanStr(pendingLoc.pincode) !== cleanStr(liveLoc.pincode));
+  // Pin coordinates: Extract actual pin marker coordinates (avoid clobbering with polygon centroids)
+  const extractPinMarker = (item, locObj) => {
+    let lat = Number(locObj?.lat ?? locObj?.latitude ?? item?.lat ?? item?.latitude);
+    let lng = Number(locObj?.lng ?? locObj?.longitude ?? item?.lng ?? item?.longitude);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      return { lat: NaN, lng: NaN };
+    }
+    return { lat, lng };
+  };
 
-  if (addressDiff || coordsDiff || localityDiff || cityDiff || districtDiff || stateDiff || pincodeDiff) {
+  const livePin = extractPinMarker(property, liveLocObj);
+  const pendingPin = extractPinMarker(pending, pendingLocObj);
+
+  // Coordinates differ ONLY if both have valid numeric coordinates and distance > 0.0002 (~22 meters)
+  const coordsDiff = Boolean(
+    !isNaN(pendingPin.lat) &&
+    !isNaN(pendingPin.lng) &&
+    !isNaN(livePin.lat) &&
+    !isNaN(livePin.lng) &&
+    (Math.abs(pendingPin.lat - livePin.lat) > 0.0002 ||
+      Math.abs(pendingPin.lng - livePin.lng) > 0.0002)
+  );
+
+  // Structural fields (locality, city, district, state, pincode) differ ONLY if BOTH specify non-empty values and they conflict
+  const compareLocField = (field) => {
+    const pVal = cleanStr(pendingLocObj[field]);
+    const lVal = cleanStr(liveLocObj[field]);
+    if (!pVal || !lVal) return false;
+    const normP = normalizeLocText(pVal);
+    const normL = normalizeLocText(lVal);
+    if (normP === normL || normL.includes(normP) || normP.includes(normL)) return false;
+    return true;
+  };
+
+  const localityDiff = compareLocField('locality');
+  const cityDiff = compareLocField('city');
+  const districtDiff = compareLocField('district');
+  const stateDiff = compareLocField('state');
+  const pincodeDiff = compareLocField('pincode') || compareLocField('postalCode');
+
+  // If pending specified modifiedSteps and step 3 was not modified, suppress location diff
+  const isLocationStepModified = !Array.isArray(pending.modifiedSteps) || pending.modifiedSteps.includes(3);
+
+  if (isLocationStepModified && (addressDiff || coordsDiff || localityDiff || cityDiff || districtDiff || stateDiff || pincodeDiff)) {
     changedKeys.add('location');
     diffs.location = {
       changed: true,
@@ -235,10 +299,10 @@ export function computeReauditDiff(property) {
       coordsDiff,
       liveAddress: liveAddress || 'Address not set',
       proposedAddress: pendingAddress || liveAddress,
-      liveCoords,
-      proposedCoords: !isNaN(pendingCoords.lat) ? pendingCoords : liveCoords,
-      liveLoc,
-      proposedLoc: pendingLoc
+      liveCoords: !isNaN(livePin.lat) ? livePin : extractCoordinates(property),
+      proposedCoords: !isNaN(pendingPin.lat) ? pendingPin : extractCoordinates(pending),
+      liveLoc: liveLocObj,
+      proposedLoc: pendingLocObj
     };
   }
 
@@ -247,14 +311,18 @@ export function computeReauditDiff(property) {
   const pendingPoly = extractBoundaryPolygon(pending);
 
   let boundaryDiff = false;
-  if (pendingPoly.length > 0) {
-    if (livePoly.length !== pendingPoly.length) {
+  const isBoundaryStepModified = !Array.isArray(pending.modifiedSteps) || pending.modifiedSteps.includes(7);
+
+  if (isBoundaryStepModified && pendingPoly.length > 0) {
+    if (livePoly.length === 0) {
+      boundaryDiff = true;
+    } else if (livePoly.length !== pendingPoly.length) {
       boundaryDiff = true;
     } else {
       for (let i = 0; i < pendingPoly.length; i++) {
         if (
-          Math.abs(pendingPoly[i][0] - livePoly[i][0]) > 0.00005 ||
-          Math.abs(pendingPoly[i][1] - livePoly[i][1]) > 0.00005
+          Math.abs(pendingPoly[i][0] - livePoly[i][0]) > 0.0001 ||
+          Math.abs(pendingPoly[i][1] - livePoly[i][1]) > 0.0001
         ) {
           boundaryDiff = true;
           break;

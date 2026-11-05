@@ -45,10 +45,13 @@ export function parseVideoLink(url) {
 
 function isPropertyCurrentlyLive(propData) {
   if (!propData) return false;
+  const st = String(propData.status || propData.listingStatus || propData.listing_status || '').toUpperCase();
   return Boolean(
     propData.isAlreadyLive === true ||
-    String(propData.status || propData.listingStatus || propData.listing_status || '').toUpperCase() === 'LIVE' ||
-    (propData.isPublished && propData.isPlatformVerified) ||
+    st === 'LIVE' ||
+    st === 'APPROVED' ||
+    st === 'APPROVED_LIVE' ||
+    (propData.isPublished && (propData.isPlatformVerified || String(propData.verificationStatus || '').toUpperCase() === 'PLATFORM VERIFIED')) ||
     propData.hasPendingEdits === true ||
     Boolean(propData.reAuditStatus) ||
     Boolean(propData.pendingReauditData)
@@ -91,12 +94,24 @@ export async function addPropertyVideoLink(
     }
 
     if (!propData || Object.keys(propData).length === 0) {
+      if (typeof window !== 'undefined') {
+        try {
+          const pRes = await fetch('/api/properties/' + encodeURIComponent(propertyId));
+          if (pRes.ok) {
+            const json = await pRes.json();
+            if (json.success && json.property) {
+              propData = json.property;
+              if (Array.isArray(propData.media)) masterMedia = sanitizeMediaArray(propData.media);
+            }
+          }
+        } catch (e) {}
+      }
       try {
         const { mockApi } = await import('../services/mockApi.js');
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj) {
-          propData = pObj;
-          if (Array.isArray(pObj.media)) masterMedia = sanitizeMediaArray(pObj.media);
+          propData = { ...pObj, ...propData };
+          if (Array.isArray(pObj.media) && masterMedia.length === 0) masterMedia = sanitizeMediaArray(pObj.media);
         }
       } catch (e) {}
     }
@@ -399,12 +414,24 @@ export async function uploadPropertyMediaFile(
     }
 
     if (!propData || Object.keys(propData).length === 0) {
+      if (typeof window !== 'undefined') {
+        try {
+          const pRes = await fetch('/api/properties/' + encodeURIComponent(propertyId));
+          if (pRes.ok) {
+            const json = await pRes.json();
+            if (json.success && json.property) {
+              propData = json.property;
+              if (Array.isArray(propData.media)) masterMedia = sanitizeMediaArray(propData.media);
+            }
+          }
+        } catch (e) {}
+      }
       try {
         const { mockApi } = await import('../services/mockApi.js');
         const pObj = mockApi.getPropertyById(propertyId);
         if (pObj) {
-          propData = pObj;
-          if (Array.isArray(pObj.media)) masterMedia = sanitizeMediaArray(pObj.media);
+          propData = { ...pObj, ...propData };
+          if (Array.isArray(pObj.media) && masterMedia.length === 0) masterMedia = sanitizeMediaArray(pObj.media);
         }
       } catch (e) {}
     }

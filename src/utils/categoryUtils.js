@@ -297,22 +297,98 @@ export function getCategoryFallbackImage(property) {
  * 2. If no cover photo is marked, the first genuine user-uploaded photo from media / photos / images is used.
  * 3. Default stock images are NEVER returned anywhere. If zero photos were uploaded, NO_PHOTO_PLACEHOLDER is returned.
  */
+/**
+ * Helper to identify unapproved/pending media URLs for live properties under re-audit
+ */
+function getReauditBlockedPhotoUrls(property) {
+  const isLiveReaudit = Boolean(
+    property && (
+      property.hasPendingEdits ||
+      property.pendingReauditData ||
+      property.pendingEdits ||
+      property.reAuditStatus === 'PENDING_VERIFICATION' ||
+      property.reAuditStatus === 'UNDER_REVIEW'
+    )
+  );
+
+  const blockedUrls = new Set();
+  if (!isLiveReaudit) return { isLiveReaudit: false, blockedUrls };
+
+  const registerBlocked = (m) => {
+    if (!m) return;
+    if (typeof m === 'object') {
+      const st = String(m.verificationStatus || m.status || '').toUpperCase();
+      if (st === 'PENDING_REVIEW' || st === 'PENDING' || st === 'REJECTED') {
+        const u = m.publicUrl || m.url || m.mediaUrl || m.storagePath;
+        if (u) blockedUrls.add(String(u).toLowerCase().trim());
+      }
+    }
+  };
+
+  if (Array.isArray(property.media)) property.media.forEach(registerBlocked);
+  if (Array.isArray(property.pendingReauditData?.media)) property.pendingReauditData.media.forEach(registerBlocked);
+  if (Array.isArray(property.pendingEdits?.media)) property.pendingEdits.media.forEach(registerBlocked);
+
+  // If publicApprovedMedia exists, any photo in photos or media that is NOT in publicApprovedMedia is unapproved
+  if (Array.isArray(property.publicApprovedMedia) && property.publicApprovedMedia.length > 0) {
+    const approvedUrls = new Set(
+      property.publicApprovedMedia.map(m => {
+        const u = typeof m === 'string' ? m : (m.publicUrl || m.url || m.mediaUrl || m.storagePath);
+        return u ? String(u).toLowerCase().trim() : null;
+      }).filter(Boolean)
+    );
+    const checkUnapproved = (u) => {
+      if (!u) return;
+      const low = String(u).toLowerCase().trim();
+      if (!approvedUrls.has(low)) blockedUrls.add(low);
+    };
+    if (Array.isArray(property.photos)) {
+      property.photos.forEach(p => {
+        const u = typeof p === 'string' ? p : (p.publicUrl || p.url);
+        checkUnapproved(u);
+      });
+    }
+  }
+
+  return { isLiveReaudit: true, blockedUrls };
+}
+
 export function getPropertyCoverOrFirstImage(property) {
   if (!property) return NO_PHOTO_PLACEHOLDER;
 
-  const mediaArrays = [
-    property.media,
-    property.photos,
-    property.publicApprovedMedia,
-    property.images
-  ];
+  const { isLiveReaudit, blockedUrls } = getReauditBlockedPhotoUrls(property);
+
+  const mediaArrays = (isLiveReaudit && Array.isArray(property.publicApprovedMedia) && property.publicApprovedMedia.length > 0)
+    ? [property.publicApprovedMedia]
+    : [
+      property.publicApprovedMedia,
+      property.media,
+      property.photos,
+      property.images
+    ];
+
+  const isValidPublicPhoto = (item) => {
+    if (!item) return null;
+    if (typeof item === 'object') {
+      const st = String(item.verificationStatus || item.status || '').toUpperCase();
+      if (isLiveReaudit && (st === 'PENDING_REVIEW' || st === 'PENDING' || st === 'REJECTED')) {
+        return null;
+      }
+    }
+    const u = extractValidPhotoUrl(item);
+    if (!u) return null;
+    if (isLiveReaudit && blockedUrls.has(u.toLowerCase().trim())) {
+      return null;
+    }
+    return u;
+  };
 
   // 1. Priority 1: Check for explicit Cover Photo in media arrays
   for (const arr of mediaArrays) {
     if (Array.isArray(arr) && arr.length > 0) {
       for (const item of arr) {
         if (isItemCoverPhoto(item)) {
-          const u = extractValidPhotoUrl(item);
+          const u = isValidPublicPhoto(item);
           if (u) return u;
         }
       }
@@ -328,7 +404,7 @@ export function getPropertyCoverOrFirstImage(property) {
     property.approvedThumbnail
   ];
   for (const field of coverCandidates) {
-    const u = extractValidPhotoUrl(field);
+    const u = isValidPublicPhoto(field);
     if (u) return u;
   }
 
@@ -336,7 +412,7 @@ export function getPropertyCoverOrFirstImage(property) {
   for (const arr of mediaArrays) {
     if (Array.isArray(arr) && arr.length > 0) {
       for (const item of arr) {
-        const u = extractValidPhotoUrl(item);
+        const u = isValidPublicPhoto(item);
         if (u) return u;
       }
     }
@@ -351,7 +427,7 @@ export function getPropertyCoverOrFirstImage(property) {
     property.photoUrl
   ];
   for (const field of singleImageCandidates) {
-    const u = extractValidPhotoUrl(field);
+    const u = isValidPublicPhoto(field);
     if (u) return u;
   }
 
@@ -360,7 +436,7 @@ export function getPropertyCoverOrFirstImage(property) {
     ? property.documents
     : (Array.isArray(property.propertyDocuments) ? property.propertyDocuments : []);
   for (const d of docs) {
-    const u = extractValidPhotoUrl(d);
+    const u = isValidPublicPhoto(d);
     if (u && /\.(jpg|jpeg|png|webp|svg)/i.test(u)) return u;
   }
 
@@ -368,24 +444,16 @@ export function getPropertyCoverOrFirstImage(property) {
   return NO_PHOTO_PLACEHOLDER;
 }
 
-/**
- * Safely extracts the FIRST genuine uploaded image (or Cover Photo) from any property payload.
- * Single entry point consumed by PropertyCard, PropertyDetailsView, UniversalMapEngine, UserDashboard, etc.
- */
 export function getFirstUploadedImage(property) {
   return getPropertyCoverOrFirstImage(property);
 }
 
-/**
- * Safely extracts a DEDUPLICATED list of ONLY actual uploaded PHOTOS.
- * Prioritizes the Cover Photo at index 0, followed by remaining user-uploaded photos.
- * Dynamically filters out all videos, walkthroughs, drone footage, and documents.
- * Guarantees zero duplicate dummy images or fallback padding when real photos exist.
- */
 export function getPropertyPhotosList(property) {
   if (!property) {
     return [{ url: NO_PHOTO_PLACEHOLDER, publicUrl: NO_PHOTO_PLACEHOLDER, mediaType: 'PHOTO', caption: 'No Photo Uploaded' }];
   }
+
+  const { isLiveReaudit, blockedUrls } = getReauditBlockedPhotoUrls(property);
 
   const title = property.title || 'Property Photo';
   const seenUrls = new Set();
@@ -393,8 +461,18 @@ export function getPropertyPhotosList(property) {
 
   const addPhotoItem = (item, isCover = false) => {
     if (!item) return;
+    if (typeof item === 'object') {
+      const st = String(item.verificationStatus || item.status || '').toUpperCase();
+      if (isLiveReaudit && (st === 'PENDING_REVIEW' || st === 'PENDING' || st === 'REJECTED')) {
+        return;
+      }
+    }
+
     const url = extractValidPhotoUrl(item);
     if (!url) return;
+    if (isLiveReaudit && blockedUrls.has(url.toLowerCase().trim())) {
+      return;
+    }
 
     let caption = title;
     if (typeof item === 'object') {
@@ -418,12 +496,14 @@ export function getPropertyPhotosList(property) {
     }
   };
 
-  const mediaArrays = [
-    property.media,
-    property.photos,
-    property.publicApprovedMedia,
-    property.images
-  ];
+  const mediaArrays = (isLiveReaudit && Array.isArray(property.publicApprovedMedia) && property.publicApprovedMedia.length > 0)
+    ? [property.publicApprovedMedia]
+    : [
+      property.publicApprovedMedia,
+      property.media,
+      property.photos,
+      property.images
+    ];
 
   // 1. Process cover photos first so cover photo lands at index 0
   for (const arr of mediaArrays) {
@@ -485,16 +565,12 @@ export function getPropertyPhotosList(property) {
   return [{ url: NO_PHOTO_PLACEHOLDER, publicUrl: NO_PHOTO_PLACEHOLDER, mediaType: 'PHOTO', caption: 'No Photo Uploaded' }];
 }
 
-/**
- * Safely extracts a DEDUPLICATED list of all uploaded property media.
- * Places Cover Photo at index 0.
- * Returns an array of normalized media objects: [{ url, publicUrl, mediaType, caption }]
- * Guarantees zero duplicate URLs in galleries across all property payload variants.
- */
 export function getPropertyMediaList(property) {
   if (!property) {
     return [{ url: NO_PHOTO_PLACEHOLDER, publicUrl: NO_PHOTO_PLACEHOLDER, mediaType: 'PHOTO', caption: 'No Media Uploaded' }];
   }
+
+  const { isLiveReaudit, blockedUrls } = getReauditBlockedPhotoUrls(property);
 
   const title = property.title || 'Property Media';
   const seenUrls = new Set();
@@ -502,6 +578,13 @@ export function getPropertyMediaList(property) {
 
   const addMediaItem = (item, isCover = false) => {
     if (!item) return;
+    if (typeof item === 'object') {
+      const st = String(item.verificationStatus || item.status || '').toUpperCase();
+      if (isLiveReaudit && (st === 'PENDING_REVIEW' || st === 'PENDING' || st === 'REJECTED')) {
+        return;
+      }
+    }
+
     let url = null;
     let caption = title;
     let mediaType = 'PHOTO';
@@ -519,6 +602,9 @@ export function getPropertyMediaList(property) {
     if (!url || typeof url !== 'string') return;
     url = url.trim();
     if (!url || isDefaultStockImageUrl(url)) return;
+    if (isLiveReaudit && blockedUrls.has(url.toLowerCase().trim())) {
+      return;
+    }
 
     const lowerUrl = url.toLowerCase();
     if (
@@ -566,12 +652,14 @@ export function getPropertyMediaList(property) {
     }
   };
 
-  const arraysToProcess = [
-    property.media,
-    property.photos,
-    property.publicApprovedMedia,
-    property.images
-  ];
+  const arraysToProcess = (isLiveReaudit && Array.isArray(property.publicApprovedMedia) && property.publicApprovedMedia.length > 0)
+    ? [property.publicApprovedMedia]
+    : [
+      property.publicApprovedMedia,
+      property.media,
+      property.photos,
+      property.images
+    ];
 
   // 1. Process cover photos first so cover photo is at index 0
   for (const arr of arraysToProcess) {

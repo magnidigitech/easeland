@@ -21,6 +21,8 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
   const [step, setStep] = useState(1);
   const [propertyId, setPropertyId] = useState(null);
   const [referenceId, setReferenceId] = useState(null);
+  const [modifiedSteps, setModifiedSteps] = useState(() => new Set());
+  const markStepModified = (stepNum) => setModifiedSteps(prev => new Set([...prev, stepNum]));
 
   // Resume Draft State
   const [draftsList, setDraftsList] = useState([]);
@@ -286,6 +288,11 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
       ownerSubmittedBoundary: p.ownerSubmittedBoundary || p.boundary || propCandidate.ownerSubmittedBoundary || null
     });
 
+    const existingSteps = pendingData.modifiedSteps || propCandidate.modifiedSteps || baseP.modifiedSteps;
+    if (Array.isArray(existingSteps) && existingSteps.length > 0) {
+      setModifiedSteps(new Set(existingSteps));
+    }
+
     const targetStep = overrideStep !== null && overrideStep !== undefined
       ? Number(overrideStep)
       : determineResumeStep(propCandidate);
@@ -543,6 +550,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
   };
 
   const handleRefreshMedia = async (directMedia = null) => {
+    markStepModified(5);
     if (Array.isArray(directMedia)) {
       setFormData(prev => ({
         ...prev,
@@ -588,6 +596,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
   };
 
   const handleRefreshDocuments = async () => {
+    markStepModified(6);
     if (!propertyId || !user?.uid) return;
     try {
       const { getPropertyDocuments } = await import('../firebase/documentService.js');
@@ -621,9 +630,17 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
       const effPurpose = customUpdates?.purpose !== undefined ? customUpdates.purpose : formData.purpose;
       const isRental = effPurpose === Purpose.RENT || effPurpose === Purpose.LEASE || effPurpose === 'RENT' || effPurpose === 'LEASE';
 
+      const currentModifiedSteps = Array.from(modifiedSteps);
+      if (customUpdates?.location) currentModifiedSteps.push(3);
+      if (customUpdates?.media || customUpdates?.photos) currentModifiedSteps.push(5);
+      if (customUpdates?.documents) currentModifiedSteps.push(6);
+      if (customUpdates?.boundary || customUpdates?.ownerSubmittedBoundary) currentModifiedSteps.push(7);
+      const uniqueModifiedSteps = Array.from(new Set(currentModifiedSteps));
+
       const draftData = {
         ...formData,
         ...(customUpdates || {}),
+        modifiedSteps: uniqueModifiedSteps,
         lastStep: targetStep,
         ownerId: user?.uid || user?.id,
         ownerPublicName: ownerName,
@@ -1741,6 +1758,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
           <PropertyLocationStep
             locationData={formData.location}
             onLocationConfirmed={(confirmedLocation) => {
+              markStepModified(3);
               setFormData(prev => {
                 const next = { ...prev, location: confirmedLocation };
                 if (typeof window !== 'undefined' && propertyId) {
@@ -1806,6 +1824,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
             propertyLocation={formData.location}
             boundaryData={formData.boundary || formData.ownerSubmittedBoundary}
             onSaveBoundary={async (boundaryPayload) => {
+              markStepModified(7);
               setFormData(prev => ({ ...prev, boundary: boundaryPayload, ownerSubmittedBoundary: boundaryPayload }));
               await handleSaveDraft(7, { boundary: boundaryPayload, ownerSubmittedBoundary: boundaryPayload });
               setStep(8);
@@ -1825,7 +1844,7 @@ export default function PostPropertyWizard({ onComplete, onCancel, onGoToAccount
           <PropertyReviewStep
             propertyId={propertyId}
             ownerId={user?.uid}
-            formData={formData}
+            formData={{ ...formData, modifiedSteps: Array.from(modifiedSteps) }}
             referenceId={referenceId}
             onNavigateStep={(targetStep) => setStep(targetStep)}
             onSubmissionComplete={() => {

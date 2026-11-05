@@ -435,7 +435,7 @@ export async function geocodePlaceWithHierarchy(queryStr) {
 export function extractBoundaryPolygon(item) {
   if (!item) return [];
 
-  let boundObj = item.boundary || item.ownerSubmittedBoundary;
+  let boundObj = item.boundary || item.ownerSubmittedBoundary || item.approvedPolygon || item.polygon || item.boundaryPoints || item.location?.boundary;
   if (typeof boundObj === 'string') {
     try { boundObj = JSON.parse(boundObj); } catch (e) { boundObj = null; }
   }
@@ -449,7 +449,10 @@ export function extractBoundaryPolygon(item) {
       boundObj?.points ||
       boundObj?.polygon ||
       (Array.isArray(item.boundary) ? item.boundary : null) ||
-      (Array.isArray(item.ownerSubmittedBoundary) ? item.ownerSubmittedBoundary : null)
+      (Array.isArray(item.ownerSubmittedBoundary) ? item.ownerSubmittedBoundary : null) ||
+      (Array.isArray(item.approvedPolygon) ? item.approvedPolygon : null) ||
+      (Array.isArray(item.polygon) ? item.polygon : null) ||
+      (Array.isArray(item.boundaryPoints) ? item.boundaryPoints : null)
     );
 
   if (typeof rawPoly === 'string') {

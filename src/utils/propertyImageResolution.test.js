@@ -191,4 +191,134 @@ describe('EaseLand Property Cover & Uploaded Image Resolution Suite', () => {
     assert.strictEqual(publicMedia.length, 1);
     assert.strictEqual(publicMedia[0].url, 'https://storage.easeland.in/uploads/approved_cursor_marker.jpg');
   });
+
+  it('9. DEFECT REGRESSION: Live property under re-audit must NEVER expose PENDING_REVIEW photos in getPropertyPhotosList', () => {
+    const livePropWithMixedMedia = {
+      id: 'prop_prop1',
+      title: 'Prop1',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      media: [
+        {
+          mediaId: 'm1',
+          type: 'PHOTO',
+          publicUrl: 'https://storage.easeland.in/uploads/approved_photo.jpg',
+          isPrimary: true,
+          verificationStatus: 'APPROVED'
+        },
+        {
+          mediaId: 'm2',
+          type: 'PHOTO',
+          publicUrl: 'https://storage.easeland.in/uploads/unapproved_new_photo1.jpg',
+          isPrimary: false,
+          verificationStatus: 'PENDING_REVIEW'
+        },
+        {
+          mediaId: 'm3',
+          type: 'PHOTO',
+          publicUrl: 'https://storage.easeland.in/uploads/unapproved_new_photo2.jpg',
+          isPrimary: false,
+          verificationStatus: 'PENDING_REVIEW'
+        }
+      ],
+      photos: [
+        'https://storage.easeland.in/uploads/approved_photo.jpg',
+        'https://storage.easeland.in/uploads/unapproved_new_photo1.jpg',
+        'https://storage.easeland.in/uploads/unapproved_new_photo2.jpg'
+      ],
+      pendingReauditData: {
+        photos: [
+          'https://storage.easeland.in/uploads/approved_photo.jpg',
+          'https://storage.easeland.in/uploads/unapproved_new_photo1.jpg',
+          'https://storage.easeland.in/uploads/unapproved_new_photo2.jpg'
+        ]
+      }
+    };
+
+    const photos = getPropertyPhotosList(livePropWithMixedMedia);
+    // MUST be 1 approved photo on the live view, NOT 3!
+    assert.strictEqual(photos.length, 1, 'Live property must only display 1 approved photo to public buyers');
+    assert.strictEqual(photos[0].url, 'https://storage.easeland.in/uploads/approved_photo.jpg');
+
+    const media = getPropertyMediaList(livePropWithMixedMedia);
+    assert.strictEqual(media.length, 1, 'Live property must only display 1 approved media item to public buyers');
+    assert.strictEqual(media[0].url, 'https://storage.easeland.in/uploads/approved_photo.jpg');
+  });
+
+  it('10. DEFECT REGRESSION: Live property under re-audit with publicApprovedMedia strictly prioritizes publicApprovedMedia over proposed photos', () => {
+    const livePropWithApprovedBaseline = {
+      id: 'prop_prop2',
+      title: 'Prop2',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      publicApprovedMedia: [
+        {
+          mediaId: 'm1',
+          type: 'PHOTO',
+          publicUrl: 'https://storage.easeland.in/uploads/baseline_photo.jpg',
+          isPrimary: true,
+          verificationStatus: 'APPROVED'
+        }
+      ],
+      media: [
+        {
+          mediaId: 'm1',
+          type: 'PHOTO',
+          publicUrl: 'https://storage.easeland.in/uploads/baseline_photo.jpg',
+          isPrimary: true,
+          verificationStatus: 'APPROVED'
+        },
+        {
+          mediaId: 'm2',
+          type: 'PHOTO',
+          publicUrl: 'https://storage.easeland.in/uploads/unapproved_photo2.jpg',
+          isPrimary: false
+        }
+      ],
+      photos: [
+        'https://storage.easeland.in/uploads/baseline_photo.jpg',
+        'https://storage.easeland.in/uploads/unapproved_photo2.jpg'
+      ]
+    };
+
+    const photos = getPropertyPhotosList(livePropWithApprovedBaseline);
+    assert.strictEqual(photos.length, 1);
+    assert.strictEqual(photos[0].url, 'https://storage.easeland.in/uploads/baseline_photo.jpg');
+  });
+
+  it('11. DEFECT REGRESSION: publicApprovedMedia containing string URLs safely isolates unapproved photos without wiping photos list', () => {
+    const livePropWithStringApproved = {
+      id: 'prop_prop3',
+      title: 'Prop3',
+      status: 'LIVE',
+      listingStatus: 'LIVE',
+      isPublished: true,
+      isPlatformVerified: true,
+      hasPendingEdits: true,
+      reAuditStatus: 'PENDING_VERIFICATION',
+      publicApprovedMedia: [
+        'https://storage.easeland.in/uploads/legacy_string_photo.jpg'
+      ],
+      media: [
+        'https://storage.easeland.in/uploads/legacy_string_photo.jpg',
+        'https://storage.easeland.in/uploads/unapproved_new.jpg'
+      ],
+      photos: [
+        'https://storage.easeland.in/uploads/legacy_string_photo.jpg',
+        'https://storage.easeland.in/uploads/unapproved_new.jpg'
+      ]
+    };
+
+    const photos = getPropertyPhotosList(livePropWithStringApproved);
+    assert.strictEqual(photos.length, 1);
+    assert.strictEqual(photos[0].url, 'https://storage.easeland.in/uploads/legacy_string_photo.jpg');
+  });
 });
