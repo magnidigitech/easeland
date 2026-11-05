@@ -454,7 +454,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   }
 
   return (
-    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-8 pb-14 sm:pt-12 sm:pb-20 lg:py-4 xl:py-6 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 border-b border-slate-800">
+    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-2.5 pb-4 sm:pt-8 sm:pb-12 lg:py-4 xl:py-6 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 border-b border-slate-800">
 
       {/* Dynamic CMS Hero Background Image (Desktop & Mobile PWA Versions) */}
       {(() => {
@@ -469,15 +469,17 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           : cleanMobile;
         return (
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {/* Desktop landscape cover */}
             <div
               className="hidden md:block absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none opacity-95 transition-opacity duration-700"
               style={{ backgroundImage: 'url("' + heroDesktopSrc + '")', backgroundPosition: 'center center', backgroundSize: 'cover' }}
             />
+            {/* Mobile portrait cover */}
             <div
               className="md:hidden absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none opacity-95 transition-opacity duration-700"
               style={{ backgroundImage: 'url("' + heroMobileSrc + '")', backgroundPosition: 'center center', backgroundSize: 'cover' }}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/15 to-black/45 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/55 pointer-events-none" />
           </div>
         );
       })()}
@@ -485,18 +487,18 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
       <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto text-center relative z-10 w-full">
 
         {/* Verification Tagline */}
-        <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-3 sm:mb-4 lg:mb-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
+        <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full border border-amber-400/30 text-[10px] sm:text-xs font-semibold text-amber-400 mb-1.5 sm:mb-4 lg:mb-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
           <ShieldCheck className="w-4 h-4 text-amber-400" />
           <span>{siteConfig?.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
         </div>
 
         {/* Hero Title */}
-        <h1 className="home-title-fluid text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-2 sm:mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
+        <h1 className="home-title-fluid text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-1 sm:mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
           {siteConfig?.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
           <span className="text-metallic-gold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
         </h1>
 
-        <p className="home-subtitle-fluid text-base sm:text-lg text-slate-100 max-w-2xl mx-auto mb-3.5 sm:mb-4 lg:mb-5 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+        <p className="home-subtitle-fluid text-xs sm:text-lg text-slate-100 max-w-2xl mx-auto mb-2 sm:mb-4 lg:mb-5 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
           {(() => {
             const sub = siteConfig?.homepage?.heroSubtitle;
             if (
@@ -515,15 +517,15 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         </p>
 
         {/* DEEP SEARCH CARD */}
-        <div className="home-card-fluid bg-slate-900/95 rounded-2xl p-3.5 sm:p-5 lg:p-6 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
+        <div className="home-card-fluid bg-slate-900/95 rounded-2xl p-2.5 sm:p-5 lg:p-6 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
 
           {/* Purpose Tabs */}
-          <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+          <div className="flex items-center justify-between mb-2 border-b border-slate-800 pb-1.5 sm:mb-3 sm:pb-2.5">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPurpose('buy')}
-                className={'px-5 py-2 rounded-xl text-sm font-bold transition-all border ' + (
+                className={'px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all border ' + (
                   purpose === 'buy'
                     ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
@@ -535,7 +537,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
               <button
                 type="button"
                 onClick={() => setPurpose('rent')}
-                className={'px-5 py-2 rounded-xl text-sm font-bold transition-all border ' + (
+                className={'px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all border ' + (
                   purpose === 'rent'
                     ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
@@ -553,7 +555,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           </div>
 
           {/* Search Form */}
-          <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
+          <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
 
             {/* Input with Map Pin Icon, Google Places (New) Suggestions, & Detect Current Location Button */}
             <div ref={!isCompact ? searchContainerRef : undefined} className="relative flex-1 w-full">
@@ -567,7 +569,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                   if (suggestions.length > 0) setSuggestionsOpen(true);
                 }}
                 placeholder="Search by locality, city, project name, or property type..."
-                className="w-full pl-12 pr-24 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
+                className="w-full pl-10 sm:pl-12 pr-20 sm:pr-24 py-2.5 sm:py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-xs sm:text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
               />
 
               {/* ACTION BUTTONS: CLEAR SEARCH BIN & DETECT CURRENT LOCATION */}
@@ -652,7 +654,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                   setCategory(val);
                   triggerSearch(query, purpose, val);
                 }}
-                className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                className="w-full py-2.5 sm:py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
               >
                 <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
                 {STANDARD_CATEGORIES.map(cat => (
@@ -664,7 +666,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             {/* Search Submit Button */}
             <button
               type="submit"
-              className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-slate-950 font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(234,179,8,0.25)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-yellow-400/40"
+              className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-slate-950 font-extrabold text-xs sm:text-sm px-6 py-2.5 sm:py-3.5 rounded-xl shadow-[0_4px_20px_rgba(234,179,8,0.25)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-yellow-400/40 cursor-pointer"
             >
               <Search className="w-4 h-4 stroke-[2.5]" />
               Search
@@ -672,7 +674,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           </form>
 
           {/* POPULAR SEARCHES PILLS BAR */}
-          <div className="mt-2.5 pt-2 sm:mt-3 sm:pt-2.5 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-1.5 sm:gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs font-bold text-slate-400">
+          <div className="mt-2 pt-1.5 sm:mt-2.5 sm:pt-2 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-1.5 sm:gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-[11px] sm:text-xs font-bold text-slate-400">
             <span className="flex items-center gap-1 text-slate-400 font-bold mr-1 shrink-0 whitespace-nowrap">
               <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
               Popular Searches:

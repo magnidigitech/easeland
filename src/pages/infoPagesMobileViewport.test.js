@@ -167,5 +167,10 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
     const cssContent = fs.readFileSync(cssPath, 'utf8');
     assert.ok(cssContent.includes('.home-hero-dynamic'), 'index.css must define .home-hero-dynamic');
     assert.ok(cssContent.includes('min-height: calc(100dvh - 8.5rem)'), 'home-hero-dynamic and info-hero-dynamic must support edge-to-edge flagship mobile viewports');
+
+    // 5. index.css defines PWA mobile dynamic viewport fluid scaling (dvh/dvw) without affecting desktop
+    assert.ok(cssContent.includes('max-width: 95dvw'), 'home-card-fluid must scale with dvw on mobile PWA');
+    assert.ok(cssContent.includes('max-width: 92dvw'), 'home-subtitle-fluid must scale with dvw on mobile PWA');
+    assert.ok(cssContent.includes('clamp(1.35rem, 3.8vw + 1vh, 1.85rem)'), 'home-title-fluid must scale with fluid clamp on mobile PWA');
   });
 });

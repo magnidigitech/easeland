@@ -775,6 +775,8 @@ textarea,
   }
 }
 
+
+
 /* Tablet (sm: >= 640px to < 768px): Top navbar is 5rem (h-20), bottom nav is 4rem (total 9rem) */
 @media (min-width: 640px) and (max-width: 767px) {
   .info-hero-dynamic {
@@ -811,17 +813,20 @@ textarea,
   }
 }
 
-/* Dynamic Desktop Homepage Hero Container:
-   Ensures the homepage hero banner dynamically fits desktop dynamic viewport height (100dvh minus desktop navbar),
-   while preserving mobile PWA padding and layout without hardcoding.
+/* Dynamic Homepage Hero Container:
+   Ensures the homepage hero banner dynamically fits mobile PWA visible aspect ratio (dvh/dvw)
+   and desktop dynamic viewport height (>= 1024px) without affecting desktop versions.
 */
 .home-hero-dynamic {
   min-height: calc(100vh - 8rem);
   min-height: calc(100dvh - 8rem);
+  width: 100%;
+  max-width: 100dvw;
   display: flex;
   flex-direction: column;
   justify-content: center;
   position: relative;
+  box-sizing: border-box;
 }
 
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
@@ -869,6 +874,32 @@ textarea,
     display: flex;
     flex-direction: column;
     justify-content: center;
+  }
+}
+
+/* PWA Mobile Dynamic Viewport Fluid Scaling (dvh / dvw) (< 768px):
+   Scales hero title, subtitle, and search card dynamically against dvh/dvw
+   so the search button and popular searches fit completely in the first viewport
+   WITHOUT affecting desktop/web versions (>= 1024px).
+*/
+@media screen and (max-width: 767px) {
+  .home-title-fluid {
+    font-size: clamp(1.35rem, 3.8vw + 1vh, 1.85rem) !important;
+    line-height: 1.15 !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .home-subtitle-fluid {
+    font-size: clamp(0.72rem, 1.2vw + 0.5vh, 0.85rem) !important;
+    line-height: 1.35 !important;
+    max-width: 92dvw !important;
+    margin-bottom: 0.45rem !important;
+  }
+
+  .home-card-fluid {
+    width: 100% !important;
+    max-width: 95dvw !important;
+    padding: clamp(0.6rem, 1.5vh, 0.95rem) !important;
   }
 }
 
