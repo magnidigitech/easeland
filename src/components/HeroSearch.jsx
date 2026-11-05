@@ -454,7 +454,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   }
 
   return (
-    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-12 pb-20 lg:py-8 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
+    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-12 pb-20 lg:py-4 xl:py-6 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 border-b border-slate-800">
 
       {/* Dynamic CMS Hero Background Image */}
       {(() => {
@@ -462,31 +462,31 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         const clean = (typeof raw === 'string') ? raw.trim() : '';
         const heroSrc = (!clean || clean.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : clean;
         return (
-          <>
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div
               className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-95 transition-opacity duration-700"
               style={{ backgroundImage: 'url("' + heroSrc + '")' }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/15 to-black/45 pointer-events-none" />
-          </>
+          </div>
         );
       })()}
 
       <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto text-center relative z-10 w-full">
 
         {/* Verification Tagline */}
-        <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-6 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
+        <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-3 sm:mb-4 lg:mb-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
           <ShieldCheck className="w-4 h-4 text-amber-400" />
           <span>{siteConfig?.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
         </div>
 
         {/* Hero Title */}
-        <h1 className="home-title-fluid text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
+        <h1 className="home-title-fluid text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-2 sm:mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
           {siteConfig?.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
           <span className="text-metallic-gold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
         </h1>
 
-        <p className="home-subtitle-fluid text-base sm:text-lg text-slate-100 max-w-2xl mx-auto mb-8 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+        <p className="home-subtitle-fluid text-base sm:text-lg text-slate-100 max-w-2xl mx-auto mb-3.5 sm:mb-4 lg:mb-5 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
           {(() => {
             const sub = siteConfig?.homepage?.heroSubtitle;
             if (
@@ -505,10 +505,10 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
         </p>
 
         {/* DEEP SEARCH CARD */}
-        <div className="home-card-fluid bg-slate-900/95 rounded-2xl p-4 sm:p-6 xl:p-8 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
+        <div className="home-card-fluid bg-slate-900/95 rounded-2xl p-3.5 sm:p-5 lg:p-6 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
 
           {/* Purpose Tabs */}
-          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -662,7 +662,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
           </form>
 
           {/* POPULAR SEARCHES PILLS BAR */}
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs font-bold text-slate-400">
+          <div className="mt-2.5 pt-2 sm:mt-3 sm:pt-2.5 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-1.5 sm:gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs font-bold text-slate-400">
             <span className="flex items-center gap-1 text-slate-400 font-bold mr-1 shrink-0 whitespace-nowrap">
               <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
               Popular Searches:

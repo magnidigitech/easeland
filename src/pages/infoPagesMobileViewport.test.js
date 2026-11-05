@@ -117,8 +117,9 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
     assert.ok(cssContent.includes('.home-card-fluid'), 'index.css must define .home-card-fluid');
 
     // Clamp assertions ensuring fluid scaling
-    assert.ok(cssContent.includes('clamp(3rem, 1.8rem + 1.8vw, 4.5rem)'), 'hero-title-fluid must scale dynamically between 3rem and 4.5rem');
-    assert.ok(cssContent.includes('clamp(440px, 240px + 18vh, 580px)'), 'hero-figure-fluid must scale 3D building visual height dynamically');
+    assert.ok(cssContent.includes('clamp(2.25rem, 1.5rem + 1.4vw, 3.75rem)'), 'hero-title-fluid must scale dynamically between 2.25rem and 3.75rem');
+    assert.ok(cssContent.includes('clamp(380px, 200px + 18vh, 520px)'), 'hero-figure-fluid must scale 3D building visual height dynamically');
+    assert.ok(cssContent.includes('max-height: 820px'), 'index.css must provide safeguard for compact laptop viewports');
 
     // Check all 3 info pages use fluid classes
     pages.forEach(({ name, file }) => {
