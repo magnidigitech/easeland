@@ -552,7 +552,7 @@ export default function OwnerLocationMarker({ initialLocation, initialBoundary, 
         {/* MAP CANVAS */}
         <div className="relative rounded-2xl overflow-hidden border-2 border-gray-200 shadow-inner h-96">
           
-          <div ref={mapContainerRef} className="w-full h-full z-0"></div>
+          <div ref={mapContainerRef} className="w-full h-full z-0 zoomable-map" data-allow-zoom="true"></div>
 
           {/* TOP INSTRUCTION BANNER WHEN IN BOUNDARY DRAWING MODE */}
           {isBoundaryMode && (

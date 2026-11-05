@@ -537,7 +537,7 @@ export default function VerificationLocationBoundaryCard({
 
         {/* LEAFLET CANVAS CONTAINER */}
         <div className="relative w-full h-[360px] sm:h-[420px] bg-slate-900">
-          <div ref={mapContainerRef} className="w-full h-full" />
+          <div ref={mapContainerRef} className="w-full h-full zoomable-map" data-allow-zoom="true" />
 
           {/* Floating Notice if no boundary exists */}
           {activePoly.length < 3 && (

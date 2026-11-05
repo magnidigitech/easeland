@@ -4,9 +4,10 @@ import App from './App.jsx'
 import './index.css'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
-import { registerServiceWorker } from './utils/pwaManager.js'
+import { registerServiceWorker, setupPwaMobileZoomGuard } from './utils/pwaManager.js'
 
-// Initialize EaseLand PWA Service Worker
+// Initialize EaseLand PWA Service Worker & Mobile Zoom Guard
+setupPwaMobileZoomGuard();
 registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById('root')).render(

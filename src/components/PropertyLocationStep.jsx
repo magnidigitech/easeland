@@ -1024,7 +1024,7 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
         {/* INTERACTIVE LEAFLET MINI MAP CANVAS */}
         <div className="relative rounded-2xl overflow-hidden border-2 border-slate-300 shadow-md">
-          <div ref={mapContainerRef} className="h-72 w-full z-10" />
+          <div ref={mapContainerRef} className="h-72 w-full z-10 zoomable-map" data-allow-zoom="true" />
 
           {/* Compact Hint Overlay Pill */}
           <div className="absolute top-3 right-3 z-20 pointer-events-none">

@@ -1023,9 +1023,19 @@ export default function App() {
                 }
 
                 if (matched && !isPropertyDeleted(matched) && !isFakeProperty(matched)) {
-                  const mKey = String(matched.id || matched.propertyId || matched.referenceId || '').trim().toLowerCase();
+                  // Hydrate with latest live property data from candidatePool to ensure freshest photos & media
+                  const liveMatch = candidatePool.find((p) => {
+                    if (!p) return false;
+                    const id1 = String(p.id || '').trim().toLowerCase();
+                    const id2 = String(p.propertyId || '').trim().toLowerCase();
+                    const ref = String(p.referenceId || '').trim().toLowerCase();
+                    return id1 === target || id2 === target || ref === target;
+                  });
+                  const resolvedProp = liveMatch ? { ...matched, ...liveMatch } : matched;
+
+                  const mKey = String(resolvedProp.id || resolvedProp.propertyId || resolvedProp.referenceId || '').trim().toLowerCase();
                   if (!explicitlyFeatured.some((ef) => String(ef.id || ef.propertyId || ef.referenceId || '').trim().toLowerCase() === mKey)) {
-                    explicitlyFeatured.push(matched);
+                    explicitlyFeatured.push(resolvedProp);
                   }
                 }
               });
@@ -1107,21 +1117,16 @@ export default function App() {
                       onClick={() => handleSelectProperty(homepageProperties[0])}
                       className="group bg-white rounded-3xl border border-amber-300 ring-2 ring-amber-400/30 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden flex flex-col md:flex-row transform hover:-translate-y-1"
                     >
-                      <div className="relative md:w-1/2 h-64 md:h-auto min-h-[260px] bg-slate-50 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="relative md:w-1/2 h-64 md:h-auto min-h-[260px] bg-slate-900 overflow-hidden shrink-0">
                         <img
                           src={getFirstUploadedImage(homepageProperties[0])}
-                          alt=""
-                          aria-hidden="true"
-                          className="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-20 scale-110 pointer-events-none"
-                        />
-                        <img
-                          src={getFirstUploadedImage(homepageProperties[0])}
-                          alt={homepageProperties[0].title}
+                          alt={homepageProperties[0].title || 'Showcase Property'}
                           onError={(e) => {
                             e.target.onerror = null;
                             e.target.src = getCategoryFallbackImage(homepageProperties[0]);
                           }}
-                          className="relative z-1 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
                         />
                         <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-md border border-amber-300">
                           <Sparkles className="w-3.5 h-3.5 text-brand-yellow fill-brand-yellow" />
@@ -1199,26 +1204,26 @@ export default function App() {
                               isFeatured ? 'border-amber-300 ring-2 ring-amber-400/30' : 'border-brand-bordergray'
                             )}
                           >
-                            <div className="relative h-52 sm:h-56 bg-slate-50 overflow-hidden flex items-center justify-center">
+                            <div className="relative h-52 sm:h-56 bg-slate-900 overflow-hidden">
                               <img
                                 src={getFirstUploadedImage(prop)}
-                                alt=""
-                                aria-hidden="true"
-                                className="absolute inset-0 w-full h-full object-cover filter blur-xl opacity-20 scale-110 pointer-events-none"
-                              />
-                              <img
-                                src={getFirstUploadedImage(prop)}
-                                alt={prop.title}
+                                alt={prop.title || 'Promoted Property'}
                                 onError={(e) => {
                                   e.target.onerror = null;
                                   e.target.src = getCategoryFallbackImage(prop);
                                 }}
-                                className="relative z-1 w-full h-full object-contain p-2.5 group-hover:scale-105 transition-transform duration-300"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
                               />
                               <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
                                 <Sparkles className="w-3 h-3 text-brand-yellow fill-brand-yellow" />
                                 <span>FEATURED PROMOTION</span>
                               </div>
+                              {prop.category && (
+                                <div className="absolute bottom-3 left-3 z-10 bg-brand-charcoal/80 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                  {prop.category}
+                                </div>
+                              )}
                             </div>
 
                             <div className="p-5 flex-1 flex flex-col justify-between">

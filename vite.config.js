@@ -46,6 +46,11 @@ export default defineConfig({
         target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
         changeOrigin: true,
         secure: false
+      },
+      '/uploads': {
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
       }
     }
   },

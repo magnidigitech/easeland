@@ -887,7 +887,8 @@ export default function PropertyBoundaryStep({ propertyLocation, boundaryData, o
           <div className="relative">
             <div
               ref={mapContainerRef}
-              className="h-96 w-full z-10 bg-slate-900"
+              className="h-96 w-full z-10 bg-slate-900 zoomable-map"
+              data-allow-zoom="true"
             />
 
             {/* FLOATING MAP ZOOM IN / ZOOM OUT CONTROLS */}

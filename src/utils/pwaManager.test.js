@@ -102,10 +102,14 @@ test('EaseLand PWA Suite — Manifest, Service Worker, and PWA Architecture', as
     assert.strictEqual(typeof pwaManager.registerServiceWorker, 'function');
     assert.strictEqual(typeof pwaManager.promptPwaInstall, 'function');
     assert.strictEqual(typeof pwaManager.skipWaitingAndReload, 'function');
+    assert.strictEqual(typeof pwaManager.isZoomAllowedElement, 'function');
+    assert.strictEqual(typeof pwaManager.setupPwaMobileZoomGuard, 'function');
 
     // In Node.js environment without window:
     assert.strictEqual(pwaManager.isPwaInstalled(), false, 'isPwaInstalled must return false when window is undefined');
     assert.strictEqual(pwaManager.isIOSDevice(), false, 'isIOSDevice must return false when window is undefined');
+    const cleanup = pwaManager.setupPwaMobileZoomGuard();
+    assert.strictEqual(typeof cleanup, 'function', 'setupPwaMobileZoomGuard must return a cleanup function');
 
     const promptResult = await pwaManager.promptPwaInstall();
     assert.strictEqual(promptResult.outcome, 'unavailable', 'promptPwaInstall must report unavailable when no prompt is deferred');
@@ -125,6 +129,41 @@ test('EaseLand PWA Suite — Manifest, Service Worker, and PWA Architecture', as
     const swPath = path.join(rootDir, 'public', 'sw.js');
     const swContent = fs.readFileSync(swPath, 'utf8');
     assert.ok(swContent.includes('SW_VERSION'), 'sw.js must support dynamic SW_VERSION from query parameter');
+  });
+
+  await t.test('8. PWA Mobile Zoom Guard whitelists only Map engines and Property media/inspection', async () => {
+    const { isZoomAllowedElement } = await import('./pwaManager.js');
+
+    // Safe handling of null, undefined, primitives
+    assert.strictEqual(isZoomAllowedElement(null), false);
+    assert.strictEqual(isZoomAllowedElement(undefined), false);
+    assert.strictEqual(isZoomAllowedElement({}), false);
+
+    // Mock DOM elements
+    const createMockElement = (matchesSelector) => ({
+      nodeType: 1,
+      closest: (sel) => matchesSelector
+    });
+
+    // Zoom-allowed targets
+    assert.strictEqual(isZoomAllowedElement(createMockElement(true)), true, 'Elements matching zoom whitelist must return true');
+
+    // Non-zoomable targets (navbar, footer, search, forms)
+    assert.strictEqual(isZoomAllowedElement(createMockElement(false)), false, 'Normal UI elements must return false');
+  });
+
+  await t.test('9. Mobile viewport zoom lock configured in index.html and index.css', () => {
+    const indexPath = path.join(rootDir, 'index.html');
+    const indexContent = fs.readFileSync(indexPath, 'utf8');
+    assert.ok(indexContent.includes('user-scalable=no'), 'index.html must set user-scalable=no to prevent viewport zoom in PWA');
+    assert.ok(indexContent.includes('maximum-scale=1.0'), 'index.html must set maximum-scale=1.0');
+
+    const cssPath = path.join(rootDir, 'src', 'index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+    assert.ok(cssContent.includes('touch-action: pan-x pan-y'), 'index.css must configure pan-x pan-y on body/html');
+    assert.ok(cssContent.includes('.zoomable-map') && cssContent.includes('.zoomable-property'), 'index.css must have dedicated zoomable classes');
+    assert.ok(cssContent.includes('touch-action: none !important'), 'index.css must set touch-action: none for zoomable surfaces');
+    assert.ok(cssContent.includes('font-size: 16px !important'), 'index.css must enforce 16px input font size to prevent iOS auto-zoom');
   });
 
 });

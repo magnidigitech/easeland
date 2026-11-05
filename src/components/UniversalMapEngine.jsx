@@ -1519,7 +1519,7 @@ export default function UniversalMapEngine({
         </div>
 
         {/* LEAFLET MAP CANVAS */}
-        <div ref={mapContainerRef} className="w-full h-full z-0 min-h-[300px]"></div>
+        <div ref={mapContainerRef} className="w-full h-full z-0 min-h-[300px] zoomable-map" data-allow-zoom="true"></div>
 
         {/* MAP PRICE LEGEND RIGHT EDGE SIDE STRIP TAB & SLIDE-OUT DRAWER */}
         <div className="absolute top-24 right-0 z-30 flex flex-col items-end select-none">

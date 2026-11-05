@@ -28,6 +28,7 @@ import { createEnquiry } from '../firebase/enquiryService.js';
 import { isPropertyWishlisted, addWishlistProperty, removeWishlistProperty } from '../firebase/wishlistService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { trackPropertyView, trackLeadSubmitted, trackContactInitiated } from '../utils/metaPixel.js';
+import PropertyMediaZoomViewer from '../components/PropertyMediaZoomViewer.jsx';
 
 export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavigateHome, onNavigateMap }) {
   // Extract propertyId from props or window URL (/property/:propertyId)
@@ -646,66 +647,15 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         {/* MEDIA GALLERY */}
         <div className="bg-white rounded-2xl p-4 border border-brand-bordergray shadow-sm mb-8 space-y-3">
           
-          {/* MAIN MEDIA CANVAS */}
-          <div className="relative w-full h-[360px] sm:h-[480px] bg-brand-charcoal rounded-xl overflow-hidden flex items-center justify-center">
-            {activeMedia ? (
-              activeMedia.mediaType === 'WALKTHROUGH_VIDEO' || activeMedia.mediaType === 'DRONE_VIDEO' ? (
-                activeMedia.embedUrl ? (
-                  <iframe
-                    src={activeMedia.embedUrl}
-                    title={activeMedia.caption || property.title}
-                    className="w-full h-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <video
-                    src={activeMedia.url || activeMedia.publicUrl}
-                    controls
-                    className="w-full h-full object-contain"
-                  />
-                )
-              ) : (
-                <img
-                  src={activeMedia.url || activeMedia.publicUrl || defaultCategoryFallback}
-                  alt={activeMedia.caption || property.title}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = defaultCategoryFallback;
-                  }}
-                  className="w-full h-full object-cover"
-                />
-              )
-            ) : (
-              <img
-                src={defaultCategoryFallback}
-                alt={property.title}
-                className="w-full h-full object-cover"
-              />
-            )}
-
-            {/* MEDIA COUNTER BADGE */}
-            {mediaList.length > 0 && (
-              <div className="absolute bottom-4 right-4 bg-brand-charcoal/85 backdrop-blur-md text-white text-xs font-extrabold px-3 py-1 rounded-lg border border-white/10 shadow">
-                {activeMediaIndex + 1} / {mediaList.length}
-              </div>
-            )}
-
-            {/* MEDIA TYPE LABEL */}
-            {activeMedia && (
-              <div className="absolute top-4 left-4 bg-brand-charcoal/85 backdrop-blur-md text-brand-yellow text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-lg flex items-center gap-1.5 shadow border border-white/10">
-                {activeMedia.mediaType === 'DRONE_VIDEO' && <Plane className="w-3.5 h-3.5 text-brand-yellow" />}
-                {activeMedia.mediaType === 'WALKTHROUGH_VIDEO' && <Video className="w-3.5 h-3.5 text-brand-yellow" />}
-                <span>
-                  {activeMedia.mediaType === 'DRONE_VIDEO'
-                    ? 'Drone View'
-                    : activeMedia.mediaType === 'WALKTHROUGH_VIDEO'
-                    ? 'Property Walkthrough'
-                    : 'Property Photo'}
-                </span>
-              </div>
-            )}
-          </div>
+          {/* MAIN MEDIA CANVAS WITH INTERACTIVE PROPERTY ZOOM & FULLSCREEN INSPECTOR */}
+          <PropertyMediaZoomViewer
+            activeMedia={activeMedia}
+            mediaList={mediaList}
+            activeMediaIndex={activeMediaIndex}
+            onSelectMediaIndex={setActiveMediaIndex}
+            propertyTitle={property.title}
+            defaultFallback={defaultCategoryFallback}
+          />
 
           {/* THUMBNAIL LIST */}
           {mediaList.length > 1 && (
@@ -911,7 +861,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
               {/* MAP CANVAS */}
               <div
                 ref={mapContainerRef}
-                className="w-full h-80 sm:h-96 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden"
+                className="w-full h-80 sm:h-96 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden zoomable-map"
+                data-allow-zoom="true"
               ></div>
 
               <div className="text-[11px] text-gray-400 font-semibold">

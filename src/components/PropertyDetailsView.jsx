@@ -3,9 +3,11 @@ import { ShieldCheck, Heart, MapPin, CheckCircle2, Video, Plane, Lock, ChevronLe
 import { mockApi } from '../services/mockApi';
 import { getFirstUploadedImage, getCategoryFallbackImage, getPropertyMediaList, getVideoThumbnailUrl } from '../utils/categoryUtils.js';
 import { trackPropertyView, trackContactInitiated } from '../utils/metaPixel.js';
+import PropertyMediaZoomViewer from './PropertyMediaZoomViewer.jsx';
 
 export default function PropertyDetailsView({ property, onBack, isWishlisted, onWishlistToggle, activeRole, onViewOnMap }) {
   const mediaList = getPropertyMediaList(property);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [activeMedia, setActiveMedia] = useState(getFirstUploadedImage(property));
   const [activeMediaType, setActiveMediaType] = useState('image');
   const [googleNearbyPlaces, setGoogleNearbyPlaces] = useState([]);
@@ -300,44 +302,26 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
         {/* MEDIA GALLERY SECTION */}
         <div className="bg-white rounded-2xl p-4 border border-brand-bordergray shadow-sm mb-10 space-y-4">
           
-          {/* MAIN FEATURED MEDIA CANVAS */}
-          <div className="relative w-full h-[380px] sm:h-[500px] bg-brand-charcoal rounded-xl overflow-hidden flex items-center justify-center">
-            {activeMediaType === 'image' && (
-              <img
-                src={activeMedia || getFirstUploadedImage(property)}
-                alt={property.title}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = getCategoryFallbackImage(property);
-                }}
-                className="w-full h-full object-cover"
-              />
-            )}
-
-            {activeMediaType === 'video' && (
-              <video
-                src={property.videoUrl}
-                controls
-                autoPlay
-                className="w-full h-full object-contain"
-              />
-            )}
-
-            {activeMediaType === 'drone' && (
-              <video
-                src={property.droneVideoUrl}
-                controls
-                autoPlay
-                className="w-full h-full object-contain"
-              />
-            )}
-
-            {/* VERIFICATION OVERLAY BADGE */}
-            <div className="absolute top-4 left-4 bg-brand-charcoal/90 backdrop-blur-md text-brand-yellow text-xs font-extrabold uppercase tracking-wider px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow">
-              <ShieldCheck className="w-4 h-4 text-brand-yellow" />
-              <span>{property.verificationStatus}</span>
-            </div>
-          </div>
+          {/* MAIN FEATURED MEDIA CANVAS WITH INTERACTIVE PROPERTY ZOOM & FULLSCREEN INSPECTOR */}
+          <PropertyMediaZoomViewer
+            activeMedia={
+              activeMediaType === 'video'
+                ? { mediaType: 'WALKTHROUGH_VIDEO', url: property.videoUrl }
+                : activeMediaType === 'drone'
+                ? { mediaType: 'DRONE_VIDEO', url: property.droneVideoUrl }
+                : (mediaList[activeMediaIndex] || { mediaType: 'IMAGE', url: activeMedia || getFirstUploadedImage(property) })
+            }
+            mediaList={mediaList}
+            activeMediaIndex={activeMediaIndex}
+            onSelectMediaIndex={(idx) => {
+              setActiveMediaIndex(idx);
+              setActiveMediaType('image');
+              if (mediaList[idx]) setActiveMedia(mediaList[idx].url);
+            }}
+            propertyTitle={property.title}
+            verificationStatus={property.verificationStatus}
+            defaultFallback={getCategoryFallbackImage(property)}
+          />
 
           {/* MEDIA THUMBNAILS & CONTROLS */}
           <div className="flex items-center gap-3 overflow-x-auto pb-2">
@@ -345,11 +329,12 @@ export default function PropertyDetailsView({ property, onBack, isWishlisted, on
               <button
                 key={idx}
                 onClick={() => {
+                  setActiveMediaIndex(idx);
                   setActiveMedia(mItem.url);
                   setActiveMediaType('image');
                 }}
                 className={`relative w-24 h-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
-                  activeMedia === mItem.url && activeMediaType === 'image'
+                  (activeMediaIndex === idx || activeMedia === mItem.url) && activeMediaType === 'image'
                     ? 'border-brand-yellow ring-2 ring-brand-yellow/50'
                     : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
