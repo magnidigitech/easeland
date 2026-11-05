@@ -455,247 +455,247 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
 
   return (
     <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-12 pb-20 lg:py-8 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
-          
-          {/* Dynamic CMS Hero Background Image */}
+
+      {/* Dynamic CMS Hero Background Image */}
+      {(() => {
+        const raw = siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl;
+        const clean = (typeof raw === 'string') ? raw.trim() : '';
+        const heroSrc = (!clean || clean.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : clean;
+        return (
+          <>
+            <div
+              className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-95 transition-opacity duration-700"
+              style={{ backgroundImage: 'url("' + heroSrc + '")' }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/15 to-black/45 pointer-events-none" />
+          </>
+        );
+      })()}
+
+      <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto text-center relative z-10 w-full">
+
+        {/* Verification Tagline */}
+        <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-6 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <span>{siteConfig?.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
+        </div>
+
+        {/* Hero Title */}
+        <h1 className="home-title-fluid text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
+          {siteConfig?.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
+          <span className="text-metallic-gold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
+        </h1>
+
+        <p className="home-subtitle-fluid text-base sm:text-lg text-slate-100 max-w-2xl mx-auto mb-8 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
           {(() => {
-            const raw = siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl;
-            const clean = (typeof raw === 'string') ? raw.trim() : '';
-            const heroSrc = (!clean || clean.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : clean;
-            return (
-              <>
-                <div
-                  className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-95 transition-opacity duration-700"
-                  style={{ backgroundImage: 'url("' + heroSrc + '")' }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/15 to-black/45 pointer-events-none" />
-              </>
-            );
+            const sub = siteConfig?.homepage?.heroSubtitle;
+            if (
+              !sub ||
+              sub.includes('Zero agents') ||
+              sub.includes('Zero commission') ||
+              sub.includes('Zero brokerage') ||
+              sub.includes('zero broker') ||
+              sub.includes('zero brokerage') ||
+              sub.includes('Accurate plot boundaries')
+            ) {
+              return '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.';
+            }
+            return sub;
           })()}
-          
-          <div className="max-w-5xl mx-auto text-center relative z-10 w-full">
-            
-            {/* Verification Tagline */}
-            <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-6 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <span>{siteConfig?.homepage?.heroTagline || 'India-Wide Direct Property Marketplace — Powered by Google Maps Platform'}</span>
+        </p>
+
+        {/* DEEP SEARCH CARD */}
+        <div className="home-card-fluid bg-slate-900/95 rounded-2xl p-4 sm:p-6 xl:p-8 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
+
+          {/* Purpose Tabs */}
+          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPurpose('buy')}
+                className={'px-5 py-2 rounded-xl text-sm font-bold transition-all border ' + (
+                  purpose === 'buy'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
+                )}
+              >
+                Buy Property
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPurpose('rent')}
+                className={'px-5 py-2 rounded-xl text-sm font-bold transition-all border ' + (
+                  purpose === 'rent'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
+                )}
+              >
+                Rent Property
+              </button>
             </div>
 
-            {/* Hero Title */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
-              {siteConfig?.homepage?.heroTitlePrefix || 'Find, Explore & Verify Properties '} <br className="hidden sm:inline" />
-              <span className="text-metallic-gold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{siteConfig?.homepage?.heroTitleHighlight || 'Directly from Owners'}</span>
-            </h1>
-            
-            <p className="text-base sm:text-lg text-slate-100 max-w-2xl mx-auto mb-8 font-semibold drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
-              {(() => {
-                const sub = siteConfig?.homepage?.heroSubtitle;
-                if (
-                  !sub ||
-                  sub.includes('Zero agents') ||
-                  sub.includes('Zero commission') ||
-                  sub.includes('Zero brokerage') ||
-                  sub.includes('zero broker') ||
-                  sub.includes('zero brokerage') ||
-                  sub.includes('Accurate plot boundaries')
-                ) {
-                  return '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.';
-                }
-                return sub;
-              })()}
-            </p>
+            {locationStatus && (
+              <span className="text-xs font-bold text-emerald-400 animate-pulse bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/40">
+                {locationStatus}
+              </span>
+            )}
+          </div>
 
-            {/* DEEP SEARCH CARD */}
-            <div className="bg-slate-900/95 rounded-2xl p-4 sm:p-6 shadow-2xl text-white max-w-4xl mx-auto border border-slate-700/60 backdrop-blur-xl">
-              
-              {/* Purpose Tabs */}
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPurpose('buy')}
-                    className={'px-5 py-2 rounded-xl text-sm font-bold transition-all border ' + (
-                      purpose === 'buy'
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
-                    )}
-                  >
-                    Buy Property
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setPurpose('rent')}
-                    className={'px-5 py-2 rounded-xl text-sm font-bold transition-all border ' + (
-                      purpose === 'rent'
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border-transparent'
-                    )}
-                  >
-                    Rent Property
-                  </button>
-                </div>
+          {/* Search Form */}
+          <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
 
-                {locationStatus && (
-                  <span className="text-xs font-bold text-emerald-400 animate-pulse bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/40">
-                    {locationStatus}
-                  </span>
-                )}
-              </div>
+            {/* Input with Map Pin Icon, Google Places (New) Suggestions, & Detect Current Location Button */}
+            <div ref={!isCompact ? searchContainerRef : undefined} className="relative flex-1 w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-400/80 z-10" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onFocus={() => {
+                  if (suggestions.length > 0) setSuggestionsOpen(true);
+                }}
+                placeholder="Search by locality, city, project name, or property type..."
+                className="w-full pl-12 pr-24 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
+              />
 
-              {/* Search Form */}
-              <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
-                
-                {/* Input with Map Pin Icon, Google Places (New) Suggestions, & Detect Current Location Button */}
-                <div ref={!isCompact ? searchContainerRef : undefined} className="relative flex-1 w-full">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-400/80 z-10" />
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={query}
-                    onChange={(e) => handleInputChange(e.target.value)}
-                    onFocus={() => {
-                      if (suggestions.length > 0) setSuggestionsOpen(true);
-                    }}
-                    placeholder="Search by locality, city, project name, or property type..."
-                    className="w-full pl-12 pr-24 py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
-                  />
-
-                  {/* ACTION BUTTONS: CLEAR SEARCH BIN & DETECT CURRENT LOCATION */}
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
-                    {/* BIN ICON TO CLICK AND CLEAR THE SEARCH */}
-                    <button
-                      type="button"
-                      onClick={handleClearSearch}
-                      title="Clear search"
-                      className={'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm border group cursor-pointer ' + (
-                        query
-                          ? 'bg-slate-800 hover:bg-rose-950/70 text-slate-400 hover:text-rose-400 border-slate-700 hover:border-rose-500/50'
-                          : 'bg-slate-800/80 hover:bg-slate-800 text-slate-500 hover:text-slate-300 border-slate-700/80 hover:border-slate-600'
-                      )}
-                    >
-                      <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                    </button>
-
-                    {/* DETECT MY CURRENT LOCATION CROSSHAIR BUTTON */}
-                    <button
-                      type="button"
-                      onClick={handleDetectCurrentLocation}
-                      disabled={isLocating}
-                      title="Detect My Current Location"
-                      className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center justify-center transition-all shadow-sm group border border-slate-700"
-                    >
-                      {isLocating ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-                      ) : (
-                        <LocateFixed className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* FULL GOOGLE PLACES (NEW) SUGGESTIONS FLOATING DROPDOWN */}
-                  {!isCompact && suggestionsOpen && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white text-slate-800 border border-gray-200/95 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-left animate-in fade-in slide-in-from-top-1">
-                      <div className="px-4 py-2.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
-                        <span className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">
-                          GOOGLE PLACES (NEW) SUGGESTIONS
-                        </span>
-                        <span className="text-[11px] font-black text-blue-600 tracking-wider uppercase flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                          LIVE SEARCH
-                        </span>
-                      </div>
-                      <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
-                        {suggestions.map((item, idx) => (
-                          <button
-                            key={item.placeId || idx}
-                            type="button"
-                            onClick={() => handleSelectSuggestion(item)}
-                            className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
-                          >
-                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                              <MapPin className="w-4 h-4 text-blue-600" />
-                            </div>
-                            <div className="flex-1 min-w-0 pr-2">
-                              <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
-                                {item.mainText}
-                              </div>
-                              <div className="text-[11px] text-gray-500 truncate mt-0.5">
-                                {item.secondaryText || item.description}
-                              </div>
-                            </div>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-blue-500 bg-blue-50/80 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
-                              <Plus className="w-4 h-4 stroke-[2.5]" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Category Select Dropdown */}
-                <div className="w-full sm:w-44">
-                  <select
-                    value={category}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCategory(val);
-                      triggerSearch(query, purpose, val);
-                    }}
-                    className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
-                  >
-                    <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
-                    {STANDARD_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat} className="bg-slate-900 text-white font-bold">{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Search Submit Button */}
+              {/* ACTION BUTTONS: CLEAR SEARCH BIN & DETECT CURRENT LOCATION */}
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                {/* BIN ICON TO CLICK AND CLEAR THE SEARCH */}
                 <button
-                  type="submit"
-                  className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-slate-950 font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(234,179,8,0.25)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-yellow-400/40"
+                  type="button"
+                  onClick={handleClearSearch}
+                  title="Clear search"
+                  className={'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm border group cursor-pointer ' + (
+                    query
+                      ? 'bg-slate-800 hover:bg-rose-950/70 text-slate-400 hover:text-rose-400 border-slate-700 hover:border-rose-500/50'
+                      : 'bg-slate-800/80 hover:bg-slate-800 text-slate-500 hover:text-slate-300 border-slate-700/80 hover:border-slate-600'
+                  )}
                 >
-                  <Search className="w-4 h-4 stroke-[2.5]" />
-                  Search
+                  <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
                 </button>
-              </form>
 
-              {/* POPULAR SEARCHES PILLS BAR */}
-              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs font-bold text-slate-400">
-                <span className="flex items-center gap-1 text-slate-400 font-bold mr-1 shrink-0 whitespace-nowrap">
-                  <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
-                  Popular Searches:
-                </span>
-                {popularSearches.map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      if (item.isNearMe) {
-                        handleDetectCurrentLocation();
-                      } else {
-                        setQuery(item.label);
-                        triggerSearch(item.label, purpose, category);
-                      }
-                    }}
-                    className={'px-3.5 py-1.5 rounded-full border transition-all flex items-center gap-1.5 font-bold shrink-0 whitespace-nowrap ' + (
-                      item.isNearMe
-                        ? 'bg-sky-950/80 text-sky-400 border-sky-600/50 hover:bg-sky-900 shadow-sm font-extrabold'
-                        : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800 hover:border-amber-400/50 hover:text-amber-400'
-                    )}
-                  >
-                    {item.isNearMe && <LocateFixed className="w-3.5 h-3.5 text-sky-400 stroke-[2.5]" />}
-                    <span className={item.isNearMe ? 'text-sky-400 font-extrabold' : ''}>{item.label}</span>
-                  </button>
-                ))}
+                {/* DETECT MY CURRENT LOCATION CROSSHAIR BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleDetectCurrentLocation}
+                  disabled={isLocating}
+                  title="Detect My Current Location"
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center justify-center transition-all shadow-sm group border border-slate-700"
+                >
+                  {isLocating ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                  ) : (
+                    <LocateFixed className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                  )}
+                </button>
               </div>
 
+              {/* FULL GOOGLE PLACES (NEW) SUGGESTIONS FLOATING DROPDOWN */}
+              {!isCompact && suggestionsOpen && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white text-slate-800 border border-gray-200/95 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-gray-100 text-left animate-in fade-in slide-in-from-top-1">
+                  <div className="px-4 py-2.5 bg-slate-50 flex items-center justify-between border-b border-gray-100">
+                    <span className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">
+                      GOOGLE PLACES (NEW) SUGGESTIONS
+                    </span>
+                    <span className="text-[11px] font-black text-blue-600 tracking-wider uppercase flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      LIVE SEARCH
+                    </span>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                    {suggestions.map((item, idx) => (
+                      <button
+                        key={item.placeId || idx}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(item)}
+                        className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                          <MapPin className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
+                            {item.mainText}
+                          </div>
+                          <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                            {item.secondaryText || item.description}
+                          </div>
+                        </div>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-blue-500 bg-blue-50/80 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Category Select Dropdown */}
+            <div className="w-full sm:w-44">
+              <select
+                value={category}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCategory(val);
+                  triggerSearch(query, purpose, val);
+                }}
+                className="w-full py-3.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+              >
+                <option value="All" className="bg-slate-900 text-white font-bold">All Categories</option>
+                {STANDARD_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat} className="bg-slate-900 text-white font-bold">{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search Submit Button */}
+            <button
+              type="submit"
+              className="w-full sm:w-auto bg-brand-yellow hover:bg-brand-yellowHover text-slate-950 font-extrabold text-sm px-7 py-3.5 rounded-xl shadow-[0_4px_20px_rgba(234,179,8,0.25)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 border border-yellow-400/40"
+            >
+              <Search className="w-4 h-4 stroke-[2.5]" />
+              Search
+            </button>
+          </form>
+
+          {/* POPULAR SEARCHES PILLS BAR */}
+          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center overflow-x-auto no-scrollbar py-0.5 gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs font-bold text-slate-400">
+            <span className="flex items-center gap-1 text-slate-400 font-bold mr-1 shrink-0 whitespace-nowrap">
+              <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+              Popular Searches:
+            </span>
+            {popularSearches.map((item, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  if (item.isNearMe) {
+                    handleDetectCurrentLocation();
+                  } else {
+                    setQuery(item.label);
+                    triggerSearch(item.label, purpose, category);
+                  }
+                }}
+                className={'px-3.5 py-1.5 rounded-full border transition-all flex items-center gap-1.5 font-bold shrink-0 whitespace-nowrap ' + (
+                  item.isNearMe
+                    ? 'bg-sky-950/80 text-sky-400 border-sky-600/50 hover:bg-sky-900 shadow-sm font-extrabold'
+                    : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800 hover:border-amber-400/50 hover:text-amber-400'
+                )}
+              >
+                {item.isNearMe && <LocateFixed className="w-3.5 h-3.5 text-sky-400 stroke-[2.5]" />}
+                <span className={item.isNearMe ? 'text-sky-400 font-extrabold' : ''}>{item.label}</span>
+              </button>
+            ))}
           </div>
 
         </div>
 
       </div>
+
+    </div>
   );
 }
 

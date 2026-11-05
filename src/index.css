@@ -12,7 +12,7 @@
   --brand-charcoal-light: #1e293b;
   --brand-blue: #38bdf8;
   --brand-font: 'Plus Jakarta Sans', sans-serif;
-  
+
   --metallic-dark: #000080;
   --metallic-steel: #000080;
   --metallic-titanium: #1A1A99;
@@ -24,47 +24,67 @@
 }
 
 @layer base {
-  html, body, #root {
+
+  html,
+  body,
+  #root {
     min-height: 100dvh;
     max-width: 100dvw;
     width: 100%;
     overflow-x: hidden;
   }
+
   .min-h-screen {
     min-height: 100dvh !important;
   }
+
   .h-screen {
     height: 100dvh !important;
   }
+
   .max-h-screen {
     max-height: 100dvh !important;
   }
+
   /* Mobile dynamic viewport utilities */
   .min-h-dvh {
     min-height: 100dvh !important;
   }
+
   .h-dvh {
     height: 100dvh !important;
   }
+
   .max-h-dvh {
     max-height: 100dvh !important;
   }
+
   .w-dvw {
     width: 100dvw !important;
   }
+
   .max-w-dvw {
     max-width: 100dvw !important;
   }
+
   body {
     background-color: #f8fafc;
-    background-image: 
+    background-image:
       radial-gradient(at 0% 0%, rgba(234, 179, 8, 0.05) 0px, transparent 40%),
       radial-gradient(at 100% 100%, rgba(11, 37, 69, 0.05) 0px, transparent 40%);
     background-attachment: fixed;
     color: #0b2545;
     font-family: var(--brand-font, 'Plus Jakarta Sans', sans-serif);
   }
-  html, body, #root, .font-sans, button, input, select, textarea {
+
+  html,
+  body,
+  #root,
+  .font-sans,
+  button,
+  input,
+  select,
+  textarea {
     font-family: var(--brand-font, 'Plus Jakarta Sans', sans-serif) !important;
   }
 }
@@ -73,6 +93,7 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
@@ -82,6 +103,7 @@
 .pb-safe {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px)) !important;
 }
+
 .pt-safe {
   padding-top: max(0.75rem, env(safe-area-inset-top, 0px)) !important;
 }
@@ -166,8 +188,13 @@
 
 /* NORMAL YELLOW (NO METALLIC SHIMMER) */
 @keyframes metallicShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .metallic-shimmer {
@@ -198,7 +225,9 @@
 }
 
 /* FORM ELEMENTS & DROPDOWN ACCESSIBILITY - High Contrast Legible Text */
-input, select, textarea {
+input,
+select,
+textarea {
   color: #0b132b !important;
 }
 
@@ -395,11 +424,14 @@ select.bg-gray-50 option {
 
 /* CONTINUOUS 3D PULSING GLOW ANIMATION */
 @keyframes pulseGlow3D {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.95;
     transform: scale(1.03);
     filter: blur(8px) brightness(1.3);
   }
+
   50% {
     opacity: 0.40;
     transform: scale(0.96);
@@ -416,6 +448,7 @@ select.bg-gray-50 option {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -427,9 +460,12 @@ select.bg-gray-50 option {
 
 /* SMOOTH GENTLE BOUNCE ANIMATION FOR NAV BUTTONS */
 @keyframes gentleBounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-6px);
   }
@@ -459,9 +495,12 @@ select.bg-gray-50 option {
 
 /* SMOOTH SIMPLE ZOOM IN - ZOOM OUT ANIMATION (CALM, GENTLE & UNINTRUSIVE) */
 @keyframes smoothZoomInOut {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.035);
   }
@@ -483,9 +522,12 @@ select.bg-gray-50 option {
 
 /* SMOOTH GENTLE FLOATING ANIMATION FOR HERO 3D ASSETS */
 @keyframes gentleFloat {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-8px);
   }
@@ -502,6 +544,7 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none !important;
   margin: 0 !important;
 }
+
 input[type="number"] {
   -moz-appearance: textfield !important;
 }
@@ -513,14 +556,17 @@ input[type="number"] {
   background: transparent;
   pointer-events: none;
 }
+
 .price-slider-input::-webkit-slider-runnable-track {
   background: transparent;
   height: 100%;
 }
+
 .price-slider-input::-moz-range-track {
   background: transparent;
   height: 100%;
 }
+
 .price-slider-input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -535,15 +581,18 @@ input[type="number"] {
   margin-top: -6px;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+
 .price-slider-input::-webkit-slider-thumb:hover {
   transform: scale(1.15);
   box-shadow: 0 0 12px rgba(255, 225, 53, 0.7);
 }
+
 .price-slider-input::-webkit-slider-thumb:active {
   cursor: grabbing;
   transform: scale(1.25);
   box-shadow: 0 0 16px rgba(255, 225, 53, 0.9);
 }
+
 .price-slider-input::-moz-range-thumb {
   pointer-events: auto;
   width: 22px;
@@ -555,10 +604,12 @@ input[type="number"] {
   cursor: grab;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+
 .price-slider-input::-moz-range-thumb:hover {
   transform: scale(1.15);
   box-shadow: 0 0 12px rgba(255, 225, 53, 0.7);
 }
+
 .price-slider-input::-moz-range-thumb:active {
   cursor: grabbing;
   transform: scale(1.25);
@@ -644,9 +695,11 @@ textarea,
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -661,6 +714,7 @@ textarea,
   0% {
     transform: translateX(0%);
   }
+
   100% {
     transform: translateX(-50%);
   }
@@ -680,6 +734,7 @@ textarea,
 .page-viewport-fill {
   min-height: calc(100dvh - 4rem);
 }
+
 @media (min-width: 640px) {
   .page-viewport-fill {
     min-height: calc(100dvh - 5rem);
@@ -714,6 +769,7 @@ textarea,
     min-height: calc(100dvh - 9rem);
     justify-content: center;
   }
+
   @supports (padding-bottom: env(safe-area-inset-bottom)) {
     .info-hero-dynamic {
       min-height: calc(100dvh - 9rem - env(safe-area-inset-bottom, 0px));
@@ -749,6 +805,7 @@ textarea,
 .home-hero-dynamic {
   /* Mobile and PWA defaults preserved as set by component padding */
 }
+
 @media (min-width: 1024px) {
   .home-hero-dynamic {
     min-height: calc(100vh - var(--desktop-nav-height, 5rem));
@@ -756,6 +813,43 @@ textarea,
     display: flex;
     flex-direction: column;
     justify-content: center;
+  }
+}
+
+/* ECC Fluid Responsive Typography & Stage Scaling for Desktop and Large Screens (>= 1024px):
+   Dynamically scales headlines, subtitles, search cards, and floating 3D figures using CSS clamp()
+   so large laptop and desktop monitors (1440p, 1920p Full HD, 2K, 4K) are well-proportioned
+   without excessive empty space, while 100% preserving all PWA mobile versions (< 1024px).
+*/
+@media (min-width: 1024px) {
+  .hero-title-fluid {
+    font-size: clamp(3rem, 1.8rem + 1.8vw, 4.5rem) !important;
+    line-height: 1.12 !important;
+  }
+
+  .hero-subtitle-fluid {
+    font-size: clamp(1.125rem, 0.95rem + 0.35vw, 1.375rem) !important;
+    line-height: 1.6 !important;
+  }
+
+  .hero-figure-fluid {
+    max-height: clamp(440px, 240px + 18vh, 580px) !important;
+    max-width: clamp(28rem, 18rem + 12vw, 38rem) !important;
+  }
+
+  .home-title-fluid {
+    font-size: clamp(3.75rem, 2.4rem + 2vw, 5.25rem) !important;
+    line-height: 1.1 !important;
+  }
+
+  .home-subtitle-fluid {
+    font-size: clamp(1.125rem, 0.95rem + 0.35vw, 1.45rem) !important;
+    max-width: clamp(42rem, 32rem + 12vw, 58rem) !important;
+    line-height: 1.6 !important;
+  }
+
+  .home-card-fluid {
+    max-width: clamp(56rem, 46rem + 12vw, 72rem) !important;
   }
 }
 
@@ -774,10 +868,12 @@ textarea,
     padding-bottom: max(1.15rem, calc(0.65rem + env(safe-area-inset-bottom, 0px))) !important;
     min-height: 4.15rem !important;
   }
+
   .mobile-bottom-nav-edge .mobile-nav-btn {
     padding-top: 0.25rem !important;
     padding-bottom: 0.25rem !important;
   }
+
   .mobile-bottom-nav-edge .mobile-nav-label {
     font-size: 10px !important;
     line-height: 1.15 !important;
@@ -816,4 +912,4 @@ textarea,
 
 .mobile-nav-drawer.open .mobile-nav-drawer-content {
   transform: translateY(0);
-}
+}

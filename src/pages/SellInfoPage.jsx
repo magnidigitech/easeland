@@ -20,7 +20,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
 
         <div className="max-w-7xl mx-auto relative z-10 w-full flex flex-col items-center justify-center lg:block">
           <div className="w-full flex flex-col items-center justify-center lg:grid lg:grid-cols-12 gap-3.5 sm:gap-6 lg:gap-8 items-center">
-            
+
             {/* Left Content Column */}
             <div className="lg:col-span-7 text-center lg:text-left shrink-0 w-full">
               <div className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-widest text-amber-300 bg-amber-900/70 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full border border-amber-500/40 shadow-sm mb-2.5 sm:mb-4">
@@ -28,7 +28,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
                 <span>{siteConfig?.sellPage?.badgeText || 'DIRECT OWNER LISTINGS'}</span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl lg:text-5xl font-extrabold tracking-tight text-white mb-2 sm:mb-4 leading-tight">
+              <h1 className="hero-title-fluid text-2xl sm:text-3xl lg:text-5xl font-extrabold tracking-tight text-white mb-2 sm:mb-4 leading-tight">
                 {(() => {
                   const title = siteConfig?.sellPage?.title;
                   if (!title || title.includes('Brokerage') || title.includes('brokerage') || title.includes('Commission') || title.includes('commission')) {
@@ -38,7 +38,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
                 })()}
               </h1>
 
-              <p className="text-xs sm:text-base lg:text-lg text-amber-100/90 max-w-2xl mx-auto lg:mx-0 mb-3 sm:mb-6 font-medium leading-relaxed">
+              <p className="hero-subtitle-fluid text-xs sm:text-base lg:text-lg text-amber-100/90 max-w-2xl xl:max-w-3xl mx-auto lg:mx-0 mb-3 sm:mb-6 font-medium leading-relaxed">
                 {(() => {
                   const sub = siteConfig?.sellPage?.subtitle;
                   if (!sub || sub.includes('broker') || sub.includes('commission') || sub.includes('brokerage')) {
@@ -76,15 +76,15 @@ export default function SellInfoPage({ onPostPropertyClick }) {
             {/* Right Visual Stage Column */}
             <div className="lg:col-span-5 relative w-full flex items-center justify-center py-1 sm:py-4 lg:py-0">
               {/* Ambient Glowing Aura */}
-              <div className="absolute w-52 h-52 sm:w-80 sm:h-80 bg-amber-500/25 rounded-full blur-3xl pointer-events-none -z-0"></div>
-              <div className="absolute w-40 h-40 sm:w-60 sm:h-60 bg-orange-500/20 rounded-full blur-2xl pointer-events-none -z-0"></div>
+              <div className="absolute w-52 h-52 sm:w-80 sm:h-80 xl:w-96 xl:h-96 2xl:w-[480px] 2xl:h-[480px] bg-amber-500/25 rounded-full blur-3xl pointer-events-none -z-0"></div>
+              <div className="absolute w-40 h-40 sm:w-60 sm:h-60 xl:w-80 xl:h-80 2xl:w-[400px] 2xl:h-[400px] bg-orange-500/20 rounded-full blur-2xl pointer-events-none -z-0"></div>
 
               {/* Transparent Hero Image Stage */}
               <div className="relative z-10 w-fit mx-auto flex items-center justify-center">
                 <img
                   src="/images/heroes/sell_hero_transparent.png"
                   alt="List and Sell Verified Properties"
-                  className="w-auto h-auto max-h-[220px] xs:max-h-[250px] sm:max-h-[350px] lg:max-h-[440px] max-w-[270px] xs:max-w-[310px] sm:max-w-md object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.65)] animate-gentle-float select-none"
+                  className="hero-figure-fluid w-auto h-auto max-h-[220px] xs:max-h-[250px] sm:max-h-[350px] lg:max-h-[440px] max-w-[270px] xs:max-w-[310px] sm:max-w-md object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.65)] animate-gentle-float select-none"
                   loading="eager"
                 />
 

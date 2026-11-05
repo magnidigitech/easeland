@@ -103,4 +103,39 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
     assert.ok(cssContent.includes('min-height: calc(100dvh - 9rem)'), 'Tablet PWA offset (9rem) must remain intact');
     assert.ok(cssContent.includes('env(safe-area-inset-bottom'), 'Safe area inset bottom must remain intact');
   });
+
+  it('5. Verifies ECC fluid typography and stage scaling for desktop and large displays without affecting PWA mobile versions', () => {
+    const cssPath = path.join(rootDir, 'src', 'index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+    // Fluid typography rules in index.css
+    assert.ok(cssContent.includes('.hero-title-fluid'), 'index.css must define .hero-title-fluid');
+    assert.ok(cssContent.includes('.hero-subtitle-fluid'), 'index.css must define .hero-subtitle-fluid');
+    assert.ok(cssContent.includes('.hero-figure-fluid'), 'index.css must define .hero-figure-fluid');
+    assert.ok(cssContent.includes('.home-title-fluid'), 'index.css must define .home-title-fluid');
+    assert.ok(cssContent.includes('.home-subtitle-fluid'), 'index.css must define .home-subtitle-fluid');
+    assert.ok(cssContent.includes('.home-card-fluid'), 'index.css must define .home-card-fluid');
+
+    // Clamp assertions ensuring fluid scaling
+    assert.ok(cssContent.includes('clamp(3rem, 1.8rem + 1.8vw, 4.5rem)'), 'hero-title-fluid must scale dynamically between 3rem and 4.5rem');
+    assert.ok(cssContent.includes('clamp(440px, 240px + 18vh, 580px)'), 'hero-figure-fluid must scale 3D building visual height dynamically');
+
+    // Check all 3 info pages use fluid classes
+    pages.forEach(({ name, file }) => {
+      const filePath = path.join(rootDir, 'src', 'pages', file);
+      const content = fs.readFileSync(filePath, 'utf8');
+      assert.ok(content.includes('hero-title-fluid'), file + ' must use hero-title-fluid class');
+      assert.ok(content.includes('hero-subtitle-fluid'), file + ' must use hero-subtitle-fluid class');
+      assert.ok(content.includes('hero-figure-fluid'), file + ' must use hero-figure-fluid class');
+      // Verify mobile headline classes remain completely intact
+      assert.ok(content.includes('text-2xl sm:text-3xl lg:text-5xl font-extrabold'), file + ' must keep mobile headline scale');
+    });
+
+    // Check HeroSearch uses fluid classes
+    const heroSearchPath = path.join(rootDir, 'src', 'components', 'HeroSearch.jsx');
+    const heroSearchContent = fs.readFileSync(heroSearchPath, 'utf8');
+    assert.ok(heroSearchContent.includes('home-title-fluid'), 'HeroSearch must use home-title-fluid');
+    assert.ok(heroSearchContent.includes('home-subtitle-fluid'), 'HeroSearch must use home-subtitle-fluid');
+    assert.ok(heroSearchContent.includes('home-card-fluid'), 'HeroSearch must use home-card-fluid');
+  });
 });
