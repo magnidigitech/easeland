@@ -15,7 +15,7 @@ export default function SellInfoPage({ onPostPropertyClick }) {
     <div className="min-h-screen bg-brand-offwhite pb-20">
 
       {/* HERO SECTION */}
-      <div className="info-hero-dynamic bg-gradient-to-br from-amber-950 via-orange-950 to-stone-950 text-white py-6 sm:py-10 lg:py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl border-b border-amber-900/50">
+      <div className="info-hero-dynamic bg-gradient-to-br from-amber-950 via-orange-950 to-stone-950 text-white py-6 sm:py-10 lg:py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl border-b border-amber-900/50">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.18),transparent_55%)] pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto relative z-10 w-full flex flex-col items-center justify-center lg:block">

@@ -15,7 +15,7 @@ export default function RentInfoPage({ onExploreClick }) {
     <div className="min-h-screen bg-brand-offwhite pb-20">
 
       {/* HERO SECTION */}
-      <div className="info-hero-dynamic bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-950 text-white py-6 sm:py-10 lg:py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl border-b border-purple-900/50">
+      <div className="info-hero-dynamic bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-950 text-white py-6 sm:py-10 lg:py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-2xl border-b border-purple-900/50">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_55%)] pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto relative z-10 w-full flex flex-col items-center justify-center lg:block">

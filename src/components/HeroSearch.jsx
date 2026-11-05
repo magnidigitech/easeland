@@ -454,7 +454,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   }
 
   return (
-    <div className="relative bg-metallic-dark text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
+    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-12 pb-20 lg:py-8 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800">
           
           {/* Dynamic CMS Hero Background Image */}
           {(() => {
@@ -472,7 +472,7 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             );
           })()}
           
-          <div className="max-w-5xl mx-auto text-center relative z-10">
+          <div className="max-w-5xl mx-auto text-center relative z-10 w-full">
             
             {/* Verification Tagline */}
             <div className="inline-flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-amber-400/30 text-xs font-semibold text-amber-400 mb-6 shadow-[0_0_15px_rgba(212,175,55,0.15)]">

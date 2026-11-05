@@ -20,6 +20,7 @@
   --metallic-chrome: #cbd5e1;
   --metallic-gold: #FFE135;
   --metallic-gold-light: #FFF599;
+  --desktop-nav-height: 5rem;
 }
 
 @layer base {
@@ -729,13 +730,32 @@ textarea,
   }
 }
 
-/* Desktop (lg: >= 1024px): Natural auto height multi-column stage */
+/* Desktop (lg: >= 1024px): Dynamic desktop viewport height fitting desktop dvh */
 @media (min-width: 1024px) {
   .info-hero-dynamic {
-    height: auto;
-    min-height: auto;
-    max-height: none;
-    display: block;
+    min-height: calc(100vh - var(--desktop-nav-height, 5rem));
+    min-height: calc(100dvh - var(--desktop-nav-height, 5rem));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+}
+
+/* Dynamic Desktop Homepage Hero Container:
+   Ensures the homepage hero banner dynamically fits desktop dynamic viewport height (100dvh minus desktop navbar),
+   while preserving mobile PWA padding and layout without hardcoding.
+*/
+.home-hero-dynamic {
+  /* Mobile and PWA defaults preserved as set by component padding */
+}
+@media (min-width: 1024px) {
+  .home-hero-dynamic {
+    min-height: calc(100vh - var(--desktop-nav-height, 5rem));
+    min-height: calc(100dvh - var(--desktop-nav-height, 5rem));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
 }
 

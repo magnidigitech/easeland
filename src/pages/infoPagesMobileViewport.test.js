@@ -69,4 +69,38 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
       assert.ok(content.includes('hidden sm:flex absolute'), file + ' must hide floating micro-badges on mobile');
     });
   });
+
+  it('4. Verifies desktop dynamic viewport height (dvh) fitting across all hero banners without affecting PWA mobile versions', () => {
+    const cssPath = path.join(rootDir, 'src', 'index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+    // Desktop rule for info-hero-dynamic must dynamically calculate dvh minus desktop navbar
+    assert.ok(cssContent.includes('.info-hero-dynamic'), 'index.css must define .info-hero-dynamic');
+    assert.ok(
+      cssContent.includes('min-height: calc(100dvh - var(--desktop-nav-height, 5rem))') ||
+      cssContent.includes('min-height: calc(100dvh - 5rem)'),
+      'info-hero-dynamic must dynamically fit desktop dvh minus desktop navbar'
+    );
+    assert.ok(cssContent.includes('--desktop-nav-height: 5rem'), ':root must define --desktop-nav-height dynamically');
+
+    // Desktop rule for home-hero-dynamic must dynamically calculate dvh minus desktop navbar
+    assert.ok(cssContent.includes('.home-hero-dynamic'), 'index.css must define .home-hero-dynamic');
+    assert.ok(
+      cssContent.includes('min-height: calc(100dvh - var(--desktop-nav-height, 5rem))') ||
+      cssContent.includes('min-height: calc(100dvh - 5rem)'),
+      'home-hero-dynamic must dynamically fit desktop dvh minus desktop navbar'
+    );
+
+    // HeroSearch must use home-hero-dynamic and dynamic desktop dvh utility
+    const heroSearchPath = path.join(rootDir, 'src', 'components', 'HeroSearch.jsx');
+    const heroSearchContent = fs.readFileSync(heroSearchPath, 'utf8');
+    assert.ok(heroSearchContent.includes('home-hero-dynamic'), 'HeroSearch must include home-hero-dynamic class');
+    assert.ok(heroSearchContent.includes('lg:min-h-[calc(100dvh-5rem)]'), 'HeroSearch must include lg:min-h dynamic dvh utility');
+    assert.ok(heroSearchContent.includes('lg:flex lg:flex-col lg:justify-center'), 'HeroSearch must vertically center content on desktop');
+
+    // Mobile PWA preservation checks: mobile offsets and safe-area rules must be 100% intact
+    assert.ok(cssContent.includes('min-height: calc(100dvh - 8rem)'), 'Mobile PWA offset (8rem) must remain intact');
+    assert.ok(cssContent.includes('min-height: calc(100dvh - 9rem)'), 'Tablet PWA offset (9rem) must remain intact');
+    assert.ok(cssContent.includes('env(safe-area-inset-bottom'), 'Safe area inset bottom must remain intact');
+  });
 });
