@@ -332,7 +332,8 @@ export const DEFAULT_SITE_CONFIG = {
     heroSubtitle: '100% verified listings. Zero boundary disputes & crystal-clear titles. Explore land plots, houses, apartments, and commercial spaces on our interactive map across all of India.',
     showSearchCard: true,
     showPopularSearches: true,
-    heroBackgroundImage: '/easeland_hero_bg.jpg'
+    heroBackgroundImage: '/easeland_hero_bg.jpg',
+    heroBackgroundImageMobile: '/easeland_hero_mobile.jpg'
   },
   navbar: {
     logoTextPrefix: 'Ease',
@@ -557,10 +558,14 @@ export const sanitizeSiteConfig = (cfg) => {
     }
   }
 
-  // 9. Upgrade legacy stock hero image to generated high-res landscape
+  // 9. Upgrade legacy stock hero image to generated high-res landscape and mobile vertical cover
   if (!sanitized.homepage?.heroBackgroundImage || (typeof sanitized.homepage.heroBackgroundImage === 'string' && sanitized.homepage.heroBackgroundImage.includes('photo-1500382017468-9049fed747ef'))) {
     if (!sanitized.homepage) sanitized.homepage = {};
     sanitized.homepage.heroBackgroundImage = DEFAULT_SITE_CONFIG.homepage.heroBackgroundImage;
+  }
+  if (!sanitized.homepage?.heroBackgroundImageMobile || (typeof sanitized.homepage.heroBackgroundImageMobile === 'string' && sanitized.homepage.heroBackgroundImageMobile.includes('photo-1500382017468-9049fed747ef'))) {
+    if (!sanitized.homepage) sanitized.homepage = {};
+    sanitized.homepage.heroBackgroundImageMobile = DEFAULT_SITE_CONFIG.homepage.heroBackgroundImageMobile;
   }
   if (!sanitized.media?.heroBannerUrl || (typeof sanitized.media.heroBannerUrl === 'string' && sanitized.media.heroBannerUrl.includes('photo-1500382017468-9049fed747ef'))) {
     if (!sanitized.media) sanitized.media = {};

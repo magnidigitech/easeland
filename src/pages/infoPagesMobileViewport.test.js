@@ -139,4 +139,33 @@ describe('EaseLand Info Pages Dynamic Viewport Hero Sizing Suite', () => {
     assert.ok(heroSearchContent.includes('home-subtitle-fluid'), 'HeroSearch must use home-subtitle-fluid');
     assert.ok(heroSearchContent.includes('home-card-fluid'), 'HeroSearch must use home-card-fluid');
   });
+
+  it('6. Verifies Home Page Hero Mobile Cover and dynamic vertical aspect ratio in Site Management Panel & HeroSearch', () => {
+    // 1. mockApi.js contains heroBackgroundImageMobile default & sanitization
+    const mockApiPath = path.join(rootDir, 'src', 'services', 'mockApi.js');
+    const mockApiContent = fs.readFileSync(mockApiPath, 'utf8');
+    assert.ok(mockApiContent.includes('heroBackgroundImageMobile'), 'DEFAULT_SITE_CONFIG must define heroBackgroundImageMobile');
+    assert.ok(mockApiContent.includes('/easeland_hero_mobile.jpg'), 'DEFAULT_SITE_CONFIG must provide /easeland_hero_mobile.jpg preset');
+
+    // 2. AdminPortal contains CMS control for Mobile Cover
+    const adminPortalPath = path.join(rootDir, 'src', 'pages', 'AdminPortal.jsx');
+    const adminPortalContent = fs.readFileSync(adminPortalPath, 'utf8');
+    assert.ok(adminPortalContent.includes('Hero Background Image Cover Mobile version'), 'AdminPortal must provide Mobile version cover input');
+    assert.ok(adminPortalContent.includes('Mobile Vertical Preset (9:16)'), 'AdminPortal must provide 9:16 quick preset');
+    assert.ok(adminPortalContent.includes('heroBackgroundImageMobile'), 'AdminPortal must bind heroBackgroundImageMobile state');
+
+    // 3. HeroSearch renders distinct desktop & mobile background layers
+    const heroSearchPath = path.join(rootDir, 'src', 'components', 'HeroSearch.jsx');
+    const heroSearchContent = fs.readFileSync(heroSearchPath, 'utf8');
+    assert.ok(heroSearchContent.includes('heroMobileSrc'), 'HeroSearch must extract heroMobileSrc');
+    assert.ok(heroSearchContent.includes('heroDesktopSrc'), 'HeroSearch must extract heroDesktopSrc');
+    assert.ok(heroSearchContent.includes('md:hidden absolute inset-0'), 'HeroSearch must render mobile-only cover layer');
+    assert.ok(heroSearchContent.includes('hidden md:block absolute inset-0'), 'HeroSearch must render desktop-only cover layer');
+
+    // 4. index.css defines mobile dynamic vertical aspect ratio rules for home-hero-dynamic
+    const cssPath = path.join(rootDir, 'src', 'index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+    assert.ok(cssContent.includes('.home-hero-dynamic'), 'index.css must define .home-hero-dynamic');
+    assert.ok(cssContent.includes('min-height: calc(100dvh - 8.5rem)'), 'home-hero-dynamic and info-hero-dynamic must support edge-to-edge flagship mobile viewports');
+  });
 });

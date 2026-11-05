@@ -454,18 +454,28 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
   }
 
   return (
-    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-12 pb-20 lg:py-4 xl:py-6 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 border-b border-slate-800">
+    <div className="home-hero-dynamic relative bg-metallic-dark text-white pt-8 pb-14 sm:pt-12 sm:pb-20 lg:py-4 xl:py-6 lg:min-h-[calc(100dvh-5rem)] lg:flex lg:flex-col lg:justify-center px-4 sm:px-6 lg:px-8 border-b border-slate-800">
 
-      {/* Dynamic CMS Hero Background Image */}
+      {/* Dynamic CMS Hero Background Image (Desktop & Mobile PWA Versions) */}
       {(() => {
-        const raw = siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl;
-        const clean = (typeof raw === 'string') ? raw.trim() : '';
-        const heroSrc = (!clean || clean.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : clean;
+        const rawDesktop = siteConfig?.homepage?.heroBackgroundImage || siteConfig?.media?.heroBannerUrl;
+        const cleanDesktop = (typeof rawDesktop === 'string') ? rawDesktop.trim() : '';
+        const heroDesktopSrc = (!cleanDesktop || cleanDesktop.includes('photo-1500382017468-9049fed747ef')) ? '/easeland_hero_bg.jpg' : cleanDesktop;
+
+        const rawMobile = siteConfig?.homepage?.heroBackgroundImageMobile;
+        const cleanMobile = (typeof rawMobile === 'string') ? rawMobile.trim() : '';
+        const heroMobileSrc = (!cleanMobile || cleanMobile.includes('photo-1500382017468-9049fed747ef'))
+          ? (cleanMobile || '/easeland_hero_mobile.jpg' || heroDesktopSrc)
+          : cleanMobile;
         return (
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div
-              className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-95 transition-opacity duration-700"
-              style={{ backgroundImage: 'url("' + heroSrc + '")' }}
+              className="hidden md:block absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none opacity-95 transition-opacity duration-700"
+              style={{ backgroundImage: 'url("' + heroDesktopSrc + '")', backgroundPosition: 'center center', backgroundSize: 'cover' }}
+            />
+            <div
+              className="md:hidden absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none opacity-95 transition-opacity duration-700"
+              style={{ backgroundImage: 'url("' + heroMobileSrc + '")', backgroundPosition: 'center center', backgroundSize: 'cover' }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/15 to-black/45 pointer-events-none" />
           </div>

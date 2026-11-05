@@ -59,7 +59,8 @@ import {
   Plus,
   Star,
   Tag,
-  Loader2
+  Loader2,
+  Smartphone
 } from 'lucide-react';
 import { mockApi, applySiteTheme, safeArray, isFakeProperty, DEFAULT_SITE_CONFIG } from '../services/mockApi';
 import { DEFAULT_SHOWCASE_PROPERTIES } from '../services/showcaseProperties.js';
@@ -122,18 +123,17 @@ function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/v
         const img = new Image();
         img.onload = () => {
           try {
-            const MAX_WIDTH = 1920;
-            const MAX_HEIGHT = 1080;
+            const MAX_DIMENSION = 1920;
             let width = img.width;
             let height = img.height;
 
-            if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-              if (width / height > MAX_WIDTH / MAX_HEIGHT) {
-                height = Math.round((height * MAX_WIDTH) / width);
-                width = MAX_WIDTH;
+            if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIMENSION) / width);
+                width = MAX_DIMENSION;
               } else {
-                width = Math.round((width * MAX_HEIGHT) / height);
-                height = MAX_HEIGHT;
+                width = Math.round((width * MAX_DIMENSION) / height);
+                height = MAX_DIMENSION;
               }
             }
 
@@ -3814,12 +3814,13 @@ export default function AdminPortal({ onNavigate }) {
 
                       <div>
                         <MediaUploadInput
-                          label="Hero Background Image Cover"
+                          label="Hero Background Image Cover (Desktop / Default)"
                           value={siteConfig.homepage?.heroBackgroundImage || ''}
                           onChange={(val) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: val } }))}
+                          placeholder="Paste desktop image URL or select landscape file..."
                         />
                         <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100">
-                          <span className="text-[11px] font-bold text-gray-500">Quick Presets:</span>
+                          <span className="text-[11px] font-bold text-gray-500">Quick Presets (Desktop):</span>
                           <button
                             type="button"
                             onClick={() => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImage: '/easeland_hero_bg.jpg' } }))}
@@ -3835,6 +3836,34 @@ export default function AdminPortal({ onNavigate }) {
                             High-Res Plotted Landscape
                           </button>
                         </div>
+                        <p className="text-[11px] text-gray-500 mt-1 font-medium">Desktop landscape version (recommended: 16:9 ratio, 1920x1080).</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-100">
+                        <MediaUploadInput
+                          label="Hero Background Image Cover Mobile version"
+                          value={siteConfig.homepage?.heroBackgroundImageMobile || ''}
+                          onChange={(val) => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImageMobile: val } }))}
+                          placeholder="Paste mobile image URL or select portrait file..."
+                        />
+                        <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-[11px] font-bold text-gray-500">Quick Presets (Mobile):</span>
+                          <button
+                            type="button"
+                            onClick={() => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImageMobile: '/easeland_hero_mobile.jpg' } }))}
+                            className="text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
+                          >
+                            Mobile Vertical Preset (9:16)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateCmsConfig(prev => ({ ...prev, homepage: { ...prev.homepage, heroBackgroundImageMobile: '' } }))}
+                            className="text-[11px] font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+                          >
+                            Fallback to Desktop Image
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1 font-medium">PWA mobile version with dynamic vertical visible aspect ratio (recommended: 9:16 or portrait ratio, e.g. 720x1280 or 1080x1920). If not set, smoothly falls back to the desktop cover.</p>
                       </div>
 
                       <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
