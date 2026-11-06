@@ -599,5 +599,34 @@ describe('EaseLand Distance Filter Consistency & Haversine Proximity Suite', () 
       }
     }
   });
+
+  it('correctly maps full street addresses to Indian administrative hierarchy for autofill', () => {
+    // Mock a detailed real-world Indian address result from Geocoder
+    const mockGeocodeDetail = {
+      formatted_address: 'Plot No 24, Road No 10, Jubilee Hills, Hyderabad, Telangana 500033, India',
+      address_components: [
+        { long_name: 'Plot No 24', types: ['premise'] },
+        { long_name: 'Road No 10', types: ['route'] },
+        { long_name: 'Jubilee Hills', types: ['sublocality_level_1', 'sublocality', 'political'] },
+        { long_name: 'Hyderabad', types: ['locality', 'political'] },
+        { long_name: 'Shaikpet', types: ['administrative_area_level_3', 'political'] },
+        { long_name: 'Hyderabad', types: ['administrative_area_level_2', 'political'] },
+        { long_name: 'Telangana', types: ['administrative_area_level_1', 'political'] },
+        { long_name: 'India', types: ['country', 'political'] },
+        { long_name: '500033', types: ['postal_code'] }
+      ]
+    };
+
+    const hierarchy = extractGoogleLocationHierarchy(mockGeocodeDetail);
+
+    assert.strictEqual(hierarchy.state, 'Telangana');
+    assert.strictEqual(hierarchy.district, 'Hyderabad');
+    assert.strictEqual(hierarchy.city, 'Hyderabad');
+    assert.strictEqual(hierarchy.mandal, 'Shaikpet');
+    assert.strictEqual(hierarchy.locality, 'Jubilee Hills');
+    assert.strictEqual(hierarchy.postalCode, '500033');
+    assert.strictEqual(hierarchy.road, 'Road No 10');
+    assert.strictEqual(hierarchy.colony, 'Plot No 24');
+  });
 });
 

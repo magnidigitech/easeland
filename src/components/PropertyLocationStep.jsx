@@ -102,6 +102,10 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
   const [geoLoading, setGeoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  const [addressResolving, setAddressResolving] = useState(false);
+  const [addressResolveSuccess, setAddressResolveSuccess] = useState(false);
+  const addressDebounceTimerRef = useRef(null);
+
   const [isConfirmed, setIsConfirmed] = useState(!!locationData?.confirmed);
 
   // Dynamic lists from India Location dataset
@@ -434,6 +438,7 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (addressDebounceTimerRef.current) clearTimeout(addressDebounceTimerRef.current);
     };
   }, []);
 
@@ -727,6 +732,178 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
       setErrorMsg(err.message);
     } finally {
       setGeoLoading(false);
+    }
+  };
+
+  // Auto-resolve Full Postal Street Address: Geocode, populate cascaded dropdowns, and map property pin below
+  const resolveFullPostalAddress = async (rawAddress) => {
+    if (!rawAddress || typeof rawAddress !== 'string') return;
+    const cleanAddress = rawAddress.trim();
+    if (cleanAddress.length < 4) return;
+
+    setAddressResolving(true);
+    setAddressResolveSuccess(false);
+
+    try {
+      let placeDetails = null;
+
+      // 1. Check if user pasted/typed a location link or raw coordinates into the address field
+      if (isLocationLinkOrCoordinates(cleanAddress)) {
+        const resolvedLink = await resolveLocationLink(cleanAddress);
+        if (resolvedLink && resolvedLink.lat != null && resolvedLink.lng != null) {
+          placeDetails = {
+            lat: resolvedLink.lat,
+            lng: resolvedLink.lng,
+            displayName: resolvedLink.formattedAddress || cleanAddress,
+            hierarchy: resolvedLink.hierarchy || {}
+          };
+        }
+      }
+
+      // 2. Direct Google Geocoding search on the address
+      if (!placeDetails) {
+        const directResults = await searchLocationQuery(cleanAddress);
+        if (directResults && directResults.length > 0) {
+          placeDetails = {
+            lat: directResults[0].lat,
+            lng: directResults[0].lng,
+            displayName: directResults[0].displayName,
+            hierarchy: directResults[0]
+          };
+        }
+      }
+
+      // 3. Fallback: Google Places Autocomplete Predictions
+      if (!placeDetails) {
+        const predictions = await fetchGooglePlacesPredictions(cleanAddress);
+        if (predictions && predictions.length > 0) {
+          const topPred = predictions[0];
+          const details = await fetchGooglePlaceDetails(topPred.placeId, topPred.mainText);
+          if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
+            placeDetails = details;
+          }
+        }
+      }
+
+      // 4. Fallback for detailed door/plot numbers: if address has commas (e.g. "D.No 4-5-29, Chandramouli Nagar, Guntur, AP"),
+      // strip the first segment (door/plot number) and geocode the locality/city part
+      if (!placeDetails && cleanAddress.includes(',')) {
+        const segments = cleanAddress.split(',').map(s => s.trim()).filter(Boolean);
+        if (segments.length > 1) {
+          const broaderQuery = segments.slice(1).join(', ');
+          const broaderResults = await searchLocationQuery(broaderQuery);
+          if (broaderResults && broaderResults.length > 0) {
+            placeDetails = {
+              lat: broaderResults[0].lat,
+              lng: broaderResults[0].lng,
+              displayName: broaderResults[0].displayName,
+              hierarchy: broaderResults[0]
+            };
+          }
+        }
+      }
+
+      if (placeDetails && !isNaN(placeDetails.lat) && !isNaN(placeDetails.lng)) {
+        const nextLat = Number(placeDetails.lat);
+        const nextLng = Number(placeDetails.lng);
+
+        // Mark property location as set and pin on map below
+        isPropertyLocationSetRef.current = true;
+        setIsPropertyLocationSet(true);
+        setLat(nextLat);
+        setLng(nextLng);
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([nextLat, nextLng], 17, { duration: 1.2 });
+        }
+        if (markerRef.current) {
+          markerRef.current.setLatLng([nextLat, nextLng]);
+        }
+
+        const h = placeDetails.hierarchy || {};
+        const extractedState = h.state || '';
+        const extractedDistrict = h.district || '';
+        const extractedCity = h.city || '';
+        const extractedMandal = h.mandal || '';
+        const extractedLocality = h.locality || '';
+        const extractedPostalCode = h.postalCode || '';
+
+        // Match against master dynamic India location dataset
+        const allStates = getStatesList();
+        const matchedState = allStates.find(s => s.toLowerCase() === extractedState.toLowerCase()) || extractedState;
+
+        const currentDistricts = getDistrictsList(matchedState);
+        const matchedDistrict = currentDistricts.find(d =>
+          d.toLowerCase() === extractedDistrict.toLowerCase() ||
+          extractedDistrict.toLowerCase().includes(d.toLowerCase()) ||
+          d.toLowerCase().includes(extractedDistrict.toLowerCase())
+        ) || extractedDistrict;
+
+        const currentCities = getCitiesList(matchedState, matchedDistrict);
+        const matchedCity = currentCities.find(c =>
+          c.toLowerCase() === extractedCity.toLowerCase() ||
+          extractedCity.toLowerCase().includes(c.toLowerCase()) ||
+          c.toLowerCase().includes(extractedCity.toLowerCase())
+        ) || extractedCity;
+
+        const currentMandals = getMandalsList(matchedState, matchedDistrict, matchedCity);
+        const matchedMandal = currentMandals.find(m =>
+          m.toLowerCase() === extractedMandal.toLowerCase() ||
+          extractedMandal.toLowerCase().includes(m.toLowerCase())
+        ) || extractedMandal;
+
+        const currentLocalities = getLocalitiesList(matchedState, matchedDistrict, matchedCity, matchedMandal);
+        const matchedLocality = currentLocalities.find(l =>
+          l.toLowerCase() === extractedLocality.toLowerCase() ||
+          extractedLocality.toLowerCase().includes(l.toLowerCase())
+        ) || extractedLocality;
+
+        // Custom mode auto-activation if non-empty and not present in static lists
+        const needCustomState = extractedState && !allStates.includes(matchedState);
+        const needCustomDistrict = extractedDistrict && !currentDistricts.includes(matchedDistrict);
+        const needCustomCity = extractedCity && !currentCities.includes(matchedCity);
+        const needCustomMandal = extractedMandal && !currentMandals.includes(matchedMandal);
+        const needCustomLocality = extractedLocality && !currentLocalities.includes(matchedLocality);
+
+        setCustomMode(prev => ({
+          ...prev,
+          state: !!needCustomState,
+          district: !!needCustomDistrict,
+          city: !!needCustomCity,
+          mandal: !!needCustomMandal,
+          locality: !!needCustomLocality
+        }));
+
+        setHierarchy(prev => ({
+          ...prev,
+          country: h.country || prev.country || 'India',
+          state: matchedState || prev.state,
+          district: matchedDistrict || prev.district,
+          city: matchedCity || prev.city,
+          mandal: matchedMandal || prev.mandal,
+          locality: matchedLocality || prev.locality,
+          subLocality: h.subLocality || prev.subLocality,
+          village: h.village || prev.village,
+          road: h.road || prev.road,
+          colony: h.colony || prev.colony,
+          landmark: h.landmark || prev.landmark,
+          postalCode: extractedPostalCode || prev.postalCode,
+          address: cleanAddress // Preserve user's typed street address
+        }));
+
+        setSelectedPlaceInfo({
+          name: matchedLocality || matchedCity || matchedDistrict || cleanAddress.split(',')[0],
+          address: placeDetails.displayName || cleanAddress
+        });
+
+        setAddressResolveSuccess(true);
+        setTimeout(() => setAddressResolveSuccess(false), 4000);
+        setIsConfirmed(false);
+      }
+    } catch (err) {
+      console.warn('Address auto-resolution error:', err);
+    } finally {
+      setAddressResolving(false);
     }
   };
 
@@ -1147,16 +1324,96 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
           </div>
         </div>
 
-        {/* FULL POSTAL STREET ADDRESS */}
-        <div>
-          <label className="block text-[11px] font-extrabold text-gray-600 mb-1">Full Postal Street Address</label>
-          <input
-            type="text"
-            placeholder="Plot No., Door No., Street Name, Colony / Landmark"
-            value={hierarchy.address}
-            onChange={(e) => { setHierarchy({ ...hierarchy, address: e.target.value }); setIsConfirmed(false); }}
-            className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold"
-          />
+        {/* FULL POSTAL STREET ADDRESS WITH AUTO-FILL DROPDOWNS & MAP TRIGGER */}
+        <div className="space-y-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <label className="block text-[11px] font-extrabold text-gray-700 flex items-center gap-1.5">
+              <span>Full Postal Street Address</span>
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 inline-flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-blue-600" />
+                <span>Auto-fills Dropdowns & Maps Property Pin</span>
+              </span>
+            </label>
+            {addressResolving && (
+              <span className="text-[11px] font-bold text-blue-600 flex items-center gap-1 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                <span>Resolving address & filling dropdowns...</span>
+              </span>
+            )}
+            {addressResolveSuccess && !addressResolving && (
+              <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Dropdowns filled & property mapped below ✓</span>
+              </span>
+            )}
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Plot No., Door No., Street Name, Colony, Landmark, City, State, PIN..."
+              value={hierarchy.address}
+              onChange={(e) => {
+                const val = e.target.value;
+                setHierarchy(prev => ({ ...prev, address: val }));
+                setIsConfirmed(false);
+                if (addressDebounceTimerRef.current) {
+                  clearTimeout(addressDebounceTimerRef.current);
+                }
+                if (val.trim().length >= 5) {
+                  addressDebounceTimerRef.current = setTimeout(() => {
+                    resolveFullPostalAddress(val);
+                  }, 700);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (addressDebounceTimerRef.current) clearTimeout(addressDebounceTimerRef.current);
+                  resolveFullPostalAddress(hierarchy.address);
+                }
+              }}
+              onBlur={() => {
+                if (hierarchy.address && hierarchy.address.trim().length >= 5) {
+                  resolveFullPostalAddress(hierarchy.address);
+                }
+              }}
+              onPaste={(e) => {
+                const pastedText = e.clipboardData?.getData('text');
+                if (pastedText && pastedText.trim().length >= 4) {
+                  setTimeout(() => {
+                    resolveFullPostalAddress(pastedText.trim());
+                  }, 50);
+                }
+              }}
+              className={`w-full p-3 pr-28 bg-white border-2 rounded-xl text-xs font-semibold transition-all focus:outline-none ${
+                addressResolveSuccess
+                  ? 'border-emerald-400 ring-2 ring-emerald-100'
+                  : addressResolving
+                  ? 'border-blue-400 ring-2 ring-blue-100'
+                  : 'border-gray-200 focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/30'
+              }`}
+            />
+
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {addressResolving && (
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin mr-1" />
+              )}
+              <button
+                type="button"
+                onClick={() => resolveFullPostalAddress(hierarchy.address)}
+                disabled={addressResolving || !hierarchy.address || hierarchy.address.trim().length < 4}
+                className="px-2.5 py-1.5 bg-brand-charcoal hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                title="Auto-fill all dropdowns and map property coordinates from this address"
+              >
+                <Sparkles className="w-3 h-3 text-brand-yellow" />
+                <span>Auto-Fill</span>
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-500 font-medium">
+            💡 Enter or paste your full address here. Dropdowns (State, District, City, Mandal, Locality) will automatically populate and the property location pin will be mapped on the map below.
+          </p>
         </div>
       </div>
 
