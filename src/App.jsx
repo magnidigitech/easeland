@@ -1130,11 +1130,12 @@ export default function App() {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           loading="lazy"
                         />
+                        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/85 via-slate-950/40 to-transparent pointer-events-none" />
                         <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-md border border-amber-300">
                           <Sparkles className="w-3.5 h-3.5 text-brand-yellow fill-brand-yellow" />
                           <span>FEATURED SPOTLIGHT PROMOTION</span>
                         </div>
-                        <div className="absolute bottom-3 left-3 z-10 bg-brand-charcoal/80 backdrop-blur-xs text-white text-[11px] font-bold px-2.5 py-1 rounded-md">
+                        <div className="absolute bottom-3 left-3 z-10 bg-slate-950/95 backdrop-blur-md text-white text-[11px] font-black px-3 py-1 rounded-lg border border-slate-700/80 shadow-lg tracking-wide">
                           {homepageProperties[0].category || 'Open Plot'}
                         </div>
                       </div>
@@ -1217,22 +1218,30 @@ export default function App() {
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 loading="lazy"
                               />
+                              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/85 via-slate-950/40 to-transparent pointer-events-none" />
                               <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md border border-amber-300">
                                 <Sparkles className="w-3 h-3 text-brand-yellow fill-brand-yellow" />
                                 <span>FEATURED PROMOTION</span>
                               </div>
                               {prop.category && (
-                                <div className="absolute bottom-3 left-3 z-10 bg-brand-charcoal/80 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                  {prop.category}
+                                <div className="absolute bottom-3 left-3 z-10 bg-slate-950/95 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-lg border border-slate-700/80 shadow-lg tracking-wide flex items-center gap-1">
+                                  <span>{prop.category}</span>
                                 </div>
                               )}
                             </div>
 
                             <div className="p-5 flex-1 flex flex-col justify-between">
                               <div>
-                                <div className="flex items-center justify-between text-xs text-gray-500 font-bold mb-1">
-                                  <span>{[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}</span>
-                                  <span className="text-brand-charcoal">{prop.category}</span>
+                                <div className="flex items-center justify-between gap-2 text-xs text-gray-500 font-bold mb-1.5">
+                                  <span className="truncate flex items-center gap-1 text-slate-600">
+                                    <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    <span className="truncate">
+                                      {[prop.location?.locality, prop.location?.city].map(s => typeof s === 'string' ? s.trim() : '').filter(Boolean).join(', ') || prop.location?.city || prop.location?.state || 'India'}
+                                    </span>
+                                  </span>
+                                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+                                    100% VERIFIED
+                                  </span>
                                 </div>
                                 <h3 className="text-base font-bold text-brand-charcoal line-clamp-1 mb-3">
                                   {prop.title}

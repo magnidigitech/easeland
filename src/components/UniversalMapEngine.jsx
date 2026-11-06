@@ -1446,7 +1446,7 @@ export default function UniversalMapEngine({
               alt="Map Type Toggle"
               className="w-full h-full object-cover"
             />
-            <div className="absolute bottom-0 inset-x-0 bg-brand-charcoal/80 backdrop-blur-md text-white text-[10px] font-extrabold py-0.5 text-center uppercase tracking-wider">
+            <div className="absolute bottom-0 inset-x-0 bg-slate-950/90 backdrop-blur-md text-white text-[10px] font-extrabold py-0.5 text-center uppercase tracking-wider">
               {mapType === 'satellite' ? 'Map' : 'Satellite'}
             </div>
           </div>

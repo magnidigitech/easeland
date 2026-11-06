@@ -5352,7 +5352,7 @@ export default function AdminPortal({ onNavigate }) {
                                       e.currentTarget.src = NO_PHOTO_PLACEHOLDER;
                                     }}
                                   />
-                                  <span className="absolute top-1 left-1 bg-brand-charcoal/80 backdrop-blur-xs text-amber-300 font-extrabold text-[9px] px-1.5 py-0.5 rounded">
+                                  <span className="absolute top-1 left-1 bg-slate-950/95 backdrop-blur-sm text-amber-300 font-extrabold text-[9px] px-1.5 py-0.5 rounded border border-slate-700/80 shadow">
                                     PROMOTED
                                   </span>
                                 </div>

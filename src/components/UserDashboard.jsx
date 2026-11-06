@@ -2092,7 +2092,7 @@ export default function UserDashboard({
                                 e.target.src = getCategoryFallbackImage(prop);
                               }}
                             />
-                            <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider text-brand-yellow bg-brand-charcoal/90 backdrop-blur px-2.5 py-1 rounded-md">
+                            <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider text-brand-yellow bg-slate-950/95 backdrop-blur-sm px-2.5 py-1 rounded-md border border-slate-700/80 shadow-md">
                               {getCategoryBadgeLabel(prop)}
                             </span>
                           </div>
