@@ -41,9 +41,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
   // Security Form State
   const [securityData, setSecurityData] = useState({
     newPassword: '',
-    confirmPassword: '',
-    enable2FA: profile?.security?.enable2FA ?? profile?.communicationPreferences?.enable2FA ?? false,
-    loginAlerts: profile?.security?.loginAlerts ?? profile?.communicationPreferences?.loginAlerts ?? true
+    confirmPassword: ''
   });
 
   const [showNewPass, setShowNewPass] = useState(false);
@@ -99,9 +97,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       });
       setSecurityData({
         newPassword: '',
-        confirmPassword: '',
-        enable2FA: profile?.security?.enable2FA ?? profile?.communicationPreferences?.enable2FA ?? false,
-        loginAlerts: profile?.security?.loginAlerts ?? profile?.communicationPreferences?.loginAlerts ?? true
+        confirmPassword: ''
       });
       setError(null);
       setSuccessMsg(null);
@@ -235,8 +231,6 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     setLoading(true);
     try {
       const result = await updatePreferencesData({
-        enable2FA: securityData.enable2FA,
-        loginAlerts: securityData.loginAlerts,
         ...(securityData.newPassword ? { passwordUpdated: true } : {})
       });
 
@@ -487,35 +481,6 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                   </div>
                 </div>
               )}
-
-              {/* SECURITY TOGGLES */}
-              <div className="pt-2 border-t border-gray-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="block text-xs font-extrabold text-brand-charcoal">Two-Factor Authentication</span>
-                    <span className="block text-[10px] text-gray-500 font-medium">Require SMS / Email OTP verification on login</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={securityData.enable2FA}
-                    onChange={(e) => setSecurityData({ ...securityData, enable2FA: e.target.checked })}
-                    className="w-4 h-4 text-brand-yellow rounded focus:ring-brand-yellow"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="block text-xs font-extrabold text-brand-charcoal">Unrecognized Login Alerts</span>
-                    <span className="block text-[10px] text-gray-500 font-medium">Send instant email alert when account is accessed from new device</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={securityData.loginAlerts}
-                    onChange={(e) => setSecurityData({ ...securityData, loginAlerts: e.target.checked })}
-                    className="w-4 h-4 text-brand-yellow rounded focus:ring-brand-yellow"
-                  />
-                </div>
-              </div>
 
               {/* DANGER ZONE - DELETE ACCOUNT */}
               <div className="pt-4 border-t border-red-100">

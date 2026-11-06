@@ -1411,9 +1411,6 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-gray-500 font-medium">
-            💡 Enter or paste your full address here. Dropdowns (State, District, City, Mandal, Locality) will automatically populate and the property location pin will be mapped on the map below.
-          </p>
         </div>
       </div>
 
