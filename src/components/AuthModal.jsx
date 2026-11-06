@@ -29,7 +29,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     sendPasswordReset,
     sendMobileOtp,
     loginWithMobile,
-    updateProfileData
+    updateProfileData,
+    checkAccountExists
   } = useAuth();
 
   // Top-level Auth Method: 'mobile' (Default) or 'email'
@@ -106,6 +107,23 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     setError(null);
     setSuccessMessage(null);
 
+    // Enforce "One PhoneNumber One Account" constraint
+    if (mode === 'register') {
+      const existsCheck = await checkAccountExists({ phone: cleanPhone });
+      if (existsCheck.phoneExists) {
+        setLoading(false);
+        setError('An account already exists with this mobile number (+91 ' + cleanPhone + '). Please switch to the Log In tab.');
+        return;
+      }
+    } else if (mode === 'login') {
+      const existsCheck = await checkAccountExists({ phone: cleanPhone });
+      if (!existsCheck.phoneExists) {
+        setLoading(false);
+        setError('No account found with mobile number +91 ' + cleanPhone + '. Please switch to the Register tab.');
+        return;
+      }
+    }
+
     try {
       const res = await sendMobileOtp(cleanPhone);
       setLoading(false);
@@ -137,6 +155,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
+
+    // Safety re-check in register mode
+    if (mode === 'register') {
+      const existsCheck = await checkAccountExists({ phone: cleanPhone });
+      if (existsCheck.phoneExists) {
+        setLoading(false);
+        setError('An account already exists with this mobile number (+91 ' + cleanPhone + '). Please switch to the Log In tab.');
+        return;
+      }
+    }
 
     try {
       const res = await loginWithMobile(cleanPhone, cleanCode);
@@ -270,11 +298,26 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     }
 
     if (mode === 'register') {
+      const cleanPhone = formData.phone.replace(/\D/g, '').slice(-10);
+      const cleanEmail = formData.email.trim();
+
+      const existsCheck = await checkAccountExists({ email: cleanEmail, phone: cleanPhone });
+      if (existsCheck.emailExists) {
+        setLoading(false);
+        setError('An account already exists with this email address (' + cleanEmail + '). Please log in instead.');
+        return;
+      }
+      if (existsCheck.phoneExists) {
+        setLoading(false);
+        setError('An account already exists with this mobile number (+91 ' + cleanPhone + '). Please log in instead.');
+        return;
+      }
+
       const result = await registerUser(
-        formData.email.trim(),
+        cleanEmail,
         formData.password,
         formData.name.trim(),
-        formData.phone.replace(/\D/g, '')
+        cleanPhone
       );
 
       setLoading(false);

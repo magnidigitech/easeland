@@ -2623,6 +2623,128 @@ app.post('/api/enquiries/:id/messages', async (req, res) => {
 
 
 
+// API Endpoint: Check if email or phone number already belongs to an existing account
+app.get('/api/auth/check-existence', async (req, res) => {
+  try {
+    const rawEmail = String(req.query.email || '').trim().toLowerCase();
+    const rawPhone = String(req.query.phone || '').replace(/\D/g, '').slice(-10);
+    const excludeUid = String(req.query.excludeUid || '').trim().toLowerCase();
+
+    let emailExists = false;
+    let phoneExists = false;
+
+    // 1. Check in-memory localUsersMap
+    for (const u of localUsersMap.values()) {
+      if (!u) continue;
+      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+      if (excludeUid && uUid === excludeUid) continue;
+      const uStatus = String(u.accountStatus || u.status || '').toUpperCase();
+      if (uStatus === 'REMOVED' || uStatus === 'DELETED') continue;
+
+      const uEmail = String(u.email || '').toLowerCase().trim();
+      const uPhone = String(u.phone || u.phoneNumber || '').replace(/\D/g, '').slice(-10);
+
+      if (rawEmail && uEmail && uEmail === rawEmail) {
+        emailExists = true;
+      }
+      if (rawPhone && uPhone && uPhone === rawPhone) {
+        phoneExists = true;
+      }
+      if (emailExists && phoneExists) break;
+    }
+
+    // 2. Check PostgreSQL if pool is available and not already both found
+    if ((!emailExists || !phoneExists) && pgPool) {
+      try {
+        const P = String.fromCharCode(36);
+        const conds = [];
+        const params = [];
+
+        if (rawEmail) {
+          params.push(rawEmail);
+          conds.push('LOWER(email) = LOWER(' + P + params.length + ')');
+        }
+        if (rawPhone) {
+          params.push('%' + rawPhone);
+          conds.push('(phone LIKE ' + P + params.length + " OR raw_data->>'phone' LIKE " + P + params.length + " OR raw_data->>'phoneNumber' LIKE " + P + params.length + ')');
+        }
+
+        if (conds.length > 0) {
+          let sql = 'SELECT uid, email, phone, account_status, raw_data FROM users WHERE (' + conds.join(' OR ') + ')';
+          if (excludeUid) {
+            params.push(excludeUid);
+            sql += ' AND LOWER(uid) != LOWER(' + P + params.length + ')';
+          }
+          sql += ';';
+
+          const pgResult = await pgPool.query(sql, params);
+          for (const row of pgResult.rows) {
+            const rStatus = String(row.account_status || (row.raw_data && row.raw_data.accountStatus) || '').toUpperCase();
+            if (rStatus === 'REMOVED' || rStatus === 'DELETED') continue;
+
+            const rEmail = String(row.email || (row.raw_data && row.raw_data.email) || '').toLowerCase().trim();
+            const rPhone = String(row.phone || (row.raw_data && (row.raw_data.phone || row.raw_data.phoneNumber)) || '').replace(/\D/g, '').slice(-10);
+
+            if (rawEmail && rEmail === rawEmail) emailExists = true;
+            if (rawPhone && rPhone === rawPhone) phoneExists = true;
+          }
+        }
+      } catch (pgErr) {
+        console.warn('PostgreSQL check-existence query note:', pgErr.message);
+      }
+    }
+
+    // 3. Check Firebase Admin Auth if still not found
+    if (!emailExists && rawEmail) {
+      try {
+        const adminApps = getApps();
+        const adminApp = adminApps.length ? adminApps[0] : initializeApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04' });
+        const auth = getAuth(adminApp);
+        const fbUser = await auth.getUserByEmail(rawEmail);
+        if (fbUser && (!excludeUid || String(fbUser.uid).toLowerCase() !== excludeUid)) {
+          emailExists = true;
+        }
+      } catch (authErr) {
+        // user not found or auth unavailable
+      }
+    }
+
+    if (!phoneExists && rawPhone) {
+      try {
+        const adminApps = getApps();
+        const adminApp = adminApps.length ? adminApps[0] : initializeApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04' });
+        const auth = getAuth(adminApp);
+        const fbUser = await auth.getUserByPhoneNumber('+91' + rawPhone);
+        if (fbUser && (!excludeUid || String(fbUser.uid).toLowerCase() !== excludeUid)) {
+          phoneExists = true;
+        }
+      } catch (authErr) {
+        // user not found
+      }
+    }
+
+    let error = null;
+    if (emailExists && phoneExists) {
+      error = 'An account already exists with this email address and mobile number. Please log in instead.';
+    } else if (emailExists) {
+      error = 'An account already exists with this email address. Please log in instead.';
+    } else if (phoneExists) {
+      error = 'An account already exists with this mobile number (+91 ' + rawPhone + '). Please log in instead.';
+    }
+
+    return res.json({
+      success: true,
+      exists: Boolean(emailExists || phoneExists),
+      emailExists,
+      phoneExists,
+      error
+    });
+  } catch (err) {
+    console.error('Check user existence failed:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API Endpoint: Get user by ID or email
 app.get('/api/users/:id', async (req, res) => {
   try {

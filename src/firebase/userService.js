@@ -77,6 +77,109 @@ export async function syncUserToPostgres(userData) {
 }
 
 /**
+ * Check if an account already exists with the given email and/or mobile phone number.
+ * Enforces "One PhoneNumber One Account, One Mail One Account" constraint across
+ * Backend, PostgreSQL, Firebase Auth, and local caches.
+ */
+export async function checkAccountExists({ email = '', phone = '', excludeUid = '' } = {}) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+  const cleanExcludeUid = String(excludeUid || '').trim().toLowerCase();
+
+  let emailExists = false;
+  let phoneExists = false;
+
+  // 1. First, check backend /api/auth/check-existence endpoint
+  try {
+    const params = new URLSearchParams();
+    if (cleanEmail) params.append('email', cleanEmail);
+    if (cleanPhone) params.append('phone', cleanPhone);
+    if (cleanExcludeUid) params.append('excludeUid', cleanExcludeUid);
+
+    const res = await fetch('/api/auth/check-existence?' + params.toString());
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        emailExists = Boolean(data.emailExists);
+        phoneExists = Boolean(data.phoneExists);
+      }
+    }
+  } catch (e) {
+    // Network note: fall through to local cache checks
+  }
+
+  // 2. Local Storage check (easeland_registered_users and easeland_user_profile_*)
+  if (typeof window !== 'undefined' && (!emailExists || !phoneExists)) {
+    try {
+      const rawDel = localStorage.getItem('easeland_deleted_users');
+      const deletedUsers = rawDel ? JSON.parse(rawDel).map(v => String(v).toLowerCase().trim()) : [];
+
+      const rawReg = localStorage.getItem('easeland_registered_users');
+      const registered = rawReg ? JSON.parse(rawReg) : [];
+      
+      const allLocalUsers = Array.isArray(registered) ? [...registered] : [];
+
+      // Also gather from individual user profiles in localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('easeland_user_profile_')) {
+          try {
+            const p = JSON.parse(localStorage.getItem(k));
+            if (p) allLocalUsers.push(p);
+          } catch (e) {}
+        }
+      }
+
+      // Also check session user
+      try {
+        const sess = JSON.parse(localStorage.getItem('easeland_session_user') || '{}');
+        if (sess && (sess.uid || sess.id)) allLocalUsers.push(sess);
+      } catch (e) {}
+
+      for (const u of allLocalUsers) {
+        if (!u) continue;
+        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+        if (cleanExcludeUid && uUid === cleanExcludeUid) continue;
+        if (deletedUsers.includes(uUid)) continue;
+
+        const uStatus = String(u.accountStatus || u.status || '').toUpperCase();
+        if (uStatus === 'REMOVED' || uStatus === 'DELETED') continue;
+
+        const uEmail = String(u.email || '').toLowerCase().trim();
+        if (deletedUsers.includes(uEmail)) continue;
+
+        const uPhone = String(u.phone || u.phoneNumber || u.mobile || '').replace(/\D/g, '').slice(-10);
+
+        if (cleanEmail && uEmail && uEmail === cleanEmail) {
+          emailExists = true;
+        }
+        if (cleanPhone && uPhone && uPhone === cleanPhone) {
+          phoneExists = true;
+        }
+        if (emailExists && phoneExists) break;
+      }
+    } catch (e) {}
+  }
+
+  let error = null;
+  if (emailExists && phoneExists) {
+    error = 'An account already exists with this email address and mobile number. Please log in instead.';
+  } else if (emailExists) {
+    error = 'An account already exists with this email address (' + cleanEmail + '). Please log in instead.';
+  } else if (phoneExists) {
+    error = 'An account already exists with this mobile number (+91 ' + cleanPhone + '). Please log in instead.';
+  }
+
+  return {
+    success: true,
+    exists: Boolean(emailExists || phoneExists),
+    emailExists,
+    phoneExists,
+    error
+  };
+}
+
+/**
  * Create a new user profile document in users/{uid}.
  * Ensures clean-slate creation with zero trace of old data or removed status.
  */

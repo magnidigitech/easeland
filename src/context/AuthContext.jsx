@@ -16,7 +16,8 @@ import {
   updateOwnProfile,
   updateCommunicationPreferences,
   syncUserToPostgres,
-  fetchUserFromPostgres
+  fetchUserFromPostgres,
+  checkAccountExists
 } from '../firebase/userService.js';
 import {
   checkAndTriggerSecurityAlert,
@@ -614,6 +615,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const registerUser = async (email, password, displayName = '', phone = '') => {
+    // Enforce "One Mail One Account, One PhoneNumber One Account" constraint
+    const existenceCheck = await checkAccountExists({ email, phone });
+    if (existenceCheck.emailExists) {
+      return { success: false, error: 'An account already exists with this email address (' + email + '). Please log in instead.' };
+    }
+    if (existenceCheck.phoneExists) {
+      return { success: false, error: 'An account already exists with this mobile number (+91 ' + phone + '). Please log in instead.' };
+    }
+
     let authResult = await apiRegisterUser(email, password, displayName);
     
     // Dev Fallback if Firebase API key is unconfigured, placeholder, or invalid in local dev
@@ -1424,7 +1434,8 @@ export function AuthProvider({ children }) {
     reloadProfile,
     complete2FASession,
     cancel2FASession,
-    deleteOwnAccount
+    deleteOwnAccount,
+    checkAccountExists
   };
 
   return (

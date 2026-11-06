@@ -18,7 +18,7 @@ import {
 } from '../firebase/securityService.js';
 
 export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated }) {
-  const { user, profile, updateProfileData, updatePreferencesData, deleteOwnAccount } = useAuth();
+  const { user, profile, updateProfileData, updatePreferencesData, deleteOwnAccount, checkAccountExists } = useAuth();
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'security'
 
@@ -268,6 +268,27 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     }
 
     setLoading(true);
+
+    // Enforce "One Mail One Account, One PhoneNumber One Account" constraint
+    if (typeof checkAccountExists === 'function') {
+      const activeUid = user?.uid || profile?.uid || '';
+      const existsCheck = await checkAccountExists({
+        email: profileData.email.trim(),
+        phone: cleanPhone || profileData.phone.trim(),
+        excludeUid: activeUid
+      });
+      if (existsCheck.emailExists) {
+        setLoading(false);
+        setError('An account already exists with this email address (' + profileData.email.trim() + ').');
+        return;
+      }
+      if (existsCheck.phoneExists) {
+        setLoading(false);
+        setError('An account already exists with this mobile number (+91 ' + (cleanPhone || profileData.phone.trim()) + ').');
+        return;
+      }
+    }
+
     const result = await updateProfileData({
       displayName: profileData.name.trim(),
       name: profileData.name.trim(),
