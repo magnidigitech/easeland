@@ -1,5 +1,6 @@
 import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { db } from './config.js';
+import { verifyTotpCode } from '../utils/totp.js';
 
 // In-memory active 2FA OTP store with 5-minute expiry
 const otpStore = new Map();
@@ -77,11 +78,20 @@ export function clear2FAVerifiedForSession(uid) {
 }
 
 /**
- * Verify submitted 2FA OTP code
+ * Verify submitted 2FA OTP code (supports both Authenticator App TOTP and Email OTP)
  */
-export function verify2FAOtp(identifier, codeInput) {
+export async function verify2FAOtp(identifier, codeInput, totpSecret = null) {
   if (!codeInput) return { success: false, error: 'Please enter the 6-digit verification code.' };
   
+  // If user has Authenticator App configured, verify using RFC 6238 TOTP
+  if (totpSecret) {
+    const isValid = await verifyTotpCode(totpSecret, codeInput, 1);
+    if (isValid) {
+      return { success: true };
+    }
+    return { success: false, error: 'Incorrect 6-digit code. Please check your Authenticator app and try again.' };
+  }
+
   const record = otpStore.get(identifier);
   if (!record) {
     return { success: false, error: 'Verification code has expired or is invalid. Please request a new code.' };

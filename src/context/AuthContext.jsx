@@ -329,7 +329,9 @@ export function AuthProvider({ children }) {
               adminRole: isAdmin || userProfileData?.role === 'ADMIN' || userProfileData?.adminRole
             },
             email: currentUser.email || userProfileData?.email || '',
-            phone: currentUser.phoneNumber || userProfileData?.phone || ''
+            phone: currentUser.phoneNumber || userProfileData?.phone || '',
+            totpSecret: userProfileData?.security?.totpSecret || userProfileData?.communicationPreferences?.totpSecret || null,
+            twoFactorType: userProfileData?.security?.twoFactorType || userProfileData?.communicationPreferences?.twoFactorType || 'AUTHENTICATOR_APP'
           });
         } else {
           setPending2FASession(null);
@@ -856,7 +858,9 @@ export function AuthProvider({ children }) {
           user: loggedInUser,
           profile: userProfileData,
           email: lowerEmail,
-          phone: loggedInUser.phone
+          phone: loggedInUser.phone,
+          totpSecret: userProfileData?.security?.totpSecret || userProfileData?.communicationPreferences?.totpSecret || null,
+          twoFactorType: userProfileData?.security?.twoFactorType || userProfileData?.communicationPreferences?.twoFactorType || 'AUTHENTICATOR_APP'
         });
         return { success: true, requires2FA: true, user: loggedInUser, email: lowerEmail, phone: loggedInUser.phone };
       }
@@ -1171,7 +1175,9 @@ export function AuthProvider({ children }) {
           user: result.user,
           profile: userProfileData,
           email: result.user.email,
-          phone: result.user.phoneNumber
+          phone: result.user.phoneNumber,
+          totpSecret: userProfileData?.security?.totpSecret || userProfileData?.communicationPreferences?.totpSecret || null,
+          twoFactorType: userProfileData?.security?.twoFactorType || userProfileData?.communicationPreferences?.twoFactorType || 'AUTHENTICATOR_APP'
         });
         return { success: true, requires2FA: true, user: result.user, email: result.user.email, phone: result.user.phoneNumber };
       }

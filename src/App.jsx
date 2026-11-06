@@ -1762,6 +1762,9 @@ export default function App() {
       <TwoFactorModal
         isOpen={!!pending2FASession}
         userEmail={pending2FASession?.email || ''}
+        userPhone={pending2FASession?.phone || ''}
+        totpSecret={pending2FASession?.totpSecret || pending2FASession?.profile?.security?.totpSecret || null}
+        twoFactorType={pending2FASession?.twoFactorType || pending2FASession?.profile?.security?.twoFactorType || 'AUTHENTICATOR_APP'}
         onVerifySuccess={() => {
           complete2FASession();
           changeActivePage('home');

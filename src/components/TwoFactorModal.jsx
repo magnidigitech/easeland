@@ -1,20 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Lock, RefreshCw, X, AlertCircle, CheckCircle2, ArrowRight, Mail } from 'lucide-react';
+import { ShieldCheck, Lock, RefreshCw, X, AlertCircle, CheckCircle2, ArrowRight, Mail, Smartphone } from 'lucide-react';
 import { verify2FAOtp, generate2FAOtp, send2FAEmailOtp } from '../firebase/securityService.js';
 
-export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userEmail = '', userPhone = '' }) {
+export default function TwoFactorModal({
+  isOpen,
+  onClose,
+  onVerifySuccess,
+  userEmail = '',
+  userPhone = '',
+  totpSecret = null,
+  twoFactorType = 'AUTHENTICATOR_APP'
+}) {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
+
+  const isTotp = Boolean(totpSecret || twoFactorType === 'AUTHENTICATOR_APP');
   
   const inputRefs = [
     useRef(null), useRef(null), useRef(null),
     useRef(null), useRef(null), useRef(null)
   ];
 
-  // Initialize 2FA Code on open & dispatch email
+  // Initialize 2FA Code on open (dispatch email only if not in TOTP Authenticator mode)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -25,22 +35,24 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     setLoading(false);
     setResendCountdown(30);
 
-    const identifier = userEmail || userPhone || 'session';
-    const { code } = generate2FAOtp(identifier);
-    if (userEmail) {
-      send2FAEmailOtp(userEmail, code);
+    if (!isTotp) {
+      const identifier = userEmail || userPhone || 'session';
+      const { code } = generate2FAOtp(identifier);
+      if (userEmail) {
+        send2FAEmailOtp(userEmail, code);
+      }
+      
+      // Timer countdown for email resend
+      const interval = setInterval(() => {
+        setResendCountdown(prev => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+
+      return () => clearInterval(interval);
     }
-    
-    // Timer countdown
-    const interval = setInterval(() => {
-      setResendCountdown(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
 
     // Auto-focus first input box
     setTimeout(() => inputRefs[0]?.current?.focus(), 150);
-
-    return () => clearInterval(interval);
-  }, [isOpen, userEmail, userPhone]);
+  }, [isOpen, userEmail, userPhone, isTotp]);
 
   if (!isOpen) return null;
 
@@ -75,7 +87,7 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
   };
 
   const handleResendOtp = () => {
-    if (resendCountdown > 0) return;
+    if (isTotp || resendCountdown > 0) return;
     const identifier = userEmail || userPhone || 'session';
     const { code } = generate2FAOtp(identifier);
     if (userEmail) {
@@ -87,7 +99,7 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     inputRefs[0]?.current?.focus();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e?.preventDefault();
     setError(null);
 
@@ -99,7 +111,7 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
 
     setLoading(true);
     const identifier = userEmail || userPhone || 'session';
-    const result = verify2FAOtp(identifier, fullCode);
+    const result = await verify2FAOtp(identifier, fullCode, totpSecret);
 
     setLoading(false);
     if (!result.success) {
@@ -113,11 +125,13 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
     }, 600);
   };
 
-  const maskedTarget = userEmail
+  const maskedEmail = userEmail
     ? userEmail.replace(/^(.{2})(.*)(@.*)$/, (_, a, b, c) => a + '***' + c)
-    : userPhone
-    ? userPhone.replace(/^(\+91\s?\d{2})\d{6}(\d{2})$/, '$1******$2')
-    : 'your registered account';
+    : '';
+  const maskedPhone = userPhone && userPhone.length >= 6
+    ? userPhone.slice(0, 3) + '******' + userPhone.slice(-2)
+    : userPhone;
+  const maskedTarget = maskedEmail || maskedPhone || 'your registered account';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in">
@@ -127,42 +141,59 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
         <div className="bg-slate-900 text-white p-6 relative flex items-center gap-4">
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"
+            className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
           
           <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-400 border border-amber-400/30 flex items-center justify-center font-black text-xl shrink-0">
-            <ShieldCheck className="w-6 h-6" />
+            {isTotp ? <Smartphone className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
           </div>
 
           <div>
             <h3 className="text-base font-black tracking-tight text-white">Two-Factor Authentication</h3>
-            <p className="text-xs text-slate-400 font-medium">Verify login security identity</p>
+            <p className="text-xs text-slate-400 font-medium">
+              {isTotp ? 'Authenticator App Verification' : 'Verify login security identity'}
+            </p>
           </div>
         </div>
 
         {/* BODY */}
         <div className="p-6 space-y-6">
-          <div className="text-center space-y-1">
-            <p className="text-xs font-semibold text-slate-600">
-              Enter the 6-digit verification code sent to
-            </p>
-            <strong className="text-xs font-black text-slate-900 block bg-slate-100 py-1.5 px-3 rounded-lg border border-slate-200">
-              {maskedTarget}
-            </strong>
-          </div>
-
-          {/* EMAIL DISPATCH CONFIRMATION BOX */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center space-y-1">
-            <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-xs font-bold">
-              <Mail className="w-4 h-4 text-emerald-600" />
-              <span>OTP Sent to Your Email</span>
+          {isTotp ? (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-1.5">
+              <div className="flex items-center justify-center gap-1.5 text-slate-800 text-xs font-black">
+                <Smartphone className="w-4 h-4 text-amber-500" />
+                <span>Enter Code from Authenticator App</span>
+              </div>
+              <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                Open <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>, or your authenticator app and enter the 6-digit code for <strong>{userEmail || 'EaseLand'}</strong>.
+              </p>
             </div>
-            <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
-              Check your inbox for <strong>{maskedTarget}</strong> and enter the 6-digit verification code below.
-            </p>
-          </div>
+          ) : (
+            <>
+              <div className="text-center space-y-1">
+                <p className="text-xs font-semibold text-slate-600">
+                  Enter the 6-digit verification code sent to
+                </p>
+                <strong className="text-xs font-black text-slate-900 block bg-slate-100 py-1.5 px-3 rounded-lg border border-slate-200">
+                  {maskedTarget}
+                </strong>
+              </div>
+
+              {/* EMAIL DISPATCH CONFIRMATION BOX */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center space-y-1">
+                <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-xs font-bold">
+                  <Mail className="w-4 h-4 text-emerald-600" />
+                  <span>OTP Sent to Your Email</span>
+                </div>
+                <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
+                  Check your inbox for <strong>{maskedTarget}</strong> and enter the 6-digit verification code below.
+                </p>
+              </div>
+            </>
+          )}
 
           {/* OTP PIN INPUT BOXES */}
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -199,23 +230,30 @@ export default function TwoFactorModal({ isOpen, onClose, onVerifySuccess, userE
               </div>
             )}
 
-            {/* RESEND LINK */}
-            <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span>Didn't receive the code?</span>
-              <button
-                type="button"
-                onClick={handleResendOtp}
-                disabled={resendCountdown > 0}
-                className={`font-black flex items-center gap-1 ${
-                  resendCountdown > 0
-                    ? 'text-slate-400 cursor-not-allowed'
-                    : 'text-amber-600 hover:text-amber-700 cursor-pointer underline'
-                }`}
-              >
-                <RefreshCw className={`w-3 h-3 ${resendCountdown > 0 ? 'animate-spin' : ''}`} />
-                <span>{resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend Code'}</span>
-              </button>
-            </div>
+            {/* REFRESH OR RESEND LINK */}
+            {isTotp ? (
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-50 py-2 rounded-xl border border-slate-100">
+                <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                <span>Codes refresh automatically every 30 seconds in your app</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                <span>Didn't receive the code?</span>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendCountdown > 0}
+                  className={`font-black flex items-center gap-1 ${
+                    resendCountdown > 0
+                      ? 'text-slate-400 cursor-not-allowed'
+                      : 'text-amber-600 hover:text-amber-700 cursor-pointer underline'
+                  }`}
+                >
+                  <RefreshCw className={`w-3 h-3 ${resendCountdown > 0 ? 'animate-spin' : ''}`} />
+                  <span>{resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend Code'}</span>
+                </button>
+              </div>
+            )}
 
             {/* ACTION BUTTONS */}
             <div className="flex items-center gap-3 pt-2">
