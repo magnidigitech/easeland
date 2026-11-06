@@ -2783,10 +2783,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
         let params = [];
         if (cleanPhone) {
           params.push('%' + cleanPhone);
-          sql = 'SELECT uid, email, phone, raw_data FROM users WHERE phone LIKE ' + P + '1 OR raw_data->>'phone' LIKE ' + P + '1 LIMIT 1;';
+          sql = "SELECT uid, email, phone, raw_data FROM users WHERE phone LIKE " + P + "1 OR raw_data->>'phone' LIKE " + P + "1 LIMIT 1;";
         } else if (cleanEmail) {
           params.push(cleanEmail);
-          sql = 'SELECT uid, email, phone, raw_data FROM users WHERE LOWER(email) = LOWER(' + P + '1) LIMIT 1;';
+          sql = "SELECT uid, email, phone, raw_data FROM users WHERE LOWER(email) = LOWER(" + P + "1) LIMIT 1;";
         }
 
         const pgRes = await pgPool.query(sql, params);
