@@ -36,7 +36,7 @@ export const PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {
     'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai', 'Nagapattinam',
     'Kanniyakumari', 'Namakkal', 'Perambalur', 'Pudukkottai', 'Ramanathapuram',
     'Ranipet', 'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur',
-    'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 'Tirupathur',
+    'The Nilgiris', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 'Tirupathur',
     'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Vellore',
     'Viluppuram', 'Virudhunagar'
   ],
@@ -67,7 +67,7 @@ export const PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {
     'Ajmer', 'Alwar', 'Anupgarh', 'Balotra', 'Banswara',
     'Baran', 'Barmer', 'Beawar', 'Bharatpur', 'Bhilwara',
     'Bikaner', 'Bundi', 'Chittorgarh', 'Churu', 'Dausa',
-    'Deeg', 'Didwana-Kuchaman', 'Dholpur', 'Dudu', 'Gangapur City',
+    'Deeg', 'Didwana-Kuchaman', 'Dholpur', 'Dungarpur', 'Dudu', 'Gangapur City',
     'Hanumangarh', 'Jaipur', 'Jaipur Rural', 'Jaisalmer', 'Jalore',
     'Jhalawar', 'Jhunjhunu', 'Jodhpur', 'Jodhpur Rural', 'Karauli',
     'Kekri', 'Khairthal-Tijara', 'Kota', 'Kotputli-Behror', 'Nagaur',
@@ -98,8 +98,8 @@ export const PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {
     'Chhatarpur', 'Chhindwara', 'Damoh', 'Datia', 'Dewas',
     'Dhar', 'Dindori', 'Guna', 'Gwalior', 'Harda',
     'Hoshangabad (Narmadapuram)', 'Indore', 'Jabalpur', 'Jhabua', 'Katni',
-    'Khandwa', 'Khargone', 'Mandla', 'Mandsaur', 'Morena',
-    'Narsinghpur', 'Neemuch', 'Niwari', 'Panna', 'Raisen',
+    'Khandwa', 'Khargone', 'Maihar', 'Mandla', 'Mandsaur', 'Mauganj', 'Morena',
+    'Narsinghpur', 'Neemuch', 'Niwari', 'Pandhurna', 'Panna', 'Raisen',
     'Rajgarh', 'Ratlam', 'Rewa', 'Sagar', 'Satna',
     'Sehore', 'Seoni', 'Shahdol', 'Shajapur', 'Sheopur',
     'Shivpuri', 'Sidhi', 'Singrauli', 'Tikamgarh', 'Ujjain',
@@ -145,13 +145,13 @@ export const PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {
     'Sonipat', 'Yamunanagar'
   ],
   'Assam': [
-    'Baksa', 'Barpeta', 'Biswanath', 'Bongaigaon', 'Cachar',
+    'Bajali', 'Baksa', 'Barpeta', 'Biswanath', 'Bongaigaon', 'Cachar',
     'Charaideo', 'Chirang', 'Darrang', 'Dhemaji', 'Dhubri',
     'Dibrugarh', 'Dima Hasao', 'Goalpara', 'Golaghat', 'Hailakandi',
     'Hojai', 'Jorhat', 'Kamrup', 'Kamrup Metropolitan (Guwahati)', 'Karbi Anglong',
     'Karimganj', 'Kokrajhar', 'Lakhimpur', 'Majuli', 'Morigaon',
     'Nagaon', 'Nalbari', 'Sivasagar', 'Sonitpur', 'South Salmara-Mankachar',
-    'Tinsukia', 'Udalguri', 'West Karbi Anglong'
+    'Tamulpur', 'Tinsukia', 'Udalguri', 'West Karbi Anglong'
   ],
   'Jharkhand': [
     'Bokaro', 'Chatra', 'Deoghar', 'Dhanbad', 'Dumka',
@@ -164,9 +164,10 @@ export const PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {
     'Balod', 'Baloda Bazar', 'Balrampur', 'Bastar', 'Bemetara',
     'Bijapur', 'Bilaspur', 'Dantewada', 'Dhamtari', 'Durg',
     'Gariaband', 'Gaurela-Pendra-Marwahi', 'Janjgir-Champa', 'Jashpur', 'Kabirdham',
-    'Kanker', 'Kondagaon', 'Korba', 'Koriya', 'Mahasamund',
-    'Mungeli', 'Narayanpur', 'Raigarh', 'Raipur', 'Rajnandgaon',
-    'Sukma', 'Surajpur', 'Surguja'
+    'Kanker', 'Khairagarh-Chhuikhadan-Gandai', 'Kondagaon', 'Korba', 'Koriya',
+    'Mahasamund', 'Manendragarh-Chirmiri-Bharatpur', 'Mohla-Manpur-Ambagarh Chowki',
+    'Mungeli', 'Narayanpur', 'Raigarh', 'Raipur', 'Rajnandgaon', 'Sakti',
+    'Sarangarh-Bilaigarh', 'Sukma', 'Surajpur', 'Surguja'
   ],
   'Uttarakhand': [
     'Almora', 'Bageshwar', 'Chamoli', 'Champawat', 'Dehradun',
@@ -179,7 +180,7 @@ export const PAN_INDIA_ADMINISTRATIVE_HIERARCHY = {
     'Solan', 'Una'
   ],
   'Goa': [
-    'North Goa (Panaji, Mapusa, Bardez)', 'South Goa (Margao, Vasco da Gama, Salcete)'
+    'North Goa', 'South Goa'
   ],
   'Tripura': [
     'Dhalai', 'Gomati', 'Khowai', 'North Tripura', 'Sepahijala',

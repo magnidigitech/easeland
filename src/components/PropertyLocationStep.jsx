@@ -12,6 +12,7 @@ import {
   loadGoogleMapsScript
 } from '../services/locationProvider.js';
 import { encodeGeohash } from '../utils/geohash.js';
+import { isLocationLinkOrCoordinates, resolveLocationLink, parseLocationInput } from '../utils/locationLinkParser.js';
 import {
   getStatesList,
   getDistrictsList,
@@ -491,10 +492,68 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     }
   };
 
+  // Handle paste events to immediately resolve pasted Google Maps location links or GPS coordinates
+  const handlePasteLocation = async (e) => {
+    const text = e.clipboardData?.getData('text');
+    if (text && isLocationLinkOrCoordinates(text.trim())) {
+      e.preventDefault();
+      const clean = text.trim();
+      setSearchQuery(clean);
+      setSearching(true);
+      setErrorMsg(null);
+      setDropdownOpen(false);
+      try {
+        const resolved = await resolveLocationLink(clean);
+        if (resolved && resolved.lat != null && resolved.lng != null) {
+          handleSelectPrediction({
+            placeId: `direct_${Date.now()}`,
+            mainText: resolved.placeName || `${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`,
+            secondaryText: resolved.formattedAddress,
+            description: resolved.formattedAddress,
+            lat: resolved.lat,
+            lng: resolved.lng,
+            hierarchy: resolved.hierarchy
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('Paste location link error:', err);
+        setErrorMsg('Failed to resolve location link: ' + err.message);
+      } finally {
+        setSearching(false);
+      }
+    }
+  };
+
   // Handle explicit form submission / Find button
   const handleSearchSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!searchQuery.trim()) return;
+
+    if (isLocationLinkOrCoordinates(searchQuery.trim())) {
+      setSearching(true);
+      setErrorMsg(null);
+      setDropdownOpen(false);
+      try {
+        const resolved = await resolveLocationLink(searchQuery.trim());
+        if (resolved && resolved.lat != null && resolved.lng != null) {
+          handleSelectPrediction({
+            placeId: `direct_${Date.now()}`,
+            mainText: resolved.placeName || `${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`,
+            secondaryText: resolved.formattedAddress,
+            description: resolved.formattedAddress,
+            lat: resolved.lat,
+            lng: resolved.lng,
+            hierarchy: resolved.hierarchy
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('Resolve location link error:', err);
+      } finally {
+        setSearching(false);
+      }
+    }
 
     if (predictions.length > 0) {
       handleSelectPrediction(predictions[0]);
@@ -618,7 +677,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
               <input
                 type="text"
-                placeholder="Search address, locality, business or landmark..."
+                onPaste={handlePasteLocation}
+                placeholder="Search address, locality, landmark, or paste Google Maps link..."
                 value={searchQuery}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 onFocus={() => {
@@ -679,14 +739,14 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
                       className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
                     >
                       {/* Left icon in blue rounded badge */}
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                        <MapPin className="w-4 h-4 text-blue-600" />
+                      <div className={'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ' + (item.isLocationLink ? 'bg-amber-100 text-amber-700 group-hover:bg-amber-200' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100')}>
+                        <MapPin className={'w-4 h-4 ' + (item.isLocationLink ? 'text-amber-700' : 'text-blue-600')} />
                       </div>
 
                       {/* Middle title and address */}
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
-                          {item.mainText}
+                          {item.mainText} {item.isLocationLink && <span className="text-[9.5px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full ml-1.5">Google Maps Pin</span>}
                         </div>
                         <div className="text-[11px] text-gray-500 truncate mt-0.5">
                           {item.secondaryText || item.description}

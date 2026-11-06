@@ -19,6 +19,8 @@ import {
   getPropertyTypeFromCategory,
   getCategoryFromPropertyType
 } from '../utils/categoryUtils.js';
+import { getStatesList, getDistrictsList } from '../data/indiaLocationData.js';
+import { isLocationLinkOrCoordinates, resolveLocationLink, parseLocationInput } from '../utils/locationLinkParser.js';
 
 export const AREA_UNIT_OPTIONS = [
   { label: 'Sq Ft', value: 'sq ft' },
@@ -149,6 +151,8 @@ export default function DynamicFilterPanel({
 
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [locationResolutionStatus, setLocationResolutionStatus] = useState(null);
+  const statesList = useMemo(() => getStatesList(), []);
+  const districtsList = useMemo(() => getDistrictsList(filters?.state), [filters?.state]);
 
   useEffect(() => {
     setCityQuery(filters?.city || '');
@@ -188,6 +192,20 @@ export default function DynamicFilterPanel({
   const handleNearbyInputChange = (val) => {
     setNearbyQuery(val);
     handleChange('referencePlace', val);
+    if (isLocationLinkOrCoordinates(val)) {
+      const parsed = parseLocationInput(val);
+      if (parsed && parsed.lat != null && parsed.lng != null) {
+        setFilters(prev => ({
+          ...prev,
+          referencePlace: parsed.placeName || `${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`,
+          placeName: parsed.placeName || `${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`,
+          referenceLat: parsed.lat,
+          referenceLng: parsed.lng,
+          searchLat: parsed.lat,
+          searchLng: parsed.lng
+        }));
+      }
+    }
     const coords = resolvePlaceCoordinates(val);
     if (coords) {
       setFilters(prev => ({
@@ -233,7 +251,12 @@ export default function DynamicFilterPanel({
     let placeName = text;
     let formattedAddress = item.description || text;
 
-    if (item.placeId) {
+    if (item.isLocationLink && item.lat != null && item.lng != null) {
+      lat = item.lat;
+      lng = item.lng;
+      placeName = item.mainText || text;
+      formattedAddress = item.description || text;
+    } else if (item.placeId) {
       try {
         setIsNearbySuggesting(true);
         const details = await fetchGooglePlaceDetails(item.placeId, text);
@@ -330,7 +353,12 @@ export default function DynamicFilterPanel({
     let resolvedState = '';
     let formattedAddress = item.description || text;
 
-    if (item.placeId) {
+    if (item.isLocationLink && item.lat != null && item.lng != null) {
+      lat = item.lat;
+      lng = item.lng;
+      placeName = item.mainText || text;
+      formattedAddress = item.description || text;
+    } else if (item.placeId) {
       try {
         setIsCitySuggesting(true);
         const details = await fetchGooglePlaceDetails(item.placeId, text);
@@ -444,7 +472,12 @@ export default function DynamicFilterPanel({
     let resolvedState = '';
     let formattedAddress = item.description || text;
 
-    if (item.placeId) {
+    if (item.isLocationLink && item.lat != null && item.lng != null) {
+      lat = item.lat;
+      lng = item.lng;
+      placeName = item.mainText || text;
+      formattedAddress = item.description || text;
+    } else if (item.placeId) {
       try {
         setIsLocalitySuggesting(true);
         const details = await fetchGooglePlaceDetails(item.placeId, text);
@@ -845,7 +878,7 @@ export default function DynamicFilterPanel({
             <div ref={nearbyContainerRef} className="relative">
               <input
                 type="text"
-                placeholder="Enter Nearby Place"
+                placeholder="Enter Place or Paste Link"
                 value={nearbyQuery}
                 onChange={(e) => handleNearbyInputChange(e.target.value)}
                 onKeyDown={(e) => {
@@ -966,19 +999,69 @@ export default function DynamicFilterPanel({
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
               Location Search
             </label>
-            {(filters.city || filters.locality || filters.referencePlace) && (
+            {(filters.city || filters.locality || filters.referencePlace || filters.state || filters.district) && (
               <button
                 type="button"
                 onClick={() => {
                   handleClearCity();
                   handleClearLocality();
                   handleClearNearby();
+                  handleChange('state', '');
+                  handleChange('district', '');
                 }}
                 className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline"
               >
                 Reset Location
               </button>
             )}
+          </div>
+
+          {/* STATE & DISTRICT SELECT DROPDOWNS */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                State / UT
+              </label>
+              <select
+                value={filters?.state || ''}
+                onChange={(e) => {
+                  const newState = e.target.value;
+                  setFilters(prev => ({
+                    ...prev,
+                    cleared: false,
+                    state: newState,
+                    district: ''
+                  }));
+                }}
+                className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white cursor-pointer"
+              >
+                <option value="">All States / UTs</option>
+                {statesList.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                District
+              </label>
+              <select
+                value={filters?.district || ''}
+                disabled={!filters?.state}
+                onChange={(e) => {
+                  handleChange('district', e.target.value);
+                }}
+                className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+              >
+                <option value="">
+                  {!filters?.state ? 'Select State first...' : 'All Districts'}
+                </option>
+                {districtsList.map(dst => (
+                  <option key={dst} value={dst}>{dst}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

@@ -14,6 +14,11 @@ import {
   getIndiaDistricts,
   matchStatesAndDistricts
 } from './indiaLocationHierarchy.js';
+import {
+  isLocationLinkOrCoordinates,
+  parseLocationInput,
+  resolveLocationLink
+} from '../utils/locationLinkParser.js';
 
 // In-memory client cache with 5-minute TTL
 const clientLocationCache = new Map();
@@ -63,6 +68,23 @@ export async function searchIndiaLocations(queryStr, options = {}) {
     seenKeys.add(dedupeKey);
     results.push(item);
   };
+
+  // 1a. Priority Check: Is input a Google Maps link or coordinates?
+  if (isLocationLinkOrCoordinates(q)) {
+    const parsed = parseLocationInput(q);
+    if (parsed && parsed.lat != null && parsed.lng != null) {
+      addResult({
+        id: 'link_' + parsed.lat + '_' + parsed.lng,
+        title: parsed.placeName || `${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`,
+        subtitle: '📍 Pinned Location from Google Maps Link',
+        fullAddress: `Coordinates: ${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`,
+        type: 'LOCALITY',
+        lat: parsed.lat,
+        lng: parsed.lng,
+        isPlatformListing: false
+      });
+    }
+  }
 
   // 2. Check local platform properties (if provided or active)
   const properties = options.availableProperties || [];

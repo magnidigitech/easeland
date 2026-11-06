@@ -299,6 +299,18 @@ async function fallbackGeocodeSearch(trimmed) {
   }
 }
 
+import {
+  parseLocationInput,
+  isLocationLinkOrCoordinates,
+  resolveLocationLink
+} from '../utils/locationLinkParser.js';
+
+export {
+  parseLocationInput,
+  isLocationLinkOrCoordinates,
+  resolveLocationLink
+};
+
 /**
  * Fetch live Google Places (New) Autocomplete predictions (Restricted to India)
  */
@@ -308,6 +320,42 @@ export async function fetchGooglePlacesPredictions(queryStr) {
   }
 
   const trimmed = queryStr.trim();
+
+  // 0. Priority Hook: Detect if input is a Google Maps link, map URL, or raw coordinates
+  if (isLocationLinkOrCoordinates(trimmed)) {
+    const parsed = parseLocationInput(trimmed);
+    if (parsed && parsed.lat != null && parsed.lng != null && !isNaN(parsed.lat) && !isNaN(parsed.lng)) {
+      return [{
+        placeId: `link_pinned_${parsed.lat}_${parsed.lng}`,
+        mainText: parsed.placeName || `${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`,
+        secondaryText: '📍 Google Maps Pinned Location',
+        description: `Google Maps Location (${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)})`,
+        lat: parsed.lat,
+        lng: parsed.lng,
+        isLocationLink: true,
+        types: ['geocode', 'pinned_location']
+      }];
+    }
+    // Asynchronously resolve short URL or place name link
+    try {
+      const resolved = await resolveLocationLink(trimmed);
+      if (resolved && resolved.lat != null && resolved.lng != null) {
+        return [{
+          placeId: `link_pinned_${resolved.lat}_${resolved.lng}`,
+          mainText: resolved.placeName || `${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`,
+          secondaryText: '📍 Google Maps Pinned Location',
+          description: resolved.formattedAddress || `Google Maps Location (${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)})`,
+          lat: resolved.lat,
+          lng: resolved.lng,
+          hierarchy: resolved.hierarchy,
+          isLocationLink: true,
+          types: ['geocode', 'pinned_location']
+        }];
+      }
+    } catch (e) {
+      console.warn('Error resolving location link predictions:', e);
+    }
+  }
 
   // 1. Direct call to Google Places API (New) Autocomplete REST endpoint
   if (GOOGLE_MAPS_KEY) {
@@ -356,8 +404,34 @@ export async function fetchGooglePlaceDetails(placeId, fallbackName = '') {
 
   const cleanId = String(placeId).startsWith('places/') ? placeId.replace('places/', '') : placeId;
 
+  // Handle location link pinned placeId
+  if (cleanId.startsWith('link_pinned_')) {
+    const rawCoords = cleanId.replace('link_pinned_', '');
+    const parts = rawCoords.split('_');
+    const lat = parseFloat(parts[0]);
+    const lng = parseFloat(parts[1]);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      let hierarchy = null;
+      try {
+        hierarchy = await reverseGeocodeLocation(lat, lng);
+      } catch (e) {
+        console.warn('Reverse geocode for link_pinned error:', e);
+      }
+      const displayName = hierarchy?.address || fallbackName || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      const name = fallbackName || hierarchy?.locality || hierarchy?.city || displayName;
+      return {
+        placeId: cleanId,
+        lat,
+        lng,
+        name,
+        displayName,
+        hierarchy: hierarchy || buildEmptyLocationHierarchy(lat, lng)
+      };
+    }
+  }
+
   // 1. Direct call to Google Places API (New) Place Details REST endpoint
-  if (GOOGLE_MAPS_KEY && !cleanId.startsWith('geo_') && !cleanId.startsWith('direct_')) {
+  if (GOOGLE_MAPS_KEY && !cleanId.startsWith('geo_') && !cleanId.startsWith('direct_') && !cleanId.startsWith('link_')) {
     try {
       const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(cleanId)}?fields=id,displayName,formattedAddress,location,addressComponents&key=${GOOGLE_MAPS_KEY}`;
       const response = await fetch(url);

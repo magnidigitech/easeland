@@ -3,6 +3,7 @@ import { Search, MapPin, ShieldCheck, LocateFixed, TrendingUp, Loader2, Sparkles
 import { mockApi } from '../services/mockApi';
 import { parseNaturalLanguageQuery } from '../firebase/searchParser.js';
 import { fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider.js';
+import { isLocationLinkOrCoordinates, resolveLocationLink } from '../utils/locationLinkParser.js';
 import { STANDARD_CATEGORIES, getPropertyTypeFromCategory } from '../utils/categoryUtils.js';
 
 function normalizeCategoryValue(val, purpVal) {
@@ -86,6 +87,46 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     };
   }, []);
 
+  // Handle paste events to immediately detect and resolve location links (Google Maps, Apple Maps, coordinates)
+  const handlePaste = async (e) => {
+    const pastedText = e.clipboardData?.getData('text');
+    if (pastedText && isLocationLinkOrCoordinates(pastedText.trim())) {
+      const clean = pastedText.trim();
+      setQuery(clean);
+      setIsSuggesting(true);
+      setLocationStatus('Resolving location link...');
+      try {
+        const resolved = await resolveLocationLink(clean);
+        if (resolved && resolved.lat != null && resolved.lng != null) {
+          const displayLabel = resolved.formattedAddress || resolved.placeName || clean;
+          setQuery(displayLabel);
+          setLocationStatus('Pinned from Google Maps');
+          setTimeout(() => setLocationStatus(''), 3000);
+          triggerSearch(displayLabel, purpose, category, {
+            searchLat: resolved.lat,
+            searchLng: resolved.lng,
+            referenceLat: resolved.lat,
+            referenceLng: resolved.lng,
+            referencePlace: resolved.placeName || displayLabel,
+            placeName: resolved.placeName || displayLabel,
+            formattedAddress: resolved.formattedAddress,
+            city: resolved.hierarchy?.city || '',
+            district: resolved.hierarchy?.district || '',
+            state: resolved.hierarchy?.state || '',
+            locality: resolved.hierarchy?.locality || resolved.hierarchy?.subLocality || '',
+            userLat: null,
+            userLng: null
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('Paste location link error:', err);
+      } finally {
+        setIsSuggesting(false);
+      }
+    }
+  };
+
   // Live debounced Google Places Autocomplete input change
   const handleInputChange = (val) => {
     setQuery(val);
@@ -118,9 +159,49 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     setSuggestionsOpen(false);
 
     let extraData = {};
-    if (item.placeId) {
+    if (item.isLocationLink && item.lat != null && item.lng != null) {
+      extraData = {
+        searchLat: item.lat,
+        searchLng: item.lng,
+        referenceLat: item.lat,
+        referenceLng: item.lng,
+        referencePlace: item.mainText || text,
+        placeName: item.mainText || text,
+        formattedAddress: item.description || text,
+        city: item.hierarchy?.city || '',
+        district: item.hierarchy?.district || '',
+        state: item.hierarchy?.state || '',
+        locality: item.hierarchy?.locality || item.hierarchy?.subLocality || '',
+        userLat: null,
+        userLng: null
+      };
+    } else if (item.placeId) {
       try {
         setIsSuggesting(true);
+        if (isLocationLinkOrCoordinates(trimmed)) {
+          const resolved = await resolveLocationLink(trimmed);
+          if (resolved && resolved.lat != null && resolved.lng != null) {
+            const displayLabel = resolved.formattedAddress || resolved.placeName || trimmed;
+            setQuery(displayLabel);
+            extraData = {
+              searchLat: resolved.lat,
+              searchLng: resolved.lng,
+              referenceLat: resolved.lat,
+              referenceLng: resolved.lng,
+              referencePlace: resolved.placeName || displayLabel,
+              placeName: resolved.placeName || displayLabel,
+              formattedAddress: resolved.formattedAddress,
+              city: resolved.hierarchy?.city || '',
+              district: resolved.hierarchy?.district || '',
+              state: resolved.hierarchy?.state || '',
+              locality: resolved.hierarchy?.locality || resolved.hierarchy?.subLocality || '',
+              userLat: null,
+              userLng: null
+            };
+            triggerSearch(displayLabel, purpose, category, extraData);
+            return;
+          }
+        }
         const details = await fetchGooglePlaceDetails(item.placeId, text);
         if (details && !isNaN(details.lat) && !isNaN(details.lng)) {
           extraData = {
@@ -239,6 +320,30 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
     if (trimmed && trimmed.length >= 2 && trimmed.toLowerCase() !== 'near me') {
       try {
         setIsSuggesting(true);
+        if (isLocationLinkOrCoordinates(trimmed)) {
+          const resolved = await resolveLocationLink(trimmed);
+          if (resolved && resolved.lat != null && resolved.lng != null) {
+            const displayLabel = resolved.formattedAddress || resolved.placeName || trimmed;
+            setQuery(displayLabel);
+            extraData = {
+              searchLat: resolved.lat,
+              searchLng: resolved.lng,
+              referenceLat: resolved.lat,
+              referenceLng: resolved.lng,
+              referencePlace: resolved.placeName || displayLabel,
+              placeName: resolved.placeName || displayLabel,
+              formattedAddress: resolved.formattedAddress,
+              city: resolved.hierarchy?.city || '',
+              district: resolved.hierarchy?.district || '',
+              state: resolved.hierarchy?.state || '',
+              locality: resolved.hierarchy?.locality || resolved.hierarchy?.subLocality || '',
+              userLat: null,
+              userLng: null
+            };
+            triggerSearch(displayLabel, purpose, category, extraData);
+            return;
+          }
+        }
         const predictions = await fetchGooglePlacesPredictions(trimmed);
         if (Array.isArray(predictions) && predictions.length > 0 && predictions[0].placeId) {
           const details = await fetchGooglePlaceDetails(predictions[0].placeId, trimmed);
@@ -356,7 +461,8 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
             onFocus={() => {
               if (suggestions.length > 0) setSuggestionsOpen(true);
             }}
-            placeholder="Search by locality, city, project name, or property type..."
+            onPaste={handlePaste}
+            placeholder="Search locality, city, landmark, or paste Google Maps link..."
             className="w-full pl-10 pr-16 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs font-semibold text-white placeholder-gray-400 focus:outline-none focus:border-brand-yellow truncate"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
@@ -404,12 +510,12 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                     onClick={() => handleSelectSuggestion(item)}
                     className="w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-blue-50/70 transition-colors group cursor-pointer"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                      <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    <div className={'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ' + (item.isLocationLink ? 'bg-amber-100 text-amber-700 group-hover:bg-amber-200' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100')}>
+                      <MapPin className={'w-3.5 h-3.5 ' + (item.isLocationLink ? 'text-amber-700' : 'text-blue-600')} />
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
                       <div className="text-xs font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
-                        {item.mainText}
+                        {item.mainText} {item.isLocationLink && <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full ml-1">Google Maps Pin</span>}
                       </div>
                       <div className="text-[10px] text-gray-500 truncate mt-0.5">
                         {item.secondaryText || item.description}
@@ -568,7 +674,8 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                 onFocus={() => {
                   if (suggestions.length > 0) setSuggestionsOpen(true);
                 }}
-                placeholder="Search by locality, city, project name, or property type..."
+                onPaste={handlePaste}
+            placeholder="Search locality, city, landmark, or paste Google Maps link..."
                 className="w-full pl-10 sm:pl-12 pr-20 sm:pr-24 py-2.5 sm:py-3.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-xs sm:text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-slate-900 transition-all shadow-inner"
               />
 
@@ -624,12 +731,12 @@ export default function HeroSearch({ onSearch, isCompact = false, initialState =
                         onClick={() => handleSelectSuggestion(item)}
                         className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/70 transition-colors group cursor-pointer"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                          <MapPin className="w-4 h-4 text-blue-600" />
+                        <div className={'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ' + (item.isLocationLink ? 'bg-amber-100 text-amber-700 group-hover:bg-amber-200' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100')}>
+                          <MapPin className={'w-4 h-4 ' + (item.isLocationLink ? 'text-amber-700' : 'text-blue-600')} />
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-blue-600 truncate transition-colors">
-                            {item.mainText}
+                            {item.mainText} {item.isLocationLink && <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full ml-1">Google Maps Pin</span>}
                           </div>
                           <div className="text-[11px] text-gray-500 truncate mt-0.5">
                             {item.secondaryText || item.description}

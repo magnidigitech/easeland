@@ -14,6 +14,7 @@
  */
 
 import { Purpose, PropertyType } from './schema.js';
+import { parseLocationInput } from '../utils/locationLinkParser.js';
 
 // -------------------------------------------------------------
 // 1. NLP DICTIONARIES, SYNONYMS & KNOWLEDGE GRAPH
@@ -415,6 +416,31 @@ export function parseNaturalLanguageQuery(queryString = '') {
   }
 
   const raw = queryString.trim();
+  const parsedLink = parseLocationInput(raw);
+  if (parsedLink && parsedLink.lat != null && parsedLink.lng != null) {
+    return {
+      originalQuery: raw,
+      query: parsedLink.placeName || raw,
+      purpose: 'ALL',
+      propertyType: 'ALL',
+      bedrooms: 'ANY',
+      minPrice: '',
+      maxPrice: '',
+      locationQuery: parsedLink.placeName || '',
+      cleanKeywords: parsedLink.placeName || '',
+      isLocationSpecific: true,
+      referencePlace: parsedLink.placeName || '',
+      searchLat: parsedLink.lat,
+      searchLng: parsedLink.lng,
+      referenceLat: parsedLink.lat,
+      referenceLng: parsedLink.lng,
+      radiusKm: null,
+      nlpMetadata: {
+        entities: { location: parsedLink.placeName, coordinates: { lat: parsedLink.lat, lng: parsedLink.lng } },
+        sentiment: 'NEUTRAL'
+      }
+    };
+  }
   // 1. Preprocess: normalize word-based numbers e.g. "three bhk" -> "3 bhk"
   let workingText = normalizeWordNumbers(raw.toLowerCase());
 

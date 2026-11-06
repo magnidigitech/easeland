@@ -162,6 +162,39 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// Resolve and expand shortened location links (Google Maps maps.app.goo.gl / goo.gl/maps)
+const handleResolveLocationLink = async (req, res) => {
+  try {
+    const rawUrl = req.body?.url || req.query?.url;
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      return res.status(400).json({ error: 'URL query parameter or body property is required.' });
+    }
+    const trimmed = rawUrl.trim();
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return res.status(400).json({ error: 'Invalid URL scheme. Must begin with http:// or https://' });
+    }
+
+    const response = await fetch(trimmed, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    const finalUrl = response.url || trimmed;
+    return res.status(200).json({
+      success: true,
+      originalUrl: trimmed,
+      finalUrl
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to expand location link: ' + (err.message || String(err)) });
+  }
+};
+app.post('/api/resolve-location-link', handleResolveLocationLink);
+app.get('/api/resolve-location-link', handleResolveLocationLink);
+
 // PWA Service Worker: Never cache sw.js so client devices detect updates instantly
 app.get('/sw.js', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');

@@ -204,10 +204,10 @@ export function urlParamsToSearchState(searchString = '') {
       ? Number(radiusParam)
       : (parsedNL.radiusKm && !isNaN(Number(parsedNL.radiusKm)) && Number(parsedNL.radiusKm) > 0 ? Number(parsedNL.radiusKm) : null),
     referencePlace: nearParam || parsedNL.referencePlace || '',
-    referenceLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : null,
-    referenceLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : null,
-    searchLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : null,
-    searchLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : null,
+    referenceLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : (parsedNL.referenceLat ?? null),
+    referenceLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : (parsedNL.referenceLng ?? null),
+    searchLat: (params.get('lat') && !isNaN(Number(params.get('lat')))) ? Number(params.get('lat')) : (parsedNL.searchLat ?? null),
+    searchLng: (params.get('lng') && !isNaN(Number(params.get('lng')))) ? Number(params.get('lng')) : (parsedNL.searchLng ?? null),
     sortBy: sortParam || 'newest'
   };
 }
