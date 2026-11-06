@@ -4967,6 +4967,40 @@ app.delete('/api/crm/visits/:id', async (req, res) => {
   }
 });
 
+// Reverse proxy for Firebase Auth Custom Domain handler on easeland.in
+app.use('/__/auth', async (req, res) => {
+  try {
+    const targetHost = 'easeland-fba04.firebaseapp.com';
+    const targetUrl = 'https://' + targetHost + '/__/auth' + req.url;
+    const headers = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (k.toLowerCase() !== 'host' && k.toLowerCase() !== 'content-length') {
+        headers[k] = v;
+      }
+    }
+    headers['host'] = targetHost;
+
+    const proxyRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: headers,
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body
+    });
+
+    res.status(proxyRes.status);
+    proxyRes.headers.forEach((val, key) => {
+      if (key.toLowerCase() !== 'content-encoding') {
+        res.setHeader(key, val);
+      }
+    });
+
+    const buffer = await proxyRes.arrayBuffer();
+    return res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('Firebase Auth proxy error:', err.message);
+    return res.status(502).send('Auth proxy service error');
+  }
+});
+
 // SPA Routing Fallback (for React Router / single page app) with Cache Buster
 
 app.use((req, res) => {
