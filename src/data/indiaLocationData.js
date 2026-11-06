@@ -570,8 +570,13 @@ import {
   getIndiaStates,
   getIndiaDistricts
 } from '../services/indiaLocationHierarchy.js';
+import {
+  getAllDistrictCities,
+  getAllDistrictMandals,
+  getDistrictSubdivisions
+} from '../services/indiaSubdivisionsData.js';
 
-// Automatically expand INDIA_LOCATION_DATA with all 28 States and 8 Union Territories and all 772+ districts
+// Automatically expand INDIA_LOCATION_DATA with all 28 States and 8 Union Territories and all official districts
 Object.entries(PAN_INDIA_ADMINISTRATIVE_HIERARCHY).forEach(([state, districts]) => {
   if (!INDIA_LOCATION_DATA[state]) {
     INDIA_LOCATION_DATA[state] = { districts: {} };
@@ -580,17 +585,23 @@ Object.entries(PAN_INDIA_ADMINISTRATIVE_HIERARCHY).forEach(([state, districts]) 
     INDIA_LOCATION_DATA[state].districts = {};
   }
   districts.forEach(district => {
-    // If district not already present in detailed dataset, initialize with canonical city & areas
+    // If district not already present in detailed dataset, initialize with official subdivisions
     if (!INDIA_LOCATION_DATA[state].districts[district]) {
+      const { cities, mandals } = getDistrictSubdivisions(state, district);
+      const citiesMap = {};
+      const targetCities = (cities && cities.length > 0) ? cities : [district];
+      const targetMandals = (mandals && mandals.length > 0) ? mandals : [district + ' Urban', district + ' Rural'];
+
+      targetCities.forEach(cty => {
+        const mandalsMap = {};
+        targetMandals.forEach(mdl => {
+          mandalsMap[mdl] = [cty + ' Center', cty + ' Main Road', cty + ' Market Area'];
+        });
+        citiesMap[cty] = { mandals: mandalsMap };
+      });
+
       INDIA_LOCATION_DATA[state].districts[district] = {
-        cities: {
-          [district]: {
-            mandals: {
-              [district + ' Urban']: [district + ' Town', district + ' Main Road', district + ' Colony'],
-              [district + ' Rural']: [district + ' Rural Area']
-            }
-          }
-        }
+        cities: citiesMap
       };
     }
   });
@@ -624,47 +635,71 @@ export function getCitiesList(stateName, districtName) {
   const distObj = INDIA_LOCATION_DATA[normalizedState]?.districts?.[districtName]
     || Object.entries(INDIA_LOCATION_DATA[normalizedState]?.districts || {}).find(([k]) => k.toLowerCase() === districtName.toLowerCase())?.[1];
 
-  if (distObj && distObj.cities && Object.keys(distObj.cities).length > 0) {
-    return Object.keys(distObj.cities).sort();
+  const citySet = new Set();
+
+  if (distObj && distObj.cities) {
+    Object.keys(distObj.cities).forEach(c => citySet.add(c));
   }
-  return [districtName, districtName + ' City', districtName + ' Rural'];
+
+  const officialCities = getAllDistrictCities(stateName, districtName);
+  officialCities.forEach(c => citySet.add(c));
+
+  if (citySet.size > 0) {
+    return Array.from(citySet).sort();
+  }
+  return [districtName, districtName + ' City'];
 }
 
-/** Get sorted array of Mandals/Tehsils for a given State, District & City */
+/** Get sorted array of Mandals/Tehsils for a given State, District & optional City */
 export function getMandalsList(stateName, districtName, cityName) {
-  if (!stateName || !districtName || !cityName) return [];
-  const normalizedState = Object.keys(INDIA_LOCATION_DATA).find(
-    k => k.toLowerCase() === String(stateName).toLowerCase().trim()
-  ) || stateName;
-  const distObj = INDIA_LOCATION_DATA[normalizedState]?.districts?.[districtName]
-    || Object.entries(INDIA_LOCATION_DATA[normalizedState]?.districts || {}).find(([k]) => k.toLowerCase() === districtName.toLowerCase())?.[1];
+  if (!stateName || !districtName) return [];
+  const mandalSet = new Set();
 
-  const cityObj = distObj?.cities?.[cityName]
-    || Object.entries(distObj?.cities || {}).find(([k]) => k.toLowerCase() === cityName.toLowerCase())?.[1];
+  // Always query all official mandals/tehsils of this district
+  const districtMandals = getAllDistrictMandals(stateName, districtName);
+  districtMandals.forEach(m => mandalSet.add(m));
 
-  if (!cityObj || !cityObj.mandals || Object.keys(cityObj.mandals).length === 0) {
-    return [cityName + ' Urban', cityName + ' Rural'];
+  // If cityName provided, also include any city-specific micro-mandals
+  if (cityName) {
+    const normalizedState = Object.keys(INDIA_LOCATION_DATA).find(
+      k => k.toLowerCase() === String(stateName).toLowerCase().trim()
+    ) || stateName;
+    const distObj = INDIA_LOCATION_DATA[normalizedState]?.districts?.[districtName]
+      || Object.entries(INDIA_LOCATION_DATA[normalizedState]?.districts || {}).find(([k]) => k.toLowerCase() === districtName.toLowerCase())?.[1];
+
+    const cityObj = distObj?.cities?.[cityName]
+      || Object.entries(distObj?.cities || {}).find(([k]) => k.toLowerCase() === cityName.toLowerCase())?.[1];
+
+    if (cityObj?.mandals) {
+      Object.keys(cityObj.mandals).forEach(m => mandalSet.add(m));
+    }
   }
-  return Object.keys(cityObj.mandals).sort();
+
+  if (mandalSet.size > 0) {
+    return Array.from(mandalSet).sort();
+  }
+  return [districtName + ' Urban', districtName + ' Rural'];
 }
 
 /** Get sorted array of Localities for a given State, District, City & Mandal */
 export function getLocalitiesList(stateName, districtName, cityName, mandalName) {
-  if (!stateName || !districtName || !cityName || !mandalName) return [];
+  if (!stateName || !districtName) return [];
   const normalizedState = Object.keys(INDIA_LOCATION_DATA).find(
     k => k.toLowerCase() === String(stateName).toLowerCase().trim()
   ) || stateName;
   const distObj = INDIA_LOCATION_DATA[normalizedState]?.districts?.[districtName]
     || Object.entries(INDIA_LOCATION_DATA[normalizedState]?.districts || {}).find(([k]) => k.toLowerCase() === districtName.toLowerCase())?.[1];
 
-  const cityObj = distObj?.cities?.[cityName]
-    || Object.entries(distObj?.cities || {}).find(([k]) => k.toLowerCase() === cityName.toLowerCase())?.[1];
+  const cityObj = (cityName && distObj?.cities?.[cityName])
+    || Object.entries(distObj?.cities || {}).find(([k]) => k.toLowerCase() === String(cityName).toLowerCase())?.[1];
 
-  const mandalArray = cityObj?.mandals?.[mandalName]
-    || Object.entries(cityObj?.mandals || {}).find(([k]) => k.toLowerCase() === mandalName.toLowerCase())?.[1];
+  const mandalArray = (mandalName && cityObj?.mandals?.[mandalName])
+    || Object.entries(cityObj?.mandals || {}).find(([k]) => k.toLowerCase() === String(mandalName).toLowerCase())?.[1];
 
-  if (!Array.isArray(mandalArray) || mandalArray.length === 0) {
-    return [cityName + ' Center', cityName + ' Main Road'];
+  if (Array.isArray(mandalArray) && mandalArray.length > 0) {
+    return [...mandalArray].sort();
   }
-  return [...mandalArray].sort();
+
+  const baseLoc = cityName || mandalName || districtName;
+  return [baseLoc + ' Center', baseLoc + ' Main Road', baseLoc + ' Colony', baseLoc + ' Bypass'];
 }

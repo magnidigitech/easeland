@@ -19,7 +19,12 @@ import {
   getPropertyTypeFromCategory,
   getCategoryFromPropertyType
 } from '../utils/categoryUtils.js';
-import { getStatesList, getDistrictsList } from '../data/indiaLocationData.js';
+import {
+  getStatesList,
+  getDistrictsList,
+  getCitiesList,
+  getMandalsList
+} from '../data/indiaLocationData.js';
 import { isLocationLinkOrCoordinates, resolveLocationLink, parseLocationInput } from '../utils/locationLinkParser.js';
 
 export const AREA_UNIT_OPTIONS = [
@@ -153,6 +158,8 @@ export default function DynamicFilterPanel({
   const [locationResolutionStatus, setLocationResolutionStatus] = useState(null);
   const statesList = useMemo(() => getStatesList(), []);
   const districtsList = useMemo(() => getDistrictsList(filters?.state), [filters?.state]);
+  const citiesList = useMemo(() => getCitiesList(filters?.state, filters?.district), [filters?.state, filters?.district]);
+  const mandalsList = useMemo(() => getMandalsList(filters?.state, filters?.district, filters?.city), [filters?.state, filters?.district, filters?.city]);
 
   useEffect(() => {
     setCityQuery(filters?.city || '');
@@ -999,7 +1006,7 @@ export default function DynamicFilterPanel({
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
               Location Search
             </label>
-            {(filters.city || filters.locality || filters.referencePlace || filters.state || filters.district) && (
+            {(filters.city || filters.locality || filters.referencePlace || filters.state || filters.district || filters.mandal) && (
               <button
                 type="button"
                 onClick={() => {
@@ -1008,6 +1015,7 @@ export default function DynamicFilterPanel({
                   handleClearNearby();
                   handleChange('state', '');
                   handleChange('district', '');
+                  handleChange('mandal', '');
                 }}
                 className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline"
               >
@@ -1030,7 +1038,9 @@ export default function DynamicFilterPanel({
                     ...prev,
                     cleared: false,
                     state: newState,
-                    district: ''
+                    district: '',
+                    city: '',
+                    mandal: ''
                   }));
                 }}
                 className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white cursor-pointer"
@@ -1050,7 +1060,14 @@ export default function DynamicFilterPanel({
                 value={filters?.district || ''}
                 disabled={!filters?.state}
                 onChange={(e) => {
-                  handleChange('district', e.target.value);
+                  const newDistrict = e.target.value;
+                  setFilters(prev => ({
+                    ...prev,
+                    cleared: false,
+                    district: newDistrict,
+                    city: '',
+                    mandal: ''
+                  }));
                 }}
                 className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
               >
@@ -1059,6 +1076,53 @@ export default function DynamicFilterPanel({
                 </option>
                 {districtsList.map(dst => (
                   <option key={dst} value={dst}>{dst}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* CITY & MANDAL SELECT DROPDOWNS */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                City / Town
+              </label>
+              <select
+                value={filters?.city || ''}
+                disabled={!filters?.district}
+                onChange={(e) => {
+                  const newCity = e.target.value;
+                  handleChange('city', newCity);
+                  setCityQuery(newCity);
+                }}
+                className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+              >
+                <option value="">
+                  {!filters?.district ? 'Select District first...' : `All Cities (${citiesList.length})`}
+                </option>
+                {citiesList.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                Mandal / Tehsil
+              </label>
+              <select
+                value={filters?.mandal || ''}
+                disabled={!filters?.district}
+                onChange={(e) => {
+                  handleChange('mandal', e.target.value);
+                }}
+                className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:bg-white disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+              >
+                <option value="">
+                  {!filters?.district ? 'Select District first...' : `All Mandals (${mandalsList.length})`}
+                </option>
+                {mandalsList.map(m => (
+                  <option key={m} value={m}>{m}</option>
                 ))}
               </select>
             </div>

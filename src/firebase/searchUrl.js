@@ -40,6 +40,10 @@ export function searchStateToUrlParams(searchState = {}) {
     params.set('city', searchState.city.trim());
   }
 
+  if (searchState.mandal && searchState.mandal.trim()) {
+    params.set('mandal', searchState.mandal.trim());
+  }
+
   if (searchState.locality && searchState.locality.trim()) {
     params.set('locality', searchState.locality.trim());
   }
@@ -187,6 +191,7 @@ export function urlParamsToSearchState(searchString = '') {
     state: stateParam,
     district: districtParam,
     city: cityParam,
+    mandal: params.get('mandal') ? params.get('mandal').trim() : '',
     locality: localityParam,
     minPrice: resolvedMinPrice,
     maxPrice: resolvedMaxPrice,
@@ -225,6 +230,7 @@ export function createDefaultFilterState(overrides = {}) {
     state: '',
     district: '',
     city: '',
+    mandal: '',
     locality: '',
     minPrice: '',
     maxPrice: '',

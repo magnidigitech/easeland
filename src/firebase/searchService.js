@@ -233,6 +233,7 @@ export async function searchPublicProperties({
       state,
       district,
       city,
+      mandal,
       locality,
       minPrice,
       maxPrice,
@@ -323,8 +324,17 @@ export async function searchPublicProperties({
       if (propertyType && propertyType !== 'ALL') {
         filteredCandidates = filteredCandidates.filter(c => c.data.propertyType === propertyType);
       }
+      if (state && state.trim()) {
+        filteredCandidates = filteredCandidates.filter(c => String(c.data.location?.state || '').toLowerCase() === state.trim().toLowerCase());
+      }
+      if (district && district.trim()) {
+        filteredCandidates = filteredCandidates.filter(c => String(c.data.location?.district || '').toLowerCase() === district.trim().toLowerCase());
+      }
       if (city && city.trim()) {
         filteredCandidates = filteredCandidates.filter(c => String(c.data.location?.city || '').toLowerCase() === city.trim().toLowerCase());
+      }
+      if (mandal && mandal.trim()) {
+        filteredCandidates = filteredCandidates.filter(c => String(c.data.location?.mandal || '').toLowerCase() === mandal.trim().toLowerCase());
       }
       if (locality && locality.trim()) {
         const locClean = locality.trim().toLowerCase();
@@ -540,6 +550,18 @@ export async function searchPublicProperties({
     });
 
     let filteredProperties = properties;
+    if (state && state.trim()) {
+      filteredProperties = filteredProperties.filter(p => (p.location?.state || '').toLowerCase() === state.trim().toLowerCase());
+    }
+    if (district && district.trim()) {
+      filteredProperties = filteredProperties.filter(p => (p.location?.district || '').toLowerCase() === district.trim().toLowerCase());
+    }
+    if (city && city.trim()) {
+      filteredProperties = filteredProperties.filter(p => (p.location?.city || '').toLowerCase() === city.trim().toLowerCase());
+    }
+    if (mandal && mandal.trim()) {
+      filteredProperties = filteredProperties.filter(p => (p.location?.mandal || '').toLowerCase() === mandal.trim().toLowerCase());
+    }
     if (locality && locality.trim()) {
       const locClean = locality.trim().toLowerCase();
       filteredProperties = filteredProperties.filter(p => {

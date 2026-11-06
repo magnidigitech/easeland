@@ -276,13 +276,12 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     setIsConfirmed(false);
     if (val === '__CUSTOM__') {
       setCustomMode(prev => ({ ...prev, city: true }));
-      setHierarchy(prev => ({ ...prev, city: '', mandal: '', locality: '' }));
+      setHierarchy(prev => ({ ...prev, city: '', locality: '' }));
     } else {
-      setCustomMode(prev => ({ ...prev, city: false, mandal: false, locality: false }));
+      setCustomMode(prev => ({ ...prev, city: false, locality: false }));
       setHierarchy(prev => ({
         ...prev,
         city: val,
-        mandal: '',
         locality: ''
       }));
     }
@@ -951,17 +950,17 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
             {!customMode.mandal ? (
               <select
                 value={hierarchy.mandal}
-                disabled={!hierarchy.city}
+                disabled={!hierarchy.district}
                 onChange={(e) => handleMandalChange(e.target.value)}
                 className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-yellow focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <option value="">
-                  {!hierarchy.city ? 'Select City first...' : 'Select Mandal / Tehsil...'}
+                  {!hierarchy.district ? 'Select District first...' : 'Select Mandal / Tehsil...'}
                 </option>
                 {mandalsList.map(mdl => (
                   <option key={mdl} value={mdl}>{mdl}</option>
                 ))}
-                {hierarchy.city && <option value="__CUSTOM__">+ Enter Custom Mandal...</option>}
+                {hierarchy.district && <option value="__CUSTOM__">+ Enter Custom Mandal...</option>}
               </select>
             ) : (
               <div className="flex items-center gap-1">
