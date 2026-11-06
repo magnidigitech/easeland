@@ -173,6 +173,7 @@ export async function ensureAuthSession() {
 export async function loginWithGoogle() {
   try {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
       const result = await signInWithPopup(auth, provider);
       if (result?.user) {
