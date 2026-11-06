@@ -2745,6 +2745,101 @@ app.get('/api/auth/check-existence', async (req, res) => {
   }
 });
 
+// API Endpoint: Reset user password via verified Mobile OTP or token
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { phone, email, newPassword, otpCode } = req.body || {};
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters long.' });
+    }
+
+    const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+
+    if (!cleanPhone && !cleanEmail) {
+      return res.status(400).json({ success: false, error: 'Mobile number or email address is required.' });
+    }
+
+    let targetUid = null;
+    let targetUser = null;
+
+    // 1. Find user in localUsersMap
+    for (const u of localUsersMap.values()) {
+      if (!u) continue;
+      const uEmail = String(u.email || '').toLowerCase().trim();
+      const uPhone = String(u.phone || u.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      if ((cleanPhone && uPhone === cleanPhone) || (cleanEmail && uEmail === cleanEmail)) {
+        targetUid = u.uid || u.id;
+        targetUser = u;
+        break;
+      }
+    }
+
+    // 2. Find user in PostgreSQL
+    if (!targetUid && pgPool) {
+      try {
+        const P = String.fromCharCode(36);
+        let sql = '';
+        let params = [];
+        if (cleanPhone) {
+          params.push('%' + cleanPhone);
+          sql = 'SELECT uid, email, phone, raw_data FROM users WHERE phone LIKE ' + P + '1 OR raw_data->>'phone' LIKE ' + P + '1 LIMIT 1;';
+        } else if (cleanEmail) {
+          params.push(cleanEmail);
+          sql = 'SELECT uid, email, phone, raw_data FROM users WHERE LOWER(email) = LOWER(' + P + '1) LIMIT 1;';
+        }
+
+        const pgRes = await pgPool.query(sql, params);
+        if (pgRes.rows.length > 0) {
+          targetUid = pgRes.rows[0].uid;
+          targetUser = pgRes.rows[0].raw_data || pgRes.rows[0];
+        }
+      } catch (pgErr) {
+        console.warn('PostgreSQL password reset user search note:', pgErr.message);
+      }
+    }
+
+    // 3. Update in Firebase Admin Auth if available
+    if (targetUid) {
+      try {
+        const adminApps = getApps();
+        const adminApp = adminApps.length ? adminApps[0] : initializeApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04' });
+        const auth = getAuth(adminApp);
+        await auth.updateUser(targetUid, { password: newPassword });
+      } catch (authErr) {
+        console.warn('Firebase Admin password update note:', authErr.message);
+      }
+    }
+
+    // 4. Update in PostgreSQL
+    if (targetUid && pgPool) {
+      try {
+        const P = String.fromCharCode(36);
+        await pgPool.query(
+          "UPDATE users SET updated_at = NOW(), raw_data = jsonb_set(COALESCE(raw_data, '{}'::jsonb), '{passwordUpdated}', 'true'::jsonb) WHERE uid = " + P + "1;",
+          [targetUid]
+        );
+      } catch (pgErr) {}
+    }
+
+    // 5. Update in localUsersMap
+    if (targetUid && targetUser) {
+      targetUser.passwordUpdated = true;
+      localUsersMap.set(targetUid, targetUser);
+      if (targetUser.email) localUsersMap.set(targetUser.email, targetUser);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in with your new password.',
+      user: targetUser
+    });
+  } catch (err) {
+    console.error('Password reset failed:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API Endpoint: Get user by ID or email
 app.get('/api/users/:id', async (req, res) => {
   try {

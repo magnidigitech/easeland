@@ -8,7 +8,8 @@ import {
   sendEmailVerificationUser as apiSendEmailVerification,
   subscribeToAuthState,
   sendMobileOtp as apiSendMobileOtp,
-  verifyMobileOtp as apiVerifyMobileOtp
+  verifyMobileOtp as apiVerifyMobileOtp,
+  resetPasswordWithMobileOtp as apiResetPasswordWithMobileOtp
 } from '../firebase/authService.js';
 import {
   createUserProfile,
@@ -973,6 +974,10 @@ export function AuthProvider({ children }) {
     return await apiSendPasswordReset(email);
   };
 
+  const resetPasswordWithMobileOtp = async (phone, otpCode, newPassword) => {
+    return await apiResetPasswordWithMobileOtp(phone, otpCode, newPassword);
+  };
+
   const sendEmailVerification = async () => {
     return await apiSendEmailVerification();
   };
@@ -1428,6 +1433,7 @@ export function AuthProvider({ children }) {
     completeUserProfile,
     logoutUser,
     sendPasswordReset,
+    resetPasswordWithMobileOtp,
     sendEmailVerification,
     updateProfileData,
     updatePreferencesData,

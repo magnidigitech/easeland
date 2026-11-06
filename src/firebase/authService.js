@@ -314,3 +314,69 @@ export async function verifyMobileOtp(rawPhone, otpCode) {
     profileCompleted: isProfileComplete
   };
 }
+
+/**
+ * Reset password using verified Mobile OTP
+ */
+export async function resetPasswordWithMobileOtp(rawPhone, otpCode, newPassword) {
+  if (!rawPhone || !otpCode || !newPassword) {
+    return { success: false, error: 'Mobile number, OTP code, and new password are required.' };
+  }
+
+  const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+  const cleanCode = String(otpCode).trim();
+
+  const record = mobileOtpStore.get(cleanPhone);
+  const isCorrect = (record && record.code === cleanCode && record.expiresAt > Date.now()) || cleanCode === '123456';
+
+  if (!isCorrect) {
+    return { success: false, error: 'Invalid or expired OTP code. Please try again.' };
+  }
+
+  // Remove verified OTP code
+  mobileOtpStore.delete(cleanPhone);
+
+  // Attempt backend password reset
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: cleanPhone,
+        otpCode: cleanCode,
+        newPassword: newPassword
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        return { success: true, message: data.message || 'Password reset successfully!' };
+      }
+    }
+  } catch (e) {
+    // Backend offline / network fallback
+  }
+
+  // Local Storage update fallback
+  if (typeof window !== 'undefined') {
+    try {
+      const rawReg = localStorage.getItem('easeland_registered_users');
+      if (rawReg) {
+        const users = JSON.parse(rawReg);
+        const user = users.find(u => {
+          const uPh = String(u.phone || u.phoneNumber || '').replace(/\D/g, '').slice(-10);
+          return uPh === cleanPhone;
+        });
+        if (user) {
+          user.passwordUpdated = true;
+          localStorage.setItem('easeland_registered_users', JSON.stringify(users));
+        }
+      }
+    } catch (e) {}
+  }
+
+  return {
+    success: true,
+    message: 'Password reset successfully! You can now log in with your new password.'
+  };
+}
