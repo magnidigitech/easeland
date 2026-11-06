@@ -140,23 +140,88 @@ export function extractGoogleLocationHierarchy(geocodedResult) {
 }
 
 /**
+ * Retrieve cached device location from sessionStorage if available
+ */
+export function getCachedDeviceLocation() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('easeland_device_coords');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number' && !isNaN(parsed.lat) && !isNaN(parsed.lng)) {
+      return parsed;
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * Cache device location in sessionStorage
+ */
+export function cacheDeviceLocation(lat, lng, accuracy = null) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem('easeland_device_coords', JSON.stringify({
+      lat: Number(lat),
+      lng: Number(lng),
+      accuracy: accuracy ? Number(accuracy) : null,
+      timestamp: Date.now()
+    }));
+  } catch (e) {}
+}
+
+/**
  * Request device location via standard browser Geolocation API
  */
-export async function getCurrentDeviceLocation() {
+export async function getCurrentDeviceLocation(options = {}) {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       return reject(new Error('Geolocation is not supported by your browser.'));
     }
 
+    const highAccuracyOptions = {
+      enableHighAccuracy: options.enableHighAccuracy !== undefined ? options.enableHighAccuracy : true,
+      timeout: options.timeout || 8000,
+      maximumAge: options.maximumAge !== undefined ? options.maximumAge : 60000
+    };
+
+    const handleSuccess = (position) => {
+      const coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      };
+      cacheDeviceLocation(coords.lat, coords.lng, coords.accuracy);
+      resolve(coords);
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy
-        });
-      },
+      handleSuccess,
       (error) => {
+        // If high accuracy times out or fails (other than explicit permission denial), try fast low-accuracy network fallback
+        if (error.code !== error.PERMISSION_DENIED) {
+          navigator.geolocation.getCurrentPosition(
+            handleSuccess,
+            () => {
+              let msg = 'Failed to retrieve location.';
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  msg = 'Location permission denied. Please allow location access in browser settings.';
+                  break;
+                case error.POSITION_UNAVAILABLE:
+                  msg = 'Device location information is unavailable.';
+                  break;
+                case error.TIMEOUT:
+                  msg = 'Location request timed out. Please try again.';
+                  break;
+              }
+              reject(new Error(msg));
+            },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+          );
+          return;
+        }
+
         let msg = 'Failed to retrieve location.';
         switch (error.code) {
           case error.PERMISSION_DENIED:
@@ -171,7 +236,7 @@ export async function getCurrentDeviceLocation() {
         }
         reject(new Error(msg));
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      highAccuracyOptions
     );
   });
 }

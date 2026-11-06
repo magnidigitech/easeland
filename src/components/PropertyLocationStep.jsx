@@ -5,6 +5,8 @@ import { MapPin, Navigation, Search, CheckCircle2, AlertCircle, RefreshCw, Compa
 import { GeoPoint } from 'firebase/firestore';
 import {
   getCurrentDeviceLocation,
+  getCachedDeviceLocation,
+  cacheDeviceLocation,
   reverseGeocodeLocation,
   searchLocationQuery,
   fetchGooglePlacesPredictions,
@@ -22,8 +24,40 @@ import {
 } from '../data/indiaLocationData.js';
 
 export default function PropertyLocationStep({ locationData, onLocationConfirmed }) {
-  const [lat, setLat] = useState(locationData?.geoPoint?.latitude || locationData?.lat || 20.5937);
-  const [lng, setLng] = useState(locationData?.geoPoint?.longitude || locationData?.lng || 78.9629);
+  // Helper to determine if coordinates are an explicit property location (not the India center placeholder)
+  const isCustomCoordinates = (cLat, cLng) => {
+    const nLat = Number(cLat);
+    const nLng = Number(cLng);
+    if (isNaN(nLat) || isNaN(nLng) || (nLat === 0 && nLng === 0)) return false;
+    return Math.abs(nLat - 20.5937) > 0.001 || Math.abs(nLng - 78.9629) > 0.001;
+  };
+
+  const hasPresetPropertyLocation = Boolean(
+    locationData?.confirmed ||
+    isCustomCoordinates(locationData?.geoPoint?.latitude ?? locationData?.lat, locationData?.geoPoint?.longitude ?? locationData?.lng) ||
+    Boolean(locationData?.address && locationData?.address.trim())
+  );
+
+  const cachedDevice = !hasPresetPropertyLocation ? getCachedDeviceLocation() : null;
+
+  const initialLat = hasPresetPropertyLocation
+    ? Number(locationData?.geoPoint?.latitude || locationData?.lat || 20.5937)
+    : (cachedDevice?.lat || 20.5937);
+
+  const initialLng = hasPresetPropertyLocation
+    ? Number(locationData?.geoPoint?.longitude || locationData?.lng || 78.9629)
+    : (cachedDevice?.lng || 78.9629);
+
+  const [lat, setLat] = useState(initialLat);
+  const [lng, setLng] = useState(initialLng);
+
+  // Distinguish whether coordinates represent current device location or mapped property location
+  const [isPropertyLocationSet, setIsPropertyLocationSet] = useState(hasPresetPropertyLocation);
+  const [isAutoAcquiringDevice, setIsAutoAcquiringDevice] = useState(!hasPresetPropertyLocation && !cachedDevice);
+  const [deviceLocationAcquired, setDeviceLocationAcquired] = useState(Boolean(cachedDevice));
+
+  // Mutable ref to prevent asynchronous device location responses from overwriting user property choices
+  const isPropertyLocationSetRef = useRef(hasPresetPropertyLocation);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -145,6 +179,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     marker.bindPopup('Drag pin or click map to set exact property location');
 
     const handlePinPositionChange = async (newLat, newLng) => {
+      isPropertyLocationSetRef.current = true;
+      setIsPropertyLocationSet(true);
       setLat(newLat);
       setLng(newLng);
       setIsConfirmed(false);
@@ -187,14 +223,70 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     }
   }, [lat, lng]);
 
+  // On mount: Automatically acquire user device location if property location is not yet set
+  useEffect(() => {
+    if (isPropertyLocationSetRef.current) return;
+
+    let isMounted = true;
+    setIsAutoAcquiringDevice(true);
+
+    getCurrentDeviceLocation({ enableHighAccuracy: true })
+      .then(async (pos) => {
+        if (!isMounted || isPropertyLocationSetRef.current) return;
+
+        setLat(pos.lat);
+        setLng(pos.lng);
+        setDeviceLocationAcquired(true);
+        setIsAutoAcquiringDevice(false);
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([pos.lat, pos.lng], 16, { duration: 1.2 });
+        }
+        if (markerRef.current) {
+          markerRef.current.setLatLng([pos.lat, pos.lng]);
+        }
+
+        // Reverse geocode to populate state/district/mandal/locality dropdowns as starting point if blank
+        try {
+          const res = await reverseGeocodeLocation(pos.lat, pos.lng);
+          if (!isMounted || isPropertyLocationSetRef.current) return;
+          setHierarchy(prev => ({
+            ...prev,
+            country: prev.country || res.country || 'India',
+            state: prev.state || res.state || '',
+            district: prev.district || res.district || '',
+            city: prev.city || res.city || '',
+            mandal: prev.mandal || res.mandal || '',
+            locality: prev.locality || res.locality || '',
+            postalCode: prev.postalCode || res.postalCode || '',
+            address: prev.address || res.address || ''
+          }));
+        } catch (revErr) {
+          console.warn('Reverse geocode on auto device location notice:', revErr);
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setIsAutoAcquiringDevice(false);
+        console.warn('Auto device location acquisition notice:', err.message);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Sync all location fields if locationData prop updates externally
   useEffect(() => {
     if (!locationData) return;
     const propLat = Number(locationData?.geoPoint?.latitude ?? locationData?.lat ?? locationData?.latitude);
     const propLng = Number(locationData?.geoPoint?.longitude ?? locationData?.lng ?? locationData?.longitude);
-    if (!isNaN(propLat) && !isNaN(propLng) && (propLat !== 0 || propLng !== 0) && (propLat !== 20.5937 || propLng !== 78.9629)) {
+    const hasPin = !isNaN(propLat) && !isNaN(propLng) && (propLat !== 0 || propLng !== 0) && (Math.abs(propLat - 20.5937) > 0.001 || Math.abs(propLng - 78.9629) > 0.001);
+    if (hasPin) {
       setLat(propLat);
       setLng(propLng);
+      isPropertyLocationSetRef.current = true;
+      setIsPropertyLocationSet(true);
     }
     setHierarchy({
       country: locationData.country || 'India',
@@ -214,8 +306,9 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
     if (locationData.address) {
       setSearchQuery(locationData.address);
     }
-    const hasPin = !isNaN(propLat) && !isNaN(propLng) && (propLat !== 0 || propLng !== 0) && (propLat !== 20.5937 || propLng !== 78.9629);
     if (locationData.confirmed || hasPin) {
+      isPropertyLocationSetRef.current = true;
+      setIsPropertyLocationSet(true);
       setIsConfirmed(true);
       setSelectedPlaceInfo({
         name: locationData.locality || locationData.city || locationData.address || 'Selected Location',
@@ -238,6 +331,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
   // Handlers for cascaded dropdown selections
   const handleStateChange = (val) => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setIsConfirmed(false);
     if (val === '__CUSTOM__') {
       setCustomMode(prev => ({ ...prev, state: true }));
@@ -256,6 +351,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
   };
 
   const handleDistrictChange = (val) => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setIsConfirmed(false);
     if (val === '__CUSTOM__') {
       setCustomMode(prev => ({ ...prev, district: true }));
@@ -273,6 +370,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
   };
 
   const handleCityChange = (val) => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setIsConfirmed(false);
     if (val === '__CUSTOM__') {
       setCustomMode(prev => ({ ...prev, city: true }));
@@ -288,6 +387,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
   };
 
   const handleMandalChange = (val) => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setIsConfirmed(false);
     if (val === '__CUSTOM__') {
       setCustomMode(prev => ({ ...prev, mandal: true }));
@@ -303,6 +404,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
   };
 
   const handleLocalityChange = (val) => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setIsConfirmed(false);
     if (val === '__CUSTOM__') {
       setCustomMode(prev => ({ ...prev, locality: true }));
@@ -366,6 +469,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
   // Select Place Suggestion & Deep Autofill Hierarchy
   const handleSelectPrediction = async (item) => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setDropdownOpen(false);
     setSearchQuery(item.mainText);
     setSearching(true);
@@ -592,10 +697,12 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
   // Use Current Location button trigger (Explicit one-time call)
   const handleUseCurrentLocation = async () => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setGeoLoading(true);
     setErrorMsg(null);
     try {
-      const pos = await getCurrentDeviceLocation();
+      const pos = await getCurrentDeviceLocation({ enableHighAccuracy: true });
       setLat(pos.lat);
       setLng(pos.lng);
 
@@ -625,6 +732,8 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
   // Confirm Final Location
   const handleConfirmLocation = () => {
+    isPropertyLocationSetRef.current = true;
+    setIsPropertyLocationSet(true);
     setIsConfirmed(true);
     const finalLocationObject = {
       ...hierarchy,
@@ -1053,12 +1162,28 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
       {/* METHOD C: INTERACTIVE MAP PIN SELECTOR & CONFIRMATION CARD */}
       <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm space-y-4 p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Compass className="w-5 h-5 text-brand-yellow" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Compass className="w-5 h-5 text-brand-yellow shrink-0" />
             <h4 className="text-xs font-extrabold text-brand-charcoal uppercase tracking-wider">
               Spatial Coordinates & Geohash
             </h4>
+            {isPropertyLocationSet ? (
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-emerald-600" />
+                <span>Property Location Pinned</span>
+              </span>
+            ) : isAutoAcquiringDevice && !deviceLocationAcquired ? (
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                <span>Acquiring Device GPS...</span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                <Navigation className="w-3 h-3 text-blue-600" />
+                <span>Current Device Location (Auto-detected)</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -1075,10 +1200,34 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl text-xs font-mono border border-slate-200">
-          <div><span className="text-slate-500 font-bold">Latitude:</span> {lat.toFixed(6)}</div>
-          <div><span className="text-slate-500 font-bold">Longitude:</span> {lng.toFixed(6)}</div>
-          <div><span className="text-slate-500 font-bold">Geohash:</span> {geohash}</div>
+        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl text-xs font-mono border transition-colors ${
+          isPropertyLocationSet
+            ? 'bg-slate-50 border-slate-200 text-slate-800'
+            : 'bg-blue-50/70 border-blue-200 text-blue-950'
+        }`}>
+          <div className="flex items-center justify-between sm:justify-start gap-1.5">
+            <span className={isPropertyLocationSet ? 'text-slate-500 font-bold' : 'text-blue-700 font-bold'}>Latitude:</span>
+            <span className="font-semibold">
+              {isAutoAcquiringDevice && !deviceLocationAcquired ? 'Detecting...' : lat.toFixed(6)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between sm:justify-start gap-1.5">
+            <span className={isPropertyLocationSet ? 'text-slate-500 font-bold' : 'text-blue-700 font-bold'}>Longitude:</span>
+            <span className="font-semibold">
+              {isAutoAcquiringDevice && !deviceLocationAcquired ? 'Detecting...' : lng.toFixed(6)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between sm:justify-start gap-1.5">
+            <span className={isPropertyLocationSet ? 'text-slate-500 font-bold' : 'text-blue-700 font-bold'}>Geohash:</span>
+            <span className="font-semibold">
+              {isAutoAcquiringDevice && !deviceLocationAcquired ? 'Detecting...' : geohash}
+            </span>
+            <span className={`text-[9px] font-sans font-black uppercase px-1.5 py-0.5 rounded ml-auto sm:ml-1 ${
+              isPropertyLocationSet ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {isPropertyLocationSet ? 'Property' : 'Device'}
+            </span>
+          </div>
         </div>
 
         {/* INTERACTIVE LEAFLET MINI MAP CANVAS */}
@@ -1087,9 +1236,22 @@ export default function PropertyLocationStep({ locationData, onLocationConfirmed
 
           {/* Compact Hint Overlay Pill */}
           <div className="absolute top-3 right-3 z-20 pointer-events-none">
-            <div className="bg-slate-900/90 backdrop-blur-md text-amber-400 text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-700/80 shadow-md flex items-center gap-1.5">
-              <Target className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
-              <span>Click map or drag pin to set location</span>
+            <div className={`backdrop-blur-md text-[11px] font-bold px-3 py-1.5 rounded-full border shadow-md flex items-center gap-1.5 ${
+              isPropertyLocationSet
+                ? 'bg-slate-900/90 text-emerald-400 border-slate-700/80'
+                : 'bg-slate-900/90 text-amber-400 border-slate-700/80'
+            }`}>
+              {isPropertyLocationSet ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Property location mapped — Click map or drag pin to adjust</span>
+                </>
+              ) : (
+                <>
+                  <Target className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
+                  <span>Showing device location — Click map or drag pin to map property location</span>
+                </>
+              )}
             </div>
           </div>
 

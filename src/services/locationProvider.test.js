@@ -7,7 +7,10 @@ import {
   resolvePlaceCoordinates,
   extractBoundaryPolygon,
   extractCoordinates,
-  fetchGooglePlacesPredictions
+  fetchGooglePlacesPredictions,
+  getCachedDeviceLocation,
+  cacheDeviceLocation,
+  getCurrentDeviceLocation
 } from './locationProvider.js';
 
 describe('EaseLand Location Provider & Google Places Hierarchy Suite', () => {
@@ -520,6 +523,81 @@ describe('EaseLand Distance Filter Consistency & Haversine Proximity Suite', () 
     assert.strictEqual(isPropertyPubliclyVisible(unapprovedNearProp), false);
     assert.strictEqual(isPropertyPubliclyVisible(draftNearProp), false);
     assert.strictEqual(isPropertyPubliclyVisible(blockedNearProp), false);
+  });
+
+  it('safely handles device location caching and retrieval with fallback', () => {
+    // In node environment without window, should return null safely
+    const cachedNode = getCachedDeviceLocation();
+    assert.strictEqual(cachedNode, null);
+
+    // Mock window and sessionStorage
+    const storage = new Map();
+    globalThis.window = {
+      sessionStorage: {
+        getItem: (k) => storage.get(k) || null,
+        setItem: (k, v) => storage.set(k, String(v)),
+        removeItem: (k) => storage.delete(k)
+      }
+    };
+    globalThis.sessionStorage = globalThis.window.sessionStorage;
+
+    try {
+      assert.strictEqual(getCachedDeviceLocation(), null);
+
+      cacheDeviceLocation(17.385044, 78.486671, 15);
+      const retrieved = getCachedDeviceLocation();
+      assert.ok(retrieved);
+      assert.strictEqual(retrieved.lat, 17.385044);
+      assert.strictEqual(retrieved.lng, 78.486671);
+      assert.strictEqual(retrieved.accuracy, 15);
+
+      // Handles corrupted cache JSON gracefully
+      storage.set('easeland_device_coords', 'invalid-json');
+      assert.strictEqual(getCachedDeviceLocation(), null);
+    } finally {
+      delete globalThis.window;
+      delete globalThis.sessionStorage;
+    }
+  });
+
+  it('getCurrentDeviceLocation handles high accuracy and fallback properly', async () => {
+    let highAccuracyRequested = false;
+    const mockGeolocation = {
+      getCurrentPosition: (success, error, options) => {
+        if (options && options.enableHighAccuracy) {
+          highAccuracyRequested = true;
+          success({
+            coords: {
+              latitude: 16.5062,
+              longitude: 80.6480,
+              accuracy: 10
+            }
+          });
+        }
+      }
+    };
+
+    const originalGeolocation = Object.getOwnPropertyDescriptor(globalThis.navigator, 'geolocation');
+    Object.defineProperty(globalThis.navigator, 'geolocation', {
+      value: mockGeolocation,
+      configurable: true,
+      writable: true
+    });
+
+    try {
+      const pos = await getCurrentDeviceLocation();
+      assert.ok(pos);
+      assert.strictEqual(highAccuracyRequested, true);
+      assert.strictEqual(pos.lat, 16.5062);
+      assert.strictEqual(pos.lng, 80.6480);
+      assert.strictEqual(pos.accuracy, 10);
+    } finally {
+      if (originalGeolocation) {
+        Object.defineProperty(globalThis.navigator, 'geolocation', originalGeolocation);
+      } else {
+        delete globalThis.navigator.geolocation;
+      }
+    }
   });
 });
 
