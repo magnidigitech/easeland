@@ -480,9 +480,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 >
                   <Smartphone className="w-4 h-4 text-amber-500" />
                   <span>Mobile OTP</span>
-                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-amber-400 text-slate-950 rounded-full ml-0.5">
-                    Fast
-                  </span>
                 </button>
 
                 <button
