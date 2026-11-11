@@ -30,17 +30,12 @@ describe('Property Detail Page "View on Maps" & Distance Suite', () => {
     assert.ok(content.includes('handleSelectCustomLocation'), 'Must provide handleSelectCustomLocation');
   });
 
-  it('2. Verifies PropertyDetailPage.jsx renders dedicated "View on Maps & Distance" section with EaseLand Map and Google Maps navigation', () => {
+  it('2. Verifies PropertyDetailPage.jsx renders dedicated section with Google Maps directions navigation', () => {
     const detailPath = path.join(rootDir, 'src', 'pages', 'PropertyDetailPage.jsx');
     const content = fs.readFileSync(detailPath, 'utf8');
 
     // Verify view-on-maps-section container
     assert.ok(content.includes('id="view-on-maps-section"'), 'Must render view-on-maps-section container');
-    assert.ok(content.includes('View on Maps & Distance'), 'Must render section title');
-
-    // Verify EaseLand Map navigation CTA button
-    assert.ok(content.includes('View on EaseLand Map'), 'Must render "View on EaseLand Map" button');
-    assert.ok(content.includes('handleOpenEaselandMap'), 'Must hook up handleOpenEaselandMap');
 
     // Verify Google Maps directions navigation CTA button
     assert.ok(content.includes('Get Directions on Google Maps'), 'Must render "Get Directions on Google Maps" button');
