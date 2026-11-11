@@ -47,8 +47,26 @@ export default function PropertiesSearchPage({
   useEffect(() => {
     if (initialFilters) {
       setSearchState(createDefaultFilterState(initialFilters));
+      if (initialFilters.focusedProperty) {
+        setFocusedProperty(initialFilters.focusedProperty);
+      }
+      if (initialFilters.viewMode === 'map') {
+        setIsSidePanelOpen(false);
+      }
     }
   }, [initialFilters]);
+
+  // Synchronize focusedProperty if focusedPropertyId or focusedProperty changes
+  useEffect(() => {
+    if (initialFilters?.focusedProperty) {
+      setFocusedProperty(initialFilters.focusedProperty);
+    } else if (initialFilters?.focusedPropertyId && properties.length > 0) {
+      const match = properties.find(p => (p.propertyId || p.id) === initialFilters.focusedPropertyId);
+      if (match) {
+        setFocusedProperty(match);
+      }
+    }
+  }, [initialFilters?.focusedProperty, initialFilters?.focusedPropertyId, properties]);
 
   // 2. Query Results & Pagination State
   const [properties, setProperties] = useState([]);

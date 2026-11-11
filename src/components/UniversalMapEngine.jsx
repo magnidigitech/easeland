@@ -8,7 +8,7 @@ import {
   Check, Car, Bus, Bike, Mountain, Bed, Bath, Sofa, Sparkles, CheckCircle2, Calendar, ExternalLink, Video
 } from 'lucide-react';
 import { deduplicateProperties, mockApi, isFakeProperty } from '../services/mockApi';
-import { extractCoordinates, extractBoundaryPolygon, fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery } from '../services/locationProvider';
+import { extractCoordinates, extractBoundaryPolygon, fetchGooglePlacesPredictions, fetchGooglePlaceDetails, searchLocationQuery, calculateDistanceKm } from '../services/locationProvider';
 import {
   getCategoryBadgeLabel,
   getFirstUploadedImage,
@@ -104,6 +104,7 @@ export default function UniversalMapEngine({
   const userLocationMarkerRef = useRef(null);
   const searchLocationMarkerRef = useRef(null);
   const searchRadiusCircleRef = useRef(null);
+  const distanceRouteLineRef = useRef(null);
 
   // Guarantee ZERO duplicate listings in sidebar drawer or on map canvas, filtered by active search filters
   const displayProperties = useMemo(() => {
@@ -385,6 +386,10 @@ export default function UniversalMapEngine({
         try { mapInstanceRef.current.removeLayer(searchRadiusCircleRef.current); } catch (e) {}
         searchRadiusCircleRef.current = null;
       }
+      if (distanceRouteLineRef.current && mapInstanceRef.current) {
+        try { mapInstanceRef.current.removeLayer(distanceRouteLineRef.current); } catch (e) {}
+        distanceRouteLineRef.current = null;
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -513,6 +518,52 @@ export default function UniversalMapEngine({
       userLocationMarkerRef.current = null;
     }
   }, [filters?.userLat, filters?.userLng]);
+
+  // Render distance route line connecting user location and target property
+  useEffect(() => {
+    if (!mapInstanceRef.current || typeof window === 'undefined' || !window.L) return;
+    const L = window.L;
+
+    if (distanceRouteLineRef.current) {
+      try {
+        mapInstanceRef.current.removeLayer(distanceRouteLineRef.current);
+      } catch (e) {}
+      distanceRouteLineRef.current = null;
+    }
+
+    const targetProp = focusedProperty || (selectedPropertyId ? displayProperties.find(p => (p.propertyId || p.id) === selectedPropertyId) : null);
+    if (filters?.userLat && filters?.userLng && targetProp) {
+      const targetCoords = extractCoordinates(targetProp);
+      if (!isNaN(targetCoords.lat) && !isNaN(targetCoords.lng) && (targetCoords.lat !== 0 || targetCoords.lng !== 0)) {
+        const uLat = Number(filters.userLat);
+        const uLng = Number(filters.userLng);
+        const pLat = Number(targetCoords.lat);
+        const pLng = Number(targetCoords.lng);
+        const distKm = calculateDistanceKm(uLat, uLng, pLat, pLng);
+
+        const routeLine = L.polyline([[uLat, uLng], [pLat, pLng]], {
+          color: '#2563eb',
+          weight: 3.5,
+          opacity: 0.85,
+          dashArray: '8, 8'
+        }).addTo(mapInstanceRef.current);
+
+        const distText = distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`;
+        routeLine.bindTooltip(`📍 Distance: ${distText} to ${targetProp.title || 'Property'}`, {
+          permanent: true,
+          direction: 'center',
+          className: 'bg-white text-blue-900 font-extrabold text-xs px-2.5 py-1 rounded-lg border border-blue-200 shadow-md'
+        });
+
+        distanceRouteLineRef.current = routeLine;
+
+        // If explicitly navigated from property detail page, fit bounds to show both user setup location and property
+        if (filters?.viewMode === 'map') {
+          mapInstanceRef.current.fitBounds([[uLat, uLng], [pLat, pLng]], { padding: [60, 60], maxZoom: 16 });
+        }
+      }
+    }
+  }, [focusedProperty, selectedPropertyId, filters?.userLat, filters?.userLng, filters?.viewMode, displayProperties]);
 
   // Click map anywhere to reposition your location pin to exact building
   useEffect(() => {

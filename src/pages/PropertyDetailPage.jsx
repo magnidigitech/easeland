@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ShieldCheck,
   Heart,
@@ -18,10 +18,24 @@ import {
   Calendar,
   Sparkles,
   Phone,
-  MessageCircle
+  MessageCircle,
+  Navigation,
+  Compass,
+  ExternalLink,
+  Locate,
+  Car,
+  Route
 } from 'lucide-react';
 import { getPublicPropertyById } from '../firebase/propertyService.js';
-import { loadGoogleMapsScript, extractCoordinates, extractBoundaryPolygon } from '../services/locationProvider.js';
+import {
+  loadGoogleMapsScript,
+  extractCoordinates,
+  extractBoundaryPolygon,
+  resolvePlaceCoordinates,
+  calculateDistanceKm,
+  getCurrentDeviceLocation,
+  getCachedDeviceLocation
+} from '../services/locationProvider.js';
 import { getApplicableSpecificationFields, CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
 import { getCategoryFallbackImage, getPropertyMediaList, getVideoThumbnailUrl } from '../utils/categoryUtils.js';
 import { createEnquiry } from '../firebase/enquiryService.js';
@@ -67,8 +81,57 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   // Google Maps & Nearby State
   const mapContainerRef = useRef(null);
   const googleMapRef = useRef(null);
+  const gMapsSdkRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const routePolylineRef = useRef(null);
+  const directionsRendererRef = useRef(null);
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
+
+  // User setup location & distance calculation state
+  const [userLocationName, setUserLocationName] = useState(() => {
+    if (typeof window === 'undefined') return 'Guntur, Andhra Pradesh';
+    const userCity = (user?.city || user?.location || '').trim();
+    if (userCity) return userCity;
+    const adminCity = (localStorage.getItem('easeland_admin_city') || '').trim();
+    if (adminCity) return adminCity;
+    const userLoc = (localStorage.getItem('easeland_user_location') || '').trim();
+    if (userLoc) return userLoc;
+    return 'Guntur, Andhra Pradesh';
+  });
+
+  const [userCoords, setUserCoords] = useState(() => {
+    if (typeof window === 'undefined') return { lat: 16.3067, lng: 80.4365 };
+    const userCity = (user?.city || user?.location || '').trim();
+    if (userCity) {
+      const resolved = resolvePlaceCoordinates(userCity);
+      if (resolved) return { lat: resolved.lat, lng: resolved.lng };
+      if (user?.lat && user?.lng) return { lat: Number(user.lat), lng: Number(user.lng) };
+    }
+    const adminCity = (localStorage.getItem('easeland_admin_city') || '').trim();
+    if (adminCity) {
+      const resolved = resolvePlaceCoordinates(adminCity);
+      if (resolved) return { lat: resolved.lat, lng: resolved.lng };
+    }
+    const cachedGps = getCachedDeviceLocation();
+    if (cachedGps?.lat && cachedGps?.lng) {
+      return { lat: Number(cachedGps.lat), lng: Number(cachedGps.lng) };
+    }
+    return { lat: 16.3067, lng: 80.4365 };
+  });
+
+  const [userLocationSource, setUserLocationSource] = useState(() => {
+    if (user?.city || user?.location) return 'Profile Setup Location';
+    if (typeof window !== 'undefined' && localStorage.getItem('easeland_admin_city')) return 'Configured Location';
+    return 'Default Hub (AP)';
+  });
+
+  const [gpsDetecting, setGpsDetecting] = useState(false);
+  const [gpsError, setGpsError] = useState(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [customLocationInput, setCustomLocationInput] = useState('');
+  const [drivingDistanceText, setDrivingDistanceText] = useState(null);
+  const [drivingDurationText, setDrivingDurationText] = useState(null);
 
   const formatPlaceCategory = (types, defaultLabel) => {
     if (defaultLabel) return defaultLabel;
@@ -306,6 +369,12 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         });
 
         googleMapRef.current = map;
+        gMapsSdkRef.current = gMaps;
+
+        // Render user setup location pin and route on embedded Google Map
+        if (userCoords) {
+          renderRouteOnMap(gMaps, map, userCoords, mapPos);
+        }
 
         // Price-Tier Marker Palette (100% matched to UniversalMapEngine search map)
         const priceVal = Number(property.price) || 0;
@@ -388,6 +457,248 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         setNearbyPlaces([]);
       });
   }, [property]);
+
+  // Property coordinates extraction
+  const propCoords = useMemo(() => {
+    if (!property) return null;
+    const extracted = extractCoordinates(property);
+    const lat = Number(extracted?.lat);
+    const lng = Number(extracted?.lng);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
+    return { lat, lng };
+  }, [property]);
+
+  // Spherical Haversine distance in kilometers
+  const distanceKm = useMemo(() => {
+    if (!userCoords || !propCoords) return null;
+    const d = calculateDistanceKm(userCoords.lat, userCoords.lng, propCoords.lat, propCoords.lng);
+    if (isNaN(d) || d === Infinity) return null;
+    return d;
+  }, [userCoords, propCoords]);
+
+  // Estimated driving time
+  const estimatedDriveMinutes = useMemo(() => {
+    if (drivingDurationText) {
+      const match = drivingDurationText.match(/(\d+)\s*min/);
+      if (match) return Number(match[1]);
+    }
+    if (distanceKm == null) return null;
+    return Math.max(1, Math.round((distanceKm / 35) * 60));
+  }, [distanceKm, drivingDurationText]);
+
+  // Keep user location synchronized if user profile updates
+  useEffect(() => {
+    if (user?.city || user?.location) {
+      const city = (user.city || user.location).trim();
+      setUserLocationName(city);
+      setUserLocationSource('Profile Setup Location');
+      const resolved = resolvePlaceCoordinates(city);
+      if (resolved) {
+        setUserCoords({ lat: resolved.lat, lng: resolved.lng });
+      } else if (user.lat && user.lng) {
+        setUserCoords({ lat: Number(user.lat), lng: Number(user.lng) });
+      }
+    }
+  }, [user?.city, user?.location, user?.lat, user?.lng]);
+
+  // Render route on embedded Google Map
+  const renderRouteOnMap = (gMaps, map, uCoords, pCoords) => {
+    if (!gMaps || !map || !uCoords || !pCoords) return;
+
+    if (userMarkerRef.current) {
+      try { userMarkerRef.current.setMap(null); } catch (e) {}
+      userMarkerRef.current = null;
+    }
+    if (routePolylineRef.current) {
+      try { routePolylineRef.current.setMap(null); } catch (e) {}
+      routePolylineRef.current = null;
+    }
+    if (directionsRendererRef.current) {
+      try { directionsRendererRef.current.setMap(null); } catch (e) {}
+      directionsRendererRef.current = null;
+    }
+
+    const userPos = { lat: Number(uCoords.lat), lng: Number(uCoords.lng) };
+    const propPos = { lat: Number(pCoords.lat), lng: Number(pCoords.lng) };
+
+    if (isNaN(userPos.lat) || isNaN(userPos.lng) || isNaN(propPos.lat) || isNaN(propPos.lng)) return;
+
+    // Create user marker
+    userMarkerRef.current = new gMaps.Marker({
+      position: userPos,
+      map: map,
+      title: `Your Location: ${userLocationName}`,
+      icon: {
+        path: gMaps.SymbolPath?.CIRCLE || 0,
+        scale: 7,
+        fillColor: '#2563eb',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2.5
+      }
+    });
+
+    if (gMaps.DirectionsService && gMaps.DirectionsRenderer) {
+      const directionsService = new gMaps.DirectionsService();
+      const directionsRenderer = new gMaps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: '#2563eb',
+          strokeWeight: 4,
+          strokeOpacity: 0.85
+        }
+      });
+      directionsRendererRef.current = directionsRenderer;
+
+      directionsService.route(
+        {
+          origin: userPos,
+          destination: propPos,
+          travelMode: gMaps.TravelMode?.DRIVING || 'DRIVING'
+        },
+        (result, status) => {
+          if (status === (gMaps.DirectionsStatus?.OK || 'OK') && result) {
+            directionsRenderer.setDirections(result);
+            const leg = result.routes?.[0]?.legs?.[0];
+            if (leg) {
+              setDrivingDistanceText(leg.distance?.text || null);
+              setDrivingDurationText(leg.duration?.text || null);
+            }
+          } else {
+            routePolylineRef.current = new gMaps.Polyline({
+              path: [userPos, propPos],
+              geodesic: true,
+              strokeColor: '#2563eb',
+              strokeOpacity: 0.8,
+              strokeWeight: 3,
+              map: map
+            });
+          }
+        }
+      );
+    } else {
+      routePolylineRef.current = new gMaps.Polyline({
+        path: [userPos, propPos],
+        geodesic: true,
+        strokeColor: '#2563eb',
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        map: map
+      });
+    }
+  };
+
+  // Re-render route on embedded map when coordinates change
+  useEffect(() => {
+    if (googleMapRef.current && gMapsSdkRef.current && propCoords && userCoords) {
+      renderRouteOnMap(gMapsSdkRef.current, googleMapRef.current, userCoords, propCoords);
+    }
+  }, [userCoords, propCoords]);
+
+  // Map camera centering controls
+  const handleCenterPropertyOnMap = () => {
+    if (!googleMapRef.current || !propCoords) return;
+    googleMapRef.current.setCenter({ lat: propCoords.lat, lng: propCoords.lng });
+    googleMapRef.current.setZoom(17);
+  };
+
+  const handleFitRouteOnMap = () => {
+    if (!googleMapRef.current || !gMapsSdkRef.current || !propCoords || !userCoords) return;
+    const gMaps = gMapsSdkRef.current;
+    const bounds = new gMaps.LatLngBounds();
+    bounds.extend({ lat: propCoords.lat, lng: propCoords.lng });
+    bounds.extend({ lat: userCoords.lat, lng: userCoords.lng });
+    googleMapRef.current.fitBounds(bounds, { padding: 60 });
+  };
+
+  // Detect GPS live position from device
+  const handleDetectDeviceLocation = async () => {
+    setGpsDetecting(true);
+    setGpsError(null);
+    try {
+      const pos = await getCurrentDeviceLocation({ highAccuracy: true, timeoutMs: 10000 });
+      if (pos && !isNaN(pos.lat) && !isNaN(pos.lng)) {
+        const newCoords = { lat: Number(pos.lat), lng: Number(pos.lng) };
+        setUserCoords(newCoords);
+        const label = pos.locality || pos.city || 'My Device GPS Location';
+        setUserLocationName(label);
+        setUserLocationSource('Live Device GPS');
+        try {
+          localStorage.setItem('easeland_admin_city', label);
+        } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('GPS detection error:', err);
+      setGpsError('Could not access device GPS. You can choose a city from the list.');
+    } finally {
+      setGpsDetecting(false);
+    }
+  };
+
+  // Change or select custom location
+  const handleSelectCustomLocation = (cityName) => {
+    if (!cityName) return;
+    const cleaned = cityName.trim();
+    setUserLocationName(cleaned);
+    setUserLocationSource('Selected Location');
+    setShowLocationPicker(false);
+    try {
+      localStorage.setItem('easeland_admin_city', cleaned);
+    } catch (e) {}
+
+    const resolved = resolvePlaceCoordinates(cleaned);
+    if (resolved) {
+      setUserCoords({ lat: resolved.lat, lng: resolved.lng });
+    } else if (window.google?.maps?.Geocoder) {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: cleaned }, (results, status) => {
+        if (status === 'OK' && results[0]?.geometry?.location) {
+          const loc = results[0].geometry.location;
+          const lat = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
+          const lng = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
+          setUserCoords({ lat, lng });
+        }
+      });
+    }
+  };
+
+  const handleApplyCustomLocation = () => {
+    if (!customLocationInput.trim()) return;
+    handleSelectCustomLocation(customLocationInput.trim());
+    setCustomLocationInput('');
+  };
+
+  // Navigation handlers
+  const handleOpenEaselandMap = () => {
+    if (onNavigateMap) {
+      onNavigateMap(
+        {
+          userLat: userCoords?.lat,
+          userLng: userCoords?.lng,
+          userLocation: userLocationName,
+          targetLat: propCoords?.lat,
+          targetLng: propCoords?.lng,
+          focusedProperty: property,
+          focusedPropertyId: property.propertyId || property.id,
+          viewMode: 'map',
+          distanceKm
+        },
+        property
+      );
+    } else {
+      window.location.href = `/?page=map&userLat=${userCoords?.lat || ''}&userLng=${userCoords?.lng || ''}`;
+    }
+  };
+
+  const googleMapsDirectionsUrl = useMemo(() => {
+    if (!propCoords) return 'https://www.google.com/maps';
+    const originParam = (userCoords?.lat && userCoords?.lng)
+      ? `${userCoords.lat},${userCoords.lng}`
+      : encodeURIComponent(userLocationName || 'Guntur, Andhra Pradesh');
+    const destParam = `${propCoords.lat},${propCoords.lng}`;
+    return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}`;
+  }, [userCoords, propCoords, userLocationName]);
 
   // Wishlist handler with immediate double-click protection
   const handleWishlistToggle = async () => {
@@ -845,29 +1156,265 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
             {/* GOOGLE MAP & APPROVED BOUNDARY */}
             <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-extrabold text-brand-charcoal">Location & Map</h3>
                   <p className="text-xs text-gray-500 font-semibold mt-0.5">
                     Interactive map powered by Google Maps JS SDK.
                   </p>
                 </div>
-                {property.boundary && (
-                  <span className="text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md border border-emerald-200">
-                    Approved Property Boundary
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {property.boundary && (
+                    <span className="text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md border border-emerald-200">
+                      Approved Property Boundary
+                    </span>
+                  )}
+                  {distanceKm != null && (
+                    <span className="text-[11px] font-black bg-amber-50 text-amber-900 px-2.5 py-1 rounded-md border border-amber-200 flex items-center gap-1">
+                      <Car className="w-3.5 h-3.5 text-amber-700" />
+                      <span>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`} away</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* MAP CANVAS */}
-              <div
-                ref={mapContainerRef}
-                className="w-full h-80 sm:h-96 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden zoomable-map"
-                data-allow-zoom="true"
-              ></div>
+              <div className="relative">
+                <div
+                  ref={mapContainerRef}
+                  className="w-full h-80 sm:h-96 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden zoomable-map"
+                  data-allow-zoom="true"
+                ></div>
 
-              <div className="text-[11px] text-gray-400 font-semibold">
-                📍 Pin indicates property location. {property.boundary ? 'Green polygon represents platform-approved property boundary.' : 'Property boundary is not displayed.'}
+                {/* QUICK MAP VIEW CONTROLS OVERLAY */}
+                <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleCenterPropertyOnMap}
+                    className="bg-white/95 hover:bg-white text-slate-800 text-[11px] font-extrabold px-3 py-1.5 rounded-lg shadow-md border border-slate-200 flex items-center gap-1.5 transition-all cursor-pointer backdrop-blur-xs"
+                    title="Center on Property"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Property View</span>
+                  </button>
+
+                  {userCoords && (
+                    <button
+                      type="button"
+                      onClick={handleFitRouteOnMap}
+                      className="bg-white/95 hover:bg-white text-blue-700 text-[11px] font-extrabold px-3 py-1.5 rounded-lg shadow-md border border-blue-200 flex items-center gap-1.5 transition-all cursor-pointer backdrop-blur-xs"
+                      title="Show Route from User Location"
+                    >
+                      <Route className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Fit Route View</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-gray-500 font-semibold">
+                <div>
+                  📍 Pin indicates property location. {property.boundary ? 'Green polygon represents platform-approved property boundary.' : ''}
+                </div>
+                {userLocationName && (
+                  <div className="text-blue-700 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                    <span>Route mapped from {userLocationName}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* VIEW ON MAPS & DISTANCE CALCULATOR FROM USER SETUP LOCATION */}
+            <div id="view-on-maps-section" className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-sm space-y-5">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                    <Navigation className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-brand-charcoal">View on Maps & Distance</h3>
+                    <p className="text-xs text-gray-500 font-semibold mt-0.5">
+                      Real-time distance and navigation from your setup location to this property.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Prominent Distance Badge */}
+                {distanceKm != null && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs self-start sm:self-auto">
+                    <Car className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black tracking-tight">
+                      {distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`} away
+                    </span>
+                    {estimatedDriveMinutes != null && (
+                      <span className="text-[11px] font-bold text-emerald-700/80 border-l border-emerald-300/60 pl-1.5">
+                        ~{estimatedDriveMinutes} min drive
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Origin & Destination Route Breakdown Card */}
+              <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80 space-y-3.5">
+                {/* Origin: User Setup Location */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider">Your Setup Location</span>
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                          {userLocationSource}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-slate-800 truncate mt-0.5">
+                        {userLocationName}
+                      </div>
+                      {userCoords && (
+                        <div className="text-[10px] text-slate-400 font-medium">
+                          Coordinates: {Number(userCoords.lat).toFixed(4)}° N, {Number(userCoords.lng).toFixed(4)}° E
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Location Action Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleDetectDeviceLocation}
+                      disabled={gpsDetecting}
+                      className="text-xs font-extrabold px-2.5 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                      title="Use live GPS device location"
+                    >
+                      <Locate className={`w-3.5 h-3.5 ${gpsDetecting ? 'animate-spin' : ''}`} />
+                      <span className="hidden sm:inline">{gpsDetecting ? 'Detecting...' : 'Use GPS'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowLocationPicker(!showLocationPicker)}
+                      className="text-xs font-extrabold px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                    >
+                      {showLocationPicker ? 'Close' : 'Change'}
+                    </button>
+                  </div>
+                </div>
+
+                {gpsError && (
+                  <div className="text-xs text-rose-600 font-semibold bg-rose-50 p-2 rounded-lg border border-rose-200">
+                    {gpsError}
+                  </div>
+                )}
+
+                {/* Location Picker Drawer / Selector (if open) */}
+                {showLocationPicker && (
+                  <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                    <div className="text-[11px] font-bold text-slate-600">
+                      Select or enter your location to calculate distance:
+                    </div>
+                    {/* Popular Hubs Pills */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Guntur', 'Vijayawada', 'Amaravati', 'Mangalagiri', 'Tenali', 'Hyderabad', 'Bengaluru'].map(hub => (
+                        <button
+                          key={hub}
+                          type="button"
+                          onClick={() => handleSelectCustomLocation(hub)}
+                          className={`text-xs px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                            userLocationName.toLowerCase().includes(hub.toLowerCase())
+                              ? 'bg-amber-500 text-slate-950 shadow-2xs'
+                              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                          }`}
+                        >
+                          {hub}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Custom Input */}
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={customLocationInput}
+                        onChange={(e) => setCustomLocationInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleApplyCustomLocation(); }}
+                        placeholder="Enter city or locality (e.g., Guntur, Tenali, Tirupati)..."
+                        className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomLocation}
+                        className="text-xs font-extrabold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-2xs transition-all cursor-pointer"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Vertical Connecting Connector with Distance Badge */}
+                <div className="relative pl-3.5 py-1">
+                  <div className="absolute left-3.5 top-0 bottom-0 w-0.5 border-l-2 border-dashed border-amber-400"></div>
+                  <div className="pl-4 py-1 text-xs font-extrabold text-amber-700 flex items-center gap-2">
+                    <span className="bg-amber-100/90 text-amber-900 px-2 py-0.5 rounded-full text-[10px] font-black border border-amber-300">
+                      📍 {distanceKm != null ? `${distanceKm.toFixed(1)} km route` : 'Calculating distance...'}
+                    </span>
+                    {estimatedDriveMinutes != null && (
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        (~{estimatedDriveMinutes} min drive)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Destination: Property Location */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <MapPin className="w-3.5 h-3.5 fill-current" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Property Location</div>
+                    <div className="text-sm font-bold text-slate-900 truncate mt-0.5">
+                      {property.title}
+                    </div>
+                    <div className="text-xs text-slate-600 font-medium">
+                      {[property.location?.locality, property.location?.city, property.location?.district, property.location?.state].filter(Boolean).join(', ') || 'Andhra Pradesh, India'}
+                    </div>
+                    {propCoords && (
+                      <div className="text-[10px] text-slate-400 font-medium">
+                        Coordinates: {Number(propCoords.lat).toFixed(4)}° N, {Number(propCoords.lng).toFixed(4)}° E
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Option 1: View on EaseLand Map */}
+                <button
+                  type="button"
+                  onClick={handleOpenEaselandMap}
+                  className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-slate-950 font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Compass className="w-4 h-4 stroke-[2.5]" />
+                  <span>View on EaseLand Map</span>
+                </button>
+
+                {/* Option 2: Get Directions on Google Maps */}
+                <a
+                  href={googleMapsDirectionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-brand-charcoal hover:bg-black active:scale-[0.99] text-white font-extrabold text-sm py-3.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all text-center cursor-pointer"
+                >
+                  <Navigation className="w-4 h-4 text-brand-yellow fill-current" />
+                  <span>Get Directions on Google Maps</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                </a>
               </div>
             </div>
 
@@ -950,9 +1497,28 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           <span className="text-base font-extrabold text-emerald-700 truncate block">
             {property.priceDisplay}
           </span>
+          {distanceKm != null && (
+            <span className="text-[10px] font-black text-amber-700 block truncate">
+              📍 {distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`} away
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('view-on-maps-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              else handleOpenEaselandMap();
+            }}
+            className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs px-2.5 py-2.5 rounded-xl border border-amber-300 shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+            title="View on Map & Distance"
+          >
+            <Compass className="w-4 h-4 text-amber-700 stroke-[2.5]" />
+            <span>Map</span>
+          </button>
+
           <a
             href={getEaselandWhatsAppUrl()}
             target="_blank"

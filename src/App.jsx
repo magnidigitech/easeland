@@ -1419,7 +1419,13 @@ export default function App() {
           <PropertyDetailPage
             propertyId={activePropertyId || selectedProperty?.propertyId || selectedProperty?.id}
             onNavigateHome={() => changeActivePage('home')}
-            onNavigateMap={() => changeActivePage('map')}
+            onNavigateMap={(navFilters, targetProperty) => {
+              if (targetProperty) {
+                setSelectedProperty(targetProperty);
+                setActivePropertyId(targetProperty.propertyId || targetProperty.id);
+              }
+              changeActivePage('map', navFilters || (targetProperty ? { viewMode: 'map', focusedPropertyId: targetProperty?.propertyId || targetProperty?.id } : null));
+            }}
           />
         )}
 
