@@ -233,6 +233,9 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
     // Clean payload for JSON and Firestore (strip all undefined values to prevent Firestore rejection)
     const cleanModuleData = JSON.parse(JSON.stringify(moduleData, (k, v) => (v === undefined ? null : v)));
 
+    // Canonical key resolution for dual-compatibility: maps -> mapsConfig, faq -> faqs
+    const canonicalKey = moduleId === 'maps' ? 'mapsConfig' : (moduleId === 'faq' ? 'faqs' : moduleId);
+
     try {
       let payload = {};
       if (moduleId === 'master_draft' && typeof cleanModuleData === 'object' && cleanModuleData !== null) {
@@ -240,9 +243,16 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         delete cleanDraft.master_draft;
         payload = { ...cleanDraft, master_draft: cleanDraft };
       } else {
-        payload = { [moduleId]: cleanModuleData, master_draft: { [moduleId]: cleanModuleData } };
+        payload = {
+          [canonicalKey]: cleanModuleData,
+          master_draft: { [canonicalKey]: cleanModuleData }
+        };
+        if (canonicalKey !== moduleId) {
+          payload[moduleId] = cleanModuleData;
+          payload.master_draft[moduleId] = cleanModuleData;
+        }
       }
-      if (moduleId === 'featuredListings') {
+      if (moduleId === 'featuredListings' || canonicalKey === 'featuredListings') {
         payload.master_draft = { featuredListings: cleanModuleData };
       }
       let saved = false;
@@ -283,7 +293,7 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
         await setDoc(masterDraftRef, cleanDraft, { merge: true });
       } else {
-        const docRef = doc(db, 'siteManagement', moduleId);
+        const docRef = doc(db, 'siteManagement', canonicalKey);
         const payload = {
           ...(typeof cleanModuleData === 'object' && cleanModuleData !== null ? cleanModuleData : { value: cleanModuleData }),
           state: 'PUBLISHED',
@@ -292,10 +302,19 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         };
         await setDoc(docRef, payload, { merge: true });
 
+        if (canonicalKey !== moduleId) {
+          try {
+            await setDoc(doc(db, 'siteManagement', moduleId), payload, { merge: true });
+          } catch (aliasErr) {}
+        }
+
         // Keep master_draft synchronized in Firestore so background pulls do not overwrite module
         try {
           const masterDraftRef = doc(db, 'siteManagement', 'master_draft');
-          await setDoc(masterDraftRef, { [moduleId]: cleanModuleData }, { merge: true });
+          await setDoc(masterDraftRef, {
+            [canonicalKey]: cleanModuleData,
+            ...(canonicalKey !== moduleId ? { [moduleId]: cleanModuleData } : {})
+          }, { merge: true });
         } catch (mdErr) {}
       }
     } catch (fsErr) {
@@ -314,9 +333,11 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
         delete cleanDraft.master_draft;
         fullConfig = { ...fullConfig, ...cleanDraft, master_draft: { ...(fullConfig.master_draft || {}), ...cleanDraft } };
       } else {
-        fullConfig[moduleId] = moduleData;
+        fullConfig[canonicalKey] = moduleData;
+        if (canonicalKey !== moduleId) fullConfig[moduleId] = moduleData;
         if (!fullConfig.master_draft) fullConfig.master_draft = {};
-        fullConfig.master_draft[moduleId] = moduleData;
+        fullConfig.master_draft[canonicalKey] = moduleData;
+        if (canonicalKey !== moduleId) fullConfig.master_draft[moduleId] = moduleData;
       }
       if (fullConfig.master_draft) {
         delete fullConfig.master_draft.master_draft;
@@ -331,7 +352,7 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
       window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: sanitized }));
     }
 
-    if (moduleId === 'theme' && cleanModuleData) {
+    if ((moduleId === 'theme' || canonicalKey === 'theme') && cleanModuleData) {
       applySiteTheme(cleanModuleData);
     }
 
@@ -348,6 +369,19 @@ export async function updateSiteModuleAdmin(moduleId, moduleData, adminUid) {
 export async function publishSiteConfigAdmin(fullConfig, adminUid) {
   const cleanConfig = JSON.parse(JSON.stringify(fullConfig || {}, (k, v) => (v === undefined ? null : v)));
   delete cleanConfig.master_draft;
+
+  // Ensure dual compatibility for maps/mapsConfig and faqs/faq
+  if (cleanConfig.mapsConfig && !cleanConfig.maps) {
+    cleanConfig.maps = cleanConfig.mapsConfig;
+  } else if (cleanConfig.maps && !cleanConfig.mapsConfig) {
+    cleanConfig.mapsConfig = cleanConfig.maps;
+  }
+  if (cleanConfig.faqs && !cleanConfig.faq) {
+    cleanConfig.faq = cleanConfig.faqs;
+  } else if (cleanConfig.faq && !cleanConfig.faqs) {
+    cleanConfig.faqs = cleanConfig.faq;
+  }
+
   const publishPayload = { ...cleanConfig, master_draft: cleanConfig };
 
   // 1. Primary DB Storage: Save all site config modules to PostgreSQL

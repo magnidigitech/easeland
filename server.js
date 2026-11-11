@@ -28,6 +28,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin SDK with Service Account Key if available
+let hasAdminCredential = false;
 try {
   if (!getApps().length) {
     let credential = undefined;
@@ -36,6 +37,7 @@ try {
       try {
         const rawKey = fs.readFileSync(keyPath, 'utf8');
         credential = cert(JSON.parse(rawKey));
+        hasAdminCredential = true;
         console.log('Firebase Admin initialized with local serviceAccountKey.json');
       } catch (e) {
         console.warn('Error reading local serviceAccountKey.json:', e.message);
@@ -45,6 +47,7 @@ try {
         const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim();
         const parsedKey = raw.startsWith('{') ? JSON.parse(raw) : JSON.parse(fs.readFileSync(raw, 'utf8'));
         credential = cert(parsedKey);
+        hasAdminCredential = true;
         console.log('Firebase Admin initialized with FIREBASE_SERVICE_ACCOUNT_KEY env var');
       } catch (e) {
         console.warn('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', e.message);
@@ -64,17 +67,12 @@ try {
 }
 
 function getAdminDb() {
+  if (!hasAdminCredential) {
+    return null;
+  }
   try {
     const apps = getApps();
     if (apps.length) return getFirestore(apps[0]);
-    const keyPath = path.join(__dirname, 'serviceAccountKey.json');
-    if (fs.existsSync(keyPath)) {
-      const app = initializeApp({
-        credential: cert(JSON.parse(fs.readFileSync(keyPath, 'utf8'))),
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'easeland-fba04'
-      }, 'admin-firestore-helper');
-      return getFirestore(app);
-    }
   } catch (e) {
     console.warn('Admin Firestore helper note:', e.message);
   }
@@ -1839,17 +1837,8 @@ app.delete('/api/properties/:id', async (req, res) => {
 
     // 2. Authoritative Cloud Firestore Cascade Deletion (Firebase Admin SDK)
     try {
-      const adminApps = getApps();
-      if (adminApps.length) {
-        let adminDb = null;
-        try {
-          const { getFirestore } = await import('firebase-admin/firestore');
-          adminDb = getFirestore(adminApps[0]);
-        } catch (fsImportErr) {
-          console.warn('Firebase Admin Firestore import note:', fsImportErr.message);
-        }
-
-        if (adminDb) {
+      const adminDb = getAdminDb();
+      if (adminDb) {
           const idsToPurge = Array.from(new Set([
             targetId,
             cleanNum,
@@ -1885,7 +1874,6 @@ app.delete('/api/properties/:id', async (req, res) => {
             } catch (e) { }
           }
         }
-      }
     } catch (adminFsErr) {
       console.warn('Firebase Admin Firestore purge note:', adminFsErr.message);
     }
@@ -1991,17 +1979,8 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
 
     // 2. Authoritative Cloud Firestore Cascade Batch Deletion (Firebase Admin SDK)
     try {
-      const adminApps = getApps();
-      if (adminApps.length) {
-        let adminDb = null;
-        try {
-          const { getFirestore } = await import('firebase-admin/firestore');
-          adminDb = getFirestore(adminApps[0]);
-        } catch (fsImportErr) {
-          console.warn('Firebase Admin Firestore import note:', fsImportErr.message);
-        }
-
-        if (adminDb) {
+      const adminDb = getAdminDb();
+      if (adminDb) {
           const targetCollections = [
             'properties',
             'propertyPrivate',
@@ -2036,7 +2015,6 @@ app.post('/api/admin/purge-all-properties', async (req, res) => {
             firestoreDeleted[colName] = totalDeletedInCol;
           }
         }
-      }
     } catch (fsErr) {
       console.warn('Firestore bulk purge note:', fsErr.message);
     }

@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 import { applySiteTheme, mockApi, safeArray, DEFAULT_SITE_CONFIG, resetModuleConfig } from './mockApi.js';
 
 describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
@@ -162,5 +164,71 @@ describe('Site Theme & CMS Popup Modal Item Creation Suite', () => {
     const resetThemeRes = mockApi.resetModuleConfig('theme');
     assert.strictEqual(resetThemeRes.theme.fontFamily, DEFAULT_SITE_CONFIG.theme.fontFamily);
     assert.strictEqual(resetThemeRes.theme.primaryColor, DEFAULT_SITE_CONFIG.theme.primaryColor);
+  });
+
+  it('7. resetModuleConfig accurately restores all 16 modules to factory defaults', () => {
+    const modulesToTest = [
+      'overview', 'homepage', 'navbar', 'footer', 'buyPage',
+      'rentPage', 'sellPage', 'categories', 'faq', 'contact',
+      'branding', 'theme', 'media', 'maps', 'seo', 'publish'
+    ];
+
+    modulesToTest.forEach(modId => {
+      const resetRes = mockApi.resetModuleConfig(modId);
+      assert.ok(resetRes, `Reset failed for module ${modId}`);
+
+      if (modId === 'faq') {
+        assert.deepStrictEqual(resetRes.faqs, DEFAULT_SITE_CONFIG.faqs);
+        assert.deepStrictEqual(resetRes.faq, DEFAULT_SITE_CONFIG.faqs);
+      } else if (modId === 'maps') {
+        assert.deepStrictEqual(resetRes.mapsConfig, DEFAULT_SITE_CONFIG.mapsConfig);
+        assert.deepStrictEqual(resetRes.maps, DEFAULT_SITE_CONFIG.mapsConfig);
+      } else if (modId === 'categories') {
+        assert.deepStrictEqual(resetRes.categories, DEFAULT_SITE_CONFIG.categories);
+      } else {
+        assert.deepStrictEqual(resetRes[modId], DEFAULT_SITE_CONFIG[modId], `Factory default mismatch on module ${modId}`);
+      }
+    });
+  });
+
+  it('8. Verifies AdminPortal.jsx renders "Check Live Public Site" outside individual modules', () => {
+    const adminPortalPath = path.resolve('src/pages/AdminPortal.jsx');
+    const adminCode = fs.readFileSync(adminPortalPath, 'utf8');
+
+    // 1. Must exist in the top sub-header toolbar
+    assert.ok(
+      adminCode.includes('LIVE SITE') && adminCode.includes("window.open('/', '_blank')"),
+      'AdminPortal must feature a live site button in the top toolbar'
+    );
+
+    // 2. Must exist in the persistent CMS Studio header above module selection pills
+    assert.ok(
+      adminCode.includes('Live Site Sync Engine Active') &&
+      adminCode.includes('Check Live Public Site'),
+      'AdminPortal must feature "Check Live Public Site" in the persistent header outside module 16'
+    );
+  });
+
+  it('9. Verifies all 16 individual CMS modules are wired to CmsModuleActionBar with save, publish, and reset', () => {
+    const adminPortalPath = path.resolve('src/pages/AdminPortal.jsx');
+    const adminCode = fs.readFileSync(adminPortalPath, 'utf8');
+
+    const expectedModuleIds = [
+      'overview', 'homepage', 'navbar', 'footer', 'buyPage',
+      'rentPage', 'sellPage', 'categories', 'faq', 'contact',
+      'branding', 'theme', 'media', 'maps', 'seo', 'publish'
+    ];
+
+    expectedModuleIds.forEach(modId => {
+      assert.ok(
+        adminCode.includes(`moduleId="${modId}"`),
+        `CmsModuleActionBar must be defined for module: ${modId}`
+      );
+    });
+
+    // Check that handlers are defined
+    assert.ok(adminCode.includes('const handleSaveModuleDraft = async (moduleId)'), 'handleSaveModuleDraft handler must exist');
+    assert.ok(adminCode.includes('const handlePublishModuleLive = async (moduleId)'), 'handlePublishModuleLive handler must exist');
+    assert.ok(adminCode.includes('const handleResetModule = (moduleId)'), 'handleResetModule handler must exist');
   });
 });

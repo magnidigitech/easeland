@@ -1929,14 +1929,32 @@ export default function AdminPortal({ onNavigate }) {
     setAdminActionProcessing(true);
     try {
       const adminUid = user?.uid || 'admin_auditor';
-      const updated = mockApi.updateSiteConfig(siteConfig);
+      const canonicalKey = moduleId === 'maps' ? 'mapsConfig' : (moduleId === 'faq' ? 'faqs' : moduleId);
+      let moduleData;
+      if (canonicalKey === 'faqs') {
+        moduleData = siteConfig.faqs || siteConfig.faq || DEFAULT_SITE_CONFIG.faqs;
+      } else if (canonicalKey === 'mapsConfig') {
+        moduleData = siteConfig.mapsConfig || siteConfig.maps || DEFAULT_SITE_CONFIG.mapsConfig;
+      } else if (canonicalKey === 'categories') {
+        moduleData = siteConfig.categories || DEFAULT_SITE_CONFIG.categories;
+      } else {
+        moduleData = siteConfig[canonicalKey] !== undefined ? siteConfig[canonicalKey] : (siteConfig[moduleId] || siteConfig);
+      }
+
+      const updated = mockApi.updateSiteConfig({
+        ...siteConfig,
+        [canonicalKey]: moduleData,
+        [moduleId]: moduleData
+      });
       if (updated) setSiteConfig({ ...updated });
-      const moduleData = siteConfig[moduleId] !== undefined
-        ? siteConfig[moduleId]
-        : (moduleId === 'categories' ? siteConfig.categories : (moduleId === 'faq' ? siteConfig.faqs : (moduleId === 'maps' ? siteConfig.mapsConfig : siteConfig)));
       try {
-        await updateSiteModuleAdmin(moduleId, moduleData, adminUid);
-      } catch (e) { }
+        await updateSiteModuleAdmin(canonicalKey, moduleData, adminUid);
+        if (canonicalKey !== moduleId) {
+          await updateSiteModuleAdmin(moduleId, moduleData, adminUid);
+        }
+      } catch (e) {
+        console.warn('updateSiteModuleAdmin notice:', e);
+      }
       hasUnsavedCmsChangesRef.current = false;
       setHasUnsavedCmsChanges(false);
       logAdminActivity('saved CMS draft for module: ' + moduleId);
@@ -1958,10 +1976,44 @@ export default function AdminPortal({ onNavigate }) {
     setAdminActionProcessing(true);
     try {
       const adminUid = user?.uid || 'admin_auditor';
-      const updated = mockApi.updateSiteConfig(siteConfig);
+      const canonicalKey = moduleId === 'maps' ? 'mapsConfig' : (moduleId === 'faq' ? 'faqs' : moduleId);
+      let moduleData;
+      if (canonicalKey === 'faqs') {
+        moduleData = siteConfig.faqs || siteConfig.faq || DEFAULT_SITE_CONFIG.faqs;
+      } else if (canonicalKey === 'mapsConfig') {
+        moduleData = siteConfig.mapsConfig || siteConfig.maps || DEFAULT_SITE_CONFIG.mapsConfig;
+      } else if (canonicalKey === 'categories') {
+        moduleData = siteConfig.categories || DEFAULT_SITE_CONFIG.categories;
+      } else {
+        moduleData = siteConfig[canonicalKey] !== undefined ? siteConfig[canonicalKey] : (siteConfig[moduleId] || siteConfig);
+      }
+
+      const configToPublish = {
+        ...siteConfig,
+        [canonicalKey]: moduleData,
+        [moduleId]: moduleData
+      };
+      if (canonicalKey === 'faqs') {
+        configToPublish.faqs = moduleData;
+        configToPublish.faq = moduleData;
+      }
+      if (canonicalKey === 'mapsConfig') {
+        configToPublish.mapsConfig = moduleData;
+        configToPublish.maps = moduleData;
+      }
+
+      const updated = mockApi.updateSiteConfig(configToPublish);
       if (updated) setSiteConfig({ ...updated });
       try {
-        await publishSiteConfigAdmin(siteConfig, adminUid);
+        await publishSiteConfigAdmin(configToPublish, adminUid);
+      } catch (e) {
+        console.warn('publishSiteConfigAdmin remote notice:', e);
+      }
+      try {
+        await updateSiteModuleAdmin(canonicalKey, moduleData, adminUid);
+        if (canonicalKey !== moduleId) {
+          await updateSiteModuleAdmin(moduleId, moduleData, adminUid);
+        }
       } catch (e) { }
       hasUnsavedCmsChangesRef.current = false;
       setHasUnsavedCmsChanges(false);
@@ -1982,16 +2034,19 @@ export default function AdminPortal({ onNavigate }) {
   const handleResetModule = (moduleId) => {
     if (!moduleId) return;
     const freshDefaults = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG));
+    const canonicalKey = moduleId === 'maps' ? 'mapsConfig' : (moduleId === 'faq' ? 'faqs' : moduleId);
 
     // 1. Update CMS configuration state in React immediately
     updateCmsConfig(prev => {
       const next = { ...prev };
-      if (moduleId === 'faq') {
+      if (moduleId === 'faq' || canonicalKey === 'faqs') {
         next.faqs = JSON.parse(JSON.stringify(freshDefaults.faqs));
+        next.faq = JSON.parse(JSON.stringify(freshDefaults.faqs));
       } else if (moduleId === 'categories') {
         next.categories = JSON.parse(JSON.stringify(freshDefaults.categories));
-      } else if (moduleId === 'maps') {
+      } else if (moduleId === 'maps' || canonicalKey === 'mapsConfig') {
         next.mapsConfig = JSON.parse(JSON.stringify(freshDefaults.mapsConfig));
+        next.maps = JSON.parse(JSON.stringify(freshDefaults.mapsConfig));
       } else if (freshDefaults[moduleId] !== undefined) {
         next[moduleId] = JSON.parse(JSON.stringify(freshDefaults[moduleId]));
       }
@@ -2001,17 +2056,21 @@ export default function AdminPortal({ onNavigate }) {
       return next;
     });
 
-    // 2. Persist to mockApi store and sync to Firestore
+    // 2. Persist to mockApi store and sync to Firestore and PostgreSQL
     try {
       const updatedConfig = mockApi.resetModuleConfig ? mockApi.resetModuleConfig(moduleId) : null;
       if (updatedConfig) {
         setSiteConfig({ ...updatedConfig });
       }
       const adminUid = user?.uid || 'admin_auditor';
-      const moduleData = freshDefaults[moduleId] !== undefined
-        ? freshDefaults[moduleId]
-        : (moduleId === 'categories' ? freshDefaults.categories : (moduleId === 'faq' ? freshDefaults.faqs : (moduleId === 'maps' ? freshDefaults.mapsConfig : freshDefaults)));
-      updateSiteModuleAdmin(moduleId, moduleData, adminUid).catch(() => {});
+      const defaultData = freshDefaults[canonicalKey] !== undefined
+        ? freshDefaults[canonicalKey]
+        : (freshDefaults[moduleId] !== undefined ? freshDefaults[moduleId] : freshDefaults);
+
+      updateSiteModuleAdmin(canonicalKey, defaultData, adminUid).catch(() => {});
+      if (canonicalKey !== moduleId) {
+        updateSiteModuleAdmin(moduleId, defaultData, adminUid).catch(() => {});
+      }
     } catch (err) {
       console.warn('handleResetModule sync notice:', err);
     }
@@ -3360,20 +3419,28 @@ export default function AdminPortal({ onNavigate }) {
       question: newFaqForm.question.trim(),
       answer: newFaqForm.answer.trim()
     };
-    updateCmsConfig(prev => ({
-      ...prev,
-      faqs: [newFaq, ...safeArray(prev.faqs || prev.faq)]
-    }));
+    updateCmsConfig(prev => {
+      const mergedFaqs = [newFaq, ...safeArray(prev.faqs || prev.faq)];
+      return {
+        ...prev,
+        faqs: mergedFaqs,
+        faq: mergedFaqs
+      };
+    });
     setIsAddFaqModalOpen(false);
     setPublishSuccessMessage('New FAQ question added to draft! Remember to save.');
     setTimeout(() => setPublishSuccessMessage(''), 4000);
   };
 
   const handleRemoveFaq = (id) => {
-    updateCmsConfig(prev => ({
-      ...prev,
-      faqs: safeArray(prev.faqs || prev.faq).filter(f => f && f.id !== id)
-    }));
+    updateCmsConfig(prev => {
+      const filteredFaqs = safeArray(prev.faqs || prev.faq).filter(f => f && f.id !== id);
+      return {
+        ...prev,
+        faqs: filteredFaqs,
+        faq: filteredFaqs
+      };
+    });
   };
 
   const cmsModules = [
@@ -3517,6 +3584,21 @@ export default function AdminPortal({ onNavigate }) {
           </div>
 
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto justify-start sm:justify-end shrink-0 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open('/', '_blank');
+                }
+              }}
+              className="bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5 transition-all border border-slate-700 hover:border-brand-yellow cursor-pointer shrink-0"
+              title="Open live public marketplace site in new tab"
+            >
+              <Globe className="w-3.5 h-3.5 text-brand-yellow" />
+              <span>LIVE SITE</span>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </button>
+
             <button
               type="button"
               onClick={() => setIsResetModalOpen(true)}
@@ -3669,14 +3751,65 @@ export default function AdminPortal({ onNavigate }) {
             {activeTab === 'cms' && (
               <div className="space-y-6">
 
+                {/* PERSISTENT LIVE SITE BANNER & CHECK PUBLIC SITE ACTION */}
+                <div className="p-4 bg-gradient-to-r from-slate-900 to-brand-navy rounded-2xl text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md border border-slate-800">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-sm text-white tracking-wide">Live Site Sync Engine Active</span>
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400/30 uppercase tracking-wider">
+                          Ready
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 font-medium mt-0.5">
+                        Inspect live public marketplace updates instantly from any module without navigating away.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.open('/', '_blank');
+                      }
+                    }}
+                    className="bg-brand-charcoal hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl border border-slate-700 shadow-md flex items-center gap-2 transition-all cursor-pointer hover:border-brand-yellow shrink-0 group"
+                    title="Open live public marketplace site in new tab"
+                  >
+                    <Globe className="w-4 h-4 text-brand-yellow group-hover:rotate-12 transition-transform" />
+                    <span>Check Live Public Site</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                </div>
+
                 {/* 16 MODULE SELECTION PILLS GRID */}
                 <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
-                  <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-gray-100 pb-2">
                     <span className="text-xs font-extrabold uppercase tracking-wider text-brand-charcoal flex items-center gap-2">
                       <Sliders className="w-4 h-4 text-brand-yellow" />
                       Select Site Module To Manage & Edit:
                     </span>
-                    <span className="text-[11px] font-bold text-gray-500">Live Editor Active</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open('/', '_blank');
+                          }
+                        }}
+                        className="text-[11px] font-black text-brand-charcoal bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Open live public marketplace site in new tab"
+                      >
+                        <Globe className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Live Site</span>
+                        <ExternalLink className="w-3 h-3 text-amber-700" />
+                      </button>
+                      <span className="text-[11px] font-bold text-gray-500">Live Editor Active</span>
+                    </div>
                   </div>
 
                   <div className="flex sm:grid sm:grid-cols-4 lg:grid-cols-8 gap-2 overflow-x-auto no-scrollbar py-1 w-full">
@@ -4374,7 +4507,7 @@ export default function AdminPortal({ onNavigate }) {
                               onChange={(e) => {
                                 const updatedFaqs = [...safeArray(siteConfig?.faqs || siteConfig?.faq)];
                                 updatedFaqs[idx] = { ...faq, question: e.target.value };
-                                updateCmsConfig(prev => ({ ...prev, faqs: updatedFaqs }));
+                                updateCmsConfig(prev => ({ ...prev, faqs: updatedFaqs, faq: updatedFaqs }));
                               }}
                               className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-bold"
                             />
@@ -4387,7 +4520,7 @@ export default function AdminPortal({ onNavigate }) {
                               onChange={(e) => {
                                 const updatedFaqs = [...safeArray(siteConfig?.faqs || siteConfig?.faq)];
                                 updatedFaqs[idx] = { ...faq, answer: e.target.value };
-                                updateCmsConfig(prev => ({ ...prev, faqs: updatedFaqs }));
+                                updateCmsConfig(prev => ({ ...prev, faqs: updatedFaqs, faq: updatedFaqs }));
                               }}
                               className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-medium"
                             />

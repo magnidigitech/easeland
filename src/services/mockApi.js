@@ -2363,6 +2363,20 @@ export const mockApi = {
         lastPublishedTime: new Date().toISOString()
       }
     });
+    if (newPartialConfig?.mapsConfig) {
+      siteConfig.maps = newPartialConfig.mapsConfig;
+    }
+    if (newPartialConfig?.maps && !newPartialConfig?.mapsConfig) {
+      siteConfig.mapsConfig = newPartialConfig.maps;
+      siteConfig.maps = newPartialConfig.maps;
+    }
+    if (newPartialConfig?.faqs) {
+      siteConfig.faq = newPartialConfig.faqs;
+    }
+    if (newPartialConfig?.faq && !newPartialConfig?.faqs) {
+      siteConfig.faqs = newPartialConfig.faq;
+      siteConfig.faq = newPartialConfig.faq;
+    }
     setStoredData('easeland_site_config', siteConfig);
     if (siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
@@ -2376,15 +2390,32 @@ export const mockApi = {
   resetModuleConfig: (moduleId) => {
     if (!moduleId) return siteConfig;
     const defaults = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG));
-    if (moduleId === 'faq') {
-      siteConfig.faqs = defaults.faqs;
+    if (moduleId === 'faq' || moduleId === 'faqs') {
+      siteConfig.faqs = JSON.parse(JSON.stringify(defaults.faqs));
+      siteConfig.faq = JSON.parse(JSON.stringify(defaults.faqs));
     } else if (moduleId === 'categories') {
-      siteConfig.categories = defaults.categories;
-    } else if (moduleId === 'maps') {
-      siteConfig.mapsConfig = defaults.mapsConfig;
+      siteConfig.categories = JSON.parse(JSON.stringify(defaults.categories));
+    } else if (moduleId === 'maps' || moduleId === 'mapsConfig') {
+      siteConfig.mapsConfig = JSON.parse(JSON.stringify(defaults.mapsConfig));
+      siteConfig.maps = JSON.parse(JSON.stringify(defaults.mapsConfig));
     } else if (defaults[moduleId] !== undefined) {
-      siteConfig[moduleId] = defaults[moduleId];
+      siteConfig[moduleId] = JSON.parse(JSON.stringify(defaults[moduleId]));
     }
+
+    if (siteConfig.master_draft && typeof siteConfig.master_draft === 'object') {
+      if (moduleId === 'faq' || moduleId === 'faqs') {
+        siteConfig.master_draft.faqs = JSON.parse(JSON.stringify(defaults.faqs));
+        siteConfig.master_draft.faq = JSON.parse(JSON.stringify(defaults.faqs));
+      } else if (moduleId === 'maps' || moduleId === 'mapsConfig') {
+        siteConfig.master_draft.mapsConfig = JSON.parse(JSON.stringify(defaults.mapsConfig));
+        siteConfig.master_draft.maps = JSON.parse(JSON.stringify(defaults.mapsConfig));
+      } else if (moduleId === 'categories') {
+        siteConfig.master_draft.categories = JSON.parse(JSON.stringify(defaults.categories));
+      } else if (defaults[moduleId] !== undefined) {
+        siteConfig.master_draft[moduleId] = JSON.parse(JSON.stringify(defaults[moduleId]));
+      }
+    }
+
     setStoredData('easeland_site_config', siteConfig);
     if (moduleId === 'theme' && siteConfig.theme) {
       applySiteTheme(siteConfig.theme);
