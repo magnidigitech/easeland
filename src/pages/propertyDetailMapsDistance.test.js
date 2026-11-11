@@ -46,15 +46,13 @@ describe('Property Detail Page "View on Maps" & Distance Suite', () => {
     assert.ok(content.includes('view-on-maps-section'), 'Mobile bar must link to view-on-maps-section');
   });
 
-  it('3. Verifies PropertyDetailPage.jsx embedded map provides route synchronization and camera view controls', () => {
+  it('3. Verifies PropertyDetailPage.jsx embedded map focuses strictly on property view without artificial straight lines', () => {
     const detailPath = path.join(rootDir, 'src', 'pages', 'PropertyDetailPage.jsx');
     const content = fs.readFileSync(detailPath, 'utf8');
 
     assert.ok(content.includes('handleCenterPropertyOnMap'), 'Must provide handleCenterPropertyOnMap');
-    assert.ok(content.includes('handleFitRouteOnMap'), 'Must provide handleFitRouteOnMap');
-    assert.ok(content.includes('renderRouteOnMap'), 'Must provide renderRouteOnMap helper');
     assert.ok(content.includes('Property View'), 'Must render Property View button');
-    assert.ok(content.includes('Fit Route View'), 'Must render Fit Route View button');
+    assert.ok(!content.includes('Fit Route View'), 'Must not render Fit Route View button on map overlay');
   });
 
   it('4. Verifies App.jsx forwards navFilters and targetProperty in onNavigateMap callback', () => {

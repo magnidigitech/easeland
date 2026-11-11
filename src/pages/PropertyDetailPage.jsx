@@ -387,10 +387,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     }
   }, [user?.city, user?.location, user?.lat, user?.lng]);
 
-  // Render route on embedded Google Map
-  const renderRouteOnMap = (gMaps, map, uCoords, pCoords) => {
-    if (!gMaps || !map || !uCoords || !pCoords) return;
-
+  // Clear any existing route overlays
+  const renderRouteOnMap = () => {
     if (userMarkerRef.current) {
       try { userMarkerRef.current.setMap(null); } catch (e) {}
       userMarkerRef.current = null;
@@ -402,76 +400,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     if (directionsRendererRef.current) {
       try { directionsRendererRef.current.setMap(null); } catch (e) {}
       directionsRendererRef.current = null;
-    }
-
-    const userPos = { lat: Number(uCoords.lat), lng: Number(uCoords.lng) };
-    const propPos = { lat: Number(pCoords.lat), lng: Number(pCoords.lng) };
-
-    if (isNaN(userPos.lat) || isNaN(userPos.lng) || isNaN(propPos.lat) || isNaN(propPos.lng)) return;
-
-    // Create user marker
-    userMarkerRef.current = new gMaps.Marker({
-      position: userPos,
-      map: map,
-      title: `Your Location: ${userLocationName}`,
-      icon: {
-        path: gMaps.SymbolPath?.CIRCLE || 0,
-        scale: 7,
-        fillColor: '#2563eb',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2.5
-      }
-    });
-
-    if (gMaps.DirectionsService && gMaps.DirectionsRenderer) {
-      const directionsService = new gMaps.DirectionsService();
-      const directionsRenderer = new gMaps.DirectionsRenderer({
-        map: map,
-        suppressMarkers: true,
-        polylineOptions: {
-          strokeColor: '#2563eb',
-          strokeWeight: 4,
-          strokeOpacity: 0.85
-        }
-      });
-      directionsRendererRef.current = directionsRenderer;
-
-      directionsService.route(
-        {
-          origin: userPos,
-          destination: propPos,
-          travelMode: gMaps.TravelMode?.DRIVING || 'DRIVING'
-        },
-        (result, status) => {
-          if (status === (gMaps.DirectionsStatus?.OK || 'OK') && result) {
-            directionsRenderer.setDirections(result);
-            const leg = result.routes?.[0]?.legs?.[0];
-            if (leg) {
-              setDrivingDistanceText(leg.distance?.text || null);
-              setDrivingDurationText(leg.duration?.text || null);
-            }
-          } else {
-            routePolylineRef.current = new gMaps.Polyline({
-              path: [userPos, propPos],
-              geodesic: true,
-              strokeColor: '#2563eb',
-              strokeOpacity: 0.8,
-              strokeWeight: 3,
-              map: map
-            });
-          }
-        }
-      );
-    } else {
-      routePolylineRef.current = new gMaps.Polyline({
-        path: [userPos, propPos],
-        geodesic: true,
-        strokeColor: '#2563eb',
-        strokeOpacity: 0.8,
-        strokeWeight: 3,
-        map: map
-      });
     }
   };
 
@@ -501,11 +429,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
 
         googleMapRef.current = map;
         gMapsSdkRef.current = gMaps;
-
-        // Render user setup location pin and route on embedded Google Map
-        if (userCoords) {
-          renderRouteOnMap(gMaps, map, userCoords, mapPos);
-        }
 
         // Price-Tier Marker Palette (100% matched to UniversalMapEngine search map)
         const priceVal = Number(property.price) || 0;
@@ -589,13 +512,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
       });
   }, [property]);
 
-  // Re-render route on embedded map when coordinates change
-  useEffect(() => {
-    if (googleMapRef.current && gMapsSdkRef.current && propCoords && userCoords) {
-      renderRouteOnMap(gMapsSdkRef.current, googleMapRef.current, userCoords, propCoords);
-    }
-  }, [userCoords, propCoords]);
-
   // Map camera centering controls
   const handleCenterPropertyOnMap = () => {
     if (!googleMapRef.current || !propCoords) return;
@@ -604,12 +520,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   };
 
   const handleFitRouteOnMap = () => {
-    if (!googleMapRef.current || !gMapsSdkRef.current || !propCoords || !userCoords) return;
-    const gMaps = gMapsSdkRef.current;
-    const bounds = new gMaps.LatLngBounds();
-    bounds.extend({ lat: propCoords.lat, lng: propCoords.lng });
-    bounds.extend({ lat: userCoords.lat, lng: userCoords.lng });
-    googleMapRef.current.fitBounds(bounds, { padding: 60 });
+    handleCenterPropertyOnMap();
   };
 
   // Detect GPS live position from device
@@ -1169,12 +1080,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                       Approved Property Boundary
                     </span>
                   )}
-                  {distanceKm != null && (
-                    <span className="text-[11px] font-black bg-amber-50 text-amber-900 px-2.5 py-1 rounded-md border border-amber-200 flex items-center gap-1">
-                      <Car className="w-3.5 h-3.5 text-amber-700" />
-                      <span>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`} away</span>
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -1197,31 +1102,11 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                     <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Property View</span>
                   </button>
-
-                  {userCoords && (
-                    <button
-                      type="button"
-                      onClick={handleFitRouteOnMap}
-                      className="bg-white/95 hover:bg-white text-blue-700 text-[11px] font-extrabold px-3 py-1.5 rounded-lg shadow-md border border-blue-200 flex items-center gap-1.5 transition-all cursor-pointer backdrop-blur-xs"
-                      title="Show Route from User Location"
-                    >
-                      <Route className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Fit Route View</span>
-                    </button>
-                  )}
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-gray-500 font-semibold">
-                <div>
-                  📍 Pin indicates property location. {property.boundary ? 'Green polygon represents platform-approved property boundary.' : ''}
-                </div>
-                {userLocationName && (
-                  <div className="text-blue-700 font-bold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
-                    <span>Route mapped from {userLocationName}</span>
-                  </div>
-                )}
+              <div className="text-[11px] text-gray-500 font-semibold">
+                📍 Pin indicates property location. {property.boundary ? 'Green polygon represents platform-approved property boundary.' : ''}
               </div>
             </div>
 
@@ -1318,11 +1203,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           <span className="text-base font-extrabold text-emerald-700 truncate block">
             {property.priceDisplay}
           </span>
-          {distanceKm != null && (
-            <span className="text-[10px] font-black text-amber-700 block truncate">
-              📍 {distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`} away
-            </span>
-          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -1334,7 +1214,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
               else handleOpenEaselandMap();
             }}
             className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-xs px-2.5 py-2.5 rounded-xl border border-amber-300 shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-            title="View on Map & Distance"
+            title="View on Map"
           >
             <Compass className="w-4 h-4 text-amber-700 stroke-[2.5]" />
             <span>Map</span>
