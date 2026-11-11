@@ -344,120 +344,6 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     };
   }, [propertyId, user]);
 
-  // 2. Initialize Native Google Maps JS SDK
-  useEffect(() => {
-    if (!property || !mapContainerRef.current) return;
-
-    const coords = extractCoordinates(property);
-    const lat = Number(coords.lat);
-    const lng = Number(coords.lng);
-
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
-
-    loadGoogleMapsScript()
-      .then((gMaps) => {
-        const mapPos = { lat, lng };
-
-        // Create native Google Map
-        const map = new gMaps.Map(mapContainerRef.current, {
-          center: mapPos,
-          zoom: 17,
-          mapTypeId: gMaps.MapTypeId?.HYBRID || 'hybrid',
-          fullscreenControl: true,
-          streetViewControl: false,
-          zoomControl: true
-        });
-
-        googleMapRef.current = map;
-        gMapsSdkRef.current = gMaps;
-
-        // Render user setup location pin and route on embedded Google Map
-        if (userCoords) {
-          renderRouteOnMap(gMaps, map, userCoords, mapPos);
-        }
-
-        // Price-Tier Marker Palette (100% matched to UniversalMapEngine search map)
-        const priceVal = Number(property.price) || 0;
-        let markerColor = '#10b981'; // Emerald Green
-        let strokeColor = '#047857';
-
-        if (priceVal > 15000000) {
-          markerColor = '#0B2545';  // Navy Blue (Luxury)
-          strokeColor = '#F4C542';  // Gold Border
-        } else if (priceVal > 6000000) {
-          markerColor = '#F4C542';  // Amber Gold
-          strokeColor = '#B48B1B';
-        } else if (priceVal > 3000000) {
-          markerColor = '#7c3aed';  // Deep Violet / Purple
-          strokeColor = '#5b21b6';
-        }
-
-        // Add Property Location Marker Pin matching user's exact teardrop pin specification
-        const pinSvgDataUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48">
-            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.4"/>
-            </filter>
-            <g filter="url(#shadow)">
-              <path d="M 20 2 C 11.16 2 4 9.16 4 18 C 4 29 20 46 20 46 C 20 46 36 29 36 18 C 36 9.16 28.84 2 20 2 Z" fill="${markerColor}" stroke="${strokeColor}" stroke-width="1.8"/>
-              <circle cx="20" cy="17.5" r="7" fill="#ffffff"/>
-            </g>
-          </svg>
-        `);
-
-        new gMaps.Marker({
-          position: mapPos,
-          map: map,
-          title: property.title,
-          icon: {
-            url: pinSvgDataUrl,
-            scaledSize: new gMaps.Size(38, 45.6),
-            anchor: new gMaps.Point(19, 44)
-          }
-        });
-
-        // Add Plot Boundary Polygon if present
-        const formattedPoly = extractBoundaryPolygon(property);
-        if (formattedPoly && formattedPoly.length >= 3) {
-          const polyCoords = formattedPoly.map(pt => ({ lat: Number(pt[0]), lng: Number(pt[1]) }));
-
-          const polygon = new gMaps.Polygon({
-            paths: polyCoords,
-            strokeColor: '#D4A017',
-            strokeOpacity: 0.95,
-            strokeWeight: 3,
-            fillColor: '#F4C542',
-            fillOpacity: 0.35,
-            map: map
-          });
-
-          // Fit map bounds precisely to plot boundary
-          const bounds = new gMaps.LatLngBounds();
-          polyCoords.forEach(c => bounds.extend(c));
-          map.fitBounds(bounds, { padding: 40 });
-        }
-
-        // Fetch Google Places Nearby Infrastructure automatically
-        setNearbyLoading(true);
-        fetchRealNearbyPlacesFromGoogle(gMaps, map, mapPos, property)
-          .then(places => {
-            setNearbyPlaces(places);
-          })
-          .catch(err => {
-            console.warn('Google Places load error:', err);
-            setNearbyPlaces([]);
-          })
-          .finally(() => {
-            setNearbyLoading(false);
-          });
-      })
-      .catch(err => {
-        console.warn('Google Maps JS SDK load error on detail page:', err);
-        setNearbyLoading(false);
-        setNearbyPlaces([]);
-      });
-  }, [property]);
-
   // Property coordinates extraction
   const propCoords = useMemo(() => {
     if (!property) return null;
@@ -588,6 +474,120 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
       });
     }
   };
+
+  // 2. Initialize Native Google Maps JS SDK
+  useEffect(() => {
+    if (!property || !mapContainerRef.current) return;
+
+    const coords = extractCoordinates(property);
+    const lat = Number(coords.lat);
+    const lng = Number(coords.lng);
+
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+
+    loadGoogleMapsScript()
+      .then((gMaps) => {
+        const mapPos = { lat, lng };
+
+        // Create native Google Map
+        const map = new gMaps.Map(mapContainerRef.current, {
+          center: mapPos,
+          zoom: 17,
+          mapTypeId: gMaps.MapTypeId?.HYBRID || 'hybrid',
+          fullscreenControl: true,
+          streetViewControl: false,
+          zoomControl: true
+        });
+
+        googleMapRef.current = map;
+        gMapsSdkRef.current = gMaps;
+
+        // Render user setup location pin and route on embedded Google Map
+        if (userCoords) {
+          renderRouteOnMap(gMaps, map, userCoords, mapPos);
+        }
+
+        // Price-Tier Marker Palette (100% matched to UniversalMapEngine search map)
+        const priceVal = Number(property.price) || 0;
+        let markerColor = '#10b981'; // Emerald Green
+        let strokeColor = '#047857';
+
+        if (priceVal > 15000000) {
+          markerColor = '#0B2545';  // Navy Blue (Luxury)
+          strokeColor = '#F4C542';  // Gold Border
+        } else if (priceVal > 6000000) {
+          markerColor = '#F4C542';  // Amber Gold
+          strokeColor = '#B48B1B';
+        } else if (priceVal > 3000000) {
+          markerColor = '#7c3aed';  // Deep Violet / Purple
+          strokeColor = '#5b21b6';
+        }
+
+        // Add Property Location Marker Pin matching user's exact teardrop pin specification
+        const pinSvgDataUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48">
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.4"/>
+            </filter>
+            <g filter="url(#shadow)">
+              <path d="M 20 2 C 11.16 2 4 9.16 4 18 C 4 29 20 46 20 46 C 20 46 36 29 36 18 C 36 9.16 28.84 2 20 2 Z" fill="${markerColor}" stroke="${strokeColor}" stroke-width="1.8"/>
+              <circle cx="20" cy="17.5" r="7" fill="#ffffff"/>
+            </g>
+          </svg>
+        `);
+
+        new gMaps.Marker({
+          position: mapPos,
+          map: map,
+          title: property.title,
+          icon: {
+            url: pinSvgDataUrl,
+            scaledSize: new gMaps.Size(38, 45.6),
+            anchor: new gMaps.Point(19, 44)
+          }
+        });
+
+        // Add Plot Boundary Polygon if present
+        const formattedPoly = extractBoundaryPolygon(property);
+        if (formattedPoly && formattedPoly.length >= 3) {
+          const polyCoords = formattedPoly.map(pt => ({ lat: Number(pt[0]), lng: Number(pt[1]) }));
+
+          const polygon = new gMaps.Polygon({
+            paths: polyCoords,
+            strokeColor: '#D4A017',
+            strokeOpacity: 0.95,
+            strokeWeight: 3,
+            fillColor: '#F4C542',
+            fillOpacity: 0.35,
+            map: map
+          });
+
+          // Fit map bounds precisely to plot boundary
+          const bounds = new gMaps.LatLngBounds();
+          polyCoords.forEach(c => bounds.extend(c));
+          map.fitBounds(bounds, { padding: 40 });
+        }
+
+        // Fetch Google Places Nearby Infrastructure automatically
+        setNearbyLoading(true);
+        fetchRealNearbyPlacesFromGoogle(gMaps, map, mapPos, property)
+          .then(places => {
+            setNearbyPlaces(places);
+          })
+          .catch(err => {
+            console.warn('Google Places load error:', err);
+            setNearbyPlaces([]);
+          })
+          .finally(() => {
+            setNearbyLoading(false);
+          });
+      })
+      .catch(err => {
+        console.warn('Google Maps JS SDK load error on detail page:', err);
+        setNearbyLoading(false);
+        setNearbyPlaces([]);
+      });
+  }, [property]);
 
   // Re-render route on embedded map when coordinates change
   useEffect(() => {

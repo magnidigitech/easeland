@@ -43,6 +43,30 @@ export default function PropertiesSearchPage({
     return createDefaultFilterState(fromUrl);
   });
 
+  // 2. Query Results & Pagination State
+  const [properties, setProperties] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastDocStack, setLastDocStack] = useState([]);
+  const [currentLastDoc, setCurrentLastDoc] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [disclosureMsg, setDisclosureMsg] = useState(null);
+  const [candidateLimitReached, setCandidateLimitReached] = useState(false);
+  const [sortCheck, setSortCheck] = useState({ compatible: true });
+  const [candidateProperties, setCandidateProperties] = useState([]);
+  const [priceBounds, setPriceBounds] = useState(null);
+
+  // 3. Wishlist State
+  const [wishlistSet, setWishlistSet] = useState(new Set());
+  const [wishlistNotice, setWishlistNotice] = useState(null);
+
+  // 4. UI View Mode (Responsive Split vs Mobile Toggle)
+  const [viewMode, setViewMode] = useState('list'); // 'split', 'list', 'map'
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [focusedProperty, setFocusedProperty] = useState(null);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+
   // Keep searchState synchronized whenever initialFilters updates
   useEffect(() => {
     if (initialFilters) {
@@ -67,30 +91,6 @@ export default function PropertiesSearchPage({
       }
     }
   }, [initialFilters?.focusedProperty, initialFilters?.focusedPropertyId, properties]);
-
-  // 2. Query Results & Pagination State
-  const [properties, setProperties] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [lastDocStack, setLastDocStack] = useState([]);
-  const [currentLastDoc, setCurrentLastDoc] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [disclosureMsg, setDisclosureMsg] = useState(null);
-  const [candidateLimitReached, setCandidateLimitReached] = useState(false);
-  const [sortCheck, setSortCheck] = useState({ compatible: true });
-  const [candidateProperties, setCandidateProperties] = useState([]);
-  const [priceBounds, setPriceBounds] = useState(null);
-
-  // 3. Wishlist State
-  const [wishlistSet, setWishlistSet] = useState(new Set());
-  const [wishlistNotice, setWishlistNotice] = useState(null);
-
-  // 4. UI View Mode (Responsive Split vs Mobile Toggle)
-  const [viewMode, setViewMode] = useState('list'); // 'split', 'list', 'map'
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [focusedProperty, setFocusedProperty] = useState(null);
-  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
 
   // Synchronize viewMode whenever isSidePanelOpen changes
   useEffect(() => {
