@@ -941,7 +941,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
         </div>
 
         {/* TWO COLUMN GRID CONTENT */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-4 lg:pb-8">
           
           {/* LEFT 2 COLUMNS: VERIFIED INFO, SPECS, AMENITIES, NEARBY, DESCRIPTION */}
           <div className="lg:col-span-2 space-y-8">
@@ -1139,8 +1139,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           </div>
 
           {/* RIGHT COLUMN: DIRECT OWNER ENQUIRY CTA FORM */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg sticky top-28 space-y-5">
+          <div className="lg:col-span-1 relative">
+            <div className="bg-white rounded-2xl p-6 border border-brand-bordergray shadow-lg lg:sticky lg:top-28 space-y-5 z-20">
               
               {/* EASELAND SUPPORT CARD */}
               <div className="flex items-center gap-3 pb-4 border-b border-gray-100">

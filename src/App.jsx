@@ -879,7 +879,7 @@ export default function App() {
   }));
 
   return (
-    <div className={'bg-brand-offwhite text-brand-charcoal font-sans flex flex-col w-full max-w-full overflow-x-hidden ' + (
+    <div className={'bg-brand-offwhite text-brand-charcoal font-sans flex flex-col w-full max-w-full overflow-x-clip ' + (
       (activePage === 'map' || activePage === 'properties') ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : `min-h-screen ${isHighEndEdgeDevice ? 'pb-20' : 'pb-16'} md:pb-0`
     )}>
       

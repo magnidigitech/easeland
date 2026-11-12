@@ -26,15 +26,21 @@
 @layer base {
 
   html,
-  body,
+  body {
+    min-height: 100dvh;
+    max-width: 100dvw;
+    width: 100%;
+    overflow-x: clip;
+    touch-action: pan-x pan-y;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   #root {
     min-height: 100dvh;
     max-width: 100dvw;
     width: 100%;
-    overflow-x: hidden;
-    touch-action: pan-x pan-y;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+    overflow-x: clip;
   }
 
   /* Dedicated zoomable surfaces: Map engines and Property media */
