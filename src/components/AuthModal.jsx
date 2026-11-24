@@ -53,7 +53,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
   const [loading, setLoading] = useState(false);
 
   // Forgot Password States
-  const [forgotMethod, setForgotMethod] = useState('mobile'); // 'mobile' | 'email'
+  const [forgotMethod, setForgotMethod] = useState('email'); // 'email'
   const [forgotPhone, setForgotPhone] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
   const [isForgotOtpSent, setIsForgotOtpSent] = useState(false);
@@ -563,43 +563,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
           </p>
         </div>
 
-        {/* PRIMARY TOP TABS: ONLY 2 TABS - LOG IN & REGISTER */}
-        <div className="grid grid-cols-2 border-b border-gray-200 bg-slate-100 p-1.5 gap-1.5 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('login');
-              setError(null);
-              setSuccessMessage(null);
-            }}
-            className={`py-2.5 px-3 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              mode === 'login' || mode === 'forgot'
-                ? 'bg-brand-charcoal text-amber-400 shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Lock className="w-4 h-4" />
-            <span>Log In</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setMode('register');
-              setError(null);
-              setSuccessMessage(null);
-            }}
-            className={`py-2.5 px-3 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              mode === 'register'
-                ? 'bg-brand-charcoal text-amber-400 shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>Register</span>
-          </button>
-        </div>
-
         {/* TAB BODY */}
         {mode === 'forgot' ? (
           <div className="p-5 sm:p-6 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
@@ -621,45 +584,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Account Recovery</span>
               </div>
 
-              {/* RECOVERY METHOD TABS */}
-              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold gap-1 mb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotMethod('mobile');
-                    setIsForgotOtpSent(false);
-                    setForgotOtp('');
-                    setError(null);
-                    setSuccessMessage(null);
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-lg font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    forgotMethod === 'mobile'
-                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Smartphone className="w-4 h-4 text-amber-500" />
-                  <span>Reset via Mobile OTP</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotMethod('email');
-                    setError(null);
-                    setSuccessMessage(null);
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-lg font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    forgotMethod === 'email'
-                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Mail className="w-4 h-4 text-blue-600" />
-                  <span>Reset via Email</span>
-                </button>
-              </div>
-
               {/* ALERTS */}
               {error && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
@@ -675,250 +599,45 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 </div>
               )}
 
-              {/* METHOD 1: MOBILE OTP RESET */}
-              {forgotMethod === 'mobile' ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!isForgotOtpSent) {
-                      handleSendForgotMobileOtp();
-                    } else {
-                      handleResetPasswordWithOtp(e);
-                    }
-                  }}
-                  className="space-y-3.5"
-                >
-                  {!isForgotOtpSent ? (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Registered Mobile Number
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-xs font-black text-slate-800 select-none shrink-0">
-                          <span className="text-sm">🇮🇳</span>
-                          <span>+91</span>
-                        </div>
-                        <div className="relative flex-1">
-                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input
-                            type="tel"
-                            required
-                            maxLength={10}
-                            placeholder="Enter 10-digit mobile number"
-                            value={forgotPhone || mobileNumber}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '');
-                              setForgotPhone(val);
-                              setMobileNumber(val);
-                            }}
-                            className="w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none tracking-wider"
-                            autoFocus
-                          />
-                        </div>
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-1.5 font-medium">
-                        We will send a 6-digit verification code to reset your account password.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-slate-700">Enter OTP Verification Code</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsForgotOtpSent(false);
-                              setForgotOtp('');
-                              setError(null);
-                            }}
-                            className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
-                          >
-                            Change Number
-                          </button>
-                        </div>
-
-                        <div className="text-xs text-gray-600 mb-2 bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 flex items-center justify-between">
-                          <span>
-                            Sent to: <strong>+91 {forgotPhone || mobileNumber}</strong>
-                          </span>
-                          {forgotTestOtp && (
-                            <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-md">
-                              Dev OTP: {forgotTestOtp}
-                            </span>
-                          )}
-                        </div>
-
-                        <input
-                          type="text"
-                          required
-                          maxLength={6}
-                          placeholder="Enter 6-digit OTP"
-                          value={forgotOtp}
-                          onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
-                          className="w-full text-center tracking-[0.4em] py-2.5 bg-gray-50 border-2 border-amber-400 rounded-xl text-lg font-black text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                          autoFocus
-                        />
-
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                          <span>Did not receive code?</span>
-                          {forgotOtpTimer > 0 ? (
-                            <span className="font-semibold text-gray-400">Resend in {forgotOtpTimer}s</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleSendForgotMobileOtp}
-                              className="font-extrabold text-amber-600 hover:text-amber-800 underline flex items-center gap-1 cursor-pointer"
-                            >
-                              <RefreshCw className="w-3 h-3" /> Resend OTP
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* NEW PASSWORD */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
-                        <div className="relative">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input
-                            type={showForgotNewPassword ? 'text' : 'password'}
-                            required
-                            placeholder="Enter new strong password"
-                            value={forgotNewPassword}
-                            onChange={(e) => setForgotNewPassword(e.target.value)}
-                            className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                            title={showForgotNewPassword ? 'Hide password' : 'Show password'}
-                          >
-                            {showForgotNewPassword ? <EyeOff className="w-4 h-4 text-slate-700" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* CONFIRM NEW PASSWORD */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
-                        <div className="relative">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input
-                            type={showForgotConfirmPassword ? 'text' : 'password'}
-                            required
-                            placeholder="Confirm your new password"
-                            value={forgotConfirmPassword}
-                            onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                            className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                            title={showForgotConfirmPassword ? 'Hide password' : 'Show password'}
-                          >
-                            {showForgotConfirmPassword ? <EyeOff className="w-4 h-4 text-slate-700" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* PASSWORD REQUIREMENTS CHECKLIST */}
-                      <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-1 text-[11px]">
-                        <span className="font-extrabold text-gray-500 block uppercase tracking-wider text-[10px]">
-                          Password Requirements:
-                        </span>
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                          <div className={`flex items-center gap-1.5 font-bold ${forgotPassLengthValid ? 'text-emerald-700' : 'text-gray-400'}`}>
-                            <Check className={`w-3 h-3 ${forgotPassLengthValid ? 'text-emerald-600' : 'text-gray-300'}`} />
-                            <span>8+ Characters</span>
-                          </div>
-                          <div className={`flex items-center gap-1.5 font-bold ${forgotPassUpperValid ? 'text-emerald-700' : 'text-gray-400'}`}>
-                            <Check className={`w-3 h-3 ${forgotPassUpperValid ? 'text-emerald-600' : 'text-gray-300'}`} />
-                            <span>1 Capital (A-Z)</span>
-                          </div>
-                          <div className={`flex items-center gap-1.5 font-bold ${forgotPassLowerValid ? 'text-emerald-700' : 'text-gray-400'}`}>
-                            <Check className={`w-3 h-3 ${forgotPassLowerValid ? 'text-emerald-600' : 'text-gray-300'}`} />
-                            <span>1 Small (a-z)</span>
-                          </div>
-                          <div className={`flex items-center gap-1.5 font-bold ${forgotPassDigitValid ? 'text-emerald-700' : 'text-gray-400'}`}>
-                            <Check className={`w-3 h-3 ${forgotPassDigitValid ? 'text-emerald-600' : 'text-gray-300'}`} />
-                            <span>1 Digit (0-9)</span>
-                          </div>
-                          <div className={`flex items-center gap-1.5 font-bold col-span-2 ${forgotPassSymbolValid ? 'text-emerald-700' : 'text-gray-400'}`}>
-                            <Check className={`w-3 h-3 ${forgotPassSymbolValid ? 'text-emerald-600' : 'text-gray-300'}`} />
-                            <span>1 Special Symbol (!@#...)</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all mt-2 cursor-pointer disabled:opacity-60"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                        <span>Processing...</span>
-                      </>
-                    ) : !isForgotOtpSent ? (
-                      <>
-                        <span>Send Verification OTP</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    ) : (
-                      <>
-                        <span>Reset Password & Log In</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              ) : (
-                /* METHOD 2: EMAIL RESET LINK */
-                <form onSubmit={handleSendForgotEmail} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Registered Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="email"
-                        required
-                        placeholder="Enter your registered email address"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                        autoFocus
-                      />
-                    </div>
-                    <p className="text-[11px] text-gray-500 mt-1.5 font-medium">
-                      We will send an email with secure instructions to reset your password.
-                    </p>
+              {/* EMAIL RESET LINK FORM */}
+              <form onSubmit={handleSendForgotEmail} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Registered Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="Enter your registered email address"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                      autoFocus
+                    />
                   </div>
+                  <p className="text-[11px] text-gray-500 mt-1.5 font-medium">
+                    We will send an email with secure instructions to reset your password.
+                  </p>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                        <span>Sending Instructions...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Send Password Reset Link</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Sending Instructions...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send Password Reset Link</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
 
             <div className="text-xs text-gray-500 font-medium text-center pt-3 mt-1 border-t border-gray-100">
@@ -1055,8 +774,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                             type="button"
                             onClick={() => {
                               setMode('forgot');
-                              setForgotMethod('mobile');
-                              setForgotPhone(mobileNumber);
                               setError(null);
                               setSuccessMessage(null);
                             }}
@@ -1281,7 +998,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                             type="button"
                             onClick={() => {
                               setMode('forgot');
-                              setForgotMethod('email');
                               setError(null);
                               setSuccessMessage(null);
                             }}
@@ -1415,8 +1131,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                       type="button"
                       onClick={() => {
                         setMode('forgot');
-                        setForgotMethod(authMethod);
-                        setForgotPhone(mobileNumber);
                         setError(null);
                         setSuccessMessage(null);
                       }}
