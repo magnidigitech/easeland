@@ -13,9 +13,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  Smartphone,
-  Loader2,
-  RefreshCw
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TwoFactorModal from './TwoFactorModal';
@@ -35,7 +33,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
   } = useAuth();
 
   // Top-level Auth Method: 'mobile' (Default) or 'email'
-  const [authMethod, setAuthMethod] = useState('mobile');
+  const [authMethod, setAuthMethod] = useState('email');
 
   // Mobile OTP States
   const [mobileNumber, setMobileNumber] = useState('');
@@ -519,7 +517,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in">
       <div
         className={`bg-white w-full ${
-          authMethod === 'email' && mode === 'register' ? 'max-w-lg' : 'max-w-md'
+          mode === 'register' ? 'max-w-lg' : 'max-w-md'
         } rounded-t-3xl sm:rounded-2xl shadow-2xl border border-brand-bordergray overflow-hidden transition-all duration-200 max-h-[92dvh] sm:max-h-[90vh] flex flex-col`}
       >
         {/* MODAL HEADER */}
@@ -658,45 +656,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         ) : (
           <div className="p-5 sm:p-6 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
             <div>
-              {/* SUB-METHOD TOGGLE: MOBILE OTP vs EMAIL & PASSWORD */}
-              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold gap-1 mb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMethod('mobile');
-                    setIsOtpSent(false);
-                    setOtpCode('');
-                    setError(null);
-                    setSuccessMessage(null);
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-lg font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    authMethod === 'mobile'
-                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Smartphone className="w-4 h-4 text-amber-500" />
-                  <span>Mobile OTP</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMethod('email');
-                    setError(null);
-                    setSuccessMessage(null);
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-lg font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    authMethod === 'email'
-                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Mail className="w-4 h-4 text-blue-600" />
-                  <span>Email & Password</span>
-                </button>
-              </div>
-
               {/* ALERTS */}
               {error && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
@@ -712,160 +671,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 </div>
               )}
 
-              {/* 1. MOBILE OTP FORM */}
-              {authMethod === 'mobile' ? (
-                <form onSubmit={handleMobileFormSubmit} className="space-y-3.5">
-                  {!isOtpSent ? (
-                    <>
-                      {mode === 'register' && (
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            Full Name
-                          </label>
-                          <div className="relative">
-                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input
-                              type="text"
-                              required
-                              placeholder="Enter your full name"
-                              value={formData.name}
-                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                              className="w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
-                              autoFocus
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Mobile Number (10 Digits)
-                        </label>
-                        <div className="flex gap-2">
-                          <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-xs font-black text-slate-800 select-none shrink-0">
-                            <span className="text-sm">🇮🇳</span>
-                            <span>+91</span>
-                          </div>
-                          <div className="relative flex-1">
-                            <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input
-                              type="tel"
-                              required
-                              maxLength={10}
-                              placeholder="Enter 10-digit mobile number"
-                              value={mobileNumber}
-                              onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
-                              className="w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none tracking-wider"
-                              autoFocus={mode === 'login'}
-                            />
-                          </div>
-                        </div>
-                        <p className="text-[11px] text-gray-500 mt-1.5 font-medium">
-                          {mode === 'register'
-                            ? "We will send a 6-digit OTP code to verify your phone number and create your account."
-                            : "We will send a 6-digit OTP code to instantly log into your account."}
-                        </p>
-                      </div>
-
-                      {mode === 'login' && (
-                        <div className="flex items-center justify-between text-xs pt-0.5 px-0.5">
-                          <span className="text-gray-500 font-medium">Forgot account password?</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMode('forgot');
-                              setError(null);
-                              setSuccessMessage(null);
-                            }}
-                            className="font-extrabold text-amber-600 hover:text-amber-800 underline cursor-pointer"
-                          >
-                            Reset Password
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-700">Enter Verification Code (OTP)</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsOtpSent(false);
-                            setOtpCode('');
-                            setError(null);
-                          }}
-                          className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
-                        >
-                          Change Number
-                        </button>
-                      </div>
-
-                      <div className="text-xs text-gray-600 mb-2.5 bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 flex items-center justify-between">
-                        <span>
-                          Sent to: <strong>+91 {mobileNumber}</strong>
-                        </span>
-                        {testOtpCode && (
-                          <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-md">
-                            Dev OTP: {testOtpCode}
-                          </span>
-                        )}
-                      </div>
-
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        placeholder="Enter 6-digit OTP"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                        className="w-full text-center tracking-[0.4em] py-3 bg-gray-50 border-2 border-amber-400 rounded-xl text-lg font-black text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                        autoFocus
-                      />
-
-                      <div className="flex items-center justify-between mt-2.5 text-xs text-gray-500">
-                        <span>Did not receive code?</span>
-                        {otpTimer > 0 ? (
-                          <span className="font-semibold text-gray-400">Resend in {otpTimer}s</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleSendMobileOtp}
-                            className="font-extrabold text-amber-600 hover:text-amber-800 underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Resend OTP
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all mt-1 cursor-pointer disabled:opacity-60"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                        <span>Processing...</span>
-                      </>
-                    ) : !isOtpSent ? (
-                      <>
-                        <span>Send OTP Code</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    ) : (
-                      <>
-                        <span>{mode === 'register' ? 'Verify & Create Account' : 'Verify OTP & Log In'}</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              ) : (
-                /* 2. EMAIL & PASSWORD FORM */
-                <form onSubmit={handleEmailSubmit} className="space-y-3">
+              {/* EMAIL & PASSWORD FORM */}
+              <form onSubmit={handleEmailSubmit} className="space-y-3">
                   {mode === 'register' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {/* FULL NAME */}
@@ -1078,7 +885,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     )}
                   </button>
                 </form>
-              )}
 
               {/* DIVIDER: OR CONTINUE WITH */}
               <div className="relative my-3">
