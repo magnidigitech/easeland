@@ -9,7 +9,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
-  signInAnonymously
+  signInAnonymously,
+  signInWithCustomToken
 } from 'firebase/auth';
 import { auth } from './config.js';
 import { createUserProfile, syncUserToPostgres } from './userService.js';
@@ -380,4 +381,87 @@ export async function resetPasswordWithMobileOtp(rawPhone, otpCode, newPassword)
     success: true,
     message: 'Password reset successfully! You can now log in with your new password.'
   };
+}
+
+/**
+ * Set or Update User 4-digit MPIN
+ */
+export async function setMpin({ uid, email, mpin }) {
+  try {
+    const res = await fetch('/api/auth/mpin/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, email, mpin })
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('setMpin failed:', err);
+    return { success: false, error: err.message || 'Failed to connect to server.' };
+  }
+}
+
+/**
+ * Verify MPIN and log into Firebase session via customToken
+ */
+export async function verifyMpin({ uid, email, mpin }) {
+  try {
+    const res = await fetch('/api/auth/mpin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, email, mpin })
+    });
+    const data = await res.json();
+
+    if (data && data.success) {
+      if (data.customToken) {
+        try {
+          const cred = await signInWithCustomToken(auth, data.customToken);
+          return { success: true, user: cred.user };
+        } catch (authErr) {
+          console.warn('Firebase customToken sign-in note:', authErr.message);
+        }
+      }
+      return { success: true, user: data.user };
+    }
+
+    return {
+      success: false,
+      error: data?.error || 'Invalid MPIN',
+      locked: Boolean(data?.locked),
+      remainingAttempts: data?.remainingAttempts
+    };
+  } catch (err) {
+    console.error('verifyMpin failed:', err);
+    return { success: false, error: err.message || 'Failed to connect to server.' };
+  }
+}
+
+/**
+ * Remove MPIN for account
+ */
+export async function removeMpin({ uid, email }) {
+  try {
+    const res = await fetch('/api/auth/mpin/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, email })
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to remove MPIN.' };
+  }
+}
+
+/**
+ * Check whether account has MPIN set
+ */
+export async function checkMpinStatus({ uid, email }) {
+  try {
+    const query = uid ? '?uid=' + encodeURIComponent(uid) : '?email=' + encodeURIComponent(email);
+    const res = await fetch('/api/auth/mpin/status' + query);
+    return await res.json();
+  } catch (err) {
+    return { success: false, hasMpin: false };
+  }
 }

@@ -18,6 +18,12 @@ import {
 import { useAuth } from '../context/AuthContext';
 import TwoFactorModal from './TwoFactorModal';
 import { trackRegistrationComplete } from '../utils/metaPixel.js';
+import {
+  validateMpinSafety,
+  getTrustedMpinUser,
+  clearTrustedMpinUser,
+  saveTrustedMpinUser
+} from '../utils/mpinDeviceStorage.js';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialIntent = null }) {
   const {
@@ -29,7 +35,9 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     sendMobileOtp,
     loginWithMobile,
     updateProfileData,
-    checkAccountExists
+    checkAccountExists,
+    verifyMpin,
+    setMpin
   } = useAuth();
 
   // Top-level Auth Method: 'mobile' (Default) or 'email'
@@ -45,10 +53,27 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
   // Email Auth States
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [pending2FAData, setPending2FAData] = useState(null);
-  const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot'
+  const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot', 'setup-mpin'
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // MPIN States
+  const [trustedUser, setTrustedUser] = useState(() => getTrustedMpinUser());
+  const [mpinInput, setMpinInput] = useState('');
+  const [usePasswordLogin, setUsePasswordLogin] = useState(false);
+  const [newMpin, setNewMpin] = useState('');
+  const [confirmMpin, setConfirmMpin] = useState('');
+  const [mpinPostLoginUser, setMpinPostLoginUser] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const saved = getTrustedMpinUser();
+      setTrustedUser(saved);
+      setMpinInput('');
+      setUsePasswordLogin(false);
+    }
+  }, [isOpen]);
 
   // Forgot Password States
   const [forgotMethod, setForgotMethod] = useState('email'); // 'email'
@@ -125,6 +150,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     forgotPassLowerValid &&
     forgotPassDigitValid &&
     forgotPassSymbolValid;
+
+  // Live MPIN Safety Validation Checks
+  const mpinSafetyResult = validateMpinSafety(newMpin);
+  const mpinSafetyChecks = mpinSafetyResult.checks;
 
   // Mobile OTP: Request Code
   const handleSendMobileOtp = async () => {
@@ -493,8 +522,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       }
 
       trackRegistrationComplete('email');
-      if (onAuthSuccess) onAuthSuccess(result.user, initialIntent);
-      onClose();
+      saveTrustedMpinUser({
+        uid: result.user.uid,
+        email: cleanEmail,
+        displayName: formData.name.trim() || 'EaseLand Member'
+      });
+      setMpinPostLoginUser(result.user);
+      setMode('setup-mpin');
+      return;
     } else {
       const result = await loginUser(formData.email.trim(), formData.password);
       setLoading(false);
@@ -508,8 +543,86 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         return;
       }
 
+      saveTrustedMpinUser({
+        uid: result.user.uid,
+        email: formData.email.trim(),
+        displayName: result.user.displayName || 'EaseLand Member'
+      });
       if (onAuthSuccess) onAuthSuccess(result.user, initialIntent);
       onClose();
+    }
+  };
+
+  const handleMpinLogin = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!mpinInput || mpinInput.length !== 4) {
+      setError('Please enter your 4-digit MPIN.');
+      return;
+    }
+    if (!trustedUser) {
+      setError('No saved account found on this device. Please log in with password.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await verifyMpin({
+        uid: trustedUser.uid,
+        email: trustedUser.email,
+        mpin: mpinInput
+      });
+
+      setLoading(false);
+      if (res && res.success) {
+        setSuccessMessage('MPIN verified! Welcome back.');
+        setTimeout(() => {
+          if (onAuthSuccess) onAuthSuccess(res.user || trustedUser, initialIntent);
+          onClose();
+        }, 500);
+      } else {
+        setError(res?.error || 'Incorrect MPIN. Please try again.');
+        setMpinInput('');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError(err?.message || 'Failed to verify MPIN.');
+    }
+  };
+
+  const handleSetMpinSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const safety = validateMpinSafety(newMpin);
+    if (!safety.valid) {
+      setError(safety.error);
+      return;
+    }
+    if (newMpin !== confirmMpin) {
+      setError('Confirm MPIN does not match.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await setMpin(newMpin);
+      setLoading(false);
+      if (res && res.success) {
+        setSuccessMessage('4-digit MPIN created successfully!');
+        setTimeout(() => {
+          if (onAuthSuccess && mpinPostLoginUser) {
+            onAuthSuccess(mpinPostLoginUser, initialIntent);
+          }
+          onClose();
+        }, 600);
+      } else {
+        setError(res?.error || 'Failed to set MPIN.');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError(err?.message || 'Failed to set MPIN.');
     }
   };
 
@@ -546,17 +659,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
           </div>
 
           <h3 className="text-base sm:text-lg font-bold text-white">
-            {mode === 'forgot'
+            {mode === 'setup-mpin'
+              ? 'Create Fast-Login MPIN'
+              : mode === 'forgot'
               ? 'Reset Your Password'
               : mode === 'register'
               ? 'Create Your EaseLand Account'
+              : (trustedUser && !usePasswordLogin)
+              ? ('Welcome back, ' + (trustedUser.displayName || 'Member'))
               : 'Log In to EaseLand'}
           </h3>
           <p className="text-xs text-gray-300 mt-0.5 font-medium">
-            {initialIntent === 'post-property'
+            {mode === 'setup-mpin'
+              ? 'Set a 4-digit PIN for quick, secure access on this browser.'
+              : initialIntent === 'post-property'
               ? 'Please log in or sign up to post and manage your property listing.'
               : mode === 'register'
               ? 'Join thousands of buyers, sellers, and agents across India.'
+              : (trustedUser && !usePasswordLogin)
+              ? 'Enter your 4-digit MPIN to quickly unlock your account.'
               : 'Welcome back! Access your properties, wishlist, and leads.'}
           </p>
         </div>
@@ -651,6 +772,265 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
               >
                 Log In Here
               </button>
+            </div>
+          </div>
+        ) : mode === 'setup-mpin' ? (
+          <div className="p-5 sm:p-6 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
+            <div>
+              {/* ALERTS */}
+              {error && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-start gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSetMpinSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Enter 4-Digit MPIN
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      required
+                      maxLength={4}
+                      placeholder="••••"
+                      value={newMpin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setNewMpin(val);
+                      }}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-center text-lg font-black tracking-[0.5em] text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                {/* MPIN SAFETY CHECKLIST */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-slate-600 text-[11px] uppercase tracking-wider">
+                      PIN Security Rules
+                    </span>
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
+                      YonoSBI Standard
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                    <div className={'flex items-center gap-1.5 text-[11px] font-bold ' + (mpinSafetyChecks.is4Digits ? 'text-emerald-700' : 'text-gray-400')}>
+                      <Check className={'w-3.5 h-3.5 ' + (mpinSafetyChecks.is4Digits ? 'text-emerald-600' : 'text-gray-300')} />
+                      <span>Exactly 4 digits</span>
+                    </div>
+                    <div className={'flex items-center gap-1.5 text-[11px] font-bold ' + (mpinSafetyChecks.notRepetitive ? 'text-emerald-700' : 'text-gray-400')}>
+                      <Check className={'w-3.5 h-3.5 ' + (mpinSafetyChecks.notRepetitive ? 'text-emerald-600' : 'text-gray-300')} />
+                      <span>No repeating digits (1111)</span>
+                    </div>
+                    <div className={'flex items-center gap-1.5 text-[11px] font-bold ' + (mpinSafetyChecks.notSequential ? 'text-emerald-700' : 'text-gray-400')}>
+                      <Check className={'w-3.5 h-3.5 ' + (mpinSafetyChecks.notSequential ? 'text-emerald-600' : 'text-gray-300')} />
+                      <span>No sequences (1234, 4321)</span>
+                    </div>
+                    <div className={'flex items-center gap-1.5 text-[11px] font-bold ' + (mpinSafetyChecks.notPattern ? 'text-emerald-700' : 'text-gray-400')}>
+                      <Check className={'w-3.5 h-3.5 ' + (mpinSafetyChecks.notPattern ? 'text-emerald-600' : 'text-gray-300')} />
+                      <span>No common patterns (2580)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Confirm 4-Digit MPIN
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      required
+                      maxLength={4}
+                      placeholder="••••"
+                      value={confirmMpin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setConfirmMpin(val);
+                      }}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-center text-lg font-black tracking-[0.5em] text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  {confirmMpin && confirmMpin.length === 4 && newMpin !== confirmMpin && (
+                    <p className="text-[11px] text-red-600 font-semibold mt-1">MPIN confirmation does not match.</p>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading || !mpinSafetyChecks.valid || newMpin !== confirmMpin}
+                    className="flex-1 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs sm:text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                        <span>Saving MPIN...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Save MPIN</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onAuthSuccess && mpinPostLoginUser) {
+                        onAuthSuccess(mpinPostLoginUser, initialIntent);
+                      }
+                      onClose();
+                    }}
+                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-slate-700 font-extrabold text-xs rounded-xl cursor-pointer transition-colors"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : (trustedUser && !usePasswordLogin && mode === 'login') ? (
+          <div className="p-5 sm:p-6 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
+            <div>
+              {/* TRUSTED USER BADGE */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl mb-4">
+                <div className="w-11 h-11 rounded-full bg-amber-400 text-slate-950 font-black flex items-center justify-center text-base shadow-sm shrink-0">
+                  {trustedUser.displayName ? trustedUser.displayName.charAt(0).toUpperCase() : 'E'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-black text-slate-900 truncate">
+                    {trustedUser.displayName || 'EaseLand Member'}
+                  </h4>
+                  <p className="text-[11px] font-semibold text-slate-500 truncate">
+                    {trustedUser.email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearTrustedMpinUser();
+                    setTrustedUser(null);
+                    setUsePasswordLogin(true);
+                  }}
+                  className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline shrink-0 cursor-pointer"
+                >
+                  Switch
+                </button>
+              </div>
+
+              {/* ALERTS */}
+              {error && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-start gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+
+              {/* 4-DIGIT MPIN FORM */}
+              <form onSubmit={handleMpinLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 text-center mb-2">
+                    Enter 4-Digit MPIN
+                  </label>
+                  <div className="relative max-w-xs mx-auto">
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      required
+                      maxLength={4}
+                      placeholder="••••"
+                      value={mpinInput}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setMpinInput(val);
+                        if (val.length === 4) {
+                          setTimeout(() => {
+                            const btn = document.getElementById('mpin-unlock-submit-btn');
+                            if (btn) btn.click();
+                          }, 100);
+                        }
+                      }}
+                      className="w-full py-3 bg-gray-50 border-2 border-amber-400 rounded-2xl text-center text-2xl font-black tracking-[0.6em] text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      autoFocus
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-500 text-center mt-2 font-medium">
+                    Protected by device-bound MPIN security.
+                  </p>
+                </div>
+
+                <button
+                  id="mpin-unlock-submit-btn"
+                  type="submit"
+                  disabled={loading || mpinInput.length !== 4}
+                  className="w-full bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Verifying PIN...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Unlock Account</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* SWITCH TO PASSWORD / FORGOT MPIN */}
+              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, email: trustedUser.email });
+                    setMode('forgot');
+                    setError(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
+                >
+                  Forgot MPIN?
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsePasswordLogin(true);
+                    setFormData({ ...formData, email: trustedUser.email });
+                    setError(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                >
+                  Log in with Password
+                </button>
+              </div>
             </div>
           </div>
         ) : (

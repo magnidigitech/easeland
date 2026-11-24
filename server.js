@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -769,6 +770,11 @@ async function initPgDb() {
         role VARCHAR(50) DEFAULT 'USER',
         account_status VARCHAR(50) DEFAULT 'ACTIVE',
         email_verified BOOLEAN DEFAULT false,
+        mpin_hash VARCHAR(255),
+        mpin_salt VARCHAR(255),
+        mpin_failed_attempts INT DEFAULT 0,
+        mpin_locked_until TIMESTAMP WITH TIME ZONE,
+        mpin_updated_at TIMESTAMP WITH TIME ZONE,
         raw_data JSONB,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -883,6 +889,11 @@ async function initPgDb() {
     try {
       await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(255);');
       await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255);');
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_hash VARCHAR(255);');
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_salt VARCHAR(255);');
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_failed_attempts INT DEFAULT 0;');
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_locked_until TIMESTAMP WITH TIME ZONE;');
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS mpin_updated_at TIMESTAMP WITH TIME ZONE;');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
       await client.query('ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
@@ -945,7 +956,7 @@ async function initPgDb() {
     }
 
     try {
-      const allUsers = await client.query('SELECT uid, email, display_name, phone, city, location, role, account_status, raw_data FROM users;');
+      const allUsers = await client.query('SELECT uid, email, display_name, phone, city, location, role, account_status, mpin_hash, mpin_salt, mpin_failed_attempts, mpin_locked_until, mpin_updated_at, raw_data FROM users;');
       allUsers.rows.forEach(r => {
         const raw = r.raw_data || {};
         const uId = r.uid || raw.uid || raw.id;
@@ -962,7 +973,13 @@ async function initPgDb() {
             city: r.city || raw.city || raw.location,
             location: r.location || r.city || raw.location || raw.city,
             role: r.role || raw.role || 'USER',
-            accountStatus: r.account_status || raw.accountStatus || 'ACTIVE'
+            accountStatus: r.account_status || raw.accountStatus || 'ACTIVE',
+            hasMpin: Boolean(r.mpin_hash),
+            mpinHash: r.mpin_hash,
+            mpinSalt: r.mpin_salt,
+            mpinFailedAttempts: r.mpin_failed_attempts || 0,
+            mpinLockedUntil: r.mpin_locked_until,
+            mpinUpdatedAt: r.mpin_updated_at
           };
           localUsersMap.set(uId, userObj);
           if (userObj.email) localUsersMap.set(userObj.email, userObj);
@@ -2858,6 +2875,371 @@ app.get('/api/users/:id', async (req, res) => {
   } catch (err) {
     console.error('CRITICAL: PostgreSQL user fetch failed:', err.message);
     return res.status(503).json({ success: false, error: 'Database unavailable: ' + err.message });
+  }
+});
+
+// --- MPIN SECURITY & VALIDATION HELPERS ---
+function validateMpinSafety(pin) {
+  if (!pin || !/^\d{4}$/.test(String(pin))) {
+    return { valid: false, error: 'MPIN must be exactly 4 numeric digits.' };
+  }
+  const s = String(pin);
+  // 1. All identical digits (0000, 1111, 2222, etc.)
+  if (/^(\d)\1{3}$/.test(s)) {
+    return { valid: false, error: 'Avoid repetitive digits like ' + s + '.' };
+  }
+  // 2. Sequential forward / backward
+  const sequences = ['0123', '1234', '2345', '3456', '4567', '5678', '6789', '9876', '8765', '7654', '6543', '5432', '4321', '3210'];
+  if (sequences.includes(s)) {
+    return { valid: false, error: 'Avoid sequential digits like ' + s + '.' };
+  }
+  // 3. Common keypad patterns and trivial repetitions
+  const commonPatterns = ['2580', '0852', '1470', '3690', '1212', '1313', '1414', '6969'];
+  if (commonPatterns.includes(s)) {
+    return { valid: false, error: 'This PIN is too predictable. Please choose a stronger PIN.' };
+  }
+  return { valid: true };
+}
+
+function hashMpin(pin, salt) {
+  return crypto.pbkdf2Sync(String(pin), salt, 100000, 64, 'sha512').toString('hex');
+}
+
+// 1. Set / Update MPIN
+app.post('/api/auth/mpin/set', async (req, res) => {
+  try {
+    const { uid, email, mpin } = req.body || {};
+    if (!uid && !email) {
+      return res.status(400).json({ success: false, error: 'User ID or Email is required.' });
+    }
+    const check = validateMpinSafety(mpin);
+    if (!check.valid) {
+      return res.status(400).json({ success: false, error: check.error });
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = hashMpin(mpin, salt);
+
+    let targetUid = uid ? String(uid).trim() : null;
+    let targetEmail = email ? String(email).trim().toLowerCase() : null;
+
+    if (!targetUid && targetEmail) {
+      const cached = localUsersMap.get(targetEmail);
+      if (cached) targetUid = cached.uid || cached.id;
+    }
+
+    const P = String.fromCharCode(36);
+    if (pgPool) {
+      try {
+        let updateSql = 'UPDATE users SET mpin_hash = ' + P + '1, mpin_salt = ' + P + '2, mpin_failed_attempts = 0, mpin_locked_until = NULL, mpin_updated_at = NOW(), updated_at = NOW() WHERE ';
+        const params = [hash, salt];
+        if (targetUid) {
+          params.push(targetUid);
+          updateSql += 'uid = ' + P + '3;';
+        } else {
+          params.push(targetEmail);
+          updateSql += 'LOWER(email) = LOWER(' + P + '3);';
+        }
+        await pgPool.query(updateSql, params);
+      } catch (dbErr) {
+        console.warn('PostgreSQL set MPIN note:', dbErr.message);
+      }
+    }
+
+    // Sync in-memory cache
+    if (targetUid || targetEmail) {
+      const userKey = targetUid || targetEmail;
+      const cached = localUsersMap.get(userKey) || {};
+      const updated = {
+        ...cached,
+        hasMpin: true,
+        mpinHash: hash,
+        mpinSalt: salt,
+        mpinFailedAttempts: 0,
+        mpinLockedUntil: null,
+        mpinUpdatedAt: new Date().toISOString()
+      };
+      if (targetUid) localUsersMap.set(targetUid, updated);
+      if (targetEmail || cached.email) localUsersMap.set(targetEmail || cached.email, updated);
+    }
+
+    // Sync lightweight flag to Firestore
+    if (targetUid) {
+      try {
+        const adminApps = getApps();
+        if (adminApps.length) {
+          const db = getFirestore(adminApps[0]);
+          await db.collection('users').doc(targetUid).set({
+            hasMpin: true,
+            mpinUpdatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (fsErr) {
+        console.warn('Firestore set hasMpin note:', fsErr.message);
+      }
+    }
+
+    return res.json({ success: true, message: 'MPIN set successfully.' });
+  } catch (err) {
+    console.error('Set MPIN failed:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Verify MPIN (Yono SBI Login)
+app.post('/api/auth/mpin/verify', async (req, res) => {
+  try {
+    const { uid, email, mpin } = req.body || {};
+    if (!uid && !email) {
+      return res.status(400).json({ success: false, error: 'User identifier is required.' });
+    }
+    if (!mpin || !/^\d{4}$/.test(String(mpin))) {
+      return res.status(400).json({ success: false, error: 'Please enter a 4-digit MPIN.' });
+    }
+
+    let targetUid = uid ? String(uid).trim() : null;
+    let targetEmail = email ? String(email).trim().toLowerCase() : null;
+
+    let userRow = null;
+    if (targetUid && localUsersMap.has(targetUid)) {
+      userRow = localUsersMap.get(targetUid);
+    } else if (targetEmail && localUsersMap.has(targetEmail)) {
+      userRow = localUsersMap.get(targetEmail);
+    }
+
+    const P = String.fromCharCode(36);
+    if (!userRow?.mpinHash && pgPool) {
+      try {
+        let sql = 'SELECT uid, email, display_name, mpin_hash, mpin_salt, mpin_failed_attempts, mpin_locked_until FROM users WHERE ';
+        const params = [];
+        if (targetUid) {
+          params.push(targetUid);
+          sql += 'uid = ' + P + '1;';
+        } else {
+          params.push(targetEmail);
+          sql += 'LOWER(email) = LOWER(' + P + '1);';
+        }
+        const pgRes = await pgPool.query(sql, params);
+        if (pgRes.rows.length > 0) {
+          userRow = {
+            uid: pgRes.rows[0].uid,
+            email: pgRes.rows[0].email,
+            displayName: pgRes.rows[0].display_name,
+            mpinHash: pgRes.rows[0].mpin_hash,
+            mpinSalt: pgRes.rows[0].mpin_salt,
+            mpinFailedAttempts: pgRes.rows[0].mpin_failed_attempts || 0,
+            mpinLockedUntil: pgRes.rows[0].mpin_locked_until
+          };
+        }
+      } catch (dbErr) {
+        console.warn('PostgreSQL verify MPIN query note:', dbErr.message);
+      }
+    }
+
+    if (!userRow || !userRow.mpinHash || !userRow.mpinSalt) {
+      return res.status(404).json({ success: false, error: 'MPIN has not been set up for this account. Please log in with password.' });
+    }
+
+    const resolvedUid = userRow.uid || targetUid;
+
+    // Check account lockout
+    if (userRow.mpinLockedUntil) {
+      const lockExpiry = new Date(userRow.mpinLockedUntil).getTime();
+      const now = Date.now();
+      if (lockExpiry > now) {
+        const remainingMinutes = Math.max(1, Math.ceil((lockExpiry - now) / 60000));
+        return res.status(429).json({
+          success: false,
+          error: 'MPIN temporarily locked due to failed attempts. Try again in ' + remainingMinutes + ' minute(s), or log in with your email & password.',
+          locked: true,
+          remainingMinutes
+        });
+      }
+    }
+
+    // Verify hash with timing safe equal
+    const computedHash = hashMpin(mpin, userRow.mpinSalt);
+    const hashBuf = Buffer.from(computedHash, 'utf8');
+    const storedBuf = Buffer.from(userRow.mpinHash, 'utf8');
+
+    const isValid = hashBuf.length === storedBuf.length && crypto.timingSafeEqual(hashBuf, storedBuf);
+
+    if (!isValid) {
+      const attempts = (userRow.mpinFailedAttempts || 0) + 1;
+      let isNowLocked = false;
+      if (attempts >= 5) {
+        isNowLocked = true;
+      }
+
+      if (pgPool && resolvedUid) {
+        try {
+          if (isNowLocked) {
+            await pgPool.query(
+              'UPDATE users SET mpin_failed_attempts = ' + P + '1, mpin_locked_until = NOW() + INTERVAL \'15 minutes\' WHERE uid = ' + P + '2;',
+              [attempts, resolvedUid]
+            );
+          } else {
+            await pgPool.query(
+              'UPDATE users SET mpin_failed_attempts = ' + P + '1 WHERE uid = ' + P + '2;',
+              [attempts, resolvedUid]
+            );
+          }
+        } catch (dbErr) {
+          console.warn('PostgreSQL update failed attempts note:', dbErr.message);
+        }
+      }
+
+      userRow.mpinFailedAttempts = attempts;
+      if (isNowLocked) {
+        userRow.mpinLockedUntil = new Date(Date.now() + 15 * 60000).toISOString();
+        return res.status(429).json({
+          success: false,
+          error: 'Too many incorrect attempts. MPIN locked for 15 minutes. Please log in with your email and password.',
+          locked: true
+        });
+      }
+
+      const remaining = Math.max(0, 5 - attempts);
+      return res.status(401).json({
+        success: false,
+        error: 'Incorrect MPIN. ' + remaining + ' attempt(s) remaining.',
+        remainingAttempts: remaining
+      });
+    }
+
+    // PIN is correct - reset failed attempts
+    if (pgPool && resolvedUid) {
+      try {
+        await pgPool.query(
+          'UPDATE users SET mpin_failed_attempts = 0, mpin_locked_until = NULL WHERE uid = ' + P + '1;',
+          [resolvedUid]
+        );
+      } catch (dbErr) {
+        console.warn('PostgreSQL reset attempts note:', dbErr.message);
+      }
+    }
+    userRow.mpinFailedAttempts = 0;
+    userRow.mpinLockedUntil = null;
+
+    // Mint Firebase Custom Token for immediate authenticated session
+    let customToken = null;
+    try {
+      const adminApps = getApps();
+      if (adminApps.length && resolvedUid) {
+        const auth = getAuth(adminApps[0]);
+        customToken = await auth.createCustomToken(resolvedUid);
+      }
+    } catch (tokErr) {
+      console.warn('Firebase customToken generation note:', tokErr.message);
+    }
+
+    return res.json({
+      success: true,
+      customToken,
+      user: {
+        uid: resolvedUid,
+        email: userRow.email || targetEmail,
+        displayName: userRow.displayName || 'EaseLand User'
+      }
+    });
+  } catch (err) {
+    console.error('Verify MPIN failed:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Remove MPIN
+app.post('/api/auth/mpin/remove', async (req, res) => {
+  try {
+    const { uid, email } = req.body || {};
+    const targetUid = uid ? String(uid).trim() : null;
+    const targetEmail = email ? String(email).trim().toLowerCase() : null;
+
+    const P = String.fromCharCode(36);
+    if (pgPool) {
+      try {
+        let sql = 'UPDATE users SET mpin_hash = NULL, mpin_salt = NULL, mpin_failed_attempts = 0, mpin_locked_until = NULL, mpin_updated_at = NOW() WHERE ';
+        const params = [];
+        if (targetUid) {
+          params.push(targetUid);
+          sql += 'uid = ' + P + '1;';
+        } else {
+          params.push(targetEmail);
+          sql += 'LOWER(email) = LOWER(' + P + '1);';
+        }
+        await pgPool.query(sql, params);
+      } catch (dbErr) {
+        console.warn('PostgreSQL remove MPIN note:', dbErr.message);
+      }
+    }
+
+    if (targetUid) {
+      try {
+        const adminApps = getApps();
+        if (adminApps.length) {
+          const db = getFirestore(adminApps[0]);
+          await db.collection('users').doc(targetUid).set({ hasMpin: false }, { merge: true });
+        }
+      } catch (fsErr) {
+        console.warn('Firestore remove hasMpin note:', fsErr.message);
+      }
+    }
+
+    const key = targetUid || targetEmail;
+    if (key && localUsersMap.has(key)) {
+      const u = localUsersMap.get(key);
+      u.hasMpin = false;
+      u.mpinHash = null;
+      u.mpinSalt = null;
+    }
+
+    return res.json({ success: true, message: 'MPIN removed successfully.' });
+  } catch (err) {
+    console.error('Remove MPIN failed:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Check MPIN Status
+app.get('/api/auth/mpin/status', async (req, res) => {
+  try {
+    const rawUid = req.query.uid ? String(req.query.uid).trim() : null;
+    const rawEmail = req.query.email ? String(req.query.email).trim().toLowerCase() : null;
+
+    let hasMpin = false;
+    let isLocked = false;
+
+    let userRow = null;
+    if (rawUid && localUsersMap.has(rawUid)) userRow = localUsersMap.get(rawUid);
+    else if (rawEmail && localUsersMap.has(rawEmail)) userRow = localUsersMap.get(rawEmail);
+
+    if (userRow) {
+      hasMpin = Boolean(userRow.mpinHash || userRow.hasMpin);
+      isLocked = Boolean(userRow.mpinLockedUntil && new Date(userRow.mpinLockedUntil).getTime() > Date.now());
+    } else if (pgPool) {
+      const P = String.fromCharCode(36);
+      let sql = 'SELECT mpin_hash, mpin_locked_until FROM users WHERE ';
+      const params = [];
+      if (rawUid) {
+        params.push(rawUid);
+        sql += 'uid = ' + P + '1;';
+      } else if (rawEmail) {
+        params.push(rawEmail);
+        sql += 'LOWER(email) = LOWER(' + P + '1);';
+      }
+      if (params.length > 0) {
+        const pgRes = await pgPool.query(sql, params);
+        if (pgRes.rows.length > 0) {
+          hasMpin = Boolean(pgRes.rows[0].mpin_hash);
+          isLocked = Boolean(pgRes.rows[0].mpin_locked_until && new Date(pgRes.rows[0].mpin_locked_until).getTime() > Date.now());
+        }
+      }
+    }
+
+    return res.json({ success: true, hasMpin, isLocked });
+  } catch (err) {
+    console.error('Get MPIN status failed:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

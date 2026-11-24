@@ -9,8 +9,13 @@ import {
   subscribeToAuthState,
   sendMobileOtp as apiSendMobileOtp,
   verifyMobileOtp as apiVerifyMobileOtp,
-  resetPasswordWithMobileOtp as apiResetPasswordWithMobileOtp
+  resetPasswordWithMobileOtp as apiResetPasswordWithMobileOtp,
+  setMpin as apiSetMpin,
+  verifyMpin as apiVerifyMpin,
+  removeMpin as apiRemoveMpin,
+  checkMpinStatus as apiCheckMpinStatus
 } from '../firebase/authService.js';
+import { saveTrustedMpinUser, clearTrustedMpinUser } from '../utils/mpinDeviceStorage.js';
 import {
   createUserProfile,
   getCurrentUserProfile,
@@ -1408,6 +1413,48 @@ export function AuthProvider({ children }) {
     return { success: true, user: updatedUserObj, profile: updatedProfileObj };
   };
 
+  const setMpin = async (mpin) => {
+    if (!user) return { success: false, error: 'Must be logged in to set MPIN.' };
+    const res = await apiSetMpin({ uid: user.uid, email: user.email, mpin });
+    if (res && res.success) {
+      saveTrustedMpinUser({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || profile?.displayName || 'EaseLand Member',
+        avatar: user.photoURL || profile?.avatar || ''
+      });
+      await reloadProfile();
+    }
+    return res;
+  };
+
+  const verifyMpin = async ({ uid, email, mpin }) => {
+    const res = await apiVerifyMpin({ uid, email, mpin });
+    if (res && res.success && res.user) {
+      saveTrustedMpinUser({
+        uid: res.user.uid,
+        email: res.user.email || email,
+        displayName: res.user.displayName || 'EaseLand Member'
+      });
+      await reloadProfile();
+    }
+    return res;
+  };
+
+  const removeMpin = async () => {
+    if (!user) return { success: false, error: 'Must be logged in.' };
+    const res = await apiRemoveMpin({ uid: user.uid, email: user.email });
+    if (res && res.success) {
+      clearTrustedMpinUser();
+      await reloadProfile();
+    }
+    return res;
+  };
+
+  const checkMpinStatus = async (targetUid, targetEmail) => {
+    return await apiCheckMpinStatus({ uid: targetUid || user?.uid, email: targetEmail || user?.email });
+  };
+
   const isProfileIncomplete = Boolean(
     user && (
       profile?.profileCompleted === false ||
@@ -1441,7 +1488,11 @@ export function AuthProvider({ children }) {
     complete2FASession,
     cancel2FASession,
     deleteOwnAccount,
-    checkAccountExists
+    checkAccountExists,
+    setMpin,
+    verifyMpin,
+    removeMpin,
+    checkMpinStatus
   };
 
   return (
