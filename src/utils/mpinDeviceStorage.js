@@ -28,10 +28,13 @@ export function validateMpinSafety(pin) {
     error = 'This PIN is too common. Please choose a more random PIN.';
   }
 
+  const isValid = is4Digits && notRepetitive && notSequential && notPattern;
+
   return {
-    valid: is4Digits && notRepetitive && notSequential && notPattern,
+    valid: isValid,
     error,
     checks: {
+      valid: isValid,
       is4Digits,
       notRepetitive,
       notSequential,

@@ -1414,16 +1414,18 @@ export function AuthProvider({ children }) {
   };
 
   const setMpin = async (mpin) => {
-    if (!user) return { success: false, error: 'Must be logged in to set MPIN.' };
-    const res = await apiSetMpin({ uid: user.uid, email: user.email, mpin });
+    const effectiveUid = user?.uid || user?.id || profile?.uid || profile?.id;
+    const effectiveEmail = user?.email || profile?.email;
+    if (!effectiveUid && !effectiveEmail) return { success: false, error: 'Must be logged in to set MPIN.' };
+    const res = await apiSetMpin({ uid: effectiveUid, email: effectiveEmail, mpin });
     if (res && res.success) {
       saveTrustedMpinUser({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || profile?.displayName || 'EaseLand Member',
-        avatar: user.photoURL || profile?.avatar || ''
+        uid: effectiveUid,
+        email: effectiveEmail,
+        displayName: user?.displayName || profile?.displayName || profile?.name || 'EaseLand Member',
+        avatar: user?.photoURL || profile?.avatar || ''
       });
-      await reloadProfile();
+      if (typeof reloadProfile === 'function') await reloadProfile();
     }
     return res;
   };
@@ -1436,17 +1438,19 @@ export function AuthProvider({ children }) {
         email: res.user.email || email,
         displayName: res.user.displayName || 'EaseLand Member'
       });
-      await reloadProfile();
+      if (typeof reloadProfile === 'function') await reloadProfile();
     }
     return res;
   };
 
   const removeMpin = async () => {
-    if (!user) return { success: false, error: 'Must be logged in.' };
-    const res = await apiRemoveMpin({ uid: user.uid, email: user.email });
+    const effectiveUid = user?.uid || user?.id || profile?.uid || profile?.id;
+    const effectiveEmail = user?.email || profile?.email;
+    if (!effectiveUid && !effectiveEmail) return { success: false, error: 'Must be logged in.' };
+    const res = await apiRemoveMpin({ uid: effectiveUid, email: effectiveEmail });
     if (res && res.success) {
       clearTrustedMpinUser();
-      await reloadProfile();
+      if (typeof reloadProfile === 'function') await reloadProfile();
     }
     return res;
   };

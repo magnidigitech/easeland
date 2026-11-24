@@ -154,10 +154,12 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
       const res = await setMpin(newMpin);
       setMpinLoading(false);
       if (res && res.success) {
+        const activeUid = user?.uid || user?.id || profile?.uid || '';
+        const activeEmail = user?.email || profile?.email || '';
         saveTrustedMpinUser({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || profile?.displayName || 'EaseLand Member'
+          uid: activeUid,
+          email: activeEmail,
+          displayName: user?.displayName || profile?.displayName || profile?.name || 'EaseLand Member'
         });
         setMpinStatus({ hasMpin: true, isLocked: false, loading: false });
         setIsThisDeviceBound(true);
@@ -985,7 +987,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                       <button
                         type="button"
                         onClick={handleSaveMpin}
-                        disabled={mpinLoading || !mpinSafetyChecks.valid || newMpin !== confirmMpin}
+                        disabled={mpinLoading || !mpinSafetyResult.valid || newMpin !== confirmMpin}
                         className="px-4 py-1.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
                         {mpinLoading ? 'Saving...' : 'Save MPIN'}

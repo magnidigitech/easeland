@@ -874,7 +874,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    disabled={loading || !mpinSafetyChecks.valid || newMpin !== confirmMpin}
+                    disabled={loading || !mpinSafetyResult.valid || newMpin !== confirmMpin}
                     className="flex-1 bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs sm:text-sm py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {loading ? (
