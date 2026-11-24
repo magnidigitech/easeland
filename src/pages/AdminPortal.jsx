@@ -1154,6 +1154,161 @@ export default function AdminPortal({ onNavigate }) {
           };
         });
     });
+
+    // Seamlessly update verificationQueue with incoming live user contact details
+    setVerificationQueue(prevQueue => {
+      if (!Array.isArray(prevQueue) || prevQueue.length === 0) return prevQueue;
+      return enrichPropertiesWithOwnerDetails(prevQueue, incomingUsers, prevQueue);
+    });
+  };
+
+  /**
+   * Robust, non-destructive owner contact and account details resolver.
+   * Enriches property queue items using:
+   * 1. Existing verified phone from current queue state (NEVER wipes out a valid phone)
+   * 2. Candidate user accounts (from registeredUsersList or server/Firestore)
+   * 3. LocalStorage cached profiles and registered users
+   * 4. Session user / profile
+   * 5. Fallback fields on property (ownerPrivatePhone, ownerPublicPhone, contactNumber, etc.)
+   */
+  const enrichPropertiesWithOwnerDetails = (propsList, userList = [], fallbackExistingProps = []) => {
+    if (!Array.isArray(propsList)) return [];
+
+    const existingMap = new Map();
+    (fallbackExistingProps || []).forEach(p => {
+      if (!p) return;
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
+      if (pId) existingMap.set(pId, p);
+    });
+
+    let localProfileCache = new Map();
+    try {
+      if (typeof window !== 'undefined') {
+        const rawReg = localStorage.getItem('easeland_registered_users');
+        if (rawReg) {
+          const parsed = JSON.parse(rawReg);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(u => {
+              if (u?.email) localProfileCache.set(u.email.toLowerCase().trim(), u);
+              if (u?.uid || u?.id) localProfileCache.set(String(u.uid || u.id).toLowerCase().trim(), u);
+            });
+          }
+        }
+      }
+    } catch (e) {}
+
+    return propsList.map(p => {
+      if (!p) return p;
+      const pId = String(p.id || p.propertyId || p.referenceId || '');
+      const existing = existingMap.get(pId);
+
+      const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy || existing?.ownerId || existing?.owner?.id;
+      const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || existing?.owner?.email || '').toLowerCase().trim();
+
+      let matchedUser = (userList || []).find(u => {
+        if (!u) return false;
+        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+        const uEmail = (u.email || '').toLowerCase().trim();
+        const matchesId = oId && uUid && (uUid === String(oId).toLowerCase().trim());
+        const matchesEmail = oEmail && uEmail && (uEmail === oEmail);
+        return matchesId || matchesEmail;
+      });
+
+      if (!matchedUser && typeof window !== 'undefined') {
+        if (oEmail && localProfileCache.has(oEmail)) {
+          matchedUser = localProfileCache.get(oEmail);
+        } else if (oId && localProfileCache.has(String(oId).toLowerCase().trim())) {
+          matchedUser = localProfileCache.get(String(oId).toLowerCase().trim());
+        } else {
+          try {
+            if (oId) {
+              const rawStored = localStorage.getItem('easeland_user_profile_' + oId);
+              if (rawStored) matchedUser = JSON.parse(rawStored);
+            }
+          } catch (e) {}
+        }
+      }
+
+      const isCurrentSessionUser = user && (
+        (oId && (String(user.uid || user.id) === String(oId))) ||
+        (oEmail && user.email && user.email.toLowerCase().trim() === oEmail)
+      );
+
+      let resolvedName = '';
+      if (matchedUser?.displayName || matchedUser?.name || matchedUser?.fullName) {
+        resolvedName = matchedUser.displayName || matchedUser.name || matchedUser.fullName;
+      } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name || profile?.displayName)) {
+        resolvedName = user.displayName || user.name || profile?.name || profile?.displayName;
+      } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
+        resolvedName = p.ownerPublicName.trim();
+      } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
+        resolvedName = p.owner.name.trim();
+      } else if (existing?.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(existing.owner.name.trim())) {
+        resolvedName = existing.owner.name.trim();
+      } else if (matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
+        resolvedName = matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
+      } else {
+        resolvedName = 'Registered Account Owner';
+      }
+
+      // Check existing phone first: NEVER wipe out a valid phone already known in state!
+      const existingPhone = existing?.owner?.phone &&
+        existing.owner.phone !== 'Number Not Updated' &&
+        existing.owner.phone !== '+91 98765 43210' &&
+        existing.owner.phone !== '+91 N/A' &&
+        existing.owner.phone !== 'undefined' &&
+        existing.owner.phone !== 'null'
+          ? existing.owner.phone
+          : null;
+
+      const rawPhone =
+        matchedUser?.phone ||
+        matchedUser?.phoneNumber ||
+        matchedUser?.mobile ||
+        matchedUser?.contactNumber ||
+        matchedUser?.contactPhone ||
+        matchedUser?.phoneNo ||
+        matchedUser?.contact ||
+        matchedUser?.telePhone ||
+        matchedUser?.profile?.phone ||
+        matchedUser?.profile?.phoneNumber ||
+        (isCurrentSessionUser && (profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phoneNumber || user?.phone)) ||
+        existingPhone ||
+        p.ownerPrivatePhone ||
+        p.ownerPublicPhone ||
+        p.owner?.phone ||
+        p.owner?.phoneNumber ||
+        p.ownerContact ||
+        p.contactNumber ||
+        p.contactPhone ||
+        p.phone ||
+        p.mobile ||
+        p.pendingReauditData?.ownerPhone ||
+        p.pendingReauditData?.owner?.phone;
+
+      const cleanedPhone = rawPhone ? String(rawPhone).trim() : '';
+      const isPlaceholder = !cleanedPhone ||
+        cleanedPhone === '+91 98765 43210' ||
+        (cleanedPhone === '9876543210' && !matchedUser && !isCurrentSessionUser) ||
+        cleanedPhone === '+91 N/A' ||
+        cleanedPhone === 'N/A' ||
+        cleanedPhone === 'undefined' ||
+        cleanedPhone === 'null';
+
+      const resolvedPhone = !isPlaceholder ? cleanedPhone : (existingPhone || 'Number Not Updated');
+      const resolvedEmail = matchedUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || existing?.owner?.email || '';
+
+      return {
+        ...p,
+        owner: {
+          ...(existing?.owner || {}),
+          ...(p.owner || {}),
+          name: resolvedName,
+          phone: resolvedPhone,
+          email: resolvedEmail
+        }
+      };
+    });
   };
 
   const loadData = async () => {
@@ -1364,23 +1519,24 @@ export default function AdminPortal({ onNavigate }) {
         return false;
       });
 
-      // PROGRESSIVE STEP 1: Immediately render properties and verification queue without waiting for users or config!
+      // PROGRESSIVE STEP 1: Immediately render properties and verification queue with instant known-user enrichment!
+      const initialEnrichedQueue = enrichPropertiesWithOwnerDetails(queue, registeredUsersList, verificationQueue);
       setAllProperties(allMergedProps);
-      setVerificationQueue(queue);
+      setVerificationQueue(initialEnrichedQueue);
       try {
         if (typeof window !== 'undefined') {
           localStorage.setItem('easeland_admin_cached_properties', JSON.stringify(allMergedProps));
         }
       } catch (eCache) {}
 
-      if (queue.length > 0) {
+      if (initialEnrichedQueue.length > 0) {
         setSelectedProperty(prev => {
           if (prev) {
             const prevId = String(prev.id || prev.propertyId || prev.referenceId || '');
-            const match = queue.find(q => String(q.id || q.propertyId || q.referenceId || '') === prevId);
+            const match = initialEnrichedQueue.find(q => String(q.id || q.propertyId || q.referenceId || '') === prevId);
             if (match) return match;
           }
-          return queue[0];
+          return initialEnrichedQueue[0];
         });
       } else {
         setSelectedProperty(null);
@@ -1483,109 +1639,20 @@ export default function AdminPortal({ onNavigate }) {
         (u) => isUserExplicitlyDeleted(u.uid || u.id, u.email, u.status, u.accountStatus)
       );
 
-      // Enrich verification queue properties with matching registered user account details
-      const enrichedQueue = queue.map(p => {
-        const oId = p.ownerId || p.owner?.id || p.userId || p.uid || p.submittedBy || p.createdBy;
-        const oEmail = (p.ownerPrivateEmail || p.ownerPublicEmail || p.owner?.email || p.email || p.userEmail || '').toLowerCase().trim();
-
-        let matchedUser = users.find(u => {
-          if (!u) return false;
-          const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-          const uEmail = (u.email || '').toLowerCase().trim();
-          const matchesId = oId && uUid && (uUid === String(oId).toLowerCase().trim());
-          const matchesEmail = oEmail && uEmail && (uEmail === oEmail);
-          return matchesId || matchesEmail;
-        });
-
-        // Local storage fallback for user profile if not found in Firestore users array
-        let localUserProfile = null;
-        if (!matchedUser && typeof window !== 'undefined') {
-          try {
-            if (oId) {
-              const rawStored = localStorage.getItem('easeland_user_profile_' + oId);
-              if (rawStored) localUserProfile = JSON.parse(rawStored);
-            }
-            if (!localUserProfile && oEmail) {
-              const rawReg = localStorage.getItem('easeland_registered_users');
-              if (rawReg) {
-                const regArr = JSON.parse(rawReg);
-                if (Array.isArray(regArr)) {
-                  localUserProfile = regArr.find(u => u && u.email && u.email.toLowerCase().trim() === oEmail);
-                }
-              }
-            }
-          } catch (e) { }
-        }
-
-        const effectiveUser = matchedUser || localUserProfile;
-
-        // Check if owner matches currently authenticated session user
-        const isCurrentSessionUser = user && (
-          (oId && (String(user.uid || user.id) === String(oId))) ||
-          (oEmail && user.email && user.email.toLowerCase().trim() === oEmail)
-        );
-
-        let resolvedName = '';
-        if (effectiveUser?.displayName || effectiveUser?.name || effectiveUser?.fullName) {
-          resolvedName = effectiveUser.displayName || effectiveUser.name || effectiveUser.fullName;
-        } else if (isCurrentSessionUser && (user.displayName || user.name || profile?.name || profile?.displayName)) {
-          resolvedName = user.displayName || user.name || profile?.name || profile?.displayName;
-        } else if (p.ownerPublicName && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.ownerPublicName.trim())) {
-          resolvedName = p.ownerPublicName.trim();
-        } else if (p.owner?.name && !['Property Owner', 'Verified Property Owner', 'Verified Owner'].includes(p.owner.name.trim())) {
-          resolvedName = p.owner.name.trim();
-        } else if (effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email) {
-          resolvedName = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email;
-        } else {
-          resolvedName = 'Registered Account Owner';
-        }
-
-        const rawPhone =
-          effectiveUser?.phone ||
-          effectiveUser?.phoneNumber ||
-          effectiveUser?.mobile ||
-          effectiveUser?.contactNumber ||
-          effectiveUser?.contactPhone ||
-          effectiveUser?.phoneNo ||
-          effectiveUser?.contact ||
-          effectiveUser?.telePhone ||
-          effectiveUser?.profile?.phone ||
-          effectiveUser?.profile?.phoneNumber ||
-          (isCurrentSessionUser && (profile?.phone || profile?.phoneNumber || profile?.mobile || profile?.contactNumber || user?.phoneNumber || user?.phone)) ||
-          p.ownerPrivatePhone ||
-          p.ownerPublicPhone ||
-          p.owner?.phone ||
-          p.owner?.phoneNumber ||
-          p.ownerContact ||
-          p.contactNumber ||
-          p.contactPhone ||
-          p.phone ||
-          p.mobile;
-
-        const cleanedPhone = rawPhone ? String(rawPhone).trim() : '';
-        const isPlaceholder = !cleanedPhone ||
-          cleanedPhone === '+91 98765 43210' ||
-          (cleanedPhone === '9876543210' && !effectiveUser && !isCurrentSessionUser) ||
-          cleanedPhone === '+91 N/A' ||
-          cleanedPhone === 'N/A' ||
-          cleanedPhone === 'undefined' ||
-          cleanedPhone === 'null';
-
-        const resolvedPhone = !isPlaceholder ? cleanedPhone : 'Number Not Updated';
-        const resolvedEmail = effectiveUser?.email || oEmail || (isCurrentSessionUser && user.email) || p.ownerPrivateEmail || p.owner?.email || '';
-
-        return {
-          ...p,
-          owner: {
-            ...(p.owner || {}),
-            name: resolvedName,
-            phone: resolvedPhone,
-            email: resolvedEmail
-          }
-        };
-      });
-
+      // PROGRESSIVE STEP 2: Enrich verification queue with freshly settled user account details from network
+      const enrichedQueue = enrichPropertiesWithOwnerDetails(queue, users, initialEnrichedQueue);
       setVerificationQueue(enrichedQueue);
+
+      if (enrichedQueue.length > 0) {
+        setSelectedProperty(prev => {
+          if (prev) {
+            const prevId = String(prev.id || prev.propertyId || prev.referenceId || '');
+            const match = enrichedQueue.find(q => String(q.id || q.propertyId || q.referenceId || '') === prevId);
+            if (match) return match;
+          }
+          return enrichedQueue[0];
+        });
+      }
 
       // Enquiries
       let enqs = [];
@@ -1639,8 +1706,37 @@ export default function AdminPortal({ onNavigate }) {
       console.warn('Auto background sync note:', err);
     });
 
+    let refreshDebounceTimer = null;
     const handleRefresh = () => {
-      if (!isDataLoadingRef.current) loadData();
+      if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+      refreshDebounceTimer = setTimeout(() => {
+        if (!isDataLoadingRef.current) loadData();
+      }, 300);
+    };
+
+    const handleStorageChange = (e) => {
+      if (!e || !e.key) return;
+      const ignoredKeys = [
+        'easeland_admin_cached_properties',
+        'easeland_admin_active_tab',
+        'easeland_admin_cms_tab',
+        'easeland_site_config',
+        'easeland_admin_name',
+        'easeland_admin_email',
+        'easeland_admin_phone'
+      ];
+      if (ignoredKeys.includes(e.key)) return;
+      const relevantKeys = [
+        'easeland_properties',
+        'easeland_user_properties',
+        'easeland_owner_properties',
+        'easeland_deleted_properties',
+        'easeland_submitted_properties',
+        'easeland_registered_users'
+      ];
+      if (relevantKeys.includes(e.key) || e.key.startsWith('easeland_user_profile_')) {
+        handleRefresh();
+      }
     };
     const handleConfigUpdated = (e) => {
       if (!hasUnsavedCmsChangesRef.current) {
@@ -1668,7 +1764,7 @@ export default function AdminPortal({ onNavigate }) {
     window.addEventListener('easeland-visitor-lead-created', handleVisitorRefresh);
     window.addEventListener('easeland-visitor-lead-updated', handleVisitorRefresh);
     window.addEventListener('easeland-visitor-lead-deleted', handleVisitorRefresh);
-    window.addEventListener('storage', handleRefresh);
+    window.addEventListener('storage', handleStorageChange);
     const pollTimer = setInterval(() => {
       if (!isDataLoadingRef.current) {
         loadData();
@@ -1677,6 +1773,7 @@ export default function AdminPortal({ onNavigate }) {
     }, 20000);
 
     return () => {
+      if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
       clearInterval(pollTimer);
       unsubFirestoreUsers();
       window.removeEventListener('easeland-users-updated', handleRefresh);
@@ -1691,7 +1788,7 @@ export default function AdminPortal({ onNavigate }) {
       window.removeEventListener('easeland-visitor-lead-created', handleVisitorRefresh);
       window.removeEventListener('easeland-visitor-lead-updated', handleVisitorRefresh);
       window.removeEventListener('easeland-visitor-lead-deleted', handleVisitorRefresh);
-      window.removeEventListener('storage', handleRefresh);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -6015,14 +6112,39 @@ export default function AdminPortal({ onNavigate }) {
 
                             {/* SEPARATE COLUMN: OWNER CONTACT */}
                             <div className="col-span-2">
-                              <span className={`font-extrabold text-[11px] block line-clamp-1 ${prop.owner?.phone && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
-                                  ? 'text-slate-900'
-                                  : 'text-amber-700 font-semibold'
-                                }`}>
-                                {prop.owner?.phone && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A'
-                                  ? prop.owner.phone
-                                  : 'Number Not Updated'}
-                              </span>
+                              {(() => {
+                                const directPhone = prop.owner?.phone && prop.owner.phone !== '+91 98765 43210' && prop.owner.phone !== '+91 N/A' && prop.owner.phone !== 'Number Not Updated' && prop.owner.phone !== 'undefined' && prop.owner.phone !== 'null' ? prop.owner.phone : null;
+                                let displayPhone = directPhone;
+                                if (!displayPhone) {
+                                  const fallback = prop.ownerPrivatePhone || prop.ownerPublicPhone || prop.owner?.phoneNumber || prop.ownerContact || prop.contactNumber || prop.contactPhone || prop.phone || prop.mobile || prop.pendingReauditData?.ownerPhone;
+                                  if (fallback && fallback !== '+91 98765 43210' && fallback !== '+91 N/A' && fallback !== 'undefined' && fallback !== 'null') {
+                                    displayPhone = String(fallback).trim();
+                                  }
+                                }
+                                if (!displayPhone) {
+                                  const oEmail = (prop.owner?.email || prop.ownerPrivateEmail || prop.ownerPublicEmail || '').toLowerCase().trim();
+                                  const oId = prop.ownerId || prop.owner?.id || prop.userId || prop.uid;
+                                  const matched = (registeredUsersList || []).find(u => {
+                                    if (!u) return false;
+                                    const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+                                    const uEmail = (u.email || '').toLowerCase().trim();
+                                    return (oId && uUid && uUid === String(oId).toLowerCase().trim()) || (oEmail && uEmail && uEmail === oEmail);
+                                  });
+                                  const uPhone = matched?.phone || matched?.phoneNumber || matched?.mobile;
+                                  if (uPhone && uPhone !== '+91 98765 43210' && uPhone !== '+91 N/A' && uPhone !== 'undefined' && uPhone !== 'null') {
+                                    displayPhone = String(uPhone).trim();
+                                  }
+                                }
+                                const hasValidPhone = Boolean(displayPhone && displayPhone !== 'Number Not Updated');
+                                return (
+                                  <span className={
+                                    'font-extrabold text-[11px] block line-clamp-1 ' +
+                                    (hasValidPhone ? 'text-slate-900' : 'text-amber-700 font-semibold')
+                                  }>
+                                    {hasValidPhone ? displayPhone : 'Number Not Updated'}
+                                  </span>
+                                );
+                              })()}
                             </div>
 
                             {/* SUBMITTED */}
@@ -6141,9 +6263,21 @@ export default function AdminPortal({ onNavigate }) {
                       ? ownerNameRaw
                       : (typeof ownerNameRaw === 'object' && ownerNameRaw ? (ownerNameRaw.name || ownerNameRaw.displayName || ownerNameRaw.email || 'Account Name Not Set') : String(ownerNameRaw));
 
-                    const ownerPhoneRaw = activeAuditProp.owner?.phone && activeAuditProp.owner.phone !== '+91 98765 43210' && activeAuditProp.owner.phone !== '+91 N/A'
-                      ? activeAuditProp.owner.phone
-                      : 'Number Not Updated';
+                    const directAuditPhone = activeAuditProp.owner?.phone && activeAuditProp.owner.phone !== '+91 98765 43210' && activeAuditProp.owner.phone !== '+91 N/A' && activeAuditProp.owner.phone !== 'Number Not Updated' && activeAuditProp.owner.phone !== 'undefined' && activeAuditProp.owner.phone !== 'null' ? activeAuditProp.owner.phone : null;
+                    const fallbackAuditPhone = activeAuditProp.ownerPrivatePhone || activeAuditProp.ownerPublicPhone || activeAuditProp.owner?.phoneNumber || activeAuditProp.ownerContact || activeAuditProp.contactNumber || activeAuditProp.phone || activeAuditProp.mobile || activeAuditProp.pendingReauditData?.ownerPhone;
+                    let matchedAuditUser = null;
+                    if (!directAuditPhone && !fallbackAuditPhone) {
+                      const aEmail = (activeAuditProp.owner?.email || activeAuditProp.ownerPrivateEmail || activeAuditProp.userEmail || '').toLowerCase().trim();
+                      const aId = activeAuditProp.ownerId || activeAuditProp.owner?.id || activeAuditProp.userId || activeAuditProp.uid;
+                      matchedAuditUser = (registeredUsersList || []).find(u => {
+                        if (!u) return false;
+                        const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+                        const uEmail = (u.email || '').toLowerCase().trim();
+                        return (aId && uUid && uUid === String(aId).toLowerCase().trim()) || (aEmail && uEmail && uEmail === aEmail);
+                      });
+                    }
+                    const userAuditPhone = matchedAuditUser?.phone || matchedAuditUser?.phoneNumber || matchedAuditUser?.mobile;
+                    const ownerPhoneRaw = directAuditPhone || (fallbackAuditPhone && fallbackAuditPhone !== '+91 98765 43210' && fallbackAuditPhone !== '+91 N/A' ? fallbackAuditPhone : (userAuditPhone || 'Number Not Updated'));
                     const ownerPhoneStr = typeof ownerPhoneRaw === 'string' ? ownerPhoneRaw : String(ownerPhoneRaw || 'Number Not Updated');
 
                     const ownerEmailRaw = activeAuditProp.owner?.email || activeAuditProp.userEmail || 'N/A';
