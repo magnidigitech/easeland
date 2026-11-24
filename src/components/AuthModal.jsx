@@ -822,8 +822,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                     <span className="font-extrabold text-slate-600 text-[11px] uppercase tracking-wider">
                       PIN Security Rules
                     </span>
-                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
-                      YonoSBI Standard
+                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Bank-Grade Security
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">

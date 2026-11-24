@@ -734,7 +734,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                       </div>
                       <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
                         {isTotpActive && mpinStatus.hasMpin
-                          ? 'Your account has full dual-layer protection with two-step authenticator verification and Yono SBI-style 4-digit quick unlock.'
+                          ? 'Your account has full dual-layer protection with two-step authenticator verification and 4-digit quick unlock.'
                           : isTotpActive
                           ? 'Two-step verification is active with your Authenticator app. You can also configure a 4-digit MPIN for quick unlock.'
                           : mpinStatus.hasMpin
@@ -824,7 +824,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                 </div>
               </div>
 
-              {/* MPIN QUICK UNLOCK CARD (YONO SBI STYLE) */}
+              {/* MPIN QUICK UNLOCK CARD */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-300 transition-all space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
@@ -852,7 +852,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
                         )}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                        Yono SBI-style quick access. On remembered devices, unlock your account with just 4 digits instead of typing your email and password every time.
+                        Fast and secure access. On remembered devices, unlock your account with just 4 digits instead of typing your email and password every time.
                       </p>
                     </div>
                   </div>

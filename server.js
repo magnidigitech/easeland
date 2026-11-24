@@ -2986,7 +2986,7 @@ app.post('/api/auth/mpin/set', async (req, res) => {
   }
 });
 
-// 2. Verify MPIN (Yono SBI Login)
+// 2. Verify MPIN (Quick Unlock Login)
 app.post('/api/auth/mpin/verify', async (req, res) => {
   try {
     const { uid, email, mpin } = req.body || {};
