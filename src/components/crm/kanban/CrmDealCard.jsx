@@ -83,6 +83,7 @@ export default function CrmDealCard({
   onTriggerWhatsApp,
   onOpenFollowUp,
   isBeingDragged,
+  isSelected = false,
   onDragStart,
   onDragEnd,
   isFieldExecutive = false
@@ -114,7 +115,9 @@ export default function CrmDealCard({
           ? 'bg-rose-50/40 border-rose-300 hover:border-rose-400'
           : isBeingDragged
             ? 'opacity-40 border-amber-400 border-2 border-dashed scale-95 bg-white'
-            : ('bg-white border-slate-200 hover:border-slate-300 ' + stageStyle.borderLeft)
+            : isSelected
+              ? ('bg-amber-50/40 border-amber-400 ring-2 ring-amber-400/50 shadow-[0_0_18px_rgba(251,191,36,0.28)] ' + stageStyle.borderLeft)
+              : ('bg-white border-slate-200 hover:border-slate-300 ' + stageStyle.borderLeft)
         )
       }
     >

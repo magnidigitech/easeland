@@ -423,4 +423,18 @@ test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
     assert.strictEqual(formatLegalStatusLabel('CLEAR_TITLE'), 'Title Clear');
     assert.strictEqual(formatLegalStatusLabel('PENDING'), 'Pending Check');
   });
+
+  await t.test('20. CRM Kanban navigation keeps selected stage card unobstructed, syncs stage bar, and highlights selection', () => {
+    const kanbanSrc = fs.readFileSync(path.join(rootDir, 'src/components/crm/kanban/CrmKanbanBoard.jsx'), 'utf8');
+    const cardSrc = fs.readFileSync(path.join(rootDir, 'src/components/crm/kanban/CrmDealCard.jsx'), 'utf8');
+    const crmPageSrc = fs.readFileSync(path.join(rootDir, 'src/pages/EaseLandCRM.jsx'), 'utf8');
+
+    assert.ok(kanbanSrc.includes('canStepPrev') && kanbanSrc.includes('canStepNext'), 'Stage side navigation must step activeStageIndex via canStepPrev/canStepNext');
+    assert.ok(kanbanSrc.includes('stageLaneRefs') && kanbanSrc.includes('stagePillRefs'), 'Stage lanes and stage ribbon pills must be ref-tracked for full viewport visibility');
+    assert.strictEqual(kanbanSrc.includes('snap-mandatory'), false, 'Kanban track must not enforce snap-mandatory which fights smooth scroll positioning');
+    assert.ok(kanbanSrc.includes('isSelectedStage'), 'Active stage lane must compute isSelectedStage for glow highlight');
+    assert.ok(kanbanSrc.includes('selectedDealId'), 'CrmKanbanBoard must accept and forward selectedDealId to CrmDealCard');
+    assert.ok(cardSrc.includes('isSelected') && cardSrc.includes('ring-amber-400/50'), 'CrmDealCard must render amber glow highlight when selected');
+    assert.ok(crmPageSrc.includes('selectedDealId={selectedDealForDossierId}'), 'EaseLandCRM must pass selectedDealForDossierId to CrmKanbanBoard');
+  });
 });

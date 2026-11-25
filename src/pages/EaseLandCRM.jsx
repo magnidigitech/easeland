@@ -786,6 +786,7 @@ export default function EaseLandCRM({
             kanbanStages={kanbanStages}
             onlyDueToday={onlyDueToday}
             setOnlyDueToday={setOnlyDueToday}
+            selectedDealId={selectedDealForDossierId}
             onSelectDeal={(deal) => setSelectedDealForDossierId(deal?.id || deal?.dealId || null)}
             onAdvanceStage={handleAdvanceDealStage}
             onDeleteDeal={handleDeleteDeal}

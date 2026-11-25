@@ -131,6 +131,7 @@ export default function CrmKanbanBoard({
   kanbanStages,
   onlyDueToday: controlledOnlyDueToday,
   setOnlyDueToday: setControlledOnlyDueToday,
+  selectedDealId = null,
   onSelectDeal,
   onAdvanceStage,
   onDeleteDeal,
@@ -218,6 +219,9 @@ export default function CrmKanbanBoard({
 
   // Scroll Container Ref & Nav State
   const scrollContainerRef = useRef(null);
+  const stageLaneRefs = useRef([]);
+  const stagePillRefs = useRef([]);
+  const programmaticScrollUntilRef = useRef(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [activeStageIndex, setActiveStageIndex] = useState(0);
@@ -279,14 +283,34 @@ export default function CrmKanbanBoard({
     setCanScrollLeft(!atStart);
     setCanScrollRight(!atEnd);
 
-    // Compute which stage is centered or at start
-    const columnWidth = 336; // 320px column + 16px gap
-    const idx = Math.min(
-      visibleStages.length - 1,
-      Math.max(0, Math.round(el.scrollLeft / columnWidth))
-    );
-    setActiveStageIndex(idx);
-  }, [visibleStages.length]);
+    // Preserve explicit stage selection while programmatic smooth scroll settles
+    if (Date.now() < programmaticScrollUntilRef.current) return;
+
+    // On manual horizontal scroll, only reassign activeStageIndex if the current lane scrolled out of full view
+    const viewLeft = el.scrollLeft;
+    const viewRight = viewLeft + el.clientWidth;
+    const activeLane = stageLaneRefs.current[activeStageIndex];
+    if (activeLane) {
+      const aLeft = activeLane.offsetLeft;
+      const aRight = aLeft + activeLane.offsetWidth;
+      const isFullyVisible = aLeft >= viewLeft + 4 && aRight <= viewRight - 4;
+      if (isFullyVisible) return;
+    }
+
+    // Pick first lane cleanly inside view
+    let bestIdx = activeStageIndex;
+    for (let i = 0; i < visibleStages.length; i += 1) {
+      const lane = stageLaneRefs.current[i];
+      if (!lane) continue;
+      if (lane.offsetLeft >= viewLeft + 4 && lane.offsetLeft + lane.offsetWidth <= viewRight - 4) {
+        bestIdx = i;
+        break;
+      }
+    }
+    if (bestIdx !== activeStageIndex) {
+      setActiveStageIndex(bestIdx);
+    }
+  }, [activeStageIndex, visibleStages.length]);
 
   useEffect(() => {
     checkScrollBounds();
@@ -295,27 +319,58 @@ export default function CrmKanbanBoard({
     return () => window.removeEventListener('resize', handleResize);
   }, [checkScrollBounds, visibleStages]);
 
-  // Smooth Scroll Step (Arrows)
-  const scrollByStep = (direction) => {
+  // Clamp activeStageIndex if stage filters reduce visibleStages
+  useEffect(() => {
+    if (activeStageIndex >= visibleStages.length && visibleStages.length > 0) {
+      setActiveStageIndex(visibleStages.length - 1);
+    }
+  }, [activeStageIndex, visibleStages.length]);
+
+  // Jump directly to a stage, ensuring the entire card sits unobstructed inside the viewport
+  const scrollToStageIndex = (index) => {
+    if (visibleStages.length === 0) return;
+    const clampedIdx = Math.max(0, Math.min(visibleStages.length - 1, index));
+    setActiveStageIndex(clampedIdx);
+    programmaticScrollUntilRef.current = Date.now() + 600;
+
     const el = scrollContainerRef.current;
-    if (!el) return;
-    const columnWidth = 336;
-    const scrollAmount = direction === 'left' ? -columnWidth * 1.5 : columnWidth * 1.5;
-    el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    const targetChild = stageLaneRefs.current[clampedIdx] || (el && el.children[clampedIdx]);
+    if (el && targetChild) {
+      const safePad = typeof window !== 'undefined' && window.innerWidth < 640 ? 20 : 44;
+      const childLeft = targetChild.offsetLeft;
+      const childRight = childLeft + targetChild.offsetWidth;
+      const viewLeft = el.scrollLeft;
+      const viewRight = viewLeft + el.clientWidth;
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+
+      let nextScrollLeft = viewLeft;
+      if (childLeft < viewLeft + safePad) {
+        nextScrollLeft = Math.max(0, childLeft - safePad);
+      } else if (childRight > viewRight - safePad) {
+        nextScrollLeft = Math.min(maxScroll, childRight - el.clientWidth + safePad);
+      }
+
+      if (typeof el.scrollTo === 'function') {
+        el.scrollTo({ left: nextScrollLeft, behavior: 'smooth' });
+      } else {
+        el.scrollLeft = nextScrollLeft;
+      }
+    }
+
+    const pillEl = stagePillRefs.current[clampedIdx];
+    if (pillEl && typeof pillEl.scrollIntoView === 'function') {
+      pillEl.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    }
   };
 
-  // Jump directly to a stage
-  const scrollToStageIndex = (index) => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const targetChild = el.children[index];
-    if (targetChild && typeof targetChild.scrollIntoView === 'function') {
-      targetChild.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-    } else {
-      el.scrollTo({ left: index * 336, behavior: 'smooth' });
-    }
-    setActiveStageIndex(index);
+  // Step Prev / Next Stage cleanly with Side Navigation Arrows & Header Controls
+  const scrollByStep = (direction) => {
+    const delta = direction === 'left' ? -1 : 1;
+    scrollToStageIndex(activeStageIndex + delta);
   };
+
+  const canStepPrev = activeStageIndex > 0;
+  const canStepNext = activeStageIndex < visibleStages.length - 1;
 
   return (
     <div className="space-y-3.5 select-none">
@@ -482,15 +537,15 @@ export default function CrmKanbanBoard({
               <button
                 type="button"
                 onClick={() => scrollByStep('left')}
-                disabled={!canScrollLeft}
+                disabled={!canStepPrev}
                 className={'p-1.5 rounded-lg transition-all ' +
-                  (canScrollLeft
+                  (canStepPrev
                     ? 'text-slate-800 hover:bg-white hover:text-amber-600 shadow-sm cursor-pointer active:scale-95'
                     : 'text-slate-300 cursor-not-allowed opacity-50'
                   )
                 }
-                title="Scroll stages left"
-                aria-label="Scroll stages left"
+                title="Previous stage"
+                aria-label="Previous stage"
               >
                 <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
               </button>
@@ -500,15 +555,15 @@ export default function CrmKanbanBoard({
               <button
                 type="button"
                 onClick={() => scrollByStep('right')}
-                disabled={!canScrollRight}
+                disabled={!canStepNext}
                 className={'p-1.5 rounded-lg transition-all ' +
-                  (canScrollRight
+                  (canStepNext
                     ? 'text-slate-800 hover:bg-white hover:text-amber-600 shadow-sm cursor-pointer active:scale-95'
                     : 'text-slate-300 cursor-not-allowed opacity-50'
                   )
                 }
-                title="Scroll stages right"
-                aria-label="Scroll stages right"
+                title="Next stage"
+                aria-label="Next stage"
               >
                 <ChevronRight className="w-4 h-4 stroke-[2.5]" />
               </button>
@@ -575,11 +630,14 @@ export default function CrmKanbanBoard({
             return (
               <button
                 key={st}
+                ref={(el) => {
+                  stagePillRefs.current[idx] = el;
+                }}
                 type="button"
                 onClick={() => scrollToStageIndex(idx)}
                 className={'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ' +
                   (isCurrentInView
-                    ? 'bg-slate-950 text-white shadow-sm scale-[1.02] ring-2 ring-amber-400/40'
+                    ? 'bg-slate-950 text-white shadow-sm scale-[1.02] ring-2 ring-amber-400/50'
                     : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60'
                   )
                 }
@@ -630,11 +688,11 @@ export default function CrmKanbanBoard({
           <button
             type="button"
             onClick={() => scrollByStep('left')}
-            disabled={!canScrollLeft}
-            aria-label="Scroll left to previous stages"
+            disabled={!canStepPrev}
+            aria-label="Previous stage"
             className={'absolute -left-3 sm:-left-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-xl border ' +
-              (canScrollLeft
-                ? 'bg-white/95 backdrop-blur-md text-slate-800 border-slate-300 hover:bg-amber-400 hover:text-slate-950 hover:border-amber-400 hover:scale-110 active:scale-95 opacity-90 group-hover/kanban:opacity-100'
+              (canStepPrev
+                ? 'bg-white/95 backdrop-blur-md text-slate-800 border-slate-300 hover:bg-amber-400 hover:text-slate-950 hover:border-amber-400 hover:scale-110 active:scale-95 opacity-95 group-hover/kanban:opacity-100'
                 : 'opacity-0 pointer-events-none'
               )
             }
@@ -646,11 +704,11 @@ export default function CrmKanbanBoard({
           <button
             type="button"
             onClick={() => scrollByStep('right')}
-            disabled={!canScrollRight}
-            aria-label="Scroll right to next stages"
+            disabled={!canStepNext}
+            aria-label="Next stage"
             className={'absolute -right-3 sm:-right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-xl border ' +
-              (canScrollRight
-                ? 'bg-white/95 backdrop-blur-md text-slate-800 border-slate-300 hover:bg-amber-400 hover:text-slate-950 hover:border-amber-400 hover:scale-110 active:scale-95 opacity-90 group-hover/kanban:opacity-100'
+              (canStepNext
+                ? 'bg-white/95 backdrop-blur-md text-slate-800 border-slate-300 hover:bg-amber-400 hover:text-slate-950 hover:border-amber-400 hover:scale-110 active:scale-95 opacity-95 group-hover/kanban:opacity-100'
                 : 'opacity-0 pointer-events-none'
               )
             }
@@ -660,19 +718,19 @@ export default function CrmKanbanBoard({
 
           {/* LEFT EDGE GRADIENT INDICATOR */}
           {canScrollLeft && (
-            <div className="absolute left-0 top-0 bottom-6 w-8 bg-gradient-to-r from-slate-100/90 to-transparent pointer-events-none z-10 rounded-l-2xl"></div>
+            <div className="absolute left-0 top-0 bottom-6 w-6 bg-gradient-to-r from-slate-50/90 to-transparent pointer-events-none z-10 rounded-l-2xl"></div>
           )}
 
           {/* RIGHT EDGE GRADIENT INDICATOR */}
           {canScrollRight && (
-            <div className="absolute right-0 top-0 bottom-6 w-8 bg-gradient-to-l from-slate-100/90 to-transparent pointer-events-none z-10 rounded-r-2xl"></div>
+            <div className="absolute right-0 top-0 bottom-6 w-6 bg-gradient-to-l from-slate-50/90 to-transparent pointer-events-none z-10 rounded-r-2xl"></div>
           )}
 
           {/* KANBAN SCROLL TRACK */}
           <div
             ref={scrollContainerRef}
             onScroll={checkScrollBounds}
-            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[380px] custom-scrollbar scroll-smooth px-1 snap-x snap-mandatory"
+            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[380px] custom-scrollbar scroll-smooth px-5 sm:px-10 snap-x snap-proximity sm:snap-none"
           >
             {visibleStages.map((stage, sIdx) => {
               const stageDeals = dealsByStage[stage] || [];
@@ -681,11 +739,15 @@ export default function CrmKanbanBoard({
                 ? 'Rs. ' + (stageTotal / 10000000).toFixed(2) + ' Cr'
                 : 'Rs. ' + (stageTotal / 100000).toFixed(1) + ' Lakhs';
               const isDropTarget = dragOverStage === stage;
+              const isSelectedStage = activeStageIndex === sIdx;
               const cfg = STAGE_CONFIG[stage] || DEFAULT_STAGE_CONFIG;
 
               return (
                 <div
                   key={stage}
+                  ref={(el) => {
+                    stageLaneRefs.current[sIdx] = el;
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault();
                     if (dragOverStage !== stage) setDragOverStage(stage);
@@ -704,10 +766,12 @@ export default function CrmKanbanBoard({
                     }
                   }}
                   className={
-                    'w-[84vw] sm:w-80 shrink-0 snap-center min-h-[380px] rounded-2xl border-2 flex flex-col transition-all duration-200 shadow-sm relative overflow-hidden ' +
+                    'w-[84vw] sm:w-80 shrink-0 snap-center sm:snap-align-none min-h-[380px] rounded-2xl border-2 flex flex-col transition-all duration-200 relative overflow-hidden ' +
                     (isDropTarget
                       ? 'bg-amber-50/90 border-amber-400 border-dashed ring-4 ring-amber-400/30 scale-[1.01] shadow-xl'
-                      : 'bg-slate-100/75 border-slate-200/90 hover:border-slate-300'
+                      : isSelectedStage
+                        ? 'bg-white border-amber-400 ring-2 ring-amber-400/35 shadow-[0_0_24px_rgba(251,191,36,0.22)]'
+                        : 'bg-slate-100/75 border-slate-200/90 hover:border-slate-300 shadow-sm'
                     )
                   }
                 >
@@ -783,6 +847,7 @@ export default function CrmKanbanBoard({
                           onTriggerWhatsApp={onTriggerWhatsApp}
                           onOpenFollowUp={onOpenFollowUp}
                           isBeingDragged={draggedDealId === deal.id}
+                          isSelected={Boolean(selectedDealId && (selectedDealId === deal.id || selectedDealId === deal.dealId))}
                           isFieldExecutive={isFieldExecutive}
                           onDragStart={(e) => {
                             setDraggedDealId(deal.id);
