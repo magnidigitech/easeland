@@ -18,6 +18,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
     const getScrollY = () => window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
     const openScrollY = getScrollY();
     let lowestScrollY = openScrollY;
+    const openedAt = Date.now();
 
     const handleScroll = (e) => {
       // If scrolling inside the drawer itself, allow normal browsing of drawer content
@@ -26,6 +27,13 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
       }
 
       const currentScrollY = getScrollY();
+
+      // During initial opening grace period (300ms), calibrate lowestScrollY and avoid false closures
+      if (Date.now() - openedAt < 300) {
+        lowestScrollY = currentScrollY;
+        return;
+      }
+
       if (currentScrollY < lowestScrollY) {
         lowestScrollY = currentScrollY;
       }

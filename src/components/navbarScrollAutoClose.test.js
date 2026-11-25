@@ -130,4 +130,43 @@ describe('EaseLand Navbar Hamburger Menu Auto-Close on Scroll Suite', () => {
     assert.ok(cssContent.includes('.mobile-nav-drawer-inner'), 'index.css must define .mobile-nav-drawer-inner');
     assert.ok(cssContent.includes('.mobile-nav-drawer-content'), 'index.css must define .mobile-nav-drawer-content');
   });
+
+  it('6. Evaluates opening menu while scrolled anywhere on page (e.g. scrollY = 600): opening grace calibration prevents premature closure, and menu stays open until subsequent user downward scroll', () => {
+    let mobileMenuOpen = true;
+    const setMobileMenuOpen = (val) => { mobileMenuOpen = val; };
+
+    const openScrollY = 600;
+    let lowestScrollY = openScrollY;
+    let openedAt = 1000;
+    let currentTime = 1050; // 50ms after opening
+
+    const handleScroll = (currentScrollY, eventTime) => {
+      // During initial opening grace period (300ms), calibrate lowestScrollY and avoid false closures
+      if (eventTime - openedAt < 300) {
+        lowestScrollY = currentScrollY;
+        return;
+      }
+
+      if (currentScrollY < lowestScrollY) {
+        lowestScrollY = currentScrollY;
+      }
+
+      if (currentScrollY > lowestScrollY + 25) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    // Immediate micro-shift / touch settling event at 50ms (scrollY shifted from 600 to 640)
+    handleScroll(640, 1050);
+    assert.strictEqual(mobileMenuOpen, true, 'Menu must remain open during opening grace period even if scroll position adjusts');
+    assert.strictEqual(lowestScrollY, 640, 'lowestScrollY must calibrate to the settled scroll position');
+
+    // After settled (400ms after open), user is browsing menu, stays open
+    handleScroll(645, 1400);
+    assert.strictEqual(mobileMenuOpen, true, 'Menu must remain open when finger wiggles slightly (+5px)');
+
+    // Now user intentionally scrolls page down past 25px threshold (640 + 26 = 666)
+    handleScroll(666, 1500);
+    assert.strictEqual(mobileMenuOpen, false, 'Menu must auto-close when user actively scrolls down past threshold after opening');
+  });
 });
