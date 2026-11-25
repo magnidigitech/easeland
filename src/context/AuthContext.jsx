@@ -1296,25 +1296,11 @@ export function AuthProvider({ children }) {
     setPending2FASession(null);
   };
 
-  const cancel2FASession = () => {
-    if (pending2FASession?.user) {
-      const { user: targetUser, profile: targetProfile } = pending2FASession;
-      const cleanProfile = { ...(targetProfile || {}) };
-      if (!cleanProfile.security) cleanProfile.security = {};
-      cleanProfile.security.enable2FA = false;
-      cleanProfile.security.twoFactorExplicitlyEnabled = false;
-      if (cleanProfile.communicationPreferences) cleanProfile.communicationPreferences.enable2FA = false;
-
-      if (targetUser?.uid) {
-        try { localStorage.setItem('easeland_user_profile_' + targetUser.uid, JSON.stringify(cleanProfile)); } catch(e){}
-      }
-      setUser(targetUser);
-      setProfile(cleanProfile);
-    } else {
-      setUser(null);
-      setProfile(null);
+  const cancel2FASession = async () => {
+    if (pending2FASession?.user?.uid) {
+      clear2FAVerifiedForSession(pending2FASession.user.uid);
     }
-    setPending2FASession(null);
+    await logoutUser();
   };
 
   const sendMobileOtp = async (phone) => {

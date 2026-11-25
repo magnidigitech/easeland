@@ -207,11 +207,12 @@ export default function TwoFactorModal({
                   value={digit}
                   onChange={(e) => handleDigitChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
-                  className={`w-11 h-13 text-center font-mono text-xl font-black rounded-xl border-2 transition-all outline-none ${
-                    digit
+                  className={
+                    'w-11 h-13 text-center font-mono text-xl font-black rounded-xl border-2 transition-all outline-none ' +
+                    (digit
                       ? 'border-amber-400 bg-amber-50/30 text-slate-950 shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-900 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20'
-                  }`}
+                      : 'border-slate-200 bg-white text-slate-900 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20')
+                  }
                 />
               ))}
             </div>
@@ -243,31 +244,25 @@ export default function TwoFactorModal({
                   type="button"
                   onClick={handleResendOtp}
                   disabled={resendCountdown > 0}
-                  className={`font-black flex items-center gap-1 ${
-                    resendCountdown > 0
+                  className={
+                    'font-black flex items-center gap-1 ' +
+                    (resendCountdown > 0
                       ? 'text-slate-400 cursor-not-allowed'
-                      : 'text-amber-600 hover:text-amber-700 cursor-pointer underline'
-                  }`}
+                      : 'text-amber-600 hover:text-amber-700 cursor-pointer underline')
+                  }
                 >
-                  <RefreshCw className={`w-3 h-3 ${resendCountdown > 0 ? 'animate-spin' : ''}`} />
-                  <span>{resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend Code'}</span>
+                  <RefreshCw className={'w-3 h-3 ' + (resendCountdown > 0 ? 'animate-spin' : '')} />
+                  <span>{resendCountdown > 0 ? 'Resend code in ' + resendCountdown + 's' : 'Resend Code'}</span>
                 </button>
               </div>
             )}
 
             {/* ACTION BUTTONS */}
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-1/2 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                Skip 2FA & Sign In
-              </button>
+            <div className="space-y-3 pt-2">
               <button
                 type="submit"
                 disabled={loading || digits.join('').length !== 6}
-                className="w-1/2 py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -281,6 +276,16 @@ export default function TwoFactorModal({
                   </>
                 )}
               </button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer py-1"
+                >
+                  Cancel & Sign Out
+                </button>
+              </div>
             </div>
           </form>
 
