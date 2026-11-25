@@ -287,22 +287,23 @@ export default function CrmKanbanBoard({
     if (Date.now() < programmaticScrollUntilRef.current) return;
 
     // On manual horizontal scroll, only reassign activeStageIndex if the current lane scrolled out of full view
-    const viewLeft = el.scrollLeft;
-    const viewRight = viewLeft + el.clientWidth;
+    const elRect = typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+    const isLaneVisible = (lane) => {
+      if (!lane) return false;
+      const laneRect = typeof lane.getBoundingClientRect === 'function' ? lane.getBoundingClientRect() : null;
+      if (elRect && laneRect && laneRect.width > 0) {
+        return laneRect.left >= elRect.left + 4 && laneRect.right <= elRect.left + el.clientWidth - 4;
+      }
+      return lane.offsetLeft >= el.scrollLeft + 4 && (lane.offsetLeft + lane.offsetWidth) <= (el.scrollLeft + el.clientWidth - 4);
+    };
+
     const activeLane = stageLaneRefs.current[activeStageIndex];
-    if (activeLane) {
-      const aLeft = activeLane.offsetLeft;
-      const aRight = aLeft + activeLane.offsetWidth;
-      const isFullyVisible = aLeft >= viewLeft + 4 && aRight <= viewRight - 4;
-      if (isFullyVisible) return;
-    }
+    if (isLaneVisible(activeLane)) return;
 
     // Pick first lane cleanly inside view
     let bestIdx = activeStageIndex;
     for (let i = 0; i < visibleStages.length; i += 1) {
-      const lane = stageLaneRefs.current[i];
-      if (!lane) continue;
-      if (lane.offsetLeft >= viewLeft + 4 && lane.offsetLeft + lane.offsetWidth <= viewRight - 4) {
+      if (isLaneVisible(stageLaneRefs.current[i])) {
         bestIdx = i;
         break;
       }
@@ -331,15 +332,19 @@ export default function CrmKanbanBoard({
     if (visibleStages.length === 0) return;
     const clampedIdx = Math.max(0, Math.min(visibleStages.length - 1, index));
     setActiveStageIndex(clampedIdx);
-    programmaticScrollUntilRef.current = Date.now() + 600;
+    programmaticScrollUntilRef.current = Date.now() + 900;
 
     const el = scrollContainerRef.current;
     const targetChild = stageLaneRefs.current[clampedIdx] || (el && el.children[clampedIdx]);
     if (el && targetChild) {
-      const safePad = typeof window !== 'undefined' && window.innerWidth < 640 ? 20 : 44;
-      const childLeft = targetChild.offsetLeft;
-      const childRight = childLeft + targetChild.offsetWidth;
+      const safePad = typeof window !== 'undefined' && window.innerWidth < 640 ? 20 : 48;
+      const elRect = typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+      const childRect = typeof targetChild.getBoundingClientRect === 'function' ? targetChild.getBoundingClientRect() : null;
+      const hasRect = Boolean(elRect && childRect && childRect.width > 0);
+
       const viewLeft = el.scrollLeft;
+      const childLeft = hasRect ? (viewLeft + (childRect.left - elRect.left)) : targetChild.offsetLeft;
+      const childRight = hasRect ? (viewLeft + (childRect.right - elRect.left)) : (childLeft + targetChild.offsetWidth);
       const viewRight = viewLeft + el.clientWidth;
       const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
 
@@ -350,10 +355,12 @@ export default function CrmKanbanBoard({
         nextScrollLeft = Math.min(maxScroll, childRight - el.clientWidth + safePad);
       }
 
-      if (typeof el.scrollTo === 'function') {
-        el.scrollTo({ left: nextScrollLeft, behavior: 'smooth' });
-      } else {
-        el.scrollLeft = nextScrollLeft;
+      if (Math.abs(nextScrollLeft - viewLeft) > 1) {
+        if (typeof el.scrollTo === 'function') {
+          el.scrollTo({ left: nextScrollLeft, behavior: 'smooth' });
+        } else {
+          el.scrollLeft = nextScrollLeft;
+        }
       }
     }
 
@@ -730,7 +737,7 @@ export default function CrmKanbanBoard({
           <div
             ref={scrollContainerRef}
             onScroll={checkScrollBounds}
-            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[380px] custom-scrollbar scroll-smooth px-5 sm:px-10 snap-x snap-proximity sm:snap-none"
+            className="flex gap-4 overflow-x-auto pt-2 pb-6 items-stretch min-h-[380px] custom-scrollbar scroll-smooth px-5 sm:px-10 snap-x snap-proximity sm:snap-none"
           >
             {visibleStages.map((stage, sIdx) => {
               const stageDeals = dealsByStage[stage] || [];
@@ -748,6 +755,7 @@ export default function CrmKanbanBoard({
                   ref={(el) => {
                     stageLaneRefs.current[sIdx] = el;
                   }}
+                  onClick={() => scrollToStageIndex(sIdx)}
                   onDragOver={(e) => {
                     e.preventDefault();
                     if (dragOverStage !== stage) setDragOverStage(stage);
@@ -766,12 +774,12 @@ export default function CrmKanbanBoard({
                     }
                   }}
                   className={
-                    'w-[84vw] sm:w-80 shrink-0 snap-center sm:snap-align-none min-h-[380px] rounded-2xl border-2 flex flex-col transition-all duration-200 relative overflow-hidden ' +
+                    'w-[84vw] sm:w-80 shrink-0 snap-center sm:snap-align-none min-h-[380px] rounded-2xl border-2 flex flex-col transition-all duration-200 relative overflow-hidden cursor-pointer ' +
                     (isDropTarget
                       ? 'bg-amber-50/90 border-amber-400 border-dashed ring-4 ring-amber-400/30 scale-[1.01] shadow-xl'
                       : isSelectedStage
-                        ? 'bg-white border-amber-400 ring-2 ring-amber-400/35 shadow-[0_0_24px_rgba(251,191,36,0.22)]'
-                        : 'bg-slate-100/75 border-slate-200/90 hover:border-slate-300 shadow-sm'
+                        ? 'bg-white border-amber-400 ring-2 ring-amber-400/60 shadow-[0_0_26px_rgba(245,158,11,0.32)]'
+                        : 'bg-slate-100/75 border-slate-200/90 hover:border-amber-300/80 hover:shadow-md shadow-sm'
                     )
                   }
                 >
@@ -828,7 +836,11 @@ export default function CrmKanbanBoard({
                         </div>
                         <button
                           type="button"
-                          onClick={onOpenNewDeal}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            scrollToStageIndex(sIdx);
+                            onOpenNewDeal();
+                          }}
                           className="mt-1 px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 text-[10px] font-black rounded-lg transition-all cursor-pointer shadow-sm hover:shadow-sm active:scale-95 flex items-center gap-1"
                         >
                           <PlusCircle className="w-3 h-3 stroke-[2.5]" />

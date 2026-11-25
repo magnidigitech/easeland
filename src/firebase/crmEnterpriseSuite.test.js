@@ -433,6 +433,8 @@ test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
     assert.ok(kanbanSrc.includes('stageLaneRefs') && kanbanSrc.includes('stagePillRefs'), 'Stage lanes and stage ribbon pills must be ref-tracked for full viewport visibility');
     assert.strictEqual(kanbanSrc.includes('snap-mandatory'), false, 'Kanban track must not enforce snap-mandatory which fights smooth scroll positioning');
     assert.ok(kanbanSrc.includes('isSelectedStage'), 'Active stage lane must compute isSelectedStage for glow highlight');
+    assert.ok(kanbanSrc.includes('onClick={() => scrollToStageIndex(sIdx)}'), 'Stage lane cards must be directly clickable to select and highlight');
+    assert.ok(kanbanSrc.includes('getBoundingClientRect'), 'Stage scroll positioning must use getBoundingClientRect relative to scrollContainerRef');
     assert.ok(kanbanSrc.includes('selectedDealId'), 'CrmKanbanBoard must accept and forward selectedDealId to CrmDealCard');
     assert.ok(cardSrc.includes('isSelected') && cardSrc.includes('ring-amber-400/50'), 'CrmDealCard must render amber glow highlight when selected');
     assert.ok(crmPageSrc.includes('selectedDealId={selectedDealForDossierId}'), 'EaseLandCRM must pass selectedDealForDossierId to CrmKanbanBoard');
