@@ -56,4 +56,18 @@ describe('Two-Factor Authentication Security & Anti-Bypass Suite', () => {
     );
   });
 
+  it('4. Exposes Security & Password Settings access across PWA Navbar, Mobile Drawer, UserDashboard, and ProfileSettingsModal', () => {
+    const navbarSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/components/Navbar.jsx'), 'utf8');
+    const dashboardSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/components/UserDashboard.jsx'), 'utf8');
+    const modalSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/components/ProfileSettingsModal.jsx'), 'utf8');
+    const appSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/App.jsx'), 'utf8');
+
+    assert.ok(navbarSrc.includes("onOpenProfileSettings('security')"), 'Navbar mobile/PWA must open Security & Password Settings directly');
+    assert.ok(navbarSrc.includes('Security &amp; Password Settings'), 'Navbar mobile/PWA drawer must label Security & Password Settings');
+    assert.ok(dashboardSrc.includes('onOpenSecuritySettings'), 'UserDashboard must accept and render onOpenSecuritySettings actions');
+    assert.ok(dashboardSrc.includes('Security &amp; Password Settings'), 'UserDashboard Account tab must surface Security & Password Settings');
+    assert.ok(modalSrc.includes("initialTab = 'profile'"), 'ProfileSettingsModal must support initialTab to jump straight to security');
+    assert.ok(appSrc.includes("onOpenSecuritySettings={() => openProfileSettings('security')}"), 'App.jsx must wire onOpenSecuritySettings to UserDashboard');
+  });
+
 });

@@ -353,7 +353,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
                 </button>
 
                 <button
-                  onClick={onOpenProfileSettings}
+                  onClick={() => onOpenProfileSettings && onOpenProfileSettings('profile')}
                   className="p-2 text-slate-700 hover:text-amber-600 hover:bg-slate-100 rounded-xl transition-colors border border-transparent"
                   title="Profile & Security Settings"
                 >
@@ -388,11 +388,22 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
             </button>
           </div>
 
-          {/* MOBILE MENU TOGGLE */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* MOBILE & TABLET PWA MENU TOGGLE */}
+          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2">
+            {user && (
+              <button
+                type="button"
+                onClick={() => onOpenProfileSettings && onOpenProfileSettings('security')}
+                className="p-2 text-slate-700 hover:text-amber-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                aria-label="Security & Password Settings"
+                title="Security & Password Settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={onPostPropertyClick}
-              className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs px-3.5 py-2 rounded-xl shadow-xs border border-amber-300/80 shrink-0 whitespace-nowrap flex items-center gap-1.5 transition-all transform active:scale-95 cursor-pointer"
+              className="bg-brand-yellow hover:bg-brand-yellowHover text-brand-charcoal font-black text-xs px-3.5 py-2 rounded-xl shadow-sm border border-amber-300/80 shrink-0 whitespace-nowrap flex items-center gap-1.5 transition-all transform active:scale-95 cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Post</span>
@@ -420,7 +431,7 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
       <div
         ref={drawerRef}
         aria-hidden={!mobileMenuOpen}
-        className={'md:hidden mobile-nav-drawer' + (mobileMenuOpen ? ' open' : '')}
+        className={'lg:hidden mobile-nav-drawer' + (mobileMenuOpen ? ' open' : '')}
       >
         <div className="mobile-nav-drawer-inner">
           <div className="mobile-nav-drawer-content bg-white border-b border-slate-200 px-4 pt-3 pb-6 space-y-3">
@@ -520,9 +531,44 @@ export default function Navbar({ activePage, setActivePage, wishlistCount, user,
           )}
 
           {user ? (
-            <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-900">{user.name}</span>
-              <button onClick={onLogoutClick} className="text-rose-600 font-bold">Log Out</button>
+            <div className="pt-2 border-t border-slate-200 space-y-2 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePage('dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 font-bold flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-600" />
+                  <span>My Account &amp; Dashboard</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenProfileSettings && onOpenProfileSettings('security');
+                }}
+                className="w-full text-left py-2.5 px-3 rounded-xl bg-amber-50/90 hover:bg-amber-100/90 border border-amber-200 text-slate-900 font-bold flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="block truncate">Security &amp; Password Settings</span>
+                    <span className="block text-[10px] font-semibold text-slate-600 truncate">2FA Authenticator, 4-Digit MPIN &amp; Password</span>
+                  </div>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              </button>
+
+              <div className="pt-1 flex items-center justify-between px-1">
+                <span className="font-bold text-slate-900 truncate max-w-[180px]">{user.name || user.displayName || user.email}</span>
+                <button onClick={onLogoutClick} className="text-rose-600 font-bold cursor-pointer">Log Out</button>
+              </div>
             </div>
           ) : (
             <button

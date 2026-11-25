@@ -54,6 +54,7 @@ export default function UserDashboard({
   onWishlistToggle,
   onNavigate,
   onPostProperty,
+  onOpenSecuritySettings,
   onTabChange,
   initialTab = 'overview',
   tabKey = 0
@@ -1266,6 +1267,17 @@ export default function UserDashboard({
             <Settings className={`w-3.5 h-3.5 ${activeTab === 'account' ? 'text-slate-950' : 'text-amber-500'}`} />
             <span>Settings</span>
           </button>
+
+          {onOpenSecuritySettings && (
+            <button
+              type="button"
+              onClick={onOpenSecuritySettings}
+              className="px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border bg-slate-900 text-white border-slate-800 hover:bg-slate-800 cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Security &amp; Password</span>
+            </button>
+          )}
         </div>
 
         {/* MAIN DASHBOARD CONTAINER WITH SIDEBAR & CONTENT */}
@@ -1359,6 +1371,20 @@ export default function UserDashboard({
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-50" />
               </button>
+
+              {onOpenSecuritySettings && (
+                <button
+                  type="button"
+                  onClick={onOpenSecuritySettings}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-extrabold transition-all border text-slate-700 border-transparent hover:bg-amber-50 hover:text-slate-900 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <span>Security &amp; Password</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-50" />
+                </button>
+              )}
 
             </div>
           </div>
@@ -2162,6 +2188,30 @@ export default function UserDashboard({
                     );
                   })()}
                 </div>
+
+                {onOpenSecuritySettings && (
+                  <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-400/15 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-white">Security &amp; Password Settings</h3>
+                        <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                          Manage Two-Factor Authenticator (2FA), 4-Digit MPIN quick unlock, and account password.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onOpenSecuritySettings}
+                      className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Open Security &amp; Password</span>
+                    </button>
+                  </div>
+                )}
 
                 {profileSaveError && (
                   <div className="bg-red-50 text-red-800 text-xs font-extrabold p-3 rounded-xl border border-red-200 flex items-center gap-2">

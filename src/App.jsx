@@ -147,6 +147,11 @@ export default function App() {
   // Auth & Profile Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalInitialTab, setProfileModalInitialTab] = useState('profile');
+  const openProfileSettings = (tab = 'profile') => {
+    setProfileModalInitialTab(tab === 'security' ? 'security' : 'profile');
+    setIsProfileModalOpen(true);
+  };
   const [authIntent, setAuthIntent] = useState(null);
   const [dashboardTab, setDashboardTab] = useState(() => {
     if (initialPageState.page === 'dashboard' && initialPageState.tab) {
@@ -908,7 +913,7 @@ export default function App() {
         }}
         onLogoutClick={handleLogout}
         onPostPropertyClick={handlePostPropertyClick}
-        onOpenProfileSettings={() => setIsProfileModalOpen(true)}
+        onOpenProfileSettings={openProfileSettings}
       />
 
       {/* ADMIN LIVE SITE INSPECTION MODE BAR */}
@@ -1489,6 +1494,7 @@ export default function App() {
             onWishlistToggle={handleWishlistToggle}
             onNavigate={(page, propId) => changeActivePage(page, propId)}
             onPostProperty={handlePostPropertyClick}
+            onOpenSecuritySettings={() => openProfileSettings('security')}
           />
         )}
 
@@ -1695,6 +1701,7 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         onUserUpdated={() => setIsProfileWarningOpen(false)}
+        initialTab={profileModalInitialTab}
       />
 
       {/* INCOMPLETE PROFILE CRITERIA WARNING MODAL FOR POST PROPERTY */}

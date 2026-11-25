@@ -23,7 +23,7 @@ import {
   clearTrustedMpinUser
 } from '../utils/mpinDeviceStorage.js';
 
-export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated }) {
+export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated, initialTab = 'profile' }) {
   const {
     user,
     profile,
@@ -36,7 +36,13 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated })
     checkMpinStatus
   } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'security'
+  const [activeTab, setActiveTab] = useState(initialTab === 'security' ? 'security' : 'profile'); // 'profile' or 'security'
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab === 'security' ? 'security' : 'profile');
+    }
+  }, [isOpen, initialTab]);
 
   const sanitizePhone = (ph) => {
     if (!ph) return '';
