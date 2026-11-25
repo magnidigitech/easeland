@@ -17,7 +17,7 @@ export const CrmStageLabels = {
   [CrmDealStages.NEW]: 'New Inquiries',
   [CrmDealStages.CONTACTED]: 'Contacted & Discovery',
   [CrmDealStages.SITE_VISIT]: 'Site Visit Scheduled',
-  [CrmDealStages.DOCUMENT_AUDIT]: 'Title Deed Audit',
+  [CrmDealStages.DOCUMENT_AUDIT]: 'Legal & Title Check',
   [CrmDealStages.PRICE_NEGOTIATION]: 'Price Negotiation',
   [CrmDealStages.TOKEN_ADVANCE]: 'Token Advance Paid',
   [CrmDealStages.REGISTRATION_PENDING]: 'Registration Pending',
@@ -29,96 +29,130 @@ export const CrmStageLabels = {
 export const CRM_STAGE_METADATA = {
   [CrmDealStages.NEW]: {
     step: 1,
-    tagline: 'Initial buyer inquiries',
-    milestone: 'Buyer Outreach',
-    defaultAction: 'Initial qualification & requirement gathering call',
+    tagline: 'Fresh buyer inquiries',
+    milestone: 'First Contact',
+    defaultAction: 'Call buyer to confirm budget & plot needs',
     leadDays: 1,
     badgeColor: 'sky',
-    checklist: ['Verify buyer budget', 'Preferred zone', 'Immediate / Long-term intent']
+    checklist: ['Confirm budget', 'Preferred area', 'Buying timeline']
   },
   [CrmDealStages.CONTACTED]: {
     step: 2,
-    tagline: 'Discovery & qualifications',
-    milestone: 'Shortlist Shared',
-    defaultAction: 'Send verified property layout & schedule pitch call',
+    tagline: 'Shortlisting matching plots',
+    milestone: 'Options Shared',
+    defaultAction: 'Share layout map & schedule discussion call',
     leadDays: 1,
     badgeColor: 'indigo',
-    checklist: ['Send layout plan', 'Facing preference confirmed', 'Plot size shortlisted']
+    checklist: ['Send layout plan', 'Facing preference', 'Plot size needed']
   },
   [CrmDealStages.SITE_VISIT]: {
     step: 3,
-    tagline: 'Physical plot inspections',
-    milestone: 'Field Inspection',
-    defaultAction: 'Coordinate physical plot inspection & boundary landmark check',
+    tagline: 'On-site plot inspections',
+    milestone: 'Site Visit',
+    defaultAction: 'Visit plot with buyer & check boundaries',
     leadDays: 2,
     badgeColor: 'amber',
-    checklist: ['GPS coordinates pin', 'Boundary stones checked', 'Road width & approach verified']
+    checklist: ['Share GPS pin', 'Check boundary stones', 'Verify approach road']
   },
   [CrmDealStages.DOCUMENT_AUDIT]: {
     step: 4,
-    tagline: 'Legal & title clearance',
-    milestone: 'Title & EC Audit',
-    defaultAction: 'Verify 30-year Link Documents, Encumbrance Certificate & Revenue clearance',
+    tagline: 'Title & EC verification',
+    milestone: 'Legal Check',
+    defaultAction: 'Verify 30-yr link deeds, EC & passbook',
     leadDays: 3,
     badgeColor: 'purple',
-    checklist: ['30-yr link deed trace', 'Nil-encumbrance EC', 'Pattadar passbook check']
+    checklist: ['30-yr link deeds', 'Encumbrance (EC)', 'Pattadar passbook']
   },
   [CrmDealStages.PRICE_NEGOTIATION]: {
     step: 5,
-    tagline: 'Price & terms structuring',
-    milestone: 'Price Structuring',
-    defaultAction: 'Buyer-Seller commercial meeting & final price per sq.yd agreement',
+    tagline: 'Finalizing rate & terms',
+    milestone: 'Price Discussion',
+    defaultAction: 'Align buyer & seller on final sq.yd rate',
     leadDays: 2,
     badgeColor: 'orange',
-    checklist: ['Asking vs Offer gap', 'Payment schedule structure', 'TDS & tax terms']
+    checklist: ['Buyer vs Seller gap', 'Payment schedule', 'Tax & TDS terms']
   },
   [CrmDealStages.TOKEN_ADVANCE]: {
     step: 6,
-    tagline: 'Advance committed',
-    milestone: 'Token / Bayana',
-    defaultAction: 'Verify token advance transfer & execute bilingual Sale Agreement',
+    tagline: 'Advance received',
+    milestone: 'Token Paid',
+    defaultAction: 'Confirm advance receipt & sign Sale Agreement',
     leadDays: 2,
     badgeColor: 'teal',
-    checklist: ['Token receipt issued', '90-day execution clause', 'Boundary schedule marked']
+    checklist: ['Advance receipt', 'Sale agreement signed', 'Boundary schedule']
   },
   [CrmDealStages.REGISTRATION_PENDING]: {
     step: 7,
-    tagline: 'Sub-registrar filing',
-    milestone: 'SRO Registration',
-    defaultAction: 'Book Sub-Registrar slot, deposit stamp duty challan & witness prep',
+    tagline: 'Sub-Registrar filing',
+    milestone: 'Registration',
+    defaultAction: 'Book SRO slot, pay stamp duty & arrange witnesses',
     leadDays: 3,
     badgeColor: 'blue',
-    checklist: ['Sub-Registrar slot booked', 'Stamp duty & cess paid', '2 witness IDs collected']
+    checklist: ['SRO slot booked', 'Stamp duty paid', '2 witness IDs ready']
   },
   [CrmDealStages.CLOSED_WON]: {
     step: 8,
-    tagline: 'Executed & registered',
-    milestone: 'Registration Complete',
-    defaultAction: 'Sale deed executed, physical possession & mutation handover complete',
+    tagline: 'Registered & handed over',
+    milestone: 'Deal Closed',
+    defaultAction: 'Sale deed registered & plot handed over',
     leadDays: 0,
     badgeColor: 'emerald',
-    checklist: ['Registered deed received', 'Physical plot possession', 'Commission settled']
+    checklist: ['Registered deed copy', 'Plot handover', 'Brokerage settled']
   },
   [CrmDealStages.CLOSED_LOST]: {
     step: 0,
-    tagline: 'Deal closed / cancelled',
-    milestone: 'Deal Lost',
-    defaultAction: 'Document loss reason, buyer feedback & archive deal dossier',
+    tagline: 'Deal dropped or paused',
+    milestone: 'Closed / Lost',
+    defaultAction: 'Note reason & set reminder to check back later',
     leadDays: 0,
     badgeColor: 'slate',
-    checklist: ['Loss reason recorded', 'Buyer re-engagement date']
+    checklist: ['Reason noted', 'Follow-up date']
   }
 };
 
+export function formatShortDate(isoDate) {
+  if (!isoDate) return '';
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(isoDate);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = Number(m[2]) - 1;
+  const dayNum = Number(m[3]);
+  if (monthIdx < 0 || monthIdx > 11 || isNaN(dayNum)) return String(isoDate);
+  return dayNum + ' ' + months[monthIdx];
+}
+
+export function formatLegalStatusLabel(status) {
+  const s = String(status || '').toUpperCase().trim();
+  if (s === 'CLEAR_TITLE' || s === 'VERIFIED') return 'Title Clear';
+  if (s === 'CONDITIONAL') return 'Needs Minor Fix';
+  if (s === 'DISPUTED') return 'Issue Found';
+  if (!s || s === 'PENDING') return 'Pending Check';
+  return status;
+}
+
+export function getLocalDateIso(offsetDays = 0) {
+  const dt = new Date();
+  if (offsetDays) dt.setDate(dt.getDate() + offsetDays);
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(dt);
+  } catch (e) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+}
+
 export function getStageDefaultFollowUp(stage) {
   const meta = CRM_STAGE_METADATA[stage] || CRM_STAGE_METADATA[CrmDealStages.NEW];
-  const targetDate = new Date();
-  if (meta.leadDays > 0) {
-    targetDate.setDate(targetDate.getDate() + meta.leadDays);
-  }
   return {
     action: meta.defaultAction,
-    date: targetDate.toISOString().split('T')[0],
+    date: getLocalDateIso(meta.leadDays > 0 ? meta.leadDays : 0),
     time: '11:00 AM',
     milestone: meta.milestone,
     tagline: meta.tagline,
@@ -405,7 +439,7 @@ export function calculateCrmAnalytics(deals = [], leads = [], visits = []) {
   const conversionRate = totalFinished > 0 ? Math.round((wonDeals.length / totalFinished) * 100) : 0;
   const scheduledVisits = safeVisits.filter(v => v && v.status === 'SCHEDULED');
 
-  const todayIso = new Date().toISOString().split('T')[0];
+  const todayIso = getLocalDateIso();
   const followUpsDueTodayCount = safeDeals.filter(d =>
     d && d.stage !== CrmDealStages.CLOSED_WON && d.stage !== CrmDealStages.CLOSED_LOST &&
     d.nextFollowUpDate && d.nextFollowUpDate <= todayIso
@@ -477,6 +511,14 @@ export async function fetchCrmBootstrap() {
   };
 }
 
+async function parseApiError(res, fallbackMsg) {
+  try {
+    const errJson = await res.json();
+    if (errJson && errJson.error) return String(errJson.error);
+  } catch (e) {}
+  return fallbackMsg + ' (HTTP ' + res.status + ')';
+}
+
 export async function getCrmLeads() {
   const bootstrap = await fetchCrmBootstrap();
   return deduplicateLeads(bootstrap.leads || []);
@@ -497,10 +539,13 @@ export async function createCrmLead(leadData) {
           return { success: true, lead: data.lead };
         }
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to save lead') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error saving lead' };
+    }
   }
 
-  // Test environment fallback
+  // Test environment fallback (Node / headless tests)
   const leadId = leadData.id || ('lead-' + Date.now().toString().slice(-6));
   const payload = {
     id: leadId,
@@ -534,8 +579,14 @@ export async function updateCrmLead(leadId, updates) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       });
-      if (res.ok) return { success: true };
-    } catch (err) {}
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, lead: data.lead };
+      }
+      return { success: false, error: await parseApiError(res, 'Failed to update lead') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error updating lead' };
+    }
   }
 
   testLeadsStore = testLeadsStore.map(l => l.id === leadId ? { ...l, ...updates, updatedAt: new Date().toISOString() } : l);
@@ -550,7 +601,10 @@ export async function deleteCrmLead(leadId) {
         testLeadsStore = testLeadsStore.filter(l => l.id !== leadId);
         return { success: true };
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to delete lead') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error deleting lead' };
+    }
   }
 
   testLeadsStore = testLeadsStore.filter(l => l.id !== leadId);
@@ -577,7 +631,10 @@ export async function createCrmDeal(dealData) {
           return { success: true, deal: data.deal };
         }
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to create deal') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error creating deal' };
+    }
   }
 
   // Test environment fallback
@@ -610,7 +667,7 @@ export async function createCrmDeal(dealData) {
     notes: dealData.notes || '',
     paymentMilestones: dealData.paymentMilestones || [],
     timeline: [
-      { date: new Date().toISOString().split('T')[0], event: 'Deal created in CRM', user: dealData.assignedAgent || 'System Admin' }
+      { date: getLocalDateIso(), event: 'Deal created in CRM', user: dealData.assignedAgent || 'System Admin' }
     ],
     version: 1,
     createdAt: new Date().toISOString(),
@@ -639,8 +696,14 @@ export async function updateCrmDealStage(dealId, newStage, noteText = '', follow
           paymentMilestones: extraData.paymentMilestones
         })
       });
-      if (res.ok) return { success: true };
-    } catch (err) {}
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, deal: data.deal };
+      }
+      return { success: false, error: await parseApiError(res, 'Failed to update deal stage') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error updating deal stage' };
+    }
   }
 
   // Test environment fallback
@@ -675,7 +738,7 @@ export async function updateCrmDealStage(dealId, newStage, noteText = '', follow
     }
     target.timeline = target.timeline || [];
     target.timeline.push({
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateIso(),
       event: 'Stage changed to ' + (CrmStageLabels[newStage] || newStage) + '. Next Follow-up: ' + stageFollowUp.action,
       user: 'EaseLand Admin' + (noteText ? ' (' + noteText + ')' : '')
     });
@@ -696,7 +759,10 @@ export async function updateCrmDealFollowUp(dealId, followUpData = {}) {
         const json = await res.json();
         return { success: true, deal: json.deal };
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to update follow-up') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error updating follow-up' };
+    }
   }
 
   // Test environment fallback
@@ -709,14 +775,14 @@ export async function updateCrmDealFollowUp(dealId, followUpData = {}) {
     target.timeline = target.timeline || [];
     if (followUpData.logNote) {
       target.timeline.push({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateIso(),
         event: followUpData.logNote,
         user: followUpData.agentName || 'EaseLand Admin'
       });
     }
     if (followUpData.followUpAction) {
       target.timeline.push({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateIso(),
         event: 'Follow-up scheduled for ' + (followUpData.followUpDate || 'Due') + ' at ' + (followUpData.followUpTime || '11:00 AM') + ': ' + followUpData.followUpAction,
         user: followUpData.agentName || 'EaseLand Admin'
       });
@@ -738,7 +804,10 @@ export async function deleteCrmDeal(dealId) {
         testDealsStore = testDealsStore.filter(d => d.id !== dealId);
         return { success: true };
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to delete deal') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error deleting deal' };
+    }
   }
 
   testDealsStore = testDealsStore.filter(d => d.id !== dealId);
@@ -765,7 +834,10 @@ export async function scheduleCrmVisit(visitData) {
           return { success: true, visit: data.visit };
         }
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to schedule site visit') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error scheduling site visit' };
+    }
   }
 
   // Test environment fallback
@@ -779,7 +851,7 @@ export async function scheduleCrmVisit(visitData) {
     propertyLocation: visitData.propertyLocation || 'Amaravati / Guntur Region',
     customerName: visitData.customerName || 'Prospective Buyer',
     customerPhone: visitData.customerPhone || '',
-    visitDate: visitData.visitDate || new Date().toISOString().split('T')[0],
+    visitDate: visitData.visitDate || getLocalDateIso(),
     visitTime: visitData.visitTime || '11:00 AM',
     agentAssigned: visitData.agentAssigned || DEFAULT_CRM_AGENTS[0].name,
     status: 'SCHEDULED',
@@ -799,7 +871,10 @@ export async function updateCrmVisitStatus(visitId, newStatus, feedbackText = ''
         body: JSON.stringify({ status: newStatus, customerFeedback: feedbackText })
       });
       if (res.ok) return { success: true };
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to update visit status') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error updating visit status' };
+    }
   }
 
   testVisitsStore = testVisitsStore.map(v => v.id === visitId ? { ...v, status: newStatus, customerFeedback: feedbackText, updatedAt: new Date().toISOString() } : v);
@@ -814,7 +889,10 @@ export async function deleteCrmVisit(visitId) {
         testVisitsStore = testVisitsStore.filter(v => v.id !== visitId);
         return { success: true };
       }
-    } catch (err) {}
+      return { success: false, error: await parseApiError(res, 'Failed to delete site visit') };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Network error deleting site visit' };
+    }
   }
 
   testVisitsStore = testVisitsStore.filter(v => v.id !== visitId);
@@ -945,6 +1023,85 @@ export function calculateBuyerMatchScore(lead, property, options = {}) {
   return Math.min(100, Math.max(10, score));
 }
 
+export function getMatchBreakdown(lead, property, options = {}) {
+  const result = {
+    locationMatch: 'unknown',
+    locationLabel: 'Location Unspecified',
+    typeMatch: false,
+    typeLabel: 'Category Review',
+    budgetMatch: 'unknown',
+    budgetLabel: 'Budget Flexible'
+  };
+  if (!lead || !property) return result;
+
+  const clusters = options.clusters || getRegionalClusters();
+  const leadLoc = String(lead.preferredLocation || '').toLowerCase().trim();
+  const propLoc = String(property.locationName || property.address || property.city || property.district || property.title || '').toLowerCase();
+
+  if (leadLoc && propLoc) {
+    if (leadLoc === 'any' || leadLoc === 'all') {
+      result.locationMatch = 'any';
+      result.locationLabel = 'Flexible Zone';
+    } else {
+      const tokens = leadLoc.split(/[\s,]+/);
+      const directMatches = tokens.filter(t => t.length > 2 && propLoc.includes(t));
+      let clusterMatch = false;
+      for (const [hub, members] of Object.entries(clusters)) {
+        const leadHasHub = leadLoc.includes(hub) || members.some(m => leadLoc.includes(m));
+        const propHasHub = propLoc.includes(hub) || members.some(m => propLoc.includes(m));
+        if (leadHasHub && propHasHub) {
+          clusterMatch = true;
+          break;
+        }
+      }
+      if (directMatches.length > 0) {
+        result.locationMatch = 'exact';
+        result.locationLabel = 'Exact Location Fit';
+      } else if (clusterMatch) {
+        result.locationMatch = 'cluster';
+        result.locationLabel = 'Regional Cluster Fit';
+      } else {
+        result.locationMatch = 'mismatch';
+        result.locationLabel = 'Outside Target Zone';
+      }
+    }
+  }
+
+  const leadType = String(lead.preferredPropertyType || '').toLowerCase().trim();
+  const propType = String(property.propertyType || property.category || property.type || '').toLowerCase().trim();
+  if (leadType && propType) {
+    if (
+      leadType === propType ||
+      (leadType.includes('plot') && propType.includes('plot')) ||
+      (leadType.includes('land') && propType.includes('land')) ||
+      (leadType.includes('commercial') && propType.includes('commercial'))
+    ) {
+      result.typeMatch = true;
+      result.typeLabel = 'Zoning Matched';
+    } else {
+      result.typeLabel = 'Cross-Category';
+    }
+  }
+
+  const propPrice = Number(property.price || property.expectedPrice || property.rawPrice) || 0;
+  const bMax = Number(lead.budgetMax) || 0;
+  const headroom = options.budgetHeadroom !== undefined ? Number(options.budgetHeadroom) : 0.15;
+  if (propPrice > 0 && bMax > 0) {
+    if (propPrice <= bMax) {
+      result.budgetMatch = 'within';
+      result.budgetLabel = 'Within Budget';
+    } else if (propPrice <= bMax * (1 + headroom)) {
+      result.budgetMatch = 'headroom';
+      result.budgetLabel = 'Negotiation Headroom';
+    } else {
+      result.budgetMatch = 'over';
+      result.budgetLabel = 'Above Max Budget';
+    }
+  }
+
+  return result;
+}
+
 export function matchPropertiesForLead(lead, allProperties = [], options = {}) {
   if (!lead || !Array.isArray(allProperties)) return [];
   registerDynamicLocationsFromProperties(allProperties);
@@ -953,7 +1110,8 @@ export function matchPropertiesForLead(lead, allProperties = [], options = {}) {
   return allProperties
     .map(p => ({
       property: p,
-      matchScore: calculateBuyerMatchScore(lead, p, options)
+      matchScore: calculateBuyerMatchScore(lead, p, options),
+      breakdown: getMatchBreakdown(lead, p, options)
     }))
     .filter(item => item.matchScore >= threshold)
     .sort((a, b) => b.matchScore - a.matchScore);
@@ -966,8 +1124,40 @@ export function matchLeadsForProperty(property, allLeads = [], options = {}) {
   return allLeads
     .map(lead => ({
       lead,
-      matchScore: calculateBuyerMatchScore(lead, property, options)
+      matchScore: calculateBuyerMatchScore(lead, property, options),
+      breakdown: getMatchBreakdown(lead, property, options)
     }))
     .filter(item => item.matchScore >= threshold)
     .sort((a, b) => b.matchScore - a.matchScore);
+}
+
+export function escapeCsvCell(val) {
+  const str = val === null || val === undefined ? '' : String(val);
+  // Protect spreadsheet tools from formula injection (=, +, -, @)
+  const neutralized = /^[=+\-@\t\r]/.test(str) ? ("'" + str) : str;
+  if (/[",\n\r]/.test(neutralized)) {
+    return '"' + neutralized.replace(/"/g, '""') + '"';
+  }
+  return neutralized;
+}
+
+export function buildCsvContent(headers = [], rows = []) {
+  const headerLine = headers.map(escapeCsvCell).join(',');
+  const dataLines = rows.map(row => row.map(escapeCsvCell).join(','));
+  return [headerLine, ...dataLines].join('\r\n');
+}
+
+export function exportRecordsToCsv(filename, headers, rows) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  const csv = buildCsvContent(headers, rows);
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || 'easeland-crm-export.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }

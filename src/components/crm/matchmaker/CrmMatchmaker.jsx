@@ -8,7 +8,8 @@ import {
   MessageSquare,
   Calendar,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react';
 import {
   matchPropertiesForLead,
@@ -28,13 +29,40 @@ export default function CrmMatchmaker({
   const [leadSearch, setLeadSearch] = useState('');
   const [propertySearch, setPropertySearch] = useState('');
 
+  const filteredLeads = useMemo(() => {
+    const q = leadSearch.toLowerCase().trim();
+    if (!q) return leads;
+    const qDigits = q.replace(/\D/g, '');
+    return leads.filter((l) => {
+      const ph = String(l.phone || '').replace(/\D/g, '');
+      return (
+        (qDigits.length >= 3 && ph.includes(qDigits)) ||
+        (l.name || '').toLowerCase().includes(q) ||
+        (l.preferredLocation || '').toLowerCase().includes(q) ||
+        (l.preferredPropertyType || '').toLowerCase().includes(q)
+      );
+    });
+  }, [leads, leadSearch]);
+
+  const filteredProperties = useMemo(() => {
+    const q = propertySearch.toLowerCase().trim();
+    if (!q) return availableProperties;
+    return availableProperties.filter((p) =>
+      (p.title || '').toLowerCase().includes(q) ||
+      (p.locationName || '').toLowerCase().includes(q) ||
+      (p.city || '').toLowerCase().includes(q) ||
+      (p.district || '').toLowerCase().includes(q) ||
+      (p.propertyType || p.category || '').toLowerCase().includes(q)
+    );
+  }, [availableProperties, propertySearch]);
+
   const activeLead = useMemo(() => {
-    return leads.find(l => l.id === selectedLeadId) || leads[0] || null;
-  }, [leads, selectedLeadId]);
+    return filteredLeads.find(l => l.id === selectedLeadId) || filteredLeads[0] || leads[0] || null;
+  }, [filteredLeads, leads, selectedLeadId]);
 
   const activeProperty = useMemo(() => {
-    return availableProperties.find(p => (p.id || p.propertyId) === selectedPropertyId) || availableProperties[0] || null;
-  }, [availableProperties, selectedPropertyId]);
+    return filteredProperties.find(p => (p.id || p.propertyId) === selectedPropertyId) || filteredProperties[0] || availableProperties[0] || null;
+  }, [filteredProperties, availableProperties, selectedPropertyId]);
 
   // Mode 1: Matched Properties for Active Buyer
   const matchedProperties = useMemo(() => {
@@ -94,13 +122,37 @@ export default function CrmMatchmaker({
       {matchMode === 'buyerToProperty' && (
         <div className="space-y-6">
 
-          {/* BUYER SELECTOR PILLS */}
+          {/* BUYER SELECTOR PILLS + SEARCH */}
           <div className="space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-              Select Active Buyer ({leads.length}):
-            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                Select Active Buyer ({filteredLeads.length} of {leads.length}):
+              </span>
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={leadSearch}
+                  onChange={(e) => setLeadSearch(e.target.value)}
+                  placeholder="Filter buyers by name, zone..."
+                  className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                />
+                {leadSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setLeadSearch('')}
+                    aria-label="Clear buyer filter"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full shrink-0">
-              {leads.map(l => (
+              {filteredLeads.length === 0 ? (
+                <span className="text-xs font-semibold text-slate-400 py-1.5">No buyers match "{leadSearch}".</span>
+              ) : filteredLeads.map(l => (
                 <button
                   key={l.id}
                   type="button"
@@ -158,14 +210,14 @@ export default function CrmMatchmaker({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {matchedProperties.map(({ property, matchScore }) => (
+                {matchedProperties.map(({ property, matchScore, breakdown }) => (
                   <div
                     key={property.id || property.propertyId}
                     className="bg-white rounded-2xl border border-slate-200 hover:border-amber-400 p-4 shadow-sm hover:shadow-md transition-all space-y-3 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <span className={'px-2.5 py-1 rounded-full text-[10px] font-black shadow-2xs ' +
+                        <span className={'px-2.5 py-1 rounded-full text-[10px] font-black shadow-sm ' +
                           (matchScore >= 80 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
                             matchScore >= 60 ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                               'bg-blue-100 text-blue-900 border border-blue-300')
@@ -186,18 +238,36 @@ export default function CrmMatchmaker({
                         <span>{property.locationName || property.address || property.city || property.district || 'Verified Venture'}</span>
                       </p>
 
-                      {/* ALGORITHMIC CRITERIA BREAKDOWN PILLS */}
-                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                        <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
-                          Location Fit: 100%
-                        </span>
-                        <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
-                          Budget Envelope Fit
-                        </span>
-                        <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
-                          Zoning Verified
-                        </span>
-                      </div>
+                      {/* DYNAMIC ALGORITHMIC CRITERIA BREAKDOWN PILLS */}
+                      {breakdown && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                          <span className={'text-[9px] font-extrabold px-2 py-0.5 rounded-md border ' +
+                            (breakdown.locationMatch === 'exact' || breakdown.locationMatch === 'cluster' || breakdown.locationMatch === 'any'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : breakdown.locationMatch === 'mismatch'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200')
+                          }>
+                            {breakdown.locationLabel}
+                          </span>
+                          <span className={'text-[9px] font-extrabold px-2 py-0.5 rounded-md border ' +
+                            (breakdown.budgetMatch === 'within'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : breakdown.budgetMatch === 'headroom'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200')
+                          }>
+                            {breakdown.budgetLabel}
+                          </span>
+                          <span className={'text-[9px] font-extrabold px-2 py-0.5 rounded-md border ' +
+                            (breakdown.typeMatch
+                              ? 'bg-purple-50 text-purple-800 border-purple-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200')
+                          }>
+                            {breakdown.typeLabel}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-black">
                         <span className="text-slate-400 text-[10px] uppercase tracking-wider">Listed Price</span>
@@ -210,7 +280,7 @@ export default function CrmMatchmaker({
                       <button
                         type="button"
                         onClick={() => onScheduleVisitForProperty(property, activeLead)}
-                        className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                        className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
                       >
                         <Calendar className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>Book Visit</span>
@@ -224,7 +294,7 @@ export default function CrmMatchmaker({
                             activeLead.name,
                             (property.title || 'Land Parcel') + ' in ' + (property.locationName || property.city || 'AP Region')
                           )}
-                          className="px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                          className="px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
                           title="Send matched property pitch to buyer on WhatsApp"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -247,13 +317,37 @@ export default function CrmMatchmaker({
       {matchMode === 'propertyToBuyer' && (
         <div className="space-y-6">
 
-          {/* PROPERTY SELECTOR PILLS */}
+          {/* PROPERTY SELECTOR PILLS + SEARCH */}
           <div className="space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-              Select Land Listing ({availableProperties.length}):
-            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                Select Land Listing ({filteredProperties.length} of {availableProperties.length}):
+              </span>
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={propertySearch}
+                  onChange={(e) => setPropertySearch(e.target.value)}
+                  placeholder="Filter listings by title, city..."
+                  className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                />
+                {propertySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setPropertySearch('')}
+                    aria-label="Clear property filter"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full shrink-0">
-              {availableProperties.map(p => {
+              {filteredProperties.length === 0 ? (
+                <span className="text-xs font-semibold text-slate-400 py-1.5">No land listings match "{propertySearch}".</span>
+              ) : filteredProperties.map(p => {
                 const pId = p.id || p.propertyId;
                 const isSelected = (activeProperty?.id || activeProperty?.propertyId) === pId;
                 return (
@@ -343,7 +437,7 @@ export default function CrmMatchmaker({
                     <button
                       type="button"
                       onClick={() => onTriggerWhatsApp(lead.phone, lead.name, activeProperty.title)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
                       <span>Dispatch Pitch on WhatsApp</span>

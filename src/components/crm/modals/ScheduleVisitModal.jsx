@@ -3,7 +3,8 @@ import { Calendar, X } from 'lucide-react';
 import {
   DEFAULT_CRM_AGENTS,
   getActiveCrmAgents,
-  getAvailableLocations
+  getAvailableLocations,
+  getLocalDateIso
 } from '../../../firebase/crmService.js';
 import DynamicLocationAutofill from '../../common/DynamicLocationAutofill.jsx';
 
@@ -24,38 +25,58 @@ export default function ScheduleVisitModal({
     propertyLocation: locationList[0] || 'Andhra Pradesh',
     customerName: '',
     customerPhone: '',
-    visitDate: new Date().toISOString().split('T')[0],
+    visitDate: getLocalDateIso(),
     visitTime: '10:30 AM',
     agentAssigned: agentList[0]?.name || 'EaseLand Admin',
     customerNotes: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
+    setIsSubmitting(false);
     if (initialData) {
-      setFormData(prev => ({
-        ...prev,
-        ...initialData,
-        propertyLocation: initialData.propertyLocation || prev.propertyLocation || locationList[0] || 'Andhra Pradesh',
-        agentAssigned: initialData.agentAssigned || prev.agentAssigned || agentList[0]?.name || 'EaseLand Admin'
-      }));
-    } else if (isOpen) {
-      setFormData(prev => ({
-        ...prev,
-        propertyLocation: prev.propertyLocation || locationList[0] || 'Andhra Pradesh',
-        agentAssigned: prev.agentAssigned || agentList[0]?.name || 'EaseLand Admin'
-      }));
+      setFormData({
+        dealId: initialData.dealId || '',
+        propertyTitle: initialData.propertyTitle || '',
+        propertyLocation: initialData.propertyLocation || locationList[0] || 'Andhra Pradesh',
+        customerName: initialData.customerName || '',
+        customerPhone: initialData.customerPhone || '',
+        visitDate: initialData.visitDate || getLocalDateIso(),
+        visitTime: initialData.visitTime || '10:30 AM',
+        agentAssigned: initialData.agentAssigned || agentList[0]?.name || 'EaseLand Admin',
+        customerNotes: initialData.customerNotes || ''
+      });
+    } else {
+      setFormData({
+        dealId: '',
+        propertyTitle: '',
+        propertyLocation: locationList[0] || 'Andhra Pradesh',
+        customerName: '',
+        customerPhone: '',
+        visitDate: getLocalDateIso(),
+        visitTime: '10:30 AM',
+        agentAssigned: agentList[0]?.name || 'EaseLand Admin',
+        customerNotes: ''
+      });
     }
   }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[92dvh] flex flex-col">
 
         {/* MODAL HEADER */}
@@ -83,7 +104,7 @@ export default function ScheduleVisitModal({
                 placeholder="Enter Customer Name"
                 value={formData.customerName}
                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-xs"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-sm"
               />
             </div>
             <div>
@@ -94,7 +115,7 @@ export default function ScheduleVisitModal({
                 placeholder="10-digit mobile number"
                 value={formData.customerPhone}
                 onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-xs"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-sm"
               />
             </div>
           </div>
@@ -108,7 +129,7 @@ export default function ScheduleVisitModal({
                 placeholder="e.g. Plot No 42, CRDA Layout, Tulluru"
                 value={formData.propertyTitle}
                 onChange={(e) => setFormData({ ...formData, propertyTitle: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-xs"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-sm"
               />
             </div>
             <div>
@@ -136,7 +157,7 @@ export default function ScheduleVisitModal({
                 required
                 value={formData.visitDate}
                 onChange={(e) => setFormData({ ...formData, visitDate: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-xs"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-sm"
               />
             </div>
             <div>
@@ -147,7 +168,7 @@ export default function ScheduleVisitModal({
                 placeholder="e.g. 11:00 AM"
                 value={formData.visitTime}
                 onChange={(e) => setFormData({ ...formData, visitTime: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-xs"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-sm"
               />
             </div>
           </div>
@@ -180,15 +201,17 @@ export default function ScheduleVisitModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              Confirm & Dispatch Visit
+              {isSubmitting ? 'Dispatching...' : 'Confirm & Dispatch Visit'}
             </button>
           </div>
 

@@ -1,5 +1,8 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   CrmDealStages,
   CrmLeadScores,
@@ -15,6 +18,7 @@ import {
   updateCrmVisitStatus,
   deleteCrmVisit,
   calculateBuyerMatchScore,
+  getMatchBreakdown,
   matchPropertiesForLead,
   matchLeadsForProperty,
   formatAmountInWords,
@@ -23,8 +27,17 @@ import {
   deduplicateDeals,
   deduplicateVisits,
   clearAllCrmData,
-  calculateCrmAnalytics
+  calculateCrmAnalytics,
+  getLocalDateIso,
+  escapeCsvCell,
+  buildCsvContent,
+  formatShortDate,
+  formatLegalStatusLabel
 } from './crmService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, '../../');
 
 test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
   beforeEach(async () => {
@@ -322,5 +335,92 @@ test('EaseLand CRM Studio Enterprise & Zero-Fallback Suite', async (t) => {
 
     const stats = calculateCrmAnalytics(testDeals, [], []);
     assert.strictEqual(stats.followUpsDueTodayCount, 2, 'Should count 1 overdue and 1 due today, ignoring future and closed deals');
+  });
+
+  await t.test('14. getMatchBreakdown produces accurate location, budget, and zoning diagnostics', () => {
+    const lead = {
+      preferredLocation: 'Mangalagiri',
+      preferredPropertyType: 'Open Plot Ventures',
+      budgetMax: 5000000
+    };
+
+    const exactFit = getMatchBreakdown(lead, {
+      locationName: 'Mangalagiri Bypass',
+      propertyType: 'Open Plot',
+      price: 4500000
+    });
+    assert.strictEqual(exactFit.locationMatch, 'exact');
+    assert.strictEqual(exactFit.budgetMatch, 'within');
+    assert.strictEqual(exactFit.typeMatch, true);
+
+    const clusterOver = getMatchBreakdown(lead, {
+      locationName: 'Tulluru CRDA Core',
+      propertyType: 'Commercial Land',
+      price: 8000000
+    });
+    assert.strictEqual(clusterOver.locationMatch, 'cluster');
+    assert.strictEqual(clusterOver.budgetMatch, 'over');
+    assert.strictEqual(clusterOver.typeMatch, false);
+  });
+
+  await t.test('15. CSV builder neutralizes spreadsheet formula prefixes and quotes commas properly', () => {
+    assert.strictEqual(escapeCsvCell('=SUM(A1:A2)'), "'=SUM(A1:A2)");
+    assert.strictEqual(escapeCsvCell('Amaravati, AP'), '"Amaravati, AP"');
+    const csv = buildCsvContent(['Name', 'Note'], [['Ravi', 'Plot 12, East']]);
+    assert.strictEqual(csv, 'Name,Note\r\nRavi,"Plot 12, East"');
+  });
+
+  await t.test('16. Local IST date helper returns valid YYYY-MM-DD strings with offset support', () => {
+    const today = getLocalDateIso(0);
+    const tomorrow = getLocalDateIso(1);
+    assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(tomorrow, /^\d{4}-\d{2}-\d{2}$/);
+    assert.notStrictEqual(today, tomorrow);
+  });
+
+  await t.test('17. CRM Studio static invariants: Rules of Hooks in StageTransitionModal, real HTTP error surfacing, and DB indexes', () => {
+    const modalSrc = fs.readFileSync(path.join(rootDir, 'src/components/crm/modals/StageTransitionModal.jsx'), 'utf8');
+    const useStatePos = modalSrc.indexOf('useState(');
+    const earlyReturnPos = modalSrc.indexOf('if (!isOpen || !deal || !targetStage) return null;');
+    assert.ok(useStatePos > 0 && earlyReturnPos > useStatePos, 'StageTransitionModal hooks must execute unconditionally before early return');
+
+    const serviceSrc = fs.readFileSync(path.join(rootDir, 'src/firebase/crmService.js'), 'utf8');
+    assert.ok(serviceSrc.includes('parseApiError('), 'crmService must surface real HTTP error responses in browser mode');
+
+    const serverSrc = fs.readFileSync(path.join(rootDir, 'server.js'), 'utf8');
+    assert.ok(serverSrc.includes('idx_crm_deals_stage'), 'server.js must index crm_deals(stage)');
+    assert.ok(serverSrc.includes("'X-Accel-Buffering': 'no'"), 'server.js SSE stream must disable proxy buffering');
+    assert.ok(serverSrc.includes("app.patch('/api/crm/leads/:id'"), 'server.js must expose PATCH /api/crm/leads/:id');
+  });
+
+  await t.test('18. CRM Studio UI invariants: valid Tailwind v3 classes, custom-scrollbar/animations in CSS, interactive KPIs, and mobile ledger', () => {
+    const cssSrc = fs.readFileSync(path.join(rootDir, 'src/index.css'), 'utf8');
+    assert.ok(cssSrc.includes('.custom-scrollbar'), 'index.css must define .custom-scrollbar');
+    assert.ok(cssSrc.includes('.animate-fade-in'), 'index.css must define .animate-fade-in');
+    assert.ok(cssSrc.includes('.animate-scale-up'), 'index.css must define .animate-scale-up');
+
+    const kpiSrc = fs.readFileSync(path.join(rootDir, 'src/components/crm/CrmKpiBanner.jsx'), 'utf8');
+    assert.ok(kpiSrc.includes('onCardSelect'), 'CrmKpiBanner must support interactive onCardSelect shortcuts');
+
+    const kanbanSrc = fs.readFileSync(path.join(rootDir, 'src/components/crm/kanban/CrmKanbanBoard.jsx'), 'utf8');
+    assert.ok(kanbanSrc.includes('MOBILE LEDGER CARDS'), 'CrmKanbanBoard ledger view must render responsive mobile cards');
+    assert.ok(kanbanSrc.includes('Reset All Filters'), 'CrmKanbanBoard must surface an active-filter reset banner');
+
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : path.join(d, e.name));
+    const crmFiles = [...walk(path.join(rootDir, 'src/components/crm')), path.join(rootDir, 'src/pages/EaseLandCRM.jsx')].filter(f => f.endsWith('.jsx'));
+    const invalidTokens = [/\bshadow-2?xs\b/, /\bbackdrop-blur-xs\b/, /\bpy-0\.2\b/, /\bscale-102\b/];
+    for (const file of crmFiles) {
+      const content = fs.readFileSync(file, 'utf8');
+      for (const rx of invalidTokens) {
+        assert.strictEqual(rx.test(content), false, 'Invalid Tailwind v3 token ' + rx + ' found in ' + file);
+      }
+    }
+  });
+
+  await t.test('19. formatShortDate and formatLegalStatusLabel produce clean, jargon-free card & dossier strings', () => {
+    assert.strictEqual(formatShortDate('2026-11-28'), '28 Nov');
+    assert.strictEqual(formatShortDate('2026-01-05'), '5 Jan');
+    assert.strictEqual(formatLegalStatusLabel('CLEAR_TITLE'), 'Title Clear');
+    assert.strictEqual(formatLegalStatusLabel('PENDING'), 'Pending Check');
   });
 });

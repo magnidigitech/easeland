@@ -60,82 +60,89 @@ export default function CrmHeader({
           </div>
 
           {/* QUICK ACTIONS & REDIRECTIONS */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full md:w-auto shrink-0 whitespace-nowrap">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto">
 
-            {/* REFRESH LIVE DATA */}
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl transition-all cursor-pointer shrink-0"
-              title="Refresh live CRM data from PostgreSQL"
-            >
-              <RefreshCw className={'w-3.5 h-3.5 ' + (loading ? 'animate-spin text-amber-400' : '')} />
-            </button>
-
-            {/* QUICK TODAY'S FOLLOW-UPS PILL */}
-            {followUpsDueTodayCount > 0 && (
+            {/* NON-CLIPPED CONTROLS WRAPPER (Refresh, Due Today, Agent Dropdown) */}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* REFRESH LIVE DATA */}
               <button
                 type="button"
-                onClick={onQuickFilterFollowUps}
-                className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer animate-pulse shrink-0"
-                title="Click to view deals with follow-ups due today"
+                onClick={onRefresh}
+                disabled={loading}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl transition-all cursor-pointer shrink-0"
+                title="Refresh live CRM data from PostgreSQL"
               >
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Due Today:</span>
-                <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
-                  {followUpsDueTodayCount}
-                </span>
-              </button>
-            )}
-
-            {/* AGENT FILTER SELECTOR */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
-                className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:border-slate-600 px-3 py-1.5 rounded-xl text-xs text-white font-bold transition-all cursor-pointer"
-              >
-                <Users className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-slate-400 text-[11px]">Agent:</span>
-                <span className="text-white font-black">{selectedAgent === 'ALL' ? 'All Team Portfolio' : selectedAgent}</span>
-                <ChevronDown className={'w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ' + (isAgentDropdownOpen ? 'rotate-180 text-amber-400' : '')} />
+                <RefreshCw className={'w-3.5 h-3.5 ' + (loading ? 'animate-spin text-amber-400' : '')} />
               </button>
 
-              {isAgentDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsAgentDropdownOpen(false)}></div>
-                  <div className="absolute left-0 mt-1.5 w-56 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl z-50 p-1.5 space-y-0.5 animate-in fade-in duration-150">
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedAgent('ALL'); setIsAgentDropdownOpen(false); }}
-                      className={'w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ' +
-                        (selectedAgent === 'ALL' ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800')
-                      }
-                    >
-                      <span>All Team Portfolio</span>
-                      {selectedAgent === 'ALL' && <Check className="w-3.5 h-3.5 text-slate-950" />}
-                    </button>
+              {/* QUICK TODAY'S FOLLOW-UPS PILL */}
+              {followUpsDueTodayCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onQuickFilterFollowUps}
+                  className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer animate-pulse shrink-0"
+                  title="Click to view deals with follow-ups due today"
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Due Today:</span>
+                  <span className="bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-full text-[10px] font-black">
+                    {followUpsDueTodayCount}
+                  </span>
+                </button>
+              )}
 
-                    <div className="h-px bg-slate-800 my-1"></div>
+              {/* AGENT FILTER SELECTOR (Placed outside overflow-x-auto so popover never clips vertically) */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
+                  aria-expanded={isAgentDropdownOpen}
+                  className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:border-slate-600 px-3 py-1.5 rounded-xl text-xs text-white font-bold transition-all cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-slate-400 text-[11px]">Agent:</span>
+                  <span className="text-white font-black max-w-[140px] truncate">{selectedAgent === 'ALL' ? 'All Team Portfolio' : selectedAgent}</span>
+                  <ChevronDown className={'w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ' + (isAgentDropdownOpen ? 'rotate-180 text-amber-400' : '')} />
+                </button>
 
-                    {agentList.map((ag) => (
+                {isAgentDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsAgentDropdownOpen(false)}></div>
+                    <div className="absolute left-0 sm:right-0 sm:left-auto mt-1.5 w-60 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl z-50 p-1.5 space-y-0.5 animate-fade-in">
                       <button
-                        key={ag.id}
                         type="button"
-                        onClick={() => { setSelectedAgent(ag.name); setIsAgentDropdownOpen(false); }}
+                        onClick={() => { setSelectedAgent('ALL'); setIsAgentDropdownOpen(false); }}
                         className={'w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ' +
-                          (selectedAgent === ag.name ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800')
+                          (selectedAgent === 'ALL' ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800')
                         }
                       >
-                        <span>{ag.name}</span>
-                        {selectedAgent === ag.name && <Check className="w-3.5 h-3.5 text-slate-950" />}
+                        <span>All Team Portfolio</span>
+                        {selectedAgent === 'ALL' && <Check className="w-3.5 h-3.5 text-slate-950" />}
                       </button>
-                    ))}
-                  </div>
-                </>
-              )}
+
+                      <div className="h-px bg-slate-800 my-1"></div>
+
+                      {agentList.map((ag) => (
+                        <button
+                          key={ag.id}
+                          type="button"
+                          onClick={() => { setSelectedAgent(ag.name); setIsAgentDropdownOpen(false); }}
+                          className={'w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ' +
+                            (selectedAgent === ag.name ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800')
+                          }
+                        >
+                          <span className="truncate">{ag.name}</span>
+                          {selectedAgent === ag.name && <Check className="w-3.5 h-3.5 text-slate-950 shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+
+            {/* SCROLLABLE ACTION STRIP ON NARROW SCREENS */}
+            <div className="flex items-center gap-2 overflow-x-auto md:overflow-visible no-scrollbar py-0.5 flex-1 md:flex-initial whitespace-nowrap">
 
             {/* ACTION: CREATE NEW LEAD */}
             <button
@@ -175,6 +182,7 @@ export default function CrmHeader({
               <span>Marketplace</span>
             </button>
 
+            </div>
           </div>
         </div>
       </div>

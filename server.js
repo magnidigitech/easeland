@@ -901,6 +901,11 @@ async function initPgDb() {
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);');
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_time VARCHAR(50);');
       await client.query('ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS next_follow_up_action TEXT;');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_crm_leads_updated_at ON crm_leads (updated_at DESC);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_crm_deals_updated_at ON crm_deals (updated_at DESC);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_crm_deals_stage ON crm_deals (stage);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_crm_visits_updated_at ON crm_visits (updated_at DESC);');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_crm_visits_deal_id ON crm_visits (deal_id);');
     } catch (migErr) {
       console.warn('CRM and User schema migration note:', migErr.message);
     }
@@ -2461,7 +2466,7 @@ app.post('/api/enquiries', async (req, res) => {
 
       // Auto-create pipeline deal so inquiry appears immediately on Kanban board
       const dealId = 'deal-' + eId;
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalIstDateIso();
       const initialDealTimeline = [
         { date: todayIso, event: 'Deal auto-created from website inquiry on ' + (fullPayload.propertyTitle || 'Listing'), user: 'EaseLand Ingestion Engine' }
       ];
@@ -4294,17 +4299,47 @@ app.delete('/api/users/:uid', async (req, res) => {
 // Helper for SQL parameter placeholder without dollar sign literal in source code
 const sqlParam = (index) => String.fromCharCode(36) + index;
 
+// IST (Asia/Kolkata) local date string helper (YYYY-MM-DD) to prevent UTC midnight drift
+const getLocalIstDateIso = (offsetDays = 0) => {
+  const dt = new Date();
+  if (offsetDays) dt.setDate(dt.getDate() + offsetDays);
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(dt);
+  } catch (e) {
+    return dt.toISOString().split('T')[0];
+  }
+};
+
 // 1. CRM LIVE STREAM: Real-Time Server-Sent Events (SSE) Bus
 app.get('/api/crm/live-stream', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
   });
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders();
+  }
   res.write('data: {"type":"CONNECTED","timestamp":' + Date.now() + '}\n\n');
   crmSseClients.add(res);
 
+  const heartbeatInterval = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch (e) {
+      clearInterval(heartbeatInterval);
+      crmSseClients.delete(res);
+    }
+  }, 25000);
+
   req.on('close', () => {
+    clearInterval(heartbeatInterval);
     crmSseClients.delete(res);
   });
 });
@@ -4312,12 +4347,12 @@ app.get('/api/crm/live-stream', (req, res) => {
 // 2. CRM BOOTSTRAP: Retrieve all Leads, Deals, Site Visits, Quarantines & Analytics
 app.get('/api/crm/bootstrap', async (req, res) => {
   try {
-    const P = String.fromCharCode(36);
     let bannedPropertyIds = [];
     try {
       const bannedRes = await pgPool.query('SELECT property_id, reference_id FROM admin_deleted_properties;');
       bannedPropertyIds = bannedRes.rows.flatMap(r => [r.property_id, r.reference_id].filter(Boolean));
     } catch (eBanned) { }
+    const bannedSet = new Set(bannedPropertyIds);
 
     const [leadsRes, dealsRes, visitsRes] = await Promise.all([
       pgPool.query('SELECT * FROM crm_leads ORDER BY updated_at DESC;'),
@@ -4351,7 +4386,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       dealId: r.deal_id,
       leadId: r.lead_id,
       propertyId: r.property_id,
-      isPropertyQuarantined: Boolean(r.property_id && bannedPropertyIds.includes(r.property_id)),
+      isPropertyQuarantined: Boolean(r.property_id && bannedSet.has(r.property_id)),
       propertyTitle: r.property_title,
       propertyLocation: r.property_location,
       customerName: r.customer_name,
@@ -4412,7 +4447,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
     const scheduledVisits = visits.filter(v => v.status === 'SCHEDULED');
     const quarantinedDeals = deals.filter(d => d.isPropertyQuarantined);
 
-    const todayIso = new Date().toISOString().split('T')[0];
+    const todayIso = getLocalIstDateIso();
     const followUpsDueTodayCount = deals.filter(d =>
       d.stage !== 'CLOSED_WON' && d.stage !== 'CLOSED_LOST' &&
       d.nextFollowUpDate && d.nextFollowUpDate <= todayIso
@@ -4440,21 +4475,21 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       followUpsDueTodayCount
     };
 
-    // Fetch Dynamic Licensed Agents & Staff from users table
+    // Fetch Dynamic Licensed Agents & Staff from users table (case-insensitive)
     let agents = [];
     try {
       const usersRes = await pgPool.query(
         "SELECT uid, email, display_name, role, phone_number, raw_data FROM users " +
-        "WHERE role IN ('admin', 'staff', 'broker', 'agent', 'FIELD_EXECUTIVE') " +
-        "OR raw_data->>'role' IN ('admin', 'staff', 'broker', 'agent', 'FIELD_EXECUTIVE');"
+        "WHERE LOWER(COALESCE(role, '')) IN ('admin', 'staff', 'broker', 'agent', 'field_executive') " +
+        "OR LOWER(COALESCE(raw_data->>'role', '')) IN ('admin', 'staff', 'broker', 'agent', 'field_executive');"
       );
       agents = usersRes.rows.map(u => {
         const raw = u.raw_data || {};
-        const uRole = u.role || raw.role || 'broker';
+        const uRole = String(u.role || raw.role || 'broker').toLowerCase();
         return {
           id: u.uid,
           name: u.display_name || raw.name || raw.fullName || (u.email ? u.email.split('@')[0] : 'Broker Executive'),
-          role: uRole === 'admin' ? 'Principal Broker / Administrator' : (uRole === 'FIELD_EXECUTIVE' ? 'Field Broker' : 'Sales Partner'),
+          role: uRole === 'admin' ? 'Principal Broker / Administrator' : (uRole === 'field_executive' ? 'Field Broker' : 'Sales Partner'),
           email: u.email || raw.email || '',
           phone: u.phone_number || raw.phone || ''
         };
@@ -4467,16 +4502,48 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       ];
     }
 
-    // Fetch Dynamic Locations from active property listings
+    // Fetch Dynamic Locations & Live Properties directly from PostgreSQL properties JSONB/columns
     let dynamicLocations = [];
+    let liveProperties = [];
     try {
-      const locRes = await pgPool.query(
-        "SELECT DISTINCT location_name, city, district FROM properties WHERE is_published = true AND listing_status = 'AVAILABLE' LIMIT 150;"
+      const propRows = await pgPool.query(
+        "SELECT property_id, title, property_type, purpose, price, area, location, listing_status, raw_data " +
+        "FROM properties " +
+        "WHERE is_published = true AND listing_status IN ('LIVE', 'AVAILABLE') " +
+        "ORDER BY updated_at DESC LIMIT 200;"
       );
-      dynamicLocations = Array.from(new Set(
-        locRes.rows.flatMap(r => [r.location_name, r.city, r.district]).filter(Boolean)
-      ));
-    } catch (locErr) { }
+      const locSet = new Set();
+      liveProperties = propRows.rows.map(r => {
+        const loc = r.location || {};
+        const raw = r.raw_data || {};
+        const locName = loc.locality || loc.locationName || raw.locationName || loc.address || '';
+        const city = loc.city || raw.city || '';
+        const district = loc.district || raw.district || '';
+        if (locName) locSet.add(locName);
+        if (city) locSet.add(city);
+        if (district) locSet.add(district);
+
+        const priceNum = r.price !== null ? Number(r.price) : (Number(raw.price) || 0);
+        return {
+          id: r.property_id,
+          propertyId: r.property_id,
+          title: r.title || raw.title || 'Verified Land Parcel',
+          propertyType: r.property_type || raw.propertyType || 'Open Plot',
+          purpose: r.purpose || raw.purpose || 'SALE',
+          price: priceNum,
+          priceDisplay: raw.priceDisplay || (priceNum > 0 ? ('Rs. ' + (priceNum / 100000).toFixed(1) + ' Lakhs') : 'Price on Request'),
+          area: r.area !== null ? Number(r.area) : (Number(raw.area) || 0),
+          locationName: locName,
+          city,
+          district,
+          address: loc.address || raw.address || '',
+          location: loc
+        };
+      });
+      dynamicLocations = Array.from(locSet).filter(Boolean);
+    } catch (locErr) {
+      console.warn('CRM live properties / dynamic locations query note:', locErr.message);
+    }
 
     return res.json({
       success: true,
@@ -4485,6 +4552,7 @@ app.get('/api/crm/bootstrap', async (req, res) => {
       visits,
       agents,
       dynamicLocations,
+      liveProperties,
       analytics,
       bannedPropertyIds
     });
@@ -4535,26 +4603,32 @@ app.get('/api/locations/autocomplete', async (req, res) => {
     try {
       const qWildcard = '%' + queryStr + '%';
       const P = String.fromCharCode(36);
-      const propSql = 'SELECT id, property_id, title, location_name, city, district, price, price_display ' +
+      const propSql = 'SELECT property_id, title, location, price, raw_data ' +
         'FROM properties ' +
-        'WHERE (location_name ILIKE ' + P + '1 OR city ILIKE ' + P + '1 OR district ILIKE ' + P + '1 OR title ILIKE ' + P + '1) ' +
-        'AND is_published = true AND listing_status = \'AVAILABLE\' LIMIT 5;';
+        "WHERE (title ILIKE " + P + "1 OR location->>'locality' ILIKE " + P + "1 OR location->>'city' ILIKE " + P + "1 OR location->>'district' ILIKE " + P + "1 OR raw_data->>'locationName' ILIKE " + P + "1) " +
+        "AND is_published = true AND listing_status IN ('LIVE', 'AVAILABLE') LIMIT 5;";
       const propRes = await pgPool.query(propSql, [qWildcard]);
       propRes.rows.forEach(p => {
+        const loc = p.location || {};
+        const raw = p.raw_data || {};
+        const locName = loc.locality || loc.locationName || raw.locationName || '';
+        const city = loc.city || raw.city || '';
+        const district = loc.district || raw.district || '';
+        const state = loc.state || raw.state || 'Andhra Pradesh';
         addResult({
-          id: 'prop_' + (p.property_id || p.id),
-          title: p.title || p.location_name,
-          subtitle: (p.location_name ? p.location_name + ', ' : '') + (p.city || p.district || 'Andhra Pradesh') + ' • Platform Verified Venture',
-          fullAddress: (p.location_name ? p.location_name + ', ' : '') + (p.city ? p.city + ', ' : '') + (p.district ? p.district + ' Dist, ' : '') + 'Andhra Pradesh',
+          id: 'prop_' + p.property_id,
+          title: p.title || locName,
+          subtitle: (locName ? locName + ', ' : '') + (city || district || state) + ' • Platform Verified Venture',
+          fullAddress: (locName ? locName + ', ' : '') + (city ? city + ', ' : '') + (district ? district + ' Dist, ' : '') + state,
           type: 'LISTED_VENTURE',
-          village: '',
-          mandal: '',
-          city: p.city || p.location_name,
-          district: p.district || '',
-          state: 'Andhra Pradesh',
+          village: loc.village || '',
+          mandal: loc.mandal || '',
+          city: city || locName,
+          district,
+          state,
           country: 'India',
           isPlatformListing: true,
-          propertyId: p.property_id || p.id
+          propertyId: p.property_id
         });
       });
     } catch (eProp) { }
@@ -4755,6 +4829,70 @@ app.post('/api/crm/leads', async (req, res) => {
   }
 });
 
+// 2B. CRM LEADS: Update Lead
+app.patch('/api/crm/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body || {};
+    const P = String.fromCharCode(36);
+    const curRes = await pgPool.query('SELECT * FROM crm_leads WHERE lead_id = ' + P + '1;', [id]);
+    if (curRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Lead not found.' });
+    }
+    const cur = curRes.rows[0];
+    const bMax = updates.budgetMax !== undefined ? (Number(updates.budgetMax) || 0) : Number(cur.budget_max);
+    const bDisplay = updates.budgetDisplay || (updates.budgetMax !== undefined ? (bMax > 0 ? 'Up to Rs. ' + (bMax / 100000).toFixed(1) + ' Lakhs' : 'Flexible') : cur.budget_display);
+
+    const updSql = 'UPDATE crm_leads SET ' +
+      'name = ' + P + '1, phone = ' + P + '2, email = ' + P + '3, score = ' + P + '4, status = ' + P + '5, ' +
+      'preferred_location = ' + P + '6, preferred_property_type = ' + P + '7, budget_max = ' + P + '8, budget_display = ' + P + '9, ' +
+      'assigned_agent = ' + P + '10, notes = ' + P + '11, updated_at = NOW() ' +
+      'WHERE lead_id = ' + P + '12 RETURNING *;';
+    const updRes = await pgPool.query(updSql, [
+      updates.name !== undefined ? updates.name : cur.name,
+      updates.phone !== undefined ? updates.phone : cur.phone,
+      updates.email !== undefined ? updates.email : cur.email,
+      updates.score !== undefined ? updates.score : cur.score,
+      updates.status !== undefined ? updates.status : cur.status,
+      updates.preferredLocation !== undefined ? updates.preferredLocation : cur.preferred_location,
+      updates.preferredPropertyType !== undefined ? updates.preferredPropertyType : cur.preferred_property_type,
+      bMax,
+      bDisplay,
+      updates.assignedAgent !== undefined ? updates.assignedAgent : cur.assigned_agent,
+      updates.notes !== undefined ? updates.notes : cur.notes,
+      id
+    ]);
+    const row = updRes.rows[0];
+    broadcastCrmEvent('LEAD_UPDATED', { id: row.lead_id, score: row.score, status: row.status });
+    return res.json({
+      success: true,
+      lead: {
+        id: row.lead_id,
+        leadId: row.lead_id,
+        name: row.name,
+        phone: row.phone,
+        email: row.email,
+        source: row.source,
+        score: row.score,
+        status: row.status,
+        preferredLocation: row.preferred_location,
+        preferredPropertyType: row.preferred_property_type,
+        budgetMin: Number(row.budget_min),
+        budgetMax: Number(row.budget_max),
+        budgetDisplay: row.budget_display,
+        assignedAgent: row.assigned_agent,
+        notes: row.notes,
+        tags: row.tags || [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    console.error('Update CRM lead error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 3. CRM LEADS: Delete Lead
 app.delete('/api/crm/leads/:id', async (req, res) => {
   try {
@@ -4922,9 +5060,7 @@ app.patch('/api/crm/deals/:id/stage', async (req, res) => {
     const targetFollowUpAction = nextFollowUpAction || stDef.action;
     let targetFollowUpDate = nextFollowUpDate;
     if (!targetFollowUpDate) {
-      const d = new Date();
-      if (stDef.leadDays > 0) d.setDate(d.getDate() + stDef.leadDays);
-      targetFollowUpDate = d.toISOString().split('T')[0];
+      targetFollowUpDate = getLocalIstDateIso(stDef.leadDays || 0);
     }
     const targetFollowUpTime = nextFollowUpTime || '11:00 AM';
 
@@ -5242,7 +5378,7 @@ app.post('/api/crm/visits', async (req, res) => {
       data.propertyLocation || 'Amaravati / Guntur Region',
       data.customerName || 'Prospective Buyer',
       data.customerPhone || '',
-      data.visitDate || new Date().toISOString().split('T')[0],
+      data.visitDate || getLocalIstDateIso(),
       data.visitTime || '11:00 AM',
       data.agentAssigned || 'EaseLand Admin',
       'SCHEDULED',
@@ -5253,13 +5389,27 @@ app.post('/api/crm/visits', async (req, res) => {
     const result = await pgPool.query(sql, values);
     const row = result.rows[0];
 
-    // If tied to deal, advance deal stage to SITE_VISIT
+    // If tied to deal, atomically advance NEW/CONTACTED deal to SITE_VISIT with full timeline & version bump
     if (data.dealId) {
       try {
-        await pgPool.query(
-          "UPDATE crm_deals SET stage = 'SITE_VISIT', probability = 50, updated_at = NOW() WHERE deal_id = " + P + "1 AND stage IN ('NEW', 'CONTACTED');",
-          [data.dealId]
-        );
+        const dealRes = await pgPool.query('SELECT stage, timeline FROM crm_deals WHERE deal_id = ' + P + '1;', [data.dealId]);
+        if (dealRes.rows.length > 0) {
+          const curDeal = dealRes.rows[0];
+          if (curDeal.stage === 'NEW' || curDeal.stage === 'CONTACTED') {
+            const nextTimeline = [
+              ...(Array.isArray(curDeal.timeline) ? curDeal.timeline : []),
+              {
+                date: getLocalIstDateIso(),
+                event: 'Site Visit Scheduled: ' + row.visit_date + ' at ' + row.visit_time + ' with ' + row.agent_assigned,
+                user: row.agent_assigned || 'EaseLand Admin'
+              }
+            ];
+            await pgPool.query(
+              "UPDATE crm_deals SET stage = 'SITE_VISIT', probability = 50, timeline = " + P + "1, version = version + 1, updated_at = NOW() WHERE deal_id = " + P + "2 AND stage IN ('NEW', 'CONTACTED');",
+              [JSON.stringify(nextTimeline), data.dealId]
+            );
+          }
+        }
       } catch (dErr) { }
     }
 

@@ -43,10 +43,11 @@ export default function NewDealModal({
     nextFollowUpAction: 'Initial buyer outreach',
     notes: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      const todayIso = new Date().toISOString().split('T')[0];
+      setIsSubmitting(false);
       const defaultStage = initialData?.stage || CrmDealStages.NEW;
       const stageDefaults = getStageDefaultFollowUp(defaultStage);
       setFormData({
@@ -72,16 +73,22 @@ export default function NewDealModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({
-      ...formData,
-      dealValue: Number(formData.dealValue) || 0
-    });
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        ...formData,
+        dealValue: Number(formData.dealValue) || 0
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[92dvh] flex flex-col">
 
         {/* MODAL HEADER */}
@@ -162,7 +169,7 @@ export default function NewDealModal({
                 placeholder="e.g. 4500000"
                 value={formData.dealValue}
                 onChange={(e) => setFormData({ ...formData, dealValue: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-xs"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all shadow-sm"
               />
 
               {/* 1-TAP BUDGET SPEED PRESETS */}
@@ -181,7 +188,7 @@ export default function NewDealModal({
                     onClick={() => setFormData({ ...formData, dealValue: p.val })}
                     className={'px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer ' +
                       (Number(formData.dealValue) === p.val
-                        ? 'bg-slate-900 text-amber-400 border-slate-900 shadow-xs'
+                        ? 'bg-slate-900 text-amber-400 border-slate-900 shadow-sm'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                       )
                     }
@@ -192,7 +199,7 @@ export default function NewDealModal({
               </div>
 
               {Number(formData.dealValue) > 0 && (
-                <div className="mt-2 p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-0.5 animate-fade-in shadow-2xs">
+                <div className="mt-2 p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-0.5 animate-fade-in shadow-sm">
                   <div className="flex items-center justify-between text-xs font-black text-slate-900">
                     <span className="text-slate-500 font-extrabold uppercase text-[10px]">Formatted Value:</span>
                     <span className="text-emerald-700 font-black">{formatAmountInWords(Number(formData.dealValue))}</span>
@@ -288,15 +295,17 @@ export default function NewDealModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              Initiate Deal in Pipeline
+              {isSubmitting ? 'Initiating...' : 'Initiate Deal in Pipeline'}
             </button>
           </div>
 

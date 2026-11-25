@@ -12,7 +12,7 @@ import {
   Lock,
   Clock
 } from 'lucide-react';
-import { CrmStageLabels } from '../../../firebase/crmService.js';
+import { CrmStageLabels, CRM_STAGE_METADATA, CrmDealStages, formatShortDate, formatLegalStatusLabel } from '../../../firebase/crmService.js';
 
 export default function DealDossierModal({
   deal,
@@ -43,7 +43,7 @@ export default function DealDossierModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[92dvh] flex flex-col">
 
         {/* MODAL HEADER */}
@@ -54,10 +54,10 @@ export default function DealDossierModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="font-black text-base">Transaction Deal Dossier</h4>
+                <h4 className="font-black text-base">Deal Overview</h4>
                 {deal.isPropertyQuarantined && (
                   <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
-                    Quarantined
+                    Paused
                   </span>
                 )}
               </div>
@@ -72,16 +72,16 @@ export default function DealDossierModal({
         {/* MODAL BODY */}
         <div className="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
 
-          {/* COMPLIANCE QUARANTINE WARNING BANNER */}
+          {/* COMPLIANCE PAUSE BANNER */}
           {deal.isPropertyQuarantined && (
             <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-3 text-rose-950">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs">
                 <span className="font-black text-rose-900 text-sm block">
-                  COMPLIANCE NOTICE: PROPERTY QUARANTINED
+                  Property Paused by Admin
                 </span>
                 <p className="leading-relaxed font-medium">
-                  This transaction is frozen because the underlying land parcel was flagged or removed by Admin Compliance. Stage advancement, customer deposits, and closing actions are locked pending clearance.
+                  This property was flagged or removed by Admin Compliance. Moving stages or recording payments is locked until cleared.
                 </p>
               </div>
             </div>
@@ -90,38 +90,44 @@ export default function DealDossierModal({
           {/* STAGE & FINANCIALS BANNER */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div>
-              <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Current Stage</span>
+              <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Stage</span>
               <span className="font-black text-slate-900 text-sm block truncate">{CrmStageLabels[deal.stage] || deal.stage}</span>
             </div>
             <div>
               <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Deal Value</span>
-              <span className="font-black text-emerald-600 text-sm block truncate">{deal.dealValueDisplay || ('Rs. ' + ((Number(deal.dealValue) || 0) / 100000).toFixed(1) + ' Lakhs')}</span>
+              <span className="font-black text-emerald-600 text-sm block truncate">
+                {Number(deal.dealValue) > 0
+                  ? (deal.dealValueDisplay || ('Rs. ' + (Number(deal.dealValue) / 100000).toFixed(1) + ' Lakhs'))
+                  : (deal.dealValueDisplay || 'Price Pending')}
+              </span>
             </div>
             <div>
-              <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Brokerage Fee</span>
-              <span className="font-black text-amber-600 text-sm block truncate">Rs. {Number(deal.expectedCommission || 0).toLocaleString()}</span>
+              <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Brokerage</span>
+              <span className="font-black text-amber-600 text-sm block truncate">
+                {Number(deal.expectedCommission) > 0 ? ('Rs. ' + Number(deal.expectedCommission).toLocaleString('en-IN')) : 'TBD'}
+              </span>
             </div>
             <div>
-              <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Legal Audit</span>
-              <span className="font-black text-blue-600 text-sm block truncate">{deal.legalAuditStatus || 'VERIFIED'}</span>
+              <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Legal Check</span>
+              <span className="font-black text-blue-600 text-sm block truncate">{formatLegalStatusLabel(deal.legalAuditStatus)}</span>
             </div>
           </div>
 
           {/* CLIENT FOLLOW-UP STATUS & SCHEDULER BANNER */}
           <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-xs font-black">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-sm font-black">
                 <Clock className="w-5 h-5 text-slate-950 stroke-[2.5]" />
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-amber-900 tracking-wider block">
-                  Next Scheduled Client Follow-up
+                  Next Follow-up
                 </span>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-black text-sm text-slate-900">
                     {deal.nextFollowUpDate
-                      ? deal.nextFollowUpDate + (deal.nextFollowUpTime ? ' at ' + deal.nextFollowUpTime : '')
-                      : 'No follow-up scheduled'}
+                      ? formatShortDate(deal.nextFollowUpDate) + (deal.nextFollowUpTime ? ' at ' + deal.nextFollowUpTime : '')
+                      : 'Not scheduled yet'}
                   </span>
                   {deal.nextFollowUpAction && (
                     <span className="text-xs font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
@@ -136,10 +142,10 @@ export default function DealDossierModal({
               <button
                 type="button"
                 onClick={() => onOpenFollowUp(deal)}
-                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs rounded-xl shadow-xs transition-colors cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs rounded-xl shadow-sm transition-colors cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>{deal.nextFollowUpDate ? 'Update Follow-up' : 'Schedule Follow-up'}</span>
+                <span>{deal.nextFollowUpDate ? 'Reschedule' : 'Set Follow-up'}</span>
               </button>
             )}
           </div>
@@ -148,46 +154,66 @@ export default function DealDossierModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Purchaser / Buyer</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Buyer</span>
                 {isFieldExecutive && (
                   <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-sm flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" /> Masked
+                    <Lock className="w-2.5 h-2.5" /> Hidden
                   </span>
                 )}
               </div>
               <h5 className="font-black text-sm text-slate-900">{deal.customerName}</h5>
-              <span className="text-xs text-slate-600 font-bold block">{maskPhone(deal.customerPhone) || 'Direct Platform Lead'}</span>
+              <span className="text-xs text-slate-600 font-bold block">{maskPhone(deal.customerPhone) || 'No phone saved'}</span>
               {deal.customerEmail && <span className="text-xs text-slate-400 block truncate">{maskEmail(deal.customerEmail)}</span>}
             </div>
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Property Owner / Seller</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">Seller / Owner</span>
                 {isFieldExecutive && (
                   <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-sm flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" /> Masked
+                    <Lock className="w-2.5 h-2.5" /> Hidden
                   </span>
                 )}
               </div>
-              <h5 className="font-black text-sm text-slate-900">{deal.ownerName || 'Verified Platform Owner'}</h5>
-              <span className="text-xs text-slate-600 font-bold block">{maskPhone(deal.ownerPhone) || '+91 Direct Registered'}</span>
+              <h5 className="font-black text-sm text-slate-900">{deal.ownerName || 'Not added'}</h5>
+              <span className="text-xs text-slate-600 font-bold block">{maskPhone(deal.ownerPhone) || 'No phone saved'}</span>
             </div>
           </div>
 
-          {/* PROPERTY PARCEL SPECIFICATION */}
+          {/* PROPERTY DETAILS */}
           <div className="space-y-1 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">Land Parcel Specification</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">Property</span>
             <h5 className="font-black text-sm text-slate-900">{deal.propertyTitle}</h5>
             <p className="text-xs text-slate-500 flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>{deal.propertyLocation || 'Verified Location'}</span>
+              <span>{deal.propertyLocation || 'Location pending'}</span>
             </p>
           </div>
 
-          {/* STAGE MILESTONE SPECIFICATIONS */}
+          {/* STAGE CHECKLIST */}
+          {(() => {
+            const stageMeta = CRM_STAGE_METADATA[deal.stage] || CRM_STAGE_METADATA[CrmDealStages.NEW];
+            if (!stageMeta?.checklist?.length) return null;
+            return (
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
+                  Things to Check in This Stage
+                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {stageMeta.checklist.map((item, idx) => (
+                    <span key={idx} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white text-slate-700 border border-slate-200">
+                      • {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* STAGE DETAILS */}
           {deal.stageData && Object.keys(deal.stageData).length > 0 && (
             <div className="space-y-2">
-              <span className="text-xs font-black text-slate-900 block">Stage Milestone Specifications</span>
+              <span className="text-xs font-black text-slate-900 block">Saved Stage Notes</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(deal.stageData).map(([stKey, stVal]) => {
                   if (!stVal || typeof stVal !== 'object') return null;
@@ -198,44 +224,49 @@ export default function DealDossierModal({
                       </span>
                       {stVal.negotiatedPrice && (
                         <div className="font-bold text-slate-800">
-                          Negotiated: <span className="font-black text-emerald-600">Rs. {Number(stVal.negotiatedPrice).toLocaleString('en-IN')}</span>
+                          Offer: <span className="font-black text-emerald-600">Rs. {Number(stVal.negotiatedPrice).toLocaleString('en-IN')}</span>
                           {stVal.ratePerSqYd && <span className="text-slate-500 font-medium"> (Rs. {stVal.ratePerSqYd}/sq.yd)</span>}
                         </div>
                       )}
                       {stVal.tokenAmount && (
                         <div className="font-bold text-slate-800">
                           Advance: <span className="font-black text-teal-700">Rs. {Number(stVal.tokenAmount).toLocaleString('en-IN')}</span>
-                          <span className="text-slate-500 font-medium"> ({stVal.paymentMode || 'RTGS'})</span>
+                          <span className="text-slate-500 font-medium"> ({stVal.paymentMode || 'Bank Transfer'})</span>
                           {stVal.paymentRef && <div className="text-[10px] font-mono text-slate-500">Ref: #{stVal.paymentRef}</div>}
                         </div>
                       )}
                       {stVal.visitDate && (
                         <div className="font-bold text-slate-800">
-                          Visit: {stVal.visitDate} {stVal.visitTime || ''}
-                          {stVal.meetingPoint && <div className="text-[10px] text-slate-500">📍 {stVal.meetingPoint}</div>}
+                          Visit: {formatShortDate(stVal.visitDate)} {stVal.visitTime || ''}
+                          {stVal.meetingPoint && (
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 shrink-0" />
+                              <span>{stVal.meetingPoint}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                       {stVal.legalStatus && (
                         <div className="font-bold text-slate-800">
-                          Legal Opinion: <span className="text-purple-700 font-black">{stVal.legalStatus}</span>
+                          Legal Status: <span className="text-purple-700 font-black">{formatLegalStatusLabel(stVal.legalStatus)}</span>
                           {stVal.ecPeriod && <div className="text-[10px] text-slate-500">EC: {stVal.ecPeriod}</div>}
                         </div>
                       )}
                       {stVal.sroOffice && (
                         <div className="font-bold text-slate-800">
-                          SRO: {stVal.sroOffice}
-                          {stVal.slotDate && <div className="text-[10px] text-blue-700 font-bold">Slot: {stVal.slotDate} {stVal.slotTime || ''}</div>}
+                          Office: {stVal.sroOffice}
+                          {stVal.slotDate && <div className="text-[10px] text-blue-700 font-bold">Slot: {formatShortDate(stVal.slotDate)} {stVal.slotTime || ''}</div>}
                           {stVal.challanNumber && <div className="text-[10px] font-mono text-slate-500">Challan: #{stVal.challanNumber}</div>}
                         </div>
                       )}
                       {stVal.deedNumber && (
                         <div className="font-bold text-slate-800">
-                          Sale Deed: <span className="font-black text-emerald-700">{stVal.deedNumber}</span>
+                          Deed No: <span className="font-black text-emerald-700">{stVal.deedNumber}</span>
                         </div>
                       )}
                       {stVal.lossReason && (
                         <div className="font-bold text-rose-700">
-                          Loss Reason: {stVal.lossReason}
+                          Drop Reason: {stVal.lossReason}
                         </div>
                       )}
                     </div>
@@ -245,23 +276,23 @@ export default function DealDossierModal({
             </div>
           )}
 
-          {/* PAYMENT MILESTONES & TOKEN ADVANCE STATUS */}
+          {/* PAYMENTS & ADVANCE */}
           <div className="space-y-2">
-            <span className="text-xs font-black text-slate-900 block">Payment Milestones & Token Status</span>
+            <span className="text-xs font-black text-slate-900 block">Payments &amp; Advance</span>
             <div className="space-y-2">
               {(deal.paymentMilestones || []).length === 0 ? (
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-400 text-xs font-semibold">
-                  Standard token advance deposit and registration milestones apply.
+                  No payments recorded yet.
                 </div>
               ) : (
                 deal.paymentMilestones.map((m, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border border-slate-200">
                     <div>
                       <span className="text-slate-900 block">{m.name}</span>
-                      <span className="text-[11px] text-slate-400">{m.date}</span>
+                      <span className="text-[11px] text-slate-400">{formatShortDate(m.date)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-slate-900 block font-black">Rs. {Number(m.amount || 0).toLocaleString()}</span>
+                      <span className="text-slate-900 block font-black">Rs. {Number(m.amount || 0).toLocaleString('en-IN')}</span>
                       <span className={'text-[10px] font-black ' + (m.status === 'PAID' ? 'text-emerald-600' : 'text-amber-600')}>
                         {m.status}
                       </span>
@@ -272,18 +303,18 @@ export default function DealDossierModal({
             </div>
           </div>
 
-          {/* AUDIT LOG TIMELINE */}
+          {/* ACTIVITY HISTORY */}
           <div className="space-y-2">
-            <span className="text-xs font-black text-slate-900 block">Transaction Audit Trail</span>
+            <span className="text-xs font-black text-slate-900 block">Activity History</span>
             <div className="space-y-1.5">
               {(deal.timeline || []).map((t, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                  <div className="flex items-center gap-2">
+                <div key={idx} className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     <span className="font-bold text-slate-800">{t.event}</span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[11px] text-slate-400 block font-medium">{t.date}</span>
+                  <div className="text-right shrink-0">
+                    <span className="text-[11px] text-slate-400 block font-medium">{formatShortDate(t.date)}</span>
                     <span className="text-[10px] text-slate-500 font-semibold">{t.user}</span>
                   </div>
                 </div>
@@ -299,13 +330,7 @@ export default function DealDossierModal({
             {deal.customerPhone && (
               <button
                 type="button"
-                onClick={() => {
-                  if (isFieldExecutive) {
-                    alert('Field Broker Policy: Direct customer messaging is restricted to Senior Brokers. Contact Admin Desk to initiate customer handover.');
-                    return;
-                  }
-                  onTriggerWhatsApp(deal.customerPhone, deal.customerName, deal.propertyTitle);
-                }}
+                onClick={() => onTriggerWhatsApp(deal.customerPhone, deal.customerName, deal.propertyTitle)}
                 className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
               >
                 <MessageSquare className="w-4 h-4" />

@@ -9,9 +9,11 @@ import {
   MapPin,
   TrendingUp,
   Lock,
-  Briefcase
+  Briefcase,
+  Download,
+  X
 } from 'lucide-react';
-import { CrmLeadScores } from '../../../firebase/crmService.js';
+import { CrmLeadScores, getLocalDateIso, exportRecordsToCsv } from '../../../firebase/crmService.js';
 
 export default function CrmLeadDirectory({
   leads,
@@ -43,22 +45,45 @@ export default function CrmLeadDirectory({
   };
 
   const filteredLeads = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const qDigits = q.replace(/\D/g, '');
     return leads.filter((lead) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        q === '' ||
-        (lead.name || '').toLowerCase().includes(q) ||
-        (lead.phone || '').includes(q) ||
-        (lead.email || '').toLowerCase().includes(q) ||
-        (lead.preferredLocation || '').toLowerCase().includes(q) ||
-        (lead.preferredPropertyType || '').toLowerCase().includes(q);
-
       const matchesScore = leadScoreFilter === 'ALL' || lead.score === leadScoreFilter;
       const matchesAgent = selectedAgent === 'ALL' || lead.assignedAgent === selectedAgent;
+      if (!matchesScore || !matchesAgent) return false;
+      if (q === '') return true;
 
-      return matchesSearch && matchesScore && matchesAgent;
+      const phoneClean = String(lead.phone || '').replace(/\D/g, '');
+      const matchesPhone = Boolean(qDigits.length >= 3 && phoneClean.includes(qDigits));
+
+      return (
+        matchesPhone ||
+        (lead.name || '').toLowerCase().includes(q) ||
+        (lead.phone || '').toLowerCase().includes(q) ||
+        (lead.email || '').toLowerCase().includes(q) ||
+        (lead.preferredLocation || '').toLowerCase().includes(q) ||
+        (lead.preferredPropertyType || '').toLowerCase().includes(q) ||
+        (lead.assignedAgent || '').toLowerCase().includes(q)
+      );
     });
   }, [leads, searchQuery, leadScoreFilter, selectedAgent]);
+
+  const handleExportLeadsCsv = () => {
+    const headers = ['Lead ID', 'Buyer Name', 'Phone', 'Email', 'Source', 'Intent Score', 'Preferred Location', 'Property Interest', 'Budget', 'Assigned Agent'];
+    const rows = filteredLeads.map(l => [
+      l.id || l.leadId,
+      l.name || '',
+      isFieldExecutive ? maskPhone(l.phone) : (l.phone || ''),
+      isFieldExecutive ? maskEmail(l.email) : (l.email || ''),
+      l.source || '',
+      l.score || '',
+      l.preferredLocation || '',
+      l.preferredPropertyType || '',
+      l.budgetDisplay || l.budgetMax || '',
+      l.assignedAgent || ''
+    ]);
+    exportRecordsToCsv('easeland-crm-leads-' + getLocalDateIso() + '.csv', headers, rows);
+  };
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
@@ -75,13 +100,26 @@ export default function CrmLeadDirectory({
           </p>
         </div>
 
-        <button
-          onClick={onOpenNewLead}
-          className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto"
-        >
-          <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-          <span>Add New Buyer Lead</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleExportLeadsCsv}
+            disabled={filteredLeads.length === 0}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs px-3 py-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Export filtered buyer leads as CSV"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={onOpenNewLead}
+            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+            <span>Add New Buyer Lead</span>
+          </button>
+        </div>
       </div>
 
       {/* FILTER & SEARCH BAR */}
@@ -93,8 +131,18 @@ export default function CrmLeadDirectory({
             placeholder="Search buyers by name, phone, city, or property type..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+            className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear buyer search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* LEAD SCORE FILTER PILLS */}
@@ -148,7 +196,7 @@ export default function CrmLeadDirectory({
                   <tr key={lead.id} className="hover:bg-amber-50/40 transition-colors">
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-slate-900 text-amber-400 font-black flex items-center justify-center shrink-0 shadow-xs">
+                        <div className="w-8 h-8 rounded-xl bg-slate-900 text-amber-400 font-black flex items-center justify-center shrink-0 shadow-sm">
                           {(lead.name || 'B')[0].toUpperCase()}
                         </div>
                         <div>
@@ -215,13 +263,7 @@ export default function CrmLeadDirectory({
                         {lead.phone && (
                           <button
                             type="button"
-                            onClick={() => {
-                              if (isFieldExecutive) {
-                                alert('Field Broker Policy: Direct customer messaging is restricted to Senior Brokers. Contact Admin Desk to initiate customer handover.');
-                                return;
-                              }
-                              onTriggerWhatsApp(lead.phone, lead.name);
-                            }}
+                            onClick={() => onTriggerWhatsApp(lead.phone, lead.name)}
                             className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors cursor-pointer"
                             title={isFieldExecutive ? 'Contact restricted by field policy' : 'Chat on WhatsApp'}
                           >
@@ -256,11 +298,11 @@ export default function CrmLeadDirectory({
           filteredLeads.map((lead) => (
             <div
               key={lead.id}
-              className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3 hover:border-amber-400 transition-all"
+              className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 hover:border-amber-400 transition-all"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-slate-900 text-amber-400 font-black flex items-center justify-center shrink-0 shadow-xs">
+                  <div className="w-9 h-9 rounded-xl bg-slate-900 text-amber-400 font-black flex items-center justify-center shrink-0 shadow-sm">
                     {(lead.name || 'B')[0].toUpperCase()}
                   </div>
                   <div className="min-w-0">
@@ -312,7 +354,7 @@ export default function CrmLeadDirectory({
                     <button
                       type="button"
                       onClick={() => onConvertToDeal(lead)}
-                      className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                      className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
                       title="Convert buyer to pipeline deal"
                     >
                       <Briefcase className="w-3.5 h-3.5 text-slate-950" />
@@ -322,14 +364,8 @@ export default function CrmLeadDirectory({
                   {lead.phone && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (isFieldExecutive) {
-                          alert('Field Broker Policy: Direct customer messaging is restricted to Senior Brokers. Contact Admin Desk to initiate customer handover.');
-                          return;
-                        }
-                        onTriggerWhatsApp(lead.phone, lead.name);
-                      }}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                      onClick={() => onTriggerWhatsApp(lead.phone, lead.name)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
                       title="Chat on WhatsApp"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />

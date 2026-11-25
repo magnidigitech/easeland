@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, X, CheckCircle2, MessageSquare, PhoneCall, Tag } from 'lucide-react';
+import { getLocalDateIso } from '../../../firebase/crmService.js';
 
 export default function ScheduleFollowUpModal({
   isOpen,
@@ -14,16 +15,18 @@ export default function ScheduleFollowUpModal({
   const [logActivity, setLogActivity] = useState(false);
   const [callOutcome, setCallOutcome] = useState('CONNECTED_INTERESTED');
   const [activityNote, setActivityNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (deal && isOpen) {
-      const todayIso = new Date().toISOString().split('T')[0];
+      const todayIso = getLocalDateIso();
       setFollowUpDate(deal.nextFollowUpDate || todayIso);
       setFollowUpTime(deal.nextFollowUpTime || '11:00 AM');
       setFollowUpAction(deal.nextFollowUpAction || 'Follow up with client regarding transaction next steps');
       setLogActivity(false);
       setCallOutcome('CONNECTED_INTERESTED');
       setActivityNote('');
+      setIsSubmitting(false);
     }
   }, [deal, isOpen]);
 
@@ -31,9 +34,7 @@ export default function ScheduleFollowUpModal({
 
   // Quick Date Presets
   const applyPreset = (daysOffset, defaultTime = '11:00 AM') => {
-    const target = new Date();
-    target.setDate(target.getDate() + daysOffset);
-    setFollowUpDate(target.toISOString().split('T')[0]);
+    setFollowUpDate(getLocalDateIso(daysOffset));
     setFollowUpTime(defaultTime);
   };
 
@@ -53,26 +54,32 @@ export default function ScheduleFollowUpModal({
     { id: 'BUSY_CALLBACK', label: 'Busy / Callback Requested' }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     let combinedLogNote = '';
     if (logActivity) {
       const outcomeLabel = CALL_OUTCOMES.find(o => o.id === callOutcome)?.label || callOutcome;
       combinedLogNote = 'Call Logged: ' + outcomeLabel + (activityNote ? ' - ' + activityNote : '');
     }
 
-    onSave(deal.id || deal.dealId, {
-      followUpDate,
-      followUpTime,
-      followUpAction: followUpAction.trim(),
-      logNote: combinedLogNote,
-      agentName
-    });
-    onClose();
+    try {
+      await onSave(deal.id || deal.dealId, {
+        followUpDate,
+        followUpTime,
+        followUpAction: followUpAction.trim(),
+        logNote: combinedLogNote,
+        agentName
+      });
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up max-h-[92dvh] flex flex-col">
 
         {/* MODAL HEADER */}
@@ -242,16 +249,18 @@ export default function ScheduleFollowUpModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
+              disabled={isSubmitting}
+              className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition-all shadow-sm cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-              <span>Save Follow-up</span>
+              <span>{isSubmitting ? 'Saving...' : 'Save Follow-up'}</span>
             </button>
           </div>
 

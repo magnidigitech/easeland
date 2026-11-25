@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Layers,
   Users,
@@ -26,7 +26,8 @@ import {
   updateCrmVisitStatus,
   deleteCrmVisit,
   matchPropertiesForLead,
-  getStageDefaultFollowUp
+  getStageDefaultFollowUp,
+  getLocalDateIso
 } from '../firebase/crmService.js';
 
 import { mockApi } from '../services/mockApi.js';
@@ -73,6 +74,7 @@ export default function EaseLandCRM({
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [leadScoreFilter, setLeadScoreFilter] = useState('ALL');
+  const [onlyDueToday, setOnlyDueToday] = useState(false);
 
   // Modals State
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
@@ -80,17 +82,30 @@ export default function EaseLandCRM({
   const [newDealInitialData, setNewDealInitialData] = useState(null);
   const [isScheduleVisitModalOpen, setIsScheduleVisitModalOpen] = useState(false);
   const [scheduleVisitInitialData, setScheduleVisitInitialData] = useState(null);
-  const [selectedDealForDossier, setSelectedDealForDossier] = useState(null);
+  const [selectedDealForDossierId, setSelectedDealForDossierId] = useState(null);
   const [isScheduleFollowUpModalOpen, setIsScheduleFollowUpModalOpen] = useState(false);
-  const [selectedDealForFollowUp, setSelectedDealForFollowUp] = useState(null);
+  const [selectedDealForFollowUpId, setSelectedDealForFollowUpId] = useState(null);
   const [stageTransitionContext, setStageTransitionContext] = useState(null);
 
-  // Toast feedback
+  // Derive open modal deals directly from live deals array so stage/follow-up edits reflect immediately
+  const selectedDealForDossier = useMemo(() => {
+    if (!selectedDealForDossierId) return null;
+    return deals.find(d => d.id === selectedDealForDossierId || d.dealId === selectedDealForDossierId) || null;
+  }, [deals, selectedDealForDossierId]);
+
+  const selectedDealForFollowUp = useMemo(() => {
+    if (!selectedDealForFollowUpId) return null;
+    return deals.find(d => d.id === selectedDealForFollowUpId || d.dealId === selectedDealForFollowUpId) || null;
+  }, [deals, selectedDealForFollowUpId]);
+
+  // Toast feedback with timer cleanup
   const [toastMessage, setToastMessage] = useState('');
-  const triggerToast = (msg) => {
+  const toastTimerRef = useRef(null);
+  const triggerToast = useCallback((msg) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3500);
-  };
+    toastTimerRef.current = setTimeout(() => setToastMessage(''), 3500);
+  }, []);
 
   // RBAC Authentication & Role Gate
   const isAdminAuthenticated = typeof window !== 'undefined' && localStorage.getItem('easeland_admin_authenticated') === 'true';
@@ -136,9 +151,19 @@ export default function EaseLandCRM({
       }
       setAnalytics(data.analytics || null);
 
-      // Load properties from marketplace
-      const props = mockApi.getPublicProperties();
-      setAvailableProperties(Array.isArray(props) ? props : []);
+      // Merge authoritative PostgreSQL live properties with any local marketplace cache
+      const livePgProps = Array.isArray(data.liveProperties) ? data.liveProperties : [];
+      const localProps = mockApi.getPublicProperties();
+      const propMap = new Map();
+      livePgProps.forEach((p) => {
+        const key = p && (p.propertyId || p.id);
+        if (key) propMap.set(key, p);
+      });
+      (Array.isArray(localProps) ? localProps : []).forEach((p) => {
+        const key = p && (p.propertyId || p.id);
+        if (key && !propMap.has(key)) propMap.set(key, p);
+      });
+      setAvailableProperties(Array.from(propMap.values()));
     } catch (err) {
       console.warn('Error loading authoritative CRM data:', err);
     } finally {
@@ -150,7 +175,7 @@ export default function EaseLandCRM({
     loadCrmData(true);
   }, []);
 
-  // Server-Sent Events (SSE) Live Synchronization Bus
+  // Server-Sent Events (SSE) Live Synchronization Bus + Mobile Wake Visibility Refresh
   useEffect(() => {
     let sseSource = null;
     try {
@@ -173,12 +198,58 @@ export default function EaseLandCRM({
       setIsLiveConnected(false);
     }
 
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        loadCrmData(false);
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
     return () => {
       if (sseSource) {
         sseSource.close();
       }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     };
   }, []);
+
+  // Global Escape key handler to dismiss open CRM modals & header dropdown cleanly
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      if (stageTransitionContext) setStageTransitionContext(null);
+      else if (isScheduleFollowUpModalOpen) {
+        setIsScheduleFollowUpModalOpen(false);
+        setSelectedDealForFollowUpId(null);
+      } else if (isScheduleVisitModalOpen) {
+        setIsScheduleVisitModalOpen(false);
+        setScheduleVisitInitialData(null);
+      } else if (isNewDealModalOpen) {
+        setIsNewDealModalOpen(false);
+        setNewDealInitialData(null);
+      } else if (isNewLeadModalOpen) {
+        setIsNewLeadModalOpen(false);
+      } else if (selectedDealForDossierId) {
+        setSelectedDealForDossierId(null);
+      } else if (isAgentDropdownOpen) {
+        setIsAgentDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    stageTransitionContext,
+    isScheduleFollowUpModalOpen,
+    isScheduleVisitModalOpen,
+    isNewDealModalOpen,
+    isNewLeadModalOpen,
+    selectedDealForDossierId,
+    isAgentDropdownOpen
+  ]);
 
   // Handle Create Lead
   const handleCreateLead = async (leadFormData) => {
@@ -187,6 +258,8 @@ export default function EaseLandCRM({
       triggerToast('Lead ' + leadFormData.name + ' saved to database.');
       setIsNewLeadModalOpen(false);
       await loadCrmData(false);
+    } else {
+      triggerToast(res.error || 'Could not save lead. Please try again.');
     }
   };
 
@@ -198,6 +271,8 @@ export default function EaseLandCRM({
       setIsNewDealModalOpen(false);
       setNewDealInitialData(null);
       await loadCrmData(false);
+    } else {
+      triggerToast(res.error || 'Could not initiate deal. Please try again.');
     }
   };
 
@@ -212,7 +287,7 @@ export default function EaseLandCRM({
       propertyTitle: lead.preferredPropertyType || 'Open Plot Venture',
       dealValue: lead.budgetMax || '',
       assignedAgent: lead.assignedAgent || (agents[0]?.name || 'EaseLand Admin'),
-      nextFollowUpDate: new Date().toISOString().split('T')[0],
+      nextFollowUpDate: getLocalDateIso(),
       nextFollowUpAction: 'Initial conversion qualification call'
     });
     setIsNewDealModalOpen(true);
@@ -220,7 +295,7 @@ export default function EaseLandCRM({
 
   // Handle Open Follow-up Modal
   const handleOpenFollowUp = (deal) => {
-    setSelectedDealForFollowUp(deal);
+    setSelectedDealForFollowUpId(deal?.id || deal?.dealId || null);
     setIsScheduleFollowUpModalOpen(true);
   };
 
@@ -228,46 +303,40 @@ export default function EaseLandCRM({
   const handleSaveFollowUp = async (dealId, followUpData) => {
     try {
       const res = await updateCrmDealFollowUp(dealId, followUpData);
-      if (res.success) {
-        setDeals(prev => prev.map(d => {
-          if (d.id === dealId || d.dealId === dealId) {
-            const updatedTimeline = Array.isArray(d.timeline) ? [...d.timeline] : [];
-            if (followUpData.logNote) {
-              updatedTimeline.push({
-                date: new Date().toISOString().split('T')[0],
-                event: followUpData.logNote,
-                user: followUpData.agentName || 'EaseLand Admin'
-              });
+        if (res.success) {
+          setDeals(prev => prev.map(d => {
+            if (d.id === dealId || d.dealId === dealId) {
+              const updatedTimeline = Array.isArray(d.timeline) ? [...d.timeline] : [];
+              if (followUpData.logNote) {
+                updatedTimeline.push({
+                  date: getLocalDateIso(),
+                  event: followUpData.logNote,
+                  user: followUpData.agentName || 'EaseLand Admin'
+                });
+              }
+              if (followUpData.followUpAction) {
+                updatedTimeline.push({
+                  date: getLocalDateIso(),
+                  event: 'Follow-up scheduled for ' + (followUpData.followUpDate || 'Due') + ' at ' + (followUpData.followUpTime || '11:00 AM') + ': ' + followUpData.followUpAction,
+                  user: followUpData.agentName || 'EaseLand Admin'
+                });
+              }
+              return {
+                ...d,
+                nextFollowUpDate: followUpData.followUpDate !== undefined ? followUpData.followUpDate : d.nextFollowUpDate,
+                nextFollowUpTime: followUpData.followUpTime || d.nextFollowUpTime,
+                nextFollowUpAction: followUpData.followUpAction !== undefined ? followUpData.followUpAction : d.nextFollowUpAction,
+                timeline: updatedTimeline,
+                updatedAt: new Date().toISOString()
+              };
             }
-            if (followUpData.followUpAction) {
-              updatedTimeline.push({
-                date: new Date().toISOString().split('T')[0],
-                event: 'Follow-up scheduled for ' + (followUpData.followUpDate || 'Due') + ' at ' + (followUpData.followUpTime || '11:00 AM') + ': ' + followUpData.followUpAction,
-                user: followUpData.agentName || 'EaseLand Admin'
-              });
-            }
-            return {
-              ...d,
-              nextFollowUpDate: followUpData.followUpDate !== undefined ? followUpData.followUpDate : d.nextFollowUpDate,
-              nextFollowUpTime: followUpData.followUpTime || d.nextFollowUpTime,
-              nextFollowUpAction: followUpData.followUpAction !== undefined ? followUpData.followUpAction : d.nextFollowUpAction,
-              timeline: updatedTimeline,
-              updatedAt: new Date().toISOString()
-            };
-          }
-          return d;
-        }));
-        if (selectedDealForDossier && (selectedDealForDossier.id === dealId || selectedDealForDossier.dealId === dealId)) {
-          setSelectedDealForDossier(prev => prev ? {
-            ...prev,
-            nextFollowUpDate: followUpData.followUpDate !== undefined ? followUpData.followUpDate : prev.nextFollowUpDate,
-            nextFollowUpTime: followUpData.followUpTime || prev.nextFollowUpTime,
-            nextFollowUpAction: followUpData.followUpAction !== undefined ? followUpData.followUpAction : prev.nextFollowUpAction
-          } : prev);
+            return d;
+          }));
+          triggerToast('Follow-up scheduled successfully.');
+          await loadCrmData(false);
+        } else {
+          triggerToast(res.error || 'Error saving follow-up.');
         }
-        triggerToast('Follow-up scheduled successfully.');
-        await loadCrmData(false);
-      }
     } catch (err) {
       console.error('Failed to schedule follow-up:', err);
       triggerToast('Error saving follow-up.');
@@ -282,6 +351,8 @@ export default function EaseLandCRM({
       setIsScheduleVisitModalOpen(false);
       setScheduleVisitInitialData(null);
       await loadCrmData(false);
+    } else {
+      triggerToast(res.error || 'Could not schedule visit.');
     }
   };
 
@@ -391,12 +462,16 @@ export default function EaseLandCRM({
     if (e) e.stopPropagation();
     const label = customerName ? ('deal for "' + customerName + '"') : 'this deal';
     if (window.confirm('Are you sure you want to delete ' + label + ' from the database?')) {
-      await deleteCrmDeal(dealId);
-      triggerToast('Deal deleted from database.');
-      if (selectedDealForDossier?.id === dealId) {
-        setSelectedDealForDossier(null);
+      const res = await deleteCrmDeal(dealId);
+      if (res.success) {
+        triggerToast('Deal deleted from database.');
+        if (selectedDealForDossierId === dealId) {
+          setSelectedDealForDossierId(null);
+        }
+        await loadCrmData(false);
+      } else {
+        triggerToast(res.error || 'Failed to delete deal.');
       }
-      await loadCrmData(false);
     }
   };
 
@@ -405,9 +480,13 @@ export default function EaseLandCRM({
     if (e) e.stopPropagation();
     const label = leadName ? ('lead "' + leadName + '"') : 'this lead';
     if (window.confirm('Are you sure you want to delete ' + label + '?')) {
-      await deleteCrmLead(leadId);
-      triggerToast('Lead deleted from database.');
-      await loadCrmData(false);
+      const res = await deleteCrmLead(leadId);
+      if (res.success) {
+        triggerToast('Lead deleted from database.');
+        await loadCrmData(false);
+      } else {
+        triggerToast(res.error || 'Failed to delete lead.');
+      }
     }
   };
 
@@ -416,18 +495,25 @@ export default function EaseLandCRM({
     if (e) e.stopPropagation();
     const label = customerName ? ('inspection for "' + customerName + '"') : 'this inspection';
     if (window.confirm('Are you sure you want to delete ' + label + '?')) {
-      await deleteCrmVisit(visitId);
-      triggerToast('Site visit deleted.');
-      await loadCrmData(false);
+      const res = await deleteCrmVisit(visitId);
+      if (res.success) {
+        triggerToast('Site visit deleted.');
+        await loadCrmData(false);
+      } else {
+        triggerToast(res.error || 'Failed to delete site visit.');
+      }
     }
   };
 
-  // Handle Update Visit Status (Mark Completed)
-  const handleUpdateVisitStatus = async (visitId, newStatus) => {
-    const feedback = window.prompt('Enter inspection notes or buyer feedback:', 'Site inspection completed successfully with buyer.');
-    await updateCrmVisitStatus(visitId, newStatus, feedback || '');
-    triggerToast('Inspection marked ' + newStatus + '.');
-    await loadCrmData(false);
+  // Handle Update Visit Status (Mark Completed via inline feedback or direct status)
+  const handleUpdateVisitStatus = async (visitId, newStatus, feedback = '') => {
+    const res = await updateCrmVisitStatus(visitId, newStatus, feedback || '');
+    if (res.success) {
+      triggerToast('Inspection marked ' + newStatus + '.');
+      await loadCrmData(false);
+    } else {
+      triggerToast(res.error || 'Failed to update inspection status.');
+    }
   };
 
   // Combined dynamic locations from API bootstrap and marketplace properties
@@ -451,7 +537,7 @@ export default function EaseLandCRM({
       propertyLocation: property.locationName || property.address || property.city || property.district || (combinedLocations[0] || 'Amaravati Capital Region'),
       customerName: lead ? lead.name : '',
       customerPhone: lead ? lead.phone : '',
-      visitDate: new Date().toISOString().split('T')[0],
+      visitDate: getLocalDateIso(),
       visitTime: '11:00 AM',
       agentAssigned: lead?.assignedAgent || (agents[0] && agents[0].name) || DEFAULT_CRM_AGENTS[0].name,
       customerNotes: 'AI Matchmaker inspection booking for ' + (property.title || 'Plot')
@@ -459,8 +545,12 @@ export default function EaseLandCRM({
     setIsScheduleVisitModalOpen(true);
   };
 
-  // Handle WhatsApp Trigger
+  // Handle WhatsApp Trigger (Enforces Field Broker Policy via Toast instead of blocking native alert)
   const handleTriggerWhatsApp = (phone, name, propTitle = '') => {
+    if (isFieldExecutive) {
+      triggerToast('Field Broker Policy: Direct customer messaging is restricted to Senior Brokers. Contact Admin Desk.');
+      return;
+    }
     if (!phone) return;
     const cleanPh = phone.replace(/[^0-9]/g, '');
     const greeting = 'Hello ' + (name || 'Sir/Madam') + ', this is EaseLand Verified Properties regarding ' +
@@ -472,21 +562,35 @@ export default function EaseLandCRM({
     }
   };
 
-  // Filtered Deals for Kanban / Table
-  const filteredDeals = deals.filter((deal) => {
+  // Filtered Deals for Kanban / Table (Memoized + searches name, phone, property, location, owner, email, ID & agent)
+  const filteredDeals = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      q === '' ||
-      (deal.customerName || '').toLowerCase().includes(q) ||
-      (deal.propertyTitle || '').toLowerCase().includes(q) ||
-      (deal.ownerName || '').toLowerCase().includes(q);
+    const qDigits = q.replace(/\D/g, '');
+    return deals.filter((deal) => {
+      const matchesAgent = selectedAgent === 'ALL' || deal.assignedAgent === selectedAgent;
+      if (!matchesAgent) return false;
+      if (!q) return true;
 
-    const matchesAgent = selectedAgent === 'ALL' || deal.assignedAgent === selectedAgent;
-    return matchesSearch && matchesAgent;
-  });
+      const phoneClean = String(deal.customerPhone || '').replace(/\D/g, '');
+      const ownerPhoneClean = String(deal.ownerPhone || '').replace(/\D/g, '');
+      const matchesPhone = Boolean(qDigits.length >= 3 && (phoneClean.includes(qDigits) || ownerPhoneClean.includes(qDigits)));
+
+      return (
+        matchesPhone ||
+        (deal.customerName || '').toLowerCase().includes(q) ||
+        (deal.customerPhone || '').toLowerCase().includes(q) ||
+        (deal.customerEmail || '').toLowerCase().includes(q) ||
+        (deal.propertyTitle || '').toLowerCase().includes(q) ||
+        (deal.propertyLocation || '').toLowerCase().includes(q) ||
+        (deal.ownerName || '').toLowerCase().includes(q) ||
+        (deal.assignedAgent || '').toLowerCase().includes(q) ||
+        (deal.id || deal.dealId || '').toLowerCase().includes(q)
+      );
+    });
+  }, [deals, searchQuery, selectedAgent]);
 
   // Count quarantined deals
-  const quarantinedDealsCount = deals.filter(d => d.isPropertyQuarantined).length;
+  const quarantinedDealsCount = useMemo(() => deals.filter(d => d.isPropertyQuarantined).length, [deals]);
 
   if (authLoading && !isAuthorized) {
     return (
@@ -588,15 +692,20 @@ export default function EaseLandCRM({
         loading={loading}
         isLiveConnected={isLiveConnected}
         followUpsDueTodayCount={analytics?.followUpsDueTodayCount || 0}
-        onQuickFilterFollowUps={() => setActiveTab('pipeline')}
+        onQuickFilterFollowUps={() => {
+          setActiveTab('pipeline');
+          setOnlyDueToday(true);
+        }}
       />
 
       {/* 2. TOAST BANNER */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-400/40 flex items-center gap-3 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
-          <span className="text-xs font-bold">{toastMessage}</span>
-          <button type="button" onClick={() => setToastMessage('')} className="text-slate-400 hover:text-white ml-2 cursor-pointer">
+        <div className="fixed bottom-16 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 bg-slate-900 text-white px-4 sm:px-5 py-3 rounded-2xl shadow-2xl border border-amber-400/40 flex items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
+            <span className="text-xs font-bold leading-snug">{toastMessage}</span>
+          </div>
+          <button type="button" onClick={() => setToastMessage('')} className="text-slate-400 hover:text-white ml-2 shrink-0 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -606,7 +715,15 @@ export default function EaseLandCRM({
       <main className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
         {/* TOP KPI PERFORMANCE CARDS */}
-        <CrmKpiBanner analytics={analytics} />
+        <CrmKpiBanner
+          analytics={analytics}
+          onCardSelect={(tabId, dueFlag) => {
+            setActiveTab(tabId);
+            if (dueFlag !== undefined) {
+              setOnlyDueToday(Boolean(dueFlag));
+            }
+          }}
+        />
 
         {/* COMPLIANCE ALERT BANNER (If any quarantined properties have active deals) */}
         {quarantinedDealsCount > 0 && (
@@ -641,7 +758,7 @@ export default function EaseLandCRM({
                 onClick={() => setActiveTab(tab.id)}
                 className={'flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ' +
                   (isActive
-                    ? 'bg-white text-slate-900 border-t-2 border-amber-400 shadow-xs'
+                    ? 'bg-white text-slate-900 border-t-2 border-amber-400 shadow-sm'
                     : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                   )
                 }
@@ -667,7 +784,9 @@ export default function EaseLandCRM({
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             kanbanStages={kanbanStages}
-            onSelectDeal={setSelectedDealForDossier}
+            onlyDueToday={onlyDueToday}
+            setOnlyDueToday={setOnlyDueToday}
+            onSelectDeal={(deal) => setSelectedDealForDossierId(deal?.id || deal?.dealId || null)}
             onAdvanceStage={handleAdvanceDealStage}
             onDeleteDeal={handleDeleteDeal}
             onTriggerWhatsApp={handleTriggerWhatsApp}
@@ -768,7 +887,7 @@ export default function EaseLandCRM({
       {/* MODAL 4: FULL DEAL DOSSIER */}
       <DealDossierModal
         deal={selectedDealForDossier}
-        onClose={() => setSelectedDealForDossier(null)}
+        onClose={() => setSelectedDealForDossierId(null)}
         onTriggerWhatsApp={handleTriggerWhatsApp}
         onDeleteDeal={handleDeleteDeal}
         onAdvanceStage={handleAdvanceDealStage}
@@ -782,7 +901,7 @@ export default function EaseLandCRM({
         isOpen={isScheduleFollowUpModalOpen}
         onClose={() => {
           setIsScheduleFollowUpModalOpen(false);
-          setSelectedDealForFollowUp(null);
+          setSelectedDealForFollowUpId(null);
         }}
         deal={selectedDealForFollowUp}
         onSave={handleSaveFollowUp}

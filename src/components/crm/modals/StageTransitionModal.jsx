@@ -13,8 +13,7 @@ import {
   ShieldCheck,
   MapPin,
   TrendingUp,
-  Tag,
-  DollarSign
+  Tag
 } from 'lucide-react';
 import {
   CrmDealStages,
@@ -22,6 +21,7 @@ import {
   CRM_STAGE_METADATA,
   getStageDefaultFollowUp,
   formatAmountInWords,
+  getLocalDateIso,
   DEFAULT_CRM_AGENTS
 } from '../../../firebase/crmService.js';
 
@@ -33,13 +33,9 @@ export default function StageTransitionModal({
   onConfirm,
   activeAgents = DEFAULT_CRM_AGENTS
 }) {
-  if (!isOpen || !deal || !targetStage) return null;
+  const defaultFollowUp = getStageDefaultFollowUp(targetStage || CrmDealStages.NEW);
 
-  const currentStageMeta = CRM_STAGE_METADATA[deal.stage] || CRM_STAGE_METADATA[CrmDealStages.NEW];
-  const targetStageMeta = CRM_STAGE_METADATA[targetStage] || CRM_STAGE_METADATA[CrmDealStages.NEW];
-  const defaultFollowUp = getStageDefaultFollowUp(targetStage);
-
-  // Form State initialized based on target stage
+  // Hooks MUST run unconditionally on every render before any early return
   const [stageFormData, setStageFormData] = useState({});
   const [followUpAction, setFollowUpAction] = useState(defaultFollowUp.action);
   const [followUpDate, setFollowUpDate] = useState(defaultFollowUp.date);
@@ -47,11 +43,12 @@ export default function StageTransitionModal({
   const [transitionNote, setTransitionNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Existing stage data for this deal if any
-  const existingStageData = (deal.stageData && deal.stageData[targetStage]) || {};
-
   useEffect(() => {
-    const todayIso = new Date().toISOString().split('T')[0];
+    if (!isOpen || !deal || !targetStage) return;
+
+    const existingStageData = (deal.stageData && deal.stageData[targetStage]) || {};
+    const stageFollowUp = getStageDefaultFollowUp(targetStage);
+    const todayIso = getLocalDateIso();
     const initialDealVal = Number(deal.dealValue) || 0;
     const defaultTokenAmt = Math.round(initialDealVal * 0.1) || 200000;
 
@@ -78,10 +75,8 @@ export default function StageTransitionModal({
         ...existingStageData
       };
     } else if (targetStage === CrmDealStages.SITE_VISIT) {
-      const visitDateDef = new Date();
-      visitDateDef.setDate(visitDateDef.getDate() + 2);
       initialData = {
-        visitDate: existingStageData.visitDate || visitDateDef.toISOString().split('T')[0],
+        visitDate: existingStageData.visitDate || getLocalDateIso(2),
         visitTime: existingStageData.visitTime || '10:30 AM',
         assignedAgent: existingStageData.assignedAgent || deal.assignedAgent || activeAgents[0]?.name || 'EaseLand Desk',
         meetingPoint: existingStageData.meetingPoint || (deal.propertyLocation || 'Venture Main Gate'),
@@ -99,11 +94,9 @@ export default function StageTransitionModal({
         ...existingStageData
       };
     } else if (targetStage === CrmDealStages.REGISTRATION_PENDING) {
-      const regDateDef = new Date();
-      regDateDef.setDate(regDateDef.getDate() + 3);
       initialData = {
         sroOffice: existingStageData.sroOffice || 'Mangalagiri Sub-Registrar Office (SRO)',
-        slotDate: existingStageData.slotDate || regDateDef.toISOString().split('T')[0],
+        slotDate: existingStageData.slotDate || getLocalDateIso(3),
         slotTime: existingStageData.slotTime || '11:30 AM',
         challanNumber: existingStageData.challanNumber || 'CHL-AP-' + Math.floor(100000 + Math.random() * 900000),
         challanAmount: existingStageData.challanAmount || Math.round(initialDealVal * 0.075),
@@ -134,11 +127,16 @@ export default function StageTransitionModal({
     }
 
     setStageFormData(initialData);
-    setFollowUpAction(defaultFollowUp.action);
-    setFollowUpDate(defaultFollowUp.date);
-    setFollowUpTime(defaultFollowUp.time);
+    setFollowUpAction(stageFollowUp.action);
+    setFollowUpDate(stageFollowUp.date);
+    setFollowUpTime(stageFollowUp.time);
     setTransitionNote('');
-  }, [targetStage, deal.id]);
+    setIsSubmitting(false);
+  }, [isOpen, targetStage, deal]);
+
+  if (!isOpen || !deal || !targetStage) return null;
+
+  const targetStageMeta = CRM_STAGE_METADATA[targetStage] || CRM_STAGE_METADATA[CrmDealStages.NEW];
 
   const updateField = (key, value) => {
     setStageFormData(prev => {
@@ -210,7 +208,7 @@ export default function StageTransitionModal({
             </span>
             <ArrowRight className="w-4 h-4 text-amber-400" />
             <span className="text-amber-300 font-bold">Target Stage:</span>
-            <span className="px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 font-black text-[11px] shadow-xs">
+            <span className="px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 font-black text-[11px] shadow-sm">
               {CrmStageLabels[targetStage] || targetStage}
             </span>
           </div>

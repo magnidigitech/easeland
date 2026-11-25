@@ -12,9 +12,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Clock
+  Clock,
+  Download,
+  X
 } from 'lucide-react';
-import { CrmStageLabels, CrmDealStages } from '../../../firebase/crmService.js';
+import { CrmStageLabels, CrmDealStages, getLocalDateIso, exportRecordsToCsv } from '../../../firebase/crmService.js';
 import CrmDealCard from './CrmDealCard.jsx';
 
 // Stage Themes with distinctive, high-contrast visual identities
@@ -127,6 +129,8 @@ export default function CrmKanbanBoard({
   searchQuery,
   setSearchQuery,
   kanbanStages,
+  onlyDueToday: controlledOnlyDueToday,
+  setOnlyDueToday: setControlledOnlyDueToday,
   onSelectDeal,
   onAdvanceStage,
   onDeleteDeal,
@@ -137,12 +141,23 @@ export default function CrmKanbanBoard({
 }) {
   const [selectedStageFilters, setSelectedStageFilters] = useState([]);
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false);
-  const [onlyDueToday, setOnlyDueToday] = useState(false);
+
+  useEffect(() => {
+    if (!isStageDropdownOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setIsStageDropdownOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isStageDropdownOpen]);
+  const [internalOnlyDueToday, setInternalOnlyDueToday] = useState(false);
+  const onlyDueToday = controlledOnlyDueToday !== undefined ? controlledOnlyDueToday : internalOnlyDueToday;
+  const setOnlyDueToday = setControlledOnlyDueToday || setInternalOnlyDueToday;
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'ledger'
   const [draggedDealId, setDraggedDealId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
 
-  const todayIso = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayIso = getLocalDateIso();
 
   const dueTodayCount = useMemo(() => {
     return deals.filter(d =>
@@ -162,6 +177,44 @@ export default function CrmKanbanBoard({
       d.nextFollowUpDate <= todayIso
     );
   }, [deals, onlyDueToday, todayIso]);
+
+  // Pre-group displayed deals by stage in O(N) for instant lane lookup
+  const dealsByStage = useMemo(() => {
+    const map = {};
+    for (const st of kanbanStages) map[st] = [];
+    for (const d of displayedDeals) {
+      if (map[d.stage]) map[d.stage].push(d);
+      else map[d.stage] = [d];
+    }
+    return map;
+  }, [displayedDeals, kanbanStages]);
+
+  const stageCountsAll = useMemo(() => {
+    const counts = {};
+    for (const st of kanbanStages) counts[st] = 0;
+    for (const d of deals) {
+      counts[d.stage] = (counts[d.stage] || 0) + 1;
+    }
+    return counts;
+  }, [deals, kanbanStages]);
+
+  const handleExportDealsCsv = () => {
+    const headers = ['Deal ID', 'Buyer Name', 'Buyer Phone', 'Property Title', 'Location', 'Stage', 'Deal Value (Rs)', 'Expected Commission (Rs)', 'Win Prob (%)', 'Assigned Agent', 'Next Follow-Up Date'];
+    const rows = displayedDeals.map(d => [
+      d.id || d.dealId,
+      d.customerName || '',
+      isFieldExecutive ? 'Restricted' : (d.customerPhone || ''),
+      d.propertyTitle || '',
+      d.propertyLocation || '',
+      CrmStageLabels[d.stage] || d.stage,
+      Number(d.dealValue) || 0,
+      Number(d.expectedCommission) || 0,
+      Number(d.probability) || 0,
+      d.assignedAgent || '',
+      d.nextFollowUpDate || ''
+    ]);
+    exportRecordsToCsv('easeland-crm-pipeline-' + todayIso + '.csv', headers, rows);
+  };
 
   // Scroll Container Ref & Nav State
   const scrollContainerRef = useRef(null);
@@ -268,7 +321,7 @@ export default function CrmKanbanBoard({
     <div className="space-y-3.5 select-none">
 
       {/* 1. FILTER & CONTROL BAR */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 flex-1 flex-wrap">
 
           {/* SEARCH INPUT */}
@@ -276,11 +329,21 @@ export default function CrmKanbanBoard({
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search by buyer, property or owner..."
+              placeholder="Search buyer, phone, location, property or ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear deal search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* MULTI-SELECT STAGE FILTER */}
@@ -288,7 +351,7 @@ export default function CrmKanbanBoard({
             <button
               type="button"
               onClick={() => setIsStageDropdownOpen(!isStageDropdownOpen)}
-              className="bg-slate-50 border border-slate-300 hover:border-amber-400 hover:bg-white text-slate-800 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-2xs flex items-center justify-between gap-2 transition-all cursor-pointer"
+              className="bg-slate-50 border border-slate-300 hover:border-amber-400 hover:bg-white text-slate-800 font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-sm flex items-center justify-between gap-2 transition-all cursor-pointer"
             >
               <div className="flex items-center gap-1.5">
                 <Filter className="w-3.5 h-3.5 text-amber-500" />
@@ -327,7 +390,7 @@ export default function CrmKanbanBoard({
 
                   <div className="max-h-64 overflow-y-auto space-y-0.5 pr-0.5 custom-scrollbar">
                     {kanbanStages.map((st) => {
-                      const count = deals.filter(d => d.stage === st).length;
+                      const count = stageCountsAll[st] || 0;
                       const isChecked = !selectedStageFilters.includes('NONE') &&
                         (selectedStageFilters.length === 0 ||
                           selectedStageFilters.length === kanbanStages.length ||
@@ -345,7 +408,7 @@ export default function CrmKanbanBoard({
                           <div className="flex items-center gap-2.5">
                             <div className={'w-4 h-4 rounded-md border flex items-center justify-center transition-all ' +
                               (isChecked
-                                ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-xs'
+                                ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-sm'
                                 : 'border-slate-300 bg-white group-hover:border-amber-400'
                               )
                             }>
@@ -392,7 +455,7 @@ export default function CrmKanbanBoard({
             onClick={() => setOnlyDueToday(!onlyDueToday)}
             className={'px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 border ' +
               (onlyDueToday
-                ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-xs'
+                ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-sm'
                 : 'bg-slate-50 border-slate-300 text-slate-700 hover:border-amber-400 hover:bg-white'
               )
             }
@@ -401,7 +464,7 @@ export default function CrmKanbanBoard({
             <Clock className={'w-3.5 h-3.5 ' + (onlyDueToday ? 'text-slate-950' : 'text-amber-500')} />
             <span>Due Today</span>
             {dueTodayCount > 0 && (
-              <span className={'px-1.5 py-0.2 rounded-full text-[10px] font-black ' +
+              <span className={'px-1.5 py-0.5 rounded-full text-[10px] font-black ' +
                 (onlyDueToday ? 'bg-slate-950 text-amber-400' : 'bg-amber-100 text-amber-900')
               }>
                 {dueTodayCount}
@@ -422,7 +485,7 @@ export default function CrmKanbanBoard({
                 disabled={!canScrollLeft}
                 className={'p-1.5 rounded-lg transition-all ' +
                   (canScrollLeft
-                    ? 'text-slate-800 hover:bg-white hover:text-amber-600 shadow-2xs cursor-pointer active:scale-95'
+                    ? 'text-slate-800 hover:bg-white hover:text-amber-600 shadow-sm cursor-pointer active:scale-95'
                     : 'text-slate-300 cursor-not-allowed opacity-50'
                   )
                 }
@@ -440,7 +503,7 @@ export default function CrmKanbanBoard({
                 disabled={!canScrollRight}
                 className={'p-1.5 rounded-lg transition-all ' +
                   (canScrollRight
-                    ? 'text-slate-800 hover:bg-white hover:text-amber-600 shadow-2xs cursor-pointer active:scale-95'
+                    ? 'text-slate-800 hover:bg-white hover:text-amber-600 shadow-sm cursor-pointer active:scale-95'
                     : 'text-slate-300 cursor-not-allowed opacity-50'
                   )
                 }
@@ -457,7 +520,7 @@ export default function CrmKanbanBoard({
               type="button"
               onClick={() => setViewMode('kanban')}
               className={'px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ' +
-                (viewMode === 'kanban' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800')
+                (viewMode === 'kanban' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')
               }
             >
               <Layers className="w-3.5 h-3.5" />
@@ -467,7 +530,7 @@ export default function CrmKanbanBoard({
               type="button"
               onClick={() => setViewMode('ledger')}
               className={'px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ' +
-                (viewMode === 'ledger' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800')
+                (viewMode === 'ledger' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')
               }
             >
               <Table className="w-3.5 h-3.5" />
@@ -476,8 +539,19 @@ export default function CrmKanbanBoard({
           </div>
 
           <button
+            type="button"
+            onClick={handleExportDealsCsv}
+            disabled={displayedDeals.length === 0}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Export filtered deals as CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">CSV</span>
+          </button>
+
+          <button
             onClick={onOpenNewDeal}
-            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
           >
             <PlusCircle className="w-4 h-4 stroke-[2.5]" />
             <span>New Deal</span>
@@ -487,14 +561,14 @@ export default function CrmKanbanBoard({
 
       {/* 2. STAGE RIBBON / QUICK-JUMP TRACKER (KANBAN VIEW) */}
       {viewMode === 'kanban' && (
-        <div className="bg-white/80 backdrop-blur-xs p-2 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+        <div className="bg-white/80 backdrop-blur-sm p-2 rounded-2xl border border-slate-200/90 shadow-sm flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
           <div className="flex items-center gap-1 text-[11px] font-black text-slate-500 uppercase tracking-wider px-2 shrink-0">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>Stages:</span>
           </div>
 
           {visibleStages.map((st, idx) => {
-            const count = deals.filter(d => d.stage === st).length;
+            const count = (dealsByStage[st] || []).length;
             const cfg = STAGE_CONFIG[st] || DEFAULT_STAGE_CONFIG;
             const isCurrentInView = activeStageIndex === idx;
 
@@ -505,7 +579,7 @@ export default function CrmKanbanBoard({
                 onClick={() => scrollToStageIndex(idx)}
                 className={'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ' +
                   (isCurrentInView
-                    ? 'bg-slate-950 text-white shadow-xs scale-102 ring-2 ring-amber-400/40'
+                    ? 'bg-slate-950 text-white shadow-sm scale-[1.02] ring-2 ring-amber-400/40'
                     : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60'
                   )
                 }
@@ -514,7 +588,7 @@ export default function CrmKanbanBoard({
                 <span className={'w-1.5 h-1.5 rounded-full ' + (isCurrentInView ? 'bg-amber-400' : cfg.dot)}></span>
                 <span className="font-mono text-[10px] opacity-60">0{idx + 1}</span>
                 <span className="truncate max-w-[140px]">{CrmStageLabels[st] || st}</span>
-                <span className={'text-[10px] px-1.5 py-0.2 rounded-full font-black ' +
+                <span className={'text-[10px] px-1.5 py-0.5 rounded-full font-black ' +
                   (isCurrentInView
                     ? 'bg-amber-400 text-slate-950'
                     : count > 0 ? 'bg-slate-200 text-slate-800' : 'bg-slate-100 text-slate-400'
@@ -525,6 +599,26 @@ export default function CrmKanbanBoard({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* ACTIVE FILTER EMPTY STATE NOTICE */}
+      {(searchQuery || onlyDueToday || selectedStageFilters.length > 0) && displayedDeals.length === 0 && (
+        <div className="bg-amber-50/80 border border-amber-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <span className="font-bold text-amber-950">
+            No deals match your active filters{onlyDueToday ? ' ("Due Today")' : ''}{searchQuery ? (' for "' + searchQuery + '"') : ''}.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setOnlyDueToday(false);
+              setSelectedStageFilters([]);
+            }}
+            className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-amber-400 font-black rounded-lg text-[11px] self-start sm:self-auto cursor-pointer transition-colors"
+          >
+            Reset All Filters
+          </button>
         </div>
       )}
 
@@ -578,10 +672,10 @@ export default function CrmKanbanBoard({
           <div
             ref={scrollContainerRef}
             onScroll={checkScrollBounds}
-            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[calc(100dvh-340px)] custom-scrollbar scroll-smooth px-1 snap-x snap-mandatory"
+            className="flex gap-4 overflow-x-auto pb-6 items-stretch min-h-[380px] custom-scrollbar scroll-smooth px-1 snap-x snap-mandatory"
           >
             {visibleStages.map((stage, sIdx) => {
-              const stageDeals = displayedDeals.filter(d => d.stage === stage);
+              const stageDeals = dealsByStage[stage] || [];
               const stageTotal = stageDeals.reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0);
               const stageFormattedTotal = stageTotal >= 10000000
                 ? 'Rs. ' + (stageTotal / 10000000).toFixed(2) + ' Cr'
@@ -610,7 +704,7 @@ export default function CrmKanbanBoard({
                     }
                   }}
                   className={
-                    'w-[84vw] sm:w-80 shrink-0 snap-center min-h-[480px] sm:min-h-[520px] rounded-2xl border-2 flex flex-col justify-between transition-all duration-200 shadow-xs relative overflow-hidden ' +
+                    'w-[84vw] sm:w-80 shrink-0 snap-center min-h-[380px] rounded-2xl border-2 flex flex-col transition-all duration-200 shadow-sm relative overflow-hidden ' +
                     (isDropTarget
                       ? 'bg-amber-50/90 border-amber-400 border-dashed ring-4 ring-amber-400/30 scale-[1.01] shadow-xl'
                       : 'bg-slate-100/75 border-slate-200/90 hover:border-slate-300'
@@ -621,7 +715,7 @@ export default function CrmKanbanBoard({
                   <div className={'h-1.5 w-full ' + cfg.accent}></div>
 
                   {/* LANE HEADER */}
-                  <div className={'p-3.5 border-b border-slate-200/80 backdrop-blur-xs flex items-center justify-between gap-2 shrink-0 ' + cfg.headerBg}>
+                  <div className={'p-3.5 border-b border-slate-200/80 backdrop-blur-sm flex items-center justify-between gap-2 shrink-0 ' + cfg.headerBg}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-[10px] font-black text-slate-400">0{sIdx + 1}</span>
@@ -653,7 +747,7 @@ export default function CrmKanbanBoard({
                   )}
 
                   {/* DEAL CARDS CONTAINER */}
-                  <div className="p-2.5 space-y-2.5 flex-1 overflow-y-auto max-h-[calc(100dvh-390px)] custom-scrollbar">
+                  <div className="p-2.5 space-y-2.5 flex-1 overflow-y-auto max-h-[max(340px,calc(100dvh-360px))] custom-scrollbar">
                     {stageDeals.length === 0 ? (
                       <div className={'text-center rounded-xl my-2 p-5 flex flex-col items-center justify-center gap-2 border border-dashed transition-all ' +
                         (isDropTarget
@@ -671,7 +765,7 @@ export default function CrmKanbanBoard({
                         <button
                           type="button"
                           onClick={onOpenNewDeal}
-                          className="mt-1 px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 text-[10px] font-black rounded-lg transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 flex items-center gap-1"
+                          className="mt-1 px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 text-[10px] font-black rounded-lg transition-all cursor-pointer shadow-sm hover:shadow-sm active:scale-95 flex items-center gap-1"
                         >
                           <PlusCircle className="w-3 h-3 stroke-[2.5]" />
                           <span>New Deal</span>
@@ -712,78 +806,135 @@ export default function CrmKanbanBoard({
         </div>
       )}
 
-      {/* 4. AUTHORITATIVE LEDGER TABLE VIEW */}
+      {/* 4. AUTHORITATIVE LEDGER VIEW (DESKTOP TABLE + MOBILE CARDS) */}
       {viewMode === 'ledger' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Deal ID</th>
-                  <th className="px-4 py-3">Buyer Name</th>
-                  <th className="px-4 py-3">Property Parcel</th>
-                  <th className="px-4 py-3">Current Stage</th>
-                  <th className="px-4 py-3 text-right">Agreed Value</th>
-                  <th className="px-4 py-3 text-right">Commission</th>
-                  <th className="px-4 py-3 text-center">Probability</th>
-                  <th className="px-4 py-3">Agent</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                {displayedDeals.length === 0 ? (
+        <>
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                      No deals found matching the search and stage criteria.
-                    </td>
+                    <th className="px-4 py-3">Deal ID</th>
+                    <th className="px-4 py-3">Buyer Name</th>
+                    <th className="px-4 py-3">Property Parcel</th>
+                    <th className="px-4 py-3">Current Stage</th>
+                    <th className="px-4 py-3 text-right">Agreed Value</th>
+                    <th className="px-4 py-3 text-right">Commission</th>
+                    <th className="px-4 py-3 text-center">Probability</th>
+                    <th className="px-4 py-3">Agent</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
-                ) : (
-                  displayedDeals.map((deal) => (
-                    <tr
-                      key={deal.id}
-                      onClick={() => onSelectDeal(deal)}
-                      className={'hover:bg-amber-50/50 cursor-pointer transition-colors ' + (deal.isPropertyQuarantined ? 'bg-rose-50/30' : '')}
-                    >
-                      <td className="px-4 py-3 font-mono text-[11px] text-amber-600 font-black">{deal.id}</td>
-                      <td className="px-4 py-3 font-black text-slate-900">{deal.customerName}</td>
-                      <td className="px-4 py-3 text-slate-800 max-w-xs truncate">
-                        <span>{deal.propertyTitle}</span>
-                        {deal.isPropertyQuarantined && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-800 text-[9px] font-black uppercase">
-                            Quarantined
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-800 border border-slate-200">
-                          {CrmStageLabels[deal.stage] || deal.stage}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-black text-emerald-600">{deal.dealValueDisplay || ('Rs. ' + ((Number(deal.dealValue) || 0) / 100000).toFixed(1) + ' Lakhs')}</td>
-                      <td className="px-4 py-3 text-right text-amber-600 font-extrabold">Rs. {Number(deal.expectedCommission || 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] bg-slate-100 text-slate-600">
-                          {deal.probability}%
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{deal.assignedAgent}</td>
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => onDeleteDeal(e, deal.id, deal.customerName)}
-                          className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                          title="Delete deal"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                  {displayedDeals.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                        No deals found matching the search and stage criteria.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    displayedDeals.map((deal) => (
+                      <tr
+                        key={deal.id}
+                        onClick={() => onSelectDeal(deal)}
+                        className={'hover:bg-amber-50/50 cursor-pointer transition-colors ' + (deal.isPropertyQuarantined ? 'bg-rose-50/30' : '')}
+                      >
+                        <td className="px-4 py-3 font-mono text-[11px] text-amber-600 font-black">{deal.id}</td>
+                        <td className="px-4 py-3 font-black text-slate-900">{deal.customerName}</td>
+                        <td className="px-4 py-3 text-slate-800 max-w-xs truncate">
+                          <span>{deal.propertyTitle}</span>
+                          {deal.isPropertyQuarantined && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-800 text-[9px] font-black uppercase">
+                              Quarantined
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-800 border border-slate-200">
+                            {CrmStageLabels[deal.stage] || deal.stage}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-emerald-600">{deal.dealValueDisplay || ('Rs. ' + ((Number(deal.dealValue) || 0) / 100000).toFixed(1) + ' Lakhs')}</td>
+                        <td className="px-4 py-3 text-right text-amber-600 font-extrabold">Rs. {Number(deal.expectedCommission || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] bg-slate-100 text-slate-600">
+                            {deal.probability}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{deal.assignedAgent}</td>
+                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => onDeleteDeal(e, deal.id, deal.customerName)}
+                            className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                            title="Delete deal"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* MOBILE LEDGER CARDS */}
+          <div className="md:hidden space-y-3">
+            {displayedDeals.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 text-xs font-bold">
+                No deals found matching the search and stage criteria.
+              </div>
+            ) : (
+              displayedDeals.map((deal) => (
+                <div
+                  key={deal.id}
+                  onClick={() => onSelectDeal(deal)}
+                  className={'p-4 bg-white rounded-2xl border shadow-sm space-y-2.5 cursor-pointer ' +
+                    (deal.isPropertyQuarantined ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 hover:border-amber-400')
+                  }
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-mono text-amber-600 font-black block">{deal.id}</span>
+                      <span className="text-sm font-black text-slate-900 block truncate">{deal.customerName}</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-800 border border-slate-200 shrink-0">
+                      {CrmStageLabels[deal.stage] || deal.stage}
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-700 truncate">{deal.propertyTitle}</p>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Value</span>
+                      <span className="font-black text-emerald-600">{deal.dealValueDisplay || ('Rs. ' + ((Number(deal.dealValue) || 0) / 100000).toFixed(1) + ' L')}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Fee</span>
+                      <span className="font-extrabold text-amber-600">Rs. {Number(deal.expectedCommission || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Chance</span>
+                      <span className="font-black text-slate-700">{deal.probability}%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[11px] font-bold text-slate-500 truncate">{deal.assignedAgent}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => onDeleteDeal(e, deal.id, deal.customerName)}
+                      className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                      title="Delete deal"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
 
     </div>
