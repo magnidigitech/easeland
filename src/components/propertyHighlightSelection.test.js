@@ -145,4 +145,12 @@ describe('EaseLand Map Property Single-Selection & Highlighting Suite', () => {
     // Verify useEffect re-centers when isSidePanelOpen changes while selectedPropertyId is active
     assert.ok(content.includes('[selectedPropertyId, isSidePanelOpen, displayProperties]'), 'useEffect must sync centering with isSidePanelOpen');
   });
+
+  it('6. Opens preview popup on desktop web when selecting a side-panel property card without altering PWA/mobile behavior', () => {
+    const mapEnginePath = path.join(rootDir, 'src', 'components', 'UniversalMapEngine.jsx');
+    const content = fs.readFileSync(mapEnginePath, 'utf8');
+
+    assert.ok(content.includes('isPwaInstalled'), 'UniversalMapEngine must check isPwaInstalled so PWA behavior stays undisturbed');
+    assert.ok(content.includes('window.innerWidth >= 768 && !isPwaInstalled()'), 'Side panel click preview popup must be gated to desktop web only');
+  });
 });

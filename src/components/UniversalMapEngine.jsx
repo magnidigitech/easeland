@@ -19,6 +19,7 @@ import {
 } from '../utils/categoryUtils';
 import { matchesSearchFilters, isPropertyDeleted, isPropertyPubliclyVisible } from '../utils/filterMatchingUtils.js';
 import { CANONICAL_AMENITIES } from '../firebase/specificationsConfig.js';
+import { isPwaInstalled } from '../utils/pwaManager.js';
 
 // Helper: Create custom EaseLand circular cluster badge with property count
 function createEaseLandClusterIcon(cluster) {
@@ -159,12 +160,19 @@ export default function UniversalMapEngine({
     return timers;
   };
 
-  // Smooth pan to property with standard zoom (level 17) and highlight only this property on map without opening preview card
+  // Smooth pan to property with standard zoom (level 17), highlight on map, and open preview popup on desktop web only (leaving PWA/mobile undisturbed)
   const handlePanToProperty = (prop) => {
     if (!prop) return;
     const propId = prop.id || prop.propertyId || prop.referenceId;
     setSelectedPropertyId(propId);
-    setSelectedPropertyPreview(null);
+
+    const isDesktopWeb = typeof window !== 'undefined' && window.innerWidth >= 768 && !isPwaInstalled();
+    if (isDesktopWeb) {
+      setSelectedPropertyPreview(prop);
+      setPreviewMediaIndex(0);
+    } else {
+      setSelectedPropertyPreview(null);
+    }
 
     // On mobile screens (< 768px), collapse side panel drawer so the user immediately sees the map
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
