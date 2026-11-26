@@ -1411,7 +1411,7 @@ export function AuthProvider({ children }) {
         displayName: user?.displayName || profile?.displayName || profile?.name || 'EaseLand Member',
         avatar: user?.photoURL || profile?.avatar || ''
       });
-      if (typeof reloadProfile === 'function') await reloadProfile();
+      if (effectiveUid && typeof reloadProfile === 'function') await reloadProfile(effectiveUid);
     }
     return res;
   };
@@ -1419,12 +1419,13 @@ export function AuthProvider({ children }) {
   const verifyMpin = async ({ uid, email, mpin }) => {
     const res = await apiVerifyMpin({ uid, email, mpin });
     if (res && res.success && res.user) {
+      const verifiedUid = res.user.uid || uid;
       saveTrustedMpinUser({
-        uid: res.user.uid,
+        uid: verifiedUid,
         email: res.user.email || email,
         displayName: res.user.displayName || 'EaseLand Member'
       });
-      if (typeof reloadProfile === 'function') await reloadProfile();
+      if (verifiedUid && typeof reloadProfile === 'function') await reloadProfile(verifiedUid);
     }
     return res;
   };
@@ -1435,8 +1436,8 @@ export function AuthProvider({ children }) {
     if (!effectiveUid && !effectiveEmail) return { success: false, error: 'Must be logged in.' };
     const res = await apiRemoveMpin({ uid: effectiveUid, email: effectiveEmail });
     if (res && res.success) {
-      clearTrustedMpinUser();
-      if (typeof reloadProfile === 'function') await reloadProfile();
+      clearTrustedMpinUser({ uid: effectiveUid, email: effectiveEmail });
+      if (effectiveUid && typeof reloadProfile === 'function') await reloadProfile(effectiveUid);
     }
     return res;
   };

@@ -1,6 +1,32 @@
 // Utility for Managing MPIN Trusted Device State in LocalStorage and Validation Rules
 
 const TRUSTED_DEVICE_KEY = 'easeland_trusted_mpin_user';
+const TRUSTED_ACCOUNTS_KEY = 'easeland_trusted_mpin_accounts';
+
+function normalizeAccountIdentity(user) {
+  if (!user) return null;
+  const uid = String(user.uid || user.id || '').trim();
+  const email = String(user.email || '').trim();
+  if (!uid && !email) return null;
+  return {
+    uid,
+    email,
+    displayName: user.displayName || user.name || 'EaseLand Member',
+    avatar: user.avatar || user.photoURL || '',
+    savedAt: user.savedAt || new Date().toISOString()
+  };
+}
+
+function isSameAccount(a, b) {
+  if (!a || !b) return false;
+  const aUid = String(a.uid || a.id || '').trim();
+  const bUid = String(b.uid || b.id || '').trim();
+  const aEmail = String(a.email || '').trim().toLowerCase();
+  const bEmail = String(b.email || '').trim().toLowerCase();
+  if (aUid && bUid && aUid === bUid) return true;
+  if (aEmail && bEmail && aEmail === bEmail) return true;
+  return false;
+}
 
 /**
  * Validate MPIN safety constraints against predictable and weak PINs
@@ -44,7 +70,35 @@ export function validateMpinSafety(pin) {
 }
 
 /**
- * Retrieve saved trusted user for MPIN quick unlock
+ * Retrieve all remembered MPIN-enabled accounts saved on this device/browser
+ */
+export function getTrustedMpinAccounts() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const rawList = localStorage.getItem(TRUSTED_ACCOUNTS_KEY);
+    let list = rawList ? JSON.parse(rawList) : [];
+    if (!Array.isArray(list)) list = [];
+    const normalized = list.map(normalizeAccountIdentity).filter(Boolean);
+
+    // Migrate legacy single-user key if accounts list is empty
+    if (normalized.length === 0) {
+      const legacy = getTrustedMpinUser();
+      if (legacy) {
+        const migrated = normalizeAccountIdentity(legacy);
+        if (migrated) {
+          localStorage.setItem(TRUSTED_ACCOUNTS_KEY, JSON.stringify([migrated]));
+          return [migrated];
+        }
+      }
+    }
+    return normalized;
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Retrieve currently active trusted user for immediate MPIN prompt
  */
 export function getTrustedMpinUser() {
   if (typeof window === 'undefined') return null;
@@ -62,31 +116,67 @@ export function getTrustedMpinUser() {
 }
 
 /**
+ * Check if a specific user account is registered for quick MPIN unlock on this device
+ */
+export function isAccountTrustedOnDevice(user) {
+  if (!user) return false;
+  const active = getTrustedMpinUser();
+  if (active && isSameAccount(active, user)) return true;
+  return getTrustedMpinAccounts().some((acct) => isSameAccount(acct, user));
+}
+
+/**
  * Save trusted user information on device for fast MPIN unlock
+ * Also preserves multiple remembered MPIN accounts on the device.
  */
 export function saveTrustedMpinUser(user) {
   if (typeof window === 'undefined' || !user) return;
   try {
-    const payload = {
-      uid: user.uid || user.id || '',
-      email: user.email || '',
-      displayName: user.displayName || user.name || 'EaseLand Member',
-      avatar: user.avatar || user.photoURL || '',
+    const payload = normalizeAccountIdentity({
+      ...user,
       savedAt: new Date().toISOString()
-    };
+    });
+    if (!payload) return;
     localStorage.setItem(TRUSTED_DEVICE_KEY, JSON.stringify(payload));
+
+    const existing = getTrustedMpinAccounts().filter((acct) => !isSameAccount(acct, payload));
+    const nextList = [payload, ...existing].slice(0, 6);
+    localStorage.setItem(TRUSTED_ACCOUNTS_KEY, JSON.stringify(nextList));
   } catch (e) {
     console.warn('Failed to save trusted MPIN device:', e);
   }
 }
 
 /**
- * Remove trusted user from this device (e.g. on Switch Account or MPIN remove)
+ * Clear only the active lock-screen pointer (when clicking Switch Account)
+ * while keeping saved MPIN accounts available to switch back cleanly (still requiring MPIN).
  */
-export function clearTrustedMpinUser() {
+export function clearActiveTrustedMpinUser() {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(TRUSTED_DEVICE_KEY);
+  } catch (e) {
+    // Ignore
+  }
+}
+
+/**
+ * Remove trusted user from this device (for a specific user if passed, or all if omitted)
+ */
+export function clearTrustedMpinUser(targetUser = null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (targetUser && (targetUser.uid || targetUser.id || targetUser.email)) {
+      const active = getTrustedMpinUser();
+      if (active && isSameAccount(active, targetUser)) {
+        localStorage.removeItem(TRUSTED_DEVICE_KEY);
+      }
+      const remaining = getTrustedMpinAccounts().filter((acct) => !isSameAccount(acct, targetUser));
+      localStorage.setItem(TRUSTED_ACCOUNTS_KEY, JSON.stringify(remaining));
+      return;
+    }
+    localStorage.removeItem(TRUSTED_DEVICE_KEY);
+    localStorage.removeItem(TRUSTED_ACCOUNTS_KEY);
   } catch (e) {
     // Ignore
   }

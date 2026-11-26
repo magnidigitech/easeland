@@ -18,7 +18,7 @@ import {
 } from '../firebase/securityService.js';
 import {
   validateMpinSafety,
-  getTrustedMpinUser,
+  isAccountTrustedOnDevice,
   saveTrustedMpinUser,
   clearTrustedMpinUser
 } from '../utils/mpinDeviceStorage.js';
@@ -121,9 +121,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated, i
 
   const loadMpinStatus = async () => {
     if (!user?.email && !user?.uid) return;
-    const trusted = getTrustedMpinUser();
-    const isBound = Boolean(trusted && (trusted.email === user.email || trusted.uid === user.uid));
-    setIsThisDeviceBound(isBound);
+    setIsThisDeviceBound(isAccountTrustedOnDevice({ uid: user.uid, email: user.email }));
 
     if (typeof checkMpinStatus === 'function') {
       try {
@@ -191,7 +189,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated, i
       const res = await removeMpin();
       setIsRemovingMpin(false);
       if (res && res.success) {
-        clearTrustedMpinUser();
+        clearTrustedMpinUser({ uid: user?.uid || user?.id, email: user?.email });
         setMpinStatus({ hasMpin: false, isLocked: false, loading: false });
         setIsThisDeviceBound(false);
         setShowRemoveMpinModal(false);
@@ -209,7 +207,7 @@ export default function ProfileSettingsModal({ isOpen, onClose, onUserUpdated, i
 
   const handleToggleDeviceBinding = () => {
     if (isThisDeviceBound) {
-      clearTrustedMpinUser();
+      clearTrustedMpinUser({ uid: user?.uid || user?.id, email: user?.email });
       setIsThisDeviceBound(false);
       setMpinSuccess('This device has been unlinked from quick MPIN unlock.');
     } else {

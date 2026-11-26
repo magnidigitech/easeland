@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Lock,
@@ -21,7 +21,9 @@ import { trackRegistrationComplete } from '../utils/metaPixel.js';
 import {
   validateMpinSafety,
   getTrustedMpinUser,
+  getTrustedMpinAccounts,
   clearTrustedMpinUser,
+  clearActiveTrustedMpinUser,
   saveTrustedMpinUser
 } from '../utils/mpinDeviceStorage.js';
 
@@ -37,7 +39,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     updateProfileData,
     checkAccountExists,
     verifyMpin,
-    setMpin
+    setMpin,
+    checkMpinStatus
   } = useAuth();
 
   // Top-level Auth Method: 'mobile' (Default) or 'email'
@@ -60,20 +63,29 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
   // MPIN States
   const [trustedUser, setTrustedUser] = useState(() => getTrustedMpinUser());
+  const [savedMpinAccounts, setSavedMpinAccounts] = useState(() => getTrustedMpinAccounts());
   const [mpinInput, setMpinInput] = useState('');
   const [usePasswordLogin, setUsePasswordLogin] = useState(false);
   const [newMpin, setNewMpin] = useState('');
   const [confirmMpin, setConfirmMpin] = useState('');
   const [mpinPostLoginUser, setMpinPostLoginUser] = useState(null);
+  const authTimerRef = useRef(null);
+  const mpinSubmitTimerRef = useRef(null);
+
+  const clearPendingAuthTimers = () => {
+    if (authTimerRef.current) {
+      clearTimeout(authTimerRef.current);
+      authTimerRef.current = null;
+    }
+    if (mpinSubmitTimerRef.current) {
+      clearTimeout(mpinSubmitTimerRef.current);
+      mpinSubmitTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    if (isOpen) {
-      const saved = getTrustedMpinUser();
-      setTrustedUser(saved);
-      setMpinInput('');
-      setUsePasswordLogin(false);
-    }
-  }, [isOpen]);
+    return () => clearPendingAuthTimers();
+  }, []);
 
   // Forgot Password States
   const [forgotMethod, setForgotMethod] = useState('email'); // 'email'
@@ -98,6 +110,61 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
 
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  useEffect(() => {
+    clearPendingAuthTimers();
+    if (!isOpen) {
+      setError(null);
+      setSuccessMessage(null);
+      setMpinInput('');
+      setNewMpin('');
+      setConfirmMpin('');
+      setMpinPostLoginUser(null);
+      setLoading(false);
+      return;
+    }
+
+    let isActive = true;
+    const saved = getTrustedMpinUser();
+    const accounts = getTrustedMpinAccounts();
+    setTrustedUser(saved);
+    setSavedMpinAccounts(accounts);
+    setMode('login');
+    setMpinInput('');
+    setNewMpin('');
+    setConfirmMpin('');
+    setMpinPostLoginUser(null);
+    setUsePasswordLogin(false);
+    setError(null);
+    setSuccessMessage(null);
+    setLoading(false);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setFormData({
+      name: '',
+      phone: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    });
+
+    if (saved && typeof checkMpinStatus === 'function') {
+      checkMpinStatus(saved.uid, saved.email)
+        .then((statusRes) => {
+          if (!isActive) return;
+          if (statusRes && statusRes.success && statusRes.hasMpin === false) {
+            clearTrustedMpinUser(saved);
+            setTrustedUser(null);
+            setSavedMpinAccounts(getTrustedMpinAccounts());
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      isActive = false;
+    };
+  }, [isOpen]);
 
   // Countdown timer for Mobile OTP Resend
   useEffect(() => {
@@ -259,9 +326,50 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
     }
   };
 
+  const syncAccountMpinPresence = async (loggedUser, fallbackEmail) => {
+    if (!loggedUser) return;
+    const uid = loggedUser.uid || loggedUser.id;
+    const email = loggedUser.email || fallbackEmail || '';
+    try {
+      if (typeof checkMpinStatus === 'function') {
+        const statusRes = await checkMpinStatus(uid, email);
+        if (statusRes && statusRes.success) {
+          if (statusRes.hasMpin) {
+            saveTrustedMpinUser({
+              uid,
+              email,
+              displayName: loggedUser.displayName || loggedUser.name || 'EaseLand Member',
+              avatar: loggedUser.photoURL || ''
+            });
+          } else {
+            clearTrustedMpinUser({ uid, email });
+          }
+          setSavedMpinAccounts(getTrustedMpinAccounts());
+          return;
+        }
+      }
+    } catch (e) {}
+    clearActiveTrustedMpinUser();
+    setSavedMpinAccounts(getTrustedMpinAccounts());
+  };
+
+  const selectSavedAccountForMpin = (account) => {
+    if (!account) return;
+    clearPendingAuthTimers();
+    saveTrustedMpinUser(account);
+    setTrustedUser(account);
+    setSavedMpinAccounts(getTrustedMpinAccounts());
+    setUsePasswordLogin(false);
+    setMode('login');
+    setMpinInput('');
+    setError(null);
+    setSuccessMessage(null);
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
     try {
       const res = await loginWithGoogle();
       setLoading(false);
@@ -270,6 +378,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
           onClose();
           return;
         }
+        await syncAccountMpinPresence(res.user, res.user?.email);
         if (onAuthSuccess) onAuthSuccess(res.user, initialIntent);
         onClose();
       } else {
@@ -522,11 +631,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       }
 
       trackRegistrationComplete('email');
-      saveTrustedMpinUser({
-        uid: result.user.uid,
-        email: cleanEmail,
-        displayName: formData.name.trim() || 'EaseLand Member'
-      });
       setMpinPostLoginUser(result.user);
       setMode('setup-mpin');
       return;
@@ -543,11 +647,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         return;
       }
 
-      saveTrustedMpinUser({
-        uid: result.user.uid,
-        email: formData.email.trim(),
-        displayName: result.user.displayName || 'EaseLand Member'
-      });
+      await syncAccountMpinPresence(result.user, formData.email.trim());
       if (onAuthSuccess) onAuthSuccess(result.user, initialIntent);
       onClose();
     }
@@ -578,10 +678,13 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       setLoading(false);
       if (res && res.success) {
         setSuccessMessage('MPIN verified! Welcome back.');
-        setTimeout(() => {
+        clearPendingAuthTimers();
+        authTimerRef.current = setTimeout(() => {
+          setSuccessMessage(null);
+          setMpinInput('');
           if (onAuthSuccess) onAuthSuccess(res.user || trustedUser, initialIntent);
           onClose();
-        }, 500);
+        }, 400);
       } else {
         setError(res?.error || 'Incorrect MPIN. Please try again.');
         setMpinInput('');
@@ -610,13 +713,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
       const res = await setMpin(newMpin);
       setLoading(false);
       if (res && res.success) {
+        if (mpinPostLoginUser) {
+          saveTrustedMpinUser({
+            uid: mpinPostLoginUser.uid,
+            email: mpinPostLoginUser.email || formData.email.trim(),
+            displayName: mpinPostLoginUser.displayName || formData.name.trim() || 'EaseLand Member'
+          });
+          setSavedMpinAccounts(getTrustedMpinAccounts());
+        }
         setSuccessMessage('4-digit MPIN created successfully!');
-        setTimeout(() => {
+        clearPendingAuthTimers();
+        authTimerRef.current = setTimeout(() => {
+          setSuccessMessage(null);
+          setNewMpin('');
+          setConfirmMpin('');
           if (onAuthSuccess && mpinPostLoginUser) {
             onAuthSuccess(mpinPostLoginUser, initialIntent);
           }
           onClose();
-        }, 600);
+        }, 500);
       } else {
         setError(res?.error || 'Failed to set MPIN.');
       }
@@ -925,9 +1040,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 <button
                   type="button"
                   onClick={() => {
-                    clearTrustedMpinUser();
+                    clearPendingAuthTimers();
+                    clearActiveTrustedMpinUser();
                     setTrustedUser(null);
+                    setSavedMpinAccounts(getTrustedMpinAccounts());
                     setUsePasswordLogin(true);
+                    setMpinInput('');
+                    setError(null);
+                    setSuccessMessage(null);
                   }}
                   className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline shrink-0 cursor-pointer"
                 >
@@ -967,8 +1087,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                         setMpinInput(val);
+                        if (mpinSubmitTimerRef.current) {
+                          clearTimeout(mpinSubmitTimerRef.current);
+                          mpinSubmitTimerRef.current = null;
+                        }
                         if (val.length === 4) {
-                          setTimeout(() => {
+                          mpinSubmitTimerRef.current = setTimeout(() => {
                             const btn = document.getElementById('mpin-unlock-submit-btn');
                             if (btn) btn.click();
                           }, 100);
@@ -1008,6 +1132,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 <button
                   type="button"
                   onClick={() => {
+                    clearPendingAuthTimers();
                     setFormData({ ...formData, email: trustedUser.email });
                     setMode('forgot');
                     setError(null);
@@ -1021,8 +1146,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
                 <button
                   type="button"
                   onClick={() => {
+                    clearPendingAuthTimers();
                     setUsePasswordLogin(true);
-                    setFormData({ ...formData, email: trustedUser.email });
+                    setMpinInput('');
+                    setFormData({ ...formData, email: trustedUser.email, password: '' });
                     setError(null);
                     setSuccessMessage(null);
                   }}
@@ -1036,6 +1163,63 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialInten
         ) : (
           <div className="p-5 sm:p-6 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
             <div>
+              {/* QUICK UNLOCK SAVED MPIN ACCOUNTS SWITCHER */}
+              {mode === 'login' && savedMpinAccounts.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                      <KeyRound className="w-3 h-3 text-amber-600" />
+                      <span>Quick Unlock Saved Account (Requires MPIN)</span>
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
+                    {savedMpinAccounts.map((acct) => (
+                      <div
+                        key={acct.uid || acct.email}
+                        className="flex items-center gap-2 p-2 bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200 rounded-xl transition-colors"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => selectSavedAccountForMpin(acct)}
+                          className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0">
+                            {(acct.displayName || acct.email || 'E').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-xs font-extrabold text-slate-900 truncate">
+                              {acct.displayName || 'EaseLand Member'}
+                            </span>
+                            <span className="block text-[10px] font-semibold text-slate-500 truncate">
+                              {acct.email}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full shrink-0">
+                            Enter MPIN
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearTrustedMpinUser(acct);
+                            setSavedMpinAccounts(getTrustedMpinAccounts());
+                            if (trustedUser && (trustedUser.uid === acct.uid || trustedUser.email === acct.email)) {
+                              setTrustedUser(null);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer shrink-0"
+                          title="Remove saved account from this device"
+                          aria-label={'Remove ' + (acct.email || 'saved account') + ' from this device'}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* ALERTS */}
               {error && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-start gap-2">
