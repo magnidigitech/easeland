@@ -362,4 +362,24 @@ describe('EaseLand Property Cover & Uploaded Image Resolution Suite', () => {
     assert.ok(viewerSrc.includes('playsInline') && viewerSrc.includes('videoLoadError'), 'PropertyMediaZoomViewer must configure mobile video playback and fallback UI');
     assert.ok(detailSrc.includes('setActiveMediaIndex(0)'), 'PropertyDetailPage must reset activeMediaIndex when propertyId changes');
   });
+
+  it('14. DEFECT REGRESSION: LIVE published property with PENDING_REVIEW media items (not in re-audit) still resolves all 3 photos and 1 video on dedicated page', async () => {
+    const { filterApprovedPublicMedia } = await import('../firebase/propertyService.js');
+    const livePropMedia = [
+      { mediaId: 'm1', type: 'PHOTO', publicUrl: 'https://easeland.in/uploads/properties/prop1/p1.jpg', verificationStatus: 'PENDING_REVIEW', isPrimary: true },
+      { mediaId: 'm2', type: 'PHOTO', publicUrl: 'https://easeland.in/uploads/properties/prop1/p2.jpg', verificationStatus: 'PENDING_REVIEW' },
+      { mediaId: 'm3', type: 'PHOTO', publicUrl: 'https://easeland.in/uploads/properties/prop1/p3.jpg', verificationStatus: 'PENDING_REVIEW' },
+      { mediaId: 'm4', type: 'WALKTHROUGH_VIDEO', publicUrl: 'https://easeland.in/uploads/properties/prop1/v1.mp4', verificationStatus: 'PENDING_REVIEW' },
+      { mediaId: 'm5', type: 'PHOTO', publicUrl: 'https://easeland.in/uploads/properties/prop1/rejected.jpg', verificationStatus: 'REJECTED' }
+    ];
+
+    const approvedForPublished = filterApprovedPublicMedia(livePropMedia, { allowPendingWhenPublished: true });
+    assert.strictEqual(approvedForPublished.length, 4);
+    assert.strictEqual(approvedForPublished.filter(m => m.mediaType === 'PHOTO').length, 3);
+    assert.strictEqual(approvedForPublished.filter(m => m.mediaType === 'WALKTHROUGH_VIDEO').length, 1);
+
+    // Strict re-audit mode still excludes PENDING_REVIEW
+    const strictReaudit = filterApprovedPublicMedia(livePropMedia);
+    assert.strictEqual(strictReaudit.length, 0);
+  });
 });

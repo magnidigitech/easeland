@@ -183,16 +183,18 @@ export function computeDerivedPropertyFields(propertyData = {}) {
 }
 
 /**
- * Filter property media to ensure public users only receive APPROVED items
+ * Filter property media to ensure public users only receive non-rejected items
+ * (and exclude PENDING_REVIEW items during live re-audit unless reading approved baseline).
  */
-export function filterApprovedPublicMedia(mediaArray = []) {
+export function filterApprovedPublicMedia(mediaArray = [], options = {}) {
   if (!Array.isArray(mediaArray)) return [];
+  const { allowPendingWhenPublished = false } = options || {};
   return mediaArray
     .filter(item => {
       if (!item) return false;
       if (typeof item === 'string') return item.trim().length > 0;
       if (item.verificationStatus === MediaStatus.REJECTED || item.status === 'REJECTED') return false;
-      if (item.verificationStatus === 'PENDING_REVIEW' || item.verificationStatus === 'PENDING' || item.status === 'PENDING_REVIEW' || item.status === 'PENDING') return false;
+      if (!allowPendingWhenPublished && (item.verificationStatus === 'PENDING_REVIEW' || item.verificationStatus === 'PENDING' || item.status === 'PENDING_REVIEW' || item.status === 'PENDING')) return false;
       return true;
     })
     .map(item => {
@@ -1783,13 +1785,29 @@ export async function getPublicPropertyById(propertyId) {
     }
 
     // Expose APPROVED public media items from publicApprovedMedia, media, photos, images, or single URLs
+    const isLiveReaudit = Boolean(
+      data.hasPendingEdits === true ||
+      data.pendingReauditData ||
+      data.pendingEdits ||
+      data.reAuditStatus === 'PENDING_VERIFICATION' ||
+      data.reAuditStatus === 'UNDER_REVIEW'
+    );
+    const hasApprovedBaseline = Array.isArray(data.publicApprovedMedia) && data.publicApprovedMedia.length > 0;
+    const allowPending = hasApprovedBaseline || !isLiveReaudit;
+
     let rawMedia = [];
-    if (Array.isArray(data.publicApprovedMedia) && data.publicApprovedMedia.length > 0) {
+    if (hasApprovedBaseline) {
       rawMedia = data.publicApprovedMedia;
     } else {
-      const approvedFromMedia = Array.isArray(data.media) ? filterApprovedPublicMedia(data.media) : [];
-      const approvedFromPhotos = Array.isArray(data.photos) ? filterApprovedPublicMedia(data.photos) : [];
-      const approvedFromImages = Array.isArray(data.images) ? filterApprovedPublicMedia(data.images) : [];
+      const approvedFromMedia = Array.isArray(data.media)
+        ? filterApprovedPublicMedia(data.media, { allowPendingWhenPublished: allowPending })
+        : [];
+      const approvedFromPhotos = Array.isArray(data.photos)
+        ? filterApprovedPublicMedia(data.photos, { allowPendingWhenPublished: allowPending })
+        : [];
+      const approvedFromImages = Array.isArray(data.images)
+        ? filterApprovedPublicMedia(data.images, { allowPendingWhenPublished: allowPending })
+        : [];
       const fallbackSingles = [
         data.coverPhoto,
         data.coverImage,
@@ -1804,7 +1822,7 @@ export async function getPublicPropertyById(propertyId) {
             : (approvedFromImages.length > 0 ? approvedFromImages : fallbackSingles));
     }
 
-    const approvedMedia = filterApprovedPublicMedia(rawMedia);
+    const approvedMedia = filterApprovedPublicMedia(rawMedia, { allowPendingWhenPublished: allowPending });
 
     // Expose plot boundary polygon for public map display
     const publicBoundary = data.boundary || data.ownerSubmittedBoundary || data.approvedPolygon || data.polygon || null;
