@@ -107,6 +107,7 @@ import { computeReauditDiff, formatInr } from '../utils/reauditDiffUtils.js';
 import { isPropertyDeleted } from '../utils/filterMatchingUtils.js';
 import { getFirstUploadedImage, getPropertyCoverOrFirstImage, NO_PHOTO_PLACEHOLDER } from '../utils/categoryUtils.js';
 import { collectAllConfidentialDocuments } from '../firebase/documentService.js';
+import { downloadUsersGovernanceCsv } from '../utils/userGovernanceCsv.js';
 
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
@@ -7638,21 +7639,6 @@ export default function AdminPortal({ onNavigate }) {
                           </div>
 
                           <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-gray-100">
-                            <button
-                              type="button"
-                              onClick={() => openWorkspace(matchedProp || {
-                                id: docItem.propertyId,
-                                propertyId: docItem.propertyId,
-                                title: docItem.propertyTitle,
-                                status: docItem.propertyStatus,
-                                ownerName: docItem.ownerName,
-                                ownerPhone: docItem.ownerPhone,
-                                ownerEmail: docItem.ownerEmail
-                              })}
-                              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-[11px] transition-all cursor-pointer"
-                            >
-                              Open in Workspace
-                            </button>
                             {docUrl && (
                               <>
                                 <button
@@ -7794,6 +7780,58 @@ export default function AdminPortal({ onNavigate }) {
                 </div>
 
                 {/* SEARCH & STATUS FILTER BAR */}
+                {(() => {
+                  let activeDeletedUsers = [];
+                  try {
+                    if (typeof window !== 'undefined') {
+                      const rawDel = localStorage.getItem('easeland_deleted_users');
+                      if (rawDel) activeDeletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
+                    }
+                  } catch (e) { }
+
+                  const filteredUsers = registeredUsersList
+                    .filter(u => {
+                      if (!u) return false;
+                      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
+                      const uEmail = (u.email || '').toLowerCase().trim();
+                      const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
+                      const isRemoved = rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
+                        (uUid && activeDeletedUsers.includes(uUid)) || (uEmail && activeDeletedUsers.includes(uEmail));
+
+                      if (userStatusFilter === 'ALL') {
+                        if (isRemoved) return false;
+                      } else if (userStatusFilter === 'REMOVED') {
+                        if (!isRemoved) return false;
+                      } else if (u.status !== userStatusFilter && u.accountStatus !== userStatusFilter) {
+                        return false;
+                      }
+                      if (userSearchQuery) {
+                        const q = userSearchQuery.toLowerCase();
+                        return (u.name || '').toLowerCase().includes(q) ||
+                          (u.displayName || '').toLowerCase().includes(q) ||
+                          (u.email || '').toLowerCase().includes(q) ||
+                          (u.phone || '').includes(q) ||
+                          (u.uid || '').toLowerCase().includes(q);
+                      }
+                      return true;
+                    })
+                    .sort((a, b) => {
+                      const aIsAdmin = a.role === 'ADMIN' || a.email === 'admin@easeland.in';
+                      const bIsAdmin = b.role === 'ADMIN' || b.email === 'admin@easeland.in';
+                      if (aIsAdmin && !bIsAdmin) return -1;
+                      if (!aIsAdmin && bIsAdmin) return 1;
+                      return (a.name || a.displayName || a.email || '').localeCompare(b.name || b.displayName || b.email || '');
+                    });
+
+                  const totalUsers = filteredUsers.length;
+                  const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage));
+                  const currentPageClamped = Math.min(Math.max(1, userCurrentPage), totalPages);
+                  const startIndex = (currentPageClamped - 1) * usersPerPage;
+                  const endIndex = Math.min(startIndex + usersPerPage, totalUsers);
+                  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+                  return (
+                    <>
                 <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="relative w-full sm:w-80">
                     <input
@@ -7810,6 +7848,17 @@ export default function AdminPortal({ onNavigate }) {
                   </div>
 
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => downloadUsersGovernanceCsv(filteredUsers)}
+                      disabled={filteredUsers.length === 0}
+                      className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm transition-all shrink-0 cursor-pointer disabled:opacity-50"
+                      title="Download filtered users list as CSV"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download CSV</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleSyncCloudAndDb}
@@ -7865,55 +7914,6 @@ export default function AdminPortal({ onNavigate }) {
                 </div>
 
                 {/* REGISTERED USERS DIRECTORY TABLE WITH PAGINATION */}
-                {(() => {
-                  let activeDeletedUsers = [];
-                  try {
-                    if (typeof window !== 'undefined') {
-                      const rawDel = localStorage.getItem('easeland_deleted_users');
-                      if (rawDel) activeDeletedUsers = JSON.parse(rawDel).map(v => String(v).toLowerCase().trim());
-                    }
-                  } catch (e) { }
-
-                  const filteredUsers = registeredUsersList
-                    .filter(u => {
-                      if (!u) return false;
-                      const uUid = String(u.uid || u.id || '').toLowerCase().trim();
-                      const uEmail = (u.email || '').toLowerCase().trim();
-                      const rawSt = String(u.status || u.accountStatus || '').toUpperCase();
-                      const isRemoved = rawSt === 'REMOVED' || rawSt === 'DELETED' || rawSt === 'ACCOUNT_DELETED' ||
-                        (uUid && activeDeletedUsers.includes(uUid)) || (uEmail && activeDeletedUsers.includes(uEmail));
-
-                      if (userStatusFilter === 'ALL') {
-                        if (isRemoved) return false;
-                      } else if (userStatusFilter === 'REMOVED') {
-                        if (!isRemoved) return false;
-                      } else if (u.status !== userStatusFilter && u.accountStatus !== userStatusFilter) {
-                        return false;
-                      }
-                      if (userSearchQuery) {
-                        const q = userSearchQuery.toLowerCase();
-                        return (u.name || '').toLowerCase().includes(q) ||
-                          (u.displayName || '').toLowerCase().includes(q) ||
-                          (u.email || '').toLowerCase().includes(q) ||
-                          (u.phone || '').includes(q) ||
-                          (u.uid || '').toLowerCase().includes(q);
-                      }
-                      return true;
-                    })
-                    .sort((a, b) => {
-                      const aIsAdmin = a.role === 'ADMIN' || a.email === 'admin@easeland.in';
-                      const bIsAdmin = b.role === 'ADMIN' || b.email === 'admin@easeland.in';
-                      if (aIsAdmin && !bIsAdmin) return -1;
-                      if (!aIsAdmin && bIsAdmin) return 1;
-                      return (a.name || a.displayName || a.email || '').localeCompare(b.name || b.displayName || b.email || '');
-                    });
-
-                  const totalUsers = filteredUsers.length;
-                  const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage));
-                  const currentPageClamped = Math.min(Math.max(1, userCurrentPage), totalPages);
-                  const startIndex = (currentPageClamped - 1) * usersPerPage;
-                  const endIndex = Math.min(startIndex + usersPerPage, totalUsers);
-                  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
                   return (
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -8144,6 +8144,7 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
                       </div>
                     </div>
+                    </>
                   );
                 })()}
 

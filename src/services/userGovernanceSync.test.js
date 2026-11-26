@@ -565,4 +565,36 @@ describe('EaseLand User Governance & Real-Time Firebase Sync Suite', () => {
     assert.equal(reactivatedProfile.postedListingsCount, 0);
     assert.equal(reactivatedProfile.oldNotes, undefined, 'Old notes must not be present in reactivated profile');
   });
+
+  it('14. buildUsersGovernanceCsv exports user directory with RFC-4180 CSV escaping and AdminPortal wires Download CSV button', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { buildUsersGovernanceCsv } = await import('../utils/userGovernanceCsv.js');
+
+    const csv = buildUsersGovernanceCsv([
+      {
+        uid: 'usr_1',
+        name: 'Ramesh, "Founder"',
+        email: 'ramesh@example.com',
+        phone: '+91 9876543210',
+        authMethod: 'Google',
+        role: 'USER',
+        status: 'ACTIVE',
+        city: 'Guntur',
+        createdAt: '2026-11-26T10:00:00.000Z'
+      }
+    ]);
+
+    const lines = csv.split('\r\n');
+    assert.equal(lines.length, 2);
+    assert.equal(lines[0], 'UID,Name,Email,Phone,Auth Method,Role,Account Status,City,Created At');
+    assert.equal(lines[1], 'usr_1,"Ramesh, ""Founder""",ramesh@example.com,+91 9876543210,Google,USER,ACTIVE,Guntur,2026-11-26T10:00:00.000Z');
+
+    const adminSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'pages', 'AdminPortal.jsx'),
+      'utf8'
+    );
+    assert.ok(adminSource.includes('downloadUsersGovernanceCsv(filteredUsers)'));
+    assert.ok(adminSource.includes('Download CSV'));
+  });
 });
