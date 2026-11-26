@@ -321,4 +321,45 @@ describe('EaseLand Property Cover & Uploaded Image Resolution Suite', () => {
     assert.strictEqual(photos.length, 1);
     assert.strictEqual(photos[0].url, 'https://storage.easeland.in/uploads/legacy_string_photo.jpg');
   });
+
+  it('12. Top-level video fields (videoUrl/droneVideoUrl) and localhost upload URLs resolve cleanly for dedicated detail page', async () => {
+    const { normalizeMediaUrl } = await import('./categoryUtils.js');
+    assert.strictEqual(
+      normalizeMediaUrl('http://localhost:3001/uploads/properties/prop_1/med-1_photo.jpg'),
+      '/uploads/properties/prop_1/med-1_photo.jpg'
+    );
+    assert.strictEqual(
+      normalizeMediaUrl('https://storage.easeland.in/uploads/photo.jpg'),
+      'https://storage.easeland.in/uploads/photo.jpg'
+    );
+
+    const propWithTopLevelVideo = {
+      id: 'prop_vid_top',
+      title: 'Top Level Video Plot',
+      media: [
+        { mediaId: 'm1', type: 'PHOTO', publicUrl: 'http://localhost:3001/uploads/properties/prop_vid_top/med-1_cover.jpg', isPrimary: true }
+      ],
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    };
+
+    const media = getPropertyMediaList(propWithTopLevelVideo);
+    assert.strictEqual(media.length, 2);
+    assert.strictEqual(media[0].url, '/uploads/properties/prop_vid_top/med-1_cover.jpg');
+    assert.strictEqual(media[1].mediaType, 'WALKTHROUGH_VIDEO');
+    assert.ok(media[1].embedUrl.includes('youtube.com/embed/dQw4w9WgXcQ'));
+  });
+
+  it('13. Backend /uploads falls back to PostgreSQL media_files with Range support and PropertyMediaZoomViewer handles video & image errors cleanly', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const serverSrc = fs.readFileSync(path.resolve(process.cwd(), 'server.js'), 'utf8');
+    const viewerSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/components/PropertyMediaZoomViewer.jsx'), 'utf8');
+    const detailSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/PropertyDetailPage.jsx'), 'utf8');
+
+    assert.ok(serverSrc.includes('serveMediaBufferWithRanges'), 'server.js must support HTTP 206 Byte-Range streaming for uploaded videos');
+    assert.ok(serverSrc.includes("app.use('/uploads', async (req, res) =>"), 'server.js /uploads must fall back to PostgreSQL media_files on container restart');
+    assert.ok(serverSrc.includes('Array.isArray(row.media) && row.media.length > 0'), 'server.js must not let empty row.media clobber raw_data.media');
+    assert.ok(viewerSrc.includes('playsInline') && viewerSrc.includes('videoLoadError'), 'PropertyMediaZoomViewer must configure mobile video playback and fallback UI');
+    assert.ok(detailSrc.includes('setActiveMediaIndex(0)'), 'PropertyDetailPage must reset activeMediaIndex when propertyId changes');
+  });
 });

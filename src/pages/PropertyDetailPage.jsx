@@ -296,6 +296,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
   // 1. Fetch Public Property Data
   useEffect(() => {
     let isMounted = true;
+    setActiveMediaIndex(0);
     if (!propertyId) {
       setErrorMsg('No property ID provided.');
       setLoading(false);
@@ -317,17 +318,8 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
           // Default enquiry message
           setEnquiryForm(prev => ({
             ...prev,
-            name: user?.displayName || '',
-            email: user?.email || '',
             message: `Hello, I am interested in your property "${res.property.title}" (Ref: ${res.property.referenceId}). Please get in touch with me for further details.`
           }));
-
-          // Check wishlist status
-          if (user?.uid) {
-            isPropertyWishlisted(user.uid, res.property.propertyId).then(isSaved => {
-              if (isMounted) setWishlisted(isSaved);
-            });
-          }
         } else {
           setErrorMsg(res.error || 'Property unavailable.');
         }
@@ -342,7 +334,26 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
     return () => {
       isMounted = false;
     };
-  }, [propertyId, user]);
+  }, [propertyId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (user?.uid && property?.propertyId) {
+      isPropertyWishlisted(user.uid, property.propertyId).then(isSaved => {
+        if (isMounted) setWishlisted(isSaved);
+      }).catch(() => {});
+    }
+    if (user) {
+      setEnquiryForm(prev => ({
+        ...prev,
+        name: prev.name || user.displayName || '',
+        email: prev.email || user.email || ''
+      }));
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid, user?.displayName, user?.email, property?.propertyId]);
 
   // Property coordinates extraction
   const propCoords = useMemo(() => {
@@ -893,7 +904,7 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                       : 'border-transparent opacity-70 hover:opacity-100'
                   }`}
                 >
-                  {item.mediaType === 'WALKTHROUGH_VIDEO' || item.mediaType === 'DRONE_VIDEO' ? (
+                  {item.mediaType === 'WALKTHROUGH_VIDEO' || item.mediaType === 'DRONE_VIDEO' || item.mediaType === 'VIDEO' ? (
                     <div className="relative w-full h-full bg-slate-950 overflow-hidden group">
                       {item.url && !item.embedUrl ? (
                         <video
@@ -901,12 +912,19 @@ export default function PropertyDetailPage({ propertyId: propIdFromProps, onNavi
                           preload="metadata"
                           muted
                           playsInline
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
                           className="w-full h-full object-cover pointer-events-none"
                         />
                       ) : (
                         <img
-                          src={getVideoThumbnailUrl(item, property)}
+                          src={getVideoThumbnailUrl(item, property) || defaultCategoryFallback}
                           alt=""
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = defaultCategoryFallback;
+                          }}
                           className="w-full h-full object-cover opacity-80"
                         />
                       )}

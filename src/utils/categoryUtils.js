@@ -264,6 +264,31 @@ export function isPhotoMedia(item) {
 }
 
 /**
+ * Normalize uploaded/local media URLs so localhost-stored upload links or mixed-content links
+ * still resolve cleanly via relative /uploads/... or /api/media/... routes on any host.
+ */
+export function normalizeMediaUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+
+  const localUploadMatch = trimmed.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/(?:uploads|api\/media)\/.+)$/i);
+  if (localUploadMatch && localUploadMatch[1]) {
+    return localUploadMatch[1];
+  }
+
+  if (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') {
+    const httpSamePathMatch = trimmed.match(/^http:\/\/([^/]+)(\/(?:uploads|api\/media)\/.+)$/i);
+    if (httpSamePathMatch && httpSamePathMatch[2]) {
+      return httpSamePathMatch[2];
+    }
+  }
+
+  return trimmed;
+}
+
+/**
  * Helper to safely extract a valid photo URL from any item format.
  * Returns null if the item is empty, a video, a document, or a stock image.
  */
@@ -277,7 +302,7 @@ function extractValidPhotoUrl(item) {
     url = item.publicUrl || item.url || item.photoUrl || item.mediaUrl || item.fileUrl || item.src || item.path || '';
   }
   if (!url || typeof url !== 'string') return null;
-  url = url.trim();
+  url = normalizeMediaUrl(url.trim());
   if (!url || isDefaultStockImageUrl(url) || !isPhotoMedia(item)) return null;
   return url;
 }
@@ -600,7 +625,7 @@ export function getPropertyMediaList(property) {
     }
 
     if (!url || typeof url !== 'string') return;
-    url = url.trim();
+    url = normalizeMediaUrl(url.trim());
     if (!url || isDefaultStockImageUrl(url)) return;
     if (isLiveReaudit && blockedUrls.has(url.toLowerCase().trim())) {
       return;
@@ -698,6 +723,23 @@ export function getPropertyMediaList(property) {
   addMediaItem(property.image, false);
   addMediaItem(property.imageUrl, false);
   addMediaItem(property.photoUrl, false);
+
+  // 3b. Process top-level video fields if not already included in media arrays
+  const videoCandidates = [
+    { val: property.videoUrl, mediaType: 'WALKTHROUGH_VIDEO' },
+    { val: property.videoLink, mediaType: 'WALKTHROUGH_VIDEO' },
+    { val: property.embeddedVideoUrl, mediaType: 'WALKTHROUGH_VIDEO' },
+    { val: property.walkthroughVideoUrl, mediaType: 'WALKTHROUGH_VIDEO' },
+    { val: property.droneVideoUrl, mediaType: 'DRONE_VIDEO' }
+  ];
+  for (const vc of videoCandidates) {
+    if (!vc.val) continue;
+    if (typeof vc.val === 'string') {
+      addMediaItem({ url: vc.val, publicUrl: vc.val, type: vc.mediaType, mediaType: vc.mediaType }, false);
+    } else if (typeof vc.val === 'object') {
+      addMediaItem({ type: vc.mediaType, mediaType: vc.mediaType, ...vc.val }, false);
+    }
+  }
 
   // 4. Process documents if image files exist
   const docs = Array.isArray(property.documents)

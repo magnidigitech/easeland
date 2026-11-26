@@ -147,11 +147,83 @@ const documentsDir = path.join(uploadsDir, 'documents');
 fs.mkdirSync(propertiesDir, { recursive: true });
 fs.mkdirSync(documentsDir, { recursive: true });
 
-// Serve uploaded media files statically from /uploads
+// Helper: Serve binary media buffer with HTTP Byte-Range (206 Partial Content) support for video & image streaming
+function serveMediaBufferWithRanges(req, res, buffer, contentType) {
+  if (!buffer) {
+    return res.status(404).send('Media file not found');
+  }
+  const total = buffer.length;
+  const resolvedType = contentType || 'application/octet-stream';
+  res.setHeader('Content-Type', resolvedType);
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+
+  const rangeHeader = req.headers.range;
+  if (rangeHeader && typeof rangeHeader === 'string' && rangeHeader.startsWith('bytes=')) {
+    const parts = rangeHeader.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+    if (!Number.isNaN(start) && start >= 0 && start < total) {
+      const clampedEnd = (!Number.isNaN(end) && end >= start) ? Math.min(end, total - 1) : (total - 1);
+      const chunkSize = (clampedEnd - start) + 1;
+      res.status(206);
+      res.setHeader('Content-Range', 'bytes ' + start + '-' + clampedEnd + '/' + total);
+      res.setHeader('Content-Length', chunkSize);
+      return res.send(buffer.subarray(start, clampedEnd + 1));
+    }
+  }
+
+  res.setHeader('Content-Length', total);
+  return res.send(buffer);
+}
+
+// Serve uploaded media files statically from /uploads with PostgreSQL media_files fallback
 app.use('/uploads', express.static(uploadsDir, {
   maxAge: '30d',
   immutable: true
 }));
+
+app.use('/uploads', async (req, res) => {
+  try {
+    const cleanPath = decodeURIComponent(req.path || '');
+    const fileName = path.basename(cleanPath);
+    const mediaIdMatch = fileName.match(/^(med-[a-zA-Z0-9-]+)/);
+    const P = String.fromCharCode(36);
+
+    if (pgPool && mediaIdMatch && mediaIdMatch[1]) {
+      const dbRes = await pgPool.query(
+        'SELECT content_type, file_data FROM media_files WHERE media_id = ' + P + '1 LIMIT 1;',
+        [mediaIdMatch[1]]
+      );
+      if (dbRes.rows.length > 0 && dbRes.rows[0].file_data) {
+        return serveMediaBufferWithRanges(req, res, dbRes.rows[0].file_data, dbRes.rows[0].content_type);
+      }
+    }
+
+    if (pgPool && fileName) {
+      const parts = cleanPath.split('/').filter(Boolean);
+      const maybePropId = parts.length >= 2 ? parts[parts.length - 2] : null;
+      const originalName = mediaIdMatch ? fileName.slice(mediaIdMatch[1].length + 1) : fileName;
+      const fallbackRes = maybePropId
+        ? await pgPool.query(
+            'SELECT content_type, file_data FROM media_files WHERE property_id = ' + P + '1 AND file_name = ' + P + '2 ORDER BY created_at DESC LIMIT 1;',
+            [maybePropId, originalName]
+          )
+        : await pgPool.query(
+            'SELECT content_type, file_data FROM media_files WHERE file_name = ' + P + '1 ORDER BY created_at DESC LIMIT 1;',
+            [originalName]
+          );
+      if (fallbackRes.rows.length > 0 && fallbackRes.rows[0].file_data) {
+        return serveMediaBufferWithRanges(req, res, fallbackRes.rows[0].file_data, fallbackRes.rows[0].content_type);
+      }
+    }
+
+    return res.status(404).send('Media file not found');
+  } catch (err) {
+    console.warn('Upload DB fallback error:', err.message);
+    return res.status(404).send('Media file not found');
+  }
+});
 
 // Cache Buster: Prevent browser, proxy, and CDN caching on all dynamic API endpoints
 app.use('/api', (req, res, next) => {
@@ -1304,14 +1376,15 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         }
         saveLocalProperty(existingProp);
 
-        // Sync directly to PostgreSQL properties table raw_data so getPropertyById has it immediately
+        // Sync directly to PostgreSQL properties table raw_data and media column so getPropertyById has it immediately
         try {
           const P = String.fromCharCode(36);
           const p1 = P + '1';
           const p2 = P + '2';
+          const p3 = P + '3';
           await pgPool.query(
-            "UPDATE properties SET raw_data = " + p1 + ", updated_at = NOW() WHERE property_id = " + p2 + " OR reference_id = " + p2 + " OR raw_data->>'id' = " + p2 + " OR raw_data->>'propertyId' = " + p2 + ";",
-            [JSON.stringify(existingProp), propertyId]
+            "UPDATE properties SET raw_data = " + p1 + ", media = " + p2 + ", updated_at = NOW() WHERE property_id = " + p3 + " OR reference_id = " + p3 + " OR raw_data->>'id' = " + p3 + " OR raw_data->>'propertyId' = " + p3 + ";",
+            [JSON.stringify(existingProp), JSON.stringify(existingProp.media || []), propertyId]
           );
         } catch (pgSyncErr) {
           console.warn('PostgreSQL property doc/media update note:', pgSyncErr.message);
@@ -1351,9 +1424,7 @@ app.get('/api/media/:mediaId', async (req, res) => {
     }
 
     const file = result.rows[0];
-    res.setHeader('Content-Type', file.content_type || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
-    res.send(file.file_data);
+    return serveMediaBufferWithRanges(req, res, file.file_data, file.content_type);
   } catch (err) {
     console.error('PostgreSQL media serve error:', err);
     res.status(500).send('Error retrieving media file');
@@ -1537,7 +1608,7 @@ app.get('/api/properties', async (req, res) => {
           location: row.location || raw.location,
           specs: row.specs || raw.specs,
           amenities: row.amenities || raw.amenities,
-          media: row.media || raw.media,
+          media: (Array.isArray(row.media) && row.media.length > 0) ? row.media : (raw.media || []),
           listing_status: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
           listingStatus: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
           status: isAdminDeleted ? 'DELETED_BY_ADMIN' : (raw.status || listingStatus),
@@ -1726,7 +1797,7 @@ app.get('/api/properties/:id', async (req, res) => {
           location: row.location || raw.location,
           specs: row.specs || raw.specs,
           amenities: row.amenities || raw.amenities,
-          media: row.media || raw.media,
+          media: (Array.isArray(row.media) && row.media.length > 0) ? row.media : (raw.media || []),
           listing_status: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
           listingStatus: isAdminDeleted ? 'DELETED_BY_ADMIN' : listingStatus,
           status: isAdminDeleted ? 'DELETED_BY_ADMIN' : (raw.status || listingStatus),

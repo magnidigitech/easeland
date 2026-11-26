@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, X, ChevronLeft, ChevronRight, Maximize2, ShieldCheck, Plane, Video } from 'lucide-react';
+import { getVideoThumbnailUrl } from '../utils/categoryUtils.js';
 
 /**
  * PropertyMediaZoomViewer
@@ -21,6 +22,7 @@ export default function PropertyMediaZoomViewer({
   const [inlineScale, setInlineScale] = useState(1);
   const [inlinePosition, setInlinePosition] = useState({ x: 0, y: 0 });
   const [isInteracting, setIsInteracting] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState(false);
 
   // Full-screen modal inspector state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,10 +33,11 @@ export default function PropertyMediaZoomViewer({
   const touchStartRef = useRef({ dist: 0, startScale: 1, lastTap: 0, startPos: { x: 0, y: 0 }, panStart: { x: 0, y: 0 } });
   const modalTouchRef = useRef({ dist: 0, startScale: 1, lastTap: 0, startPos: { x: 0, y: 0 }, panStart: { x: 0, y: 0 } });
 
-  // Reset inline zoom when the active photo changes
+  // Reset inline zoom & error state when the active media changes
   useEffect(() => {
     setInlineScale(1);
     setInlinePosition({ x: 0, y: 0 });
+    setVideoLoadError(false);
   }, [activeMediaIndex, activeMedia]);
 
   // Reset modal zoom when opening or switching photo
@@ -192,8 +195,9 @@ export default function PropertyMediaZoomViewer({
   };
 
   // Determine media details
-  const isVideo = activeMedia && (activeMedia.mediaType === 'WALKTHROUGH_VIDEO' || activeMedia.mediaType === 'DRONE_VIDEO');
+  const isVideo = activeMedia && (activeMedia.mediaType === 'WALKTHROUGH_VIDEO' || activeMedia.mediaType === 'DRONE_VIDEO' || activeMedia.mediaType === 'VIDEO');
   const mediaUrl = (typeof activeMedia === 'string' ? activeMedia : (activeMedia?.url || activeMedia?.publicUrl)) || defaultFallback;
+  const mediaKey = activeMedia?.embedUrl || mediaUrl || String(activeMediaIndex);
   const caption = (typeof activeMedia === 'object' && activeMedia?.caption) ? activeMedia.caption : propertyTitle;
 
   return (
@@ -212,16 +216,34 @@ export default function PropertyMediaZoomViewer({
         {isVideo ? (
           activeMedia.embedUrl ? (
             <iframe
+              key={mediaKey}
               src={activeMedia.embedUrl}
               title={caption}
               className="w-full h-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
+          ) : videoLoadError ? (
+            <div className="flex flex-col items-center justify-center gap-2 text-center px-6 text-slate-200">
+              <Video className="w-10 h-10 text-amber-400" />
+              <p className="text-sm font-extrabold">Video preview unavailable</p>
+              <a
+                href={mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl transition-colors"
+              >
+                Open Video in New Tab
+              </a>
+            </div>
           ) : (
             <video
+              key={mediaKey}
               src={mediaUrl}
               controls
+              playsInline
+              preload="metadata"
+              onError={() => setVideoLoadError(true)}
               className="w-full h-full object-contain"
             />
           )
@@ -233,6 +255,7 @@ export default function PropertyMediaZoomViewer({
             }}
           >
             <img
+              key={mediaKey}
               src={mediaUrl}
               alt={caption}
               onError={(e) => {
@@ -391,8 +414,13 @@ export default function PropertyMediaZoomViewer({
             style={{ touchAction: 'none' }}
           >
             <img
+              key={mediaKey}
               src={mediaUrl}
               alt={caption}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = defaultFallback;
+              }}
               style={{
                 transform: 'translate(' + modalPosition.x + 'px, ' + modalPosition.y + 'px) scale(' + modalScale + ')',
                 transition: 'transform 0.15s ease-out',
@@ -445,7 +473,10 @@ export default function PropertyMediaZoomViewer({
             {mediaList.length > 1 && (
               <div className="flex items-center gap-2 max-w-full overflow-x-auto no-scrollbar py-1">
                 {mediaList.map((item, idx) => {
-                  const thumbUrl = (typeof item === 'string' ? item : (item.url || item.publicUrl)) || defaultFallback;
+                  const isVidItem = item && (item.mediaType === 'WALKTHROUGH_VIDEO' || item.mediaType === 'DRONE_VIDEO' || item.mediaType === 'VIDEO');
+                  const thumbUrl = isVidItem
+                    ? (getVideoThumbnailUrl(item) || defaultFallback)
+                    : ((typeof item === 'string' ? item : (item.url || item.publicUrl)) || defaultFallback);
                   const isCur = idx === activeMediaIndex;
                   return (
                     <button
@@ -457,7 +488,21 @@ export default function PropertyMediaZoomViewer({
                       }}
                       className={'relative w-14 h-12 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer ' + (isCur ? 'border-amber-400 scale-105 ring-2 ring-amber-400/50' : 'border-white/20 opacity-60 hover:opacity-100')}
                     >
-                      <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                      {isVidItem ? (
+                        <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                          <Video className="w-4 h-4 text-amber-400" />
+                        </div>
+                      ) : (
+                        <img
+                          src={thumbUrl}
+                          alt=""
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = defaultFallback;
+                          }}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </button>
                   );
                 })}

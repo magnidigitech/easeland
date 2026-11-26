@@ -1783,15 +1783,26 @@ export async function getPublicPropertyById(propertyId) {
     }
 
     // Expose APPROVED public media items from publicApprovedMedia, media, photos, images, or single URLs
-    const rawMedia = (Array.isArray(data.publicApprovedMedia) && data.publicApprovedMedia.length > 0)
-      ? data.publicApprovedMedia
-      : ((Array.isArray(data.media) && data.media.length > 0)
-          ? data.media
-          : ((Array.isArray(data.photos) && data.photos.length > 0)
-              ? data.photos
-              : ((Array.isArray(data.images) && data.images.length > 0)
-                  ? data.images
-                  : (data.imageUrl || data.coverImage || data.photoUrl ? [data.imageUrl || data.coverImage || data.photoUrl] : []))));
+    let rawMedia = [];
+    if (Array.isArray(data.publicApprovedMedia) && data.publicApprovedMedia.length > 0) {
+      rawMedia = data.publicApprovedMedia;
+    } else {
+      const approvedFromMedia = Array.isArray(data.media) ? filterApprovedPublicMedia(data.media) : [];
+      const approvedFromPhotos = Array.isArray(data.photos) ? filterApprovedPublicMedia(data.photos) : [];
+      const approvedFromImages = Array.isArray(data.images) ? filterApprovedPublicMedia(data.images) : [];
+      const fallbackSingles = [
+        data.coverPhoto,
+        data.coverImage,
+        data.imageUrl,
+        data.photoUrl,
+        data.thumbnailUrl
+      ].filter(Boolean);
+      rawMedia = approvedFromMedia.length > 0
+        ? approvedFromMedia
+        : (approvedFromPhotos.length > 0
+            ? approvedFromPhotos
+            : (approvedFromImages.length > 0 ? approvedFromImages : fallbackSingles));
+    }
 
     const approvedMedia = filterApprovedPublicMedia(rawMedia);
 
@@ -1816,6 +1827,11 @@ export async function getPublicPropertyById(propertyId) {
       amenities: Array.isArray(data.amenities) ? data.amenities : [],
       media: approvedMedia,
       publicApprovedMedia: approvedMedia,
+      coverPhoto: data.coverPhoto || data.coverImage || undefined,
+      videoUrl: data.videoUrl || undefined,
+      videoLink: data.videoLink || undefined,
+      embeddedVideoUrl: data.embeddedVideoUrl || undefined,
+      droneVideoUrl: data.droneVideoUrl || undefined,
       location: data.location || null,
       boundary: publicBoundary,
       listingStatus: data.listingStatus || 'LIVE',
