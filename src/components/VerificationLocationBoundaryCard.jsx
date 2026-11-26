@@ -536,12 +536,12 @@ export default function VerificationLocationBoundaryCard({
         </div>
 
         {/* LEAFLET CANVAS CONTAINER */}
-        <div className="relative w-full h-[360px] sm:h-[420px] bg-slate-900">
-          <div ref={mapContainerRef} className="w-full h-full zoomable-map" data-allow-zoom="true" />
+        <div className="relative isolate z-0 overflow-hidden w-full h-[360px] sm:h-[420px] bg-slate-900">
+          <div ref={mapContainerRef} className="relative z-0 w-full h-full zoomable-map" data-allow-zoom="true" />
 
           {/* Floating Notice if no boundary exists */}
           {activePoly.length < 3 && (
-            <div className="absolute top-3 left-3 right-3 sm:right-auto z-[500] bg-slate-900/90 backdrop-blur-md text-amber-300 text-xs font-bold px-3.5 py-2 rounded-xl border border-amber-500/40 shadow-lg flex items-center gap-2">
+            <div className="absolute top-3 left-14 right-3 sm:right-auto z-[500] bg-slate-900/90 backdrop-blur-md text-amber-300 text-xs font-bold px-3.5 py-2 rounded-xl border border-amber-500/40 shadow-lg flex items-center gap-2">
               <Info className="w-4 h-4 text-amber-400 shrink-0" />
               <span>Plot boundary polygon not drawn yet. Center pin indicates verified geographic location.</span>
             </div>

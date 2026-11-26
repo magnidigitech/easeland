@@ -296,5 +296,21 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     assert.ok(classNames.includes('flex-wrap'), 'ACTION BUTTONS container must use flex-wrap so buttons never clip');
     assert.ok(!classNames.includes('overflow-x-auto'), 'ACTION BUTTONS container must not use overflow-x-auto with justify-end');
   });
+
+  it('8. VerificationLocationBoundaryCard traps Leaflet z-index panes inside an isolated z-0 overflow-hidden container', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const cardSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'VerificationLocationBoundaryCard.jsx'),
+      'utf8'
+    );
+
+    const canvasMatch = cardSource.match(/\{\/\* LEAFLET CANVAS CONTAINER \*\/\}\s*<div className="([^"]+)"/);
+    assert.ok(canvasMatch, 'LEAFLET CANVAS CONTAINER must exist in VerificationLocationBoundaryCard.jsx');
+    const classNames = canvasMatch[1];
+    assert.ok(classNames.includes('isolate'), 'Leaflet container must create an isolated stacking context');
+    assert.ok(classNames.includes('z-0'), 'Leaflet container must stay at z-0 below sticky navbar');
+    assert.ok(classNames.includes('overflow-hidden'), 'Leaflet container must clip overflowing map layers');
+  });
 });
 
