@@ -596,5 +596,6 @@ describe('EaseLand User Governance & Real-Time Firebase Sync Suite', () => {
     );
     assert.ok(adminSource.includes('downloadUsersGovernanceCsv(filteredUsers)'));
     assert.ok(adminSource.includes('Download CSV'));
+    assert.ok(!/REGISTERED USERS DIRECTORY TABLE WITH PAGINATION[\s\S]{0,80}return\s*\(/.test(adminSource), 'No stray return ( text in JSX');
   });
 });

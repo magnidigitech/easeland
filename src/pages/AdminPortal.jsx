@@ -7832,8 +7832,8 @@ export default function AdminPortal({ onNavigate }) {
 
                   return (
                     <>
-                <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="relative w-full sm:w-80">
+                <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                  <div className="relative w-full xl:w-72 shrink-0">
                     <input
                       type="text"
                       placeholder="Search users by name, email, phone, or UID..."
@@ -7847,7 +7847,7 @@ export default function AdminPortal({ onNavigate }) {
                     <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   </div>
 
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto shrink-0 whitespace-nowrap">
+                  <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
                     <button
                       type="button"
                       onClick={() => downloadUsersGovernanceCsv(filteredUsers)}
@@ -7914,8 +7914,6 @@ export default function AdminPortal({ onNavigate }) {
                 </div>
 
                 {/* REGISTERED USERS DIRECTORY TABLE WITH PAGINATION */}
-
-                  return (
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                       <div className="w-full overflow-x-auto no-scrollbar">
                         <div className="min-w-[680px]">
