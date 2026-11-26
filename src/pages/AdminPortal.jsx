@@ -7322,7 +7322,7 @@ export default function AdminPortal({ onNavigate }) {
                         </div>
 
                         {/* ACTION BUTTONS */}
-                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 w-full sm:w-auto justify-start sm:justify-end shrink-0 whitespace-nowrap pt-2">
+                        <div className="flex flex-wrap items-center gap-2.5 w-full justify-start sm:justify-end pt-2">
                           <button
                             onClick={() => handleReject(activeAuditProp.id || activeAuditProp.propertyId)}
                             disabled={adminActionProcessing}

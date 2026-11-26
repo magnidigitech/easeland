@@ -281,5 +281,20 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
 
     assert.strictEqual(isLiveBranch, true, 'Server saveLocalProperty must route live re-audit edits to branch 2');
   });
+
+  it('7. AdminPortal verification action bar wraps cleanly without clipping Reject Entire Listing on the left', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const adminSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'pages', 'AdminPortal.jsx'),
+      'utf8'
+    );
+
+    const actionBarMatch = adminSource.match(/\{\/\* ACTION BUTTONS \*\/\}\s*<div className="([^"]+)"/);
+    assert.ok(actionBarMatch, 'ACTION BUTTONS container must exist in AdminPortal.jsx');
+    const classNames = actionBarMatch[1];
+    assert.ok(classNames.includes('flex-wrap'), 'ACTION BUTTONS container must use flex-wrap so buttons never clip');
+    assert.ok(!classNames.includes('overflow-x-auto'), 'ACTION BUTTONS container must not use overflow-x-auto with justify-end');
+  });
 });
 
