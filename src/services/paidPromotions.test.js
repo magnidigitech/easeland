@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { sanitizeSiteConfig, mergeSiteConfigWithDefaults, DEFAULT_SITE_CONFIG } from './mockApi.js';
 
 describe('EaseLand Paid Promotions & Admin Showcase Management Suite', () => {
@@ -393,6 +395,22 @@ describe('EaseLand Paid Promotions & Admin Showcase Management Suite', () => {
     assert.strictEqual(savedConfig.featuredListings.badgeText, 'HOT DEALS');
     assert.strictEqual(savedConfig.featuredListings.displayCount, 2);
     assert.deepStrictEqual(savedConfig.featuredListings.featuredPropertyIds, ['prop_1', 'prop_2']);
+  });
+
+  it('17. AnimatedPromotionBanner Promote Your Property CTA opens phone dialer to EaseLand Admin', () => {
+    const bannerSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'components', 'AnimatedPromotionBanner.jsx'),
+      'utf8'
+    );
+    const appSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'App.jsx'),
+      'utf8'
+    );
+
+    assert.match(bannerSource, /adminPhone\s*\|\|\s*'6300691560'/);
+    assert.match(bannerSource, /href=\{'tel:' \+ sanitizedPhone\}/);
+    assert.match(bannerSource, /Promote Your Property/);
+    assert.match(appSource, /<AnimatedPromotionBanner[\s\S]*adminPhone=\{siteConfig\?\.footer\?\.supportPhone\}/);
   });
 });
 

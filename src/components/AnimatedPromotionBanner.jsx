@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ChevronRight, ShieldCheck, TrendingUp, MapPin } from 'lucide-react';
+import { Sparkles, ChevronRight, ShieldCheck, TrendingUp, MapPin, Phone } from 'lucide-react';
 
-export default function AnimatedPromotionBanner({ onPostProperty, onExploreMap }) {
+export default function AnimatedPromotionBanner({ adminPhone, onExploreMap }) {
+  const sanitizedPhone = String(adminPhone || '6300691560').replace(/[^+\d]/g, '') || '6300691560';
   const animatedPhrases = [
     {
       badge: 'PRE-SCREENED BUYER NETWORK',
@@ -71,14 +72,14 @@ export default function AnimatedPromotionBanner({ onPostProperty, onExploreMap }
           </div>
 
           <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 self-start md:self-center">
-            <button
-              type="button"
-              onClick={onPostProperty}
+            <a
+              href={'tel:' + sanitizedPhone}
+              aria-label="Promote Your Property - Call EaseLand Admin"
               className="bg-metallic-gold hover:bg-amber-400 text-slate-950 font-black text-xs px-6 py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer transform hover:-translate-y-0.5 border border-amber-300"
             >
-              <Sparkles className="w-4 h-4 text-slate-950 fill-slate-950" />
+              <Phone className="w-4 h-4 text-slate-950" />
               <span className="font-black text-slate-950">Promote Your Property</span>
-            </button>
+            </a>
             <button
               type="button"
               onClick={onExploreMap}

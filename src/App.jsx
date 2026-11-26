@@ -1067,7 +1067,7 @@ export default function App() {
               if (count === 0) {
                 return (
                   <AnimatedPromotionBanner
-                    onPostProperty={() => changeActivePage('post-property')}
+                    adminPhone={siteConfig?.footer?.supportPhone}
                     onExploreMap={() => changeActivePage('map', { clean: true })}
                   />
                 );
