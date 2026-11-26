@@ -267,3 +267,217 @@ export async function uploadPropertyDocumentMetadata(payload) {
 export async function deletePropertyDocumentMetadata(docId, ownerId) {
   return removeConfidentialPropertyDocument(docId, null, ownerId);
 }
+
+const KNOWN_DOCUMENT_TYPES = new Set([
+  'DOCUMENT',
+  'TITLE_DEED',
+  'LAYOUT_APPROVAL',
+  'TAX_RECEIPT',
+  'ENCUMBRANCE_CERTIFICATE',
+  'FIELD_MEASUREMENT',
+  'OTHER',
+  'LEGAL_DEED',
+  'MUTATION',
+  'KHATA',
+  'PASSPORT',
+  'AADHAAR',
+  'PAN'
+]);
+
+export function isDocumentLikeItem(item) {
+  if (!item) return false;
+  if (typeof item === 'string') {
+    const clean = item.trim().toLowerCase();
+    return (
+      clean.includes('/uploads/documents/') ||
+      clean.includes('private_docs') ||
+      clean.endsWith('.pdf') ||
+      clean.endsWith('.doc') ||
+      clean.endsWith('.docx') ||
+      clean.endsWith('.txt') ||
+      clean.endsWith('.xls') ||
+      clean.endsWith('.xlsx')
+    );
+  }
+  if (typeof item !== 'object') return false;
+  if (item.isDocument === true || item.docId || item.documentType) return true;
+  const typeUpper = String(item.documentType || item.type || item.documentName || '').toUpperCase();
+  if (KNOWN_DOCUMENT_TYPES.has(typeUpper)) return true;
+  if (
+    typeUpper.includes('DOC') ||
+    typeUpper.includes('DEED') ||
+    typeUpper.includes('TAX') ||
+    typeUpper.includes('APPROVAL') ||
+    typeUpper.includes('CERTIFICATE') ||
+    typeUpper.includes('RECEIPT')
+  ) {
+    return true;
+  }
+  if (
+    typeof item.contentType === 'string' &&
+    (item.contentType.startsWith('application/') || item.contentType.includes('pdf') || item.contentType.includes('word'))
+  ) {
+    return true;
+  }
+  const urlStr = String(item.publicUrl || item.url || item.storagePath || item.path || '').trim().toLowerCase();
+  return (
+    urlStr.includes('/uploads/documents/') ||
+    urlStr.includes('private_docs') ||
+    urlStr.endsWith('.pdf') ||
+    urlStr.endsWith('.doc') ||
+    urlStr.endsWith('.docx') ||
+    urlStr.endsWith('.txt') ||
+    urlStr.endsWith('.xls') ||
+    urlStr.endsWith('.xlsx')
+  );
+}
+
+/**
+ * Aggregate all uploaded confidential documents across properties and server document records.
+ */
+export function collectAllConfidentialDocuments(properties = [], serverDocs = []) {
+  const results = [];
+  const seenKeys = new Set();
+
+  const propById = new Map();
+  (Array.isArray(properties) ? properties : []).forEach((prop) => {
+    if (!prop || typeof prop !== 'object') return;
+    [prop.id, prop.propertyId, prop.referenceId].forEach((candidateId) => {
+      const idStr = String(candidateId || '').trim();
+      if (idStr) propById.set(idStr.toLowerCase(), prop);
+    });
+  });
+
+  const pushDoc = (rawItem, propMeta = {}, isPendingReaudit = false) => {
+    if (!rawItem) return;
+    const isObj = typeof rawItem === 'object';
+    const urlStr = isObj
+      ? String(rawItem.publicUrl || rawItem.url || rawItem.mediaUrl || rawItem.storagePath || rawItem.path || '').trim()
+      : String(rawItem).trim();
+
+    if (!urlStr && !isObj) return;
+
+    const docName = isObj
+      ? String(rawItem.documentName || rawItem.name || rawItem.fileName || rawItem.title || 'Confidential Property Document').trim()
+      : (urlStr.split('/').pop() || 'Confidential Property Document');
+
+    const docType = isObj
+      ? String(rawItem.documentType || rawItem.type || 'OTHER').trim()
+      : 'OTHER';
+
+    const docId = isObj
+      ? String(rawItem.docId || rawItem.mediaId || rawItem.id || docName).trim()
+      : docName;
+
+    const propId = String(
+      propMeta.propertyId ||
+      (isObj && rawItem.propertyId) ||
+      'UNASSIGNED'
+    ).trim();
+
+    const normUrl = urlStr && urlStr !== '#' ? urlStr.toLowerCase() : '';
+    const normName = normalizeDocString(docName);
+    const dedupKey = `${propId.toLowerCase()}::${normUrl || normName || docId.toLowerCase()}`;
+
+    if (!dedupKey || seenKeys.has(dedupKey)) return;
+    seenKeys.add(dedupKey);
+
+    const matchedProp = propById.get(propId.toLowerCase()) || null;
+    const ownerObj = matchedProp?.owner || matchedProp?.ownerDetails || matchedProp?.contact || {};
+    const locObj = matchedProp?.location || {};
+
+    results.push({
+      docId,
+      name: docName,
+      fileName: (isObj && rawItem.fileName) || docName,
+      type: docType,
+      url: urlStr || '#',
+      contentType: (isObj && rawItem.contentType) || '',
+      size: Number(isObj && (rawItem.fileSize || rawItem.size)) || 0,
+      uploadedAt: (isObj && (rawItem.uploadedAt || rawItem.createdAt)) || matchedProp?.updatedAt || matchedProp?.createdAt || null,
+      propertyId: propId,
+      propertyTitle:
+        propMeta.propertyTitle ||
+        (isObj && rawItem.propertyTitle) ||
+        matchedProp?.title ||
+        matchedProp?.propertyTitle ||
+        `Property ${propId}`,
+      propertyLocation:
+        propMeta.propertyLocation ||
+        [locObj.locality || matchedProp?.locality, locObj.city || matchedProp?.city].filter(Boolean).join(', ') ||
+        '',
+      propertyStatus:
+        propMeta.propertyStatus ||
+        (isObj && rawItem.propertyStatus) ||
+        matchedProp?.status ||
+        matchedProp?.listingStatus ||
+        'UNKNOWN',
+      ownerName:
+        propMeta.ownerName ||
+        (isObj && rawItem.ownerName) ||
+        matchedProp?.ownerName ||
+        ownerObj?.name ||
+        ownerObj?.fullName ||
+        '',
+      ownerPhone:
+        propMeta.ownerPhone ||
+        (isObj && rawItem.ownerPhone) ||
+        matchedProp?.ownerPhone ||
+        ownerObj?.phone ||
+        ownerObj?.mobile ||
+        '',
+      ownerEmail:
+        propMeta.ownerEmail ||
+        (isObj && rawItem.ownerEmail) ||
+        matchedProp?.ownerEmail ||
+        ownerObj?.email ||
+        '',
+      isPendingReaudit: Boolean(isPendingReaudit || (isObj && rawItem.isPendingReaudit))
+    });
+  };
+
+  (Array.isArray(properties) ? properties : []).forEach((prop) => {
+    if (!prop || typeof prop !== 'object') return;
+    const propId = String(prop.id || prop.propertyId || prop.referenceId || '').trim();
+    const ownerObj = prop.owner || prop.ownerDetails || prop.contact || {};
+    const locObj = prop.location || {};
+    const propMeta = {
+      propertyId: propId,
+      propertyTitle: prop.title || prop.propertyTitle || `Property ${propId}`,
+      propertyLocation: [locObj.locality || prop.locality, locObj.city || prop.city].filter(Boolean).join(', '),
+      propertyStatus: prop.status || prop.listingStatus || 'UNKNOWN',
+      ownerName: prop.ownerName || ownerObj?.name || ownerObj?.fullName || '',
+      ownerPhone: prop.ownerPhone || ownerObj?.phone || ownerObj?.mobile || '',
+      ownerEmail: prop.ownerEmail || ownerObj?.email || ''
+    };
+
+    const directDocArrays = [prop.documents, prop.propertyDocuments, prop.confidentialDocuments];
+    directDocArrays.forEach((arr) => {
+      if (Array.isArray(arr)) arr.forEach((d) => pushDoc(d, propMeta, false));
+    });
+
+    if (Array.isArray(prop.media)) {
+      prop.media.forEach((m) => {
+        if (isDocumentLikeItem(m)) pushDoc(m, propMeta, false);
+      });
+    }
+
+    const pending = prop.pendingReauditData || prop.pendingEdits || {};
+    if (pending && typeof pending === 'object') {
+      [pending.documents, pending.propertyDocuments, pending.confidentialDocuments].forEach((arr) => {
+        if (Array.isArray(arr)) arr.forEach((d) => pushDoc(d, propMeta, true));
+      });
+      if (Array.isArray(pending.media)) {
+        pending.media.forEach((m) => {
+          if (isDocumentLikeItem(m)) pushDoc(m, propMeta, true);
+        });
+      }
+    }
+  });
+
+  (Array.isArray(serverDocs) ? serverDocs : []).forEach((sDoc) => {
+    pushDoc(sDoc, {}, Boolean(sDoc?.isPendingReaudit));
+  });
+
+  return results;
+}

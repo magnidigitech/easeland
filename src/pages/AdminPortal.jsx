@@ -105,6 +105,7 @@ import VerificationLocationBoundaryCard from '../components/VerificationLocation
 import { computeReauditDiff, formatInr } from '../utils/reauditDiffUtils.js';
 import { isPropertyDeleted } from '../utils/filterMatchingUtils.js';
 import { getFirstUploadedImage, getPropertyCoverOrFirstImage, NO_PHOTO_PLACEHOLDER } from '../utils/categoryUtils.js';
+import { collectAllConfidentialDocuments } from '../firebase/documentService.js';
 
 // Reusable Media Uploader with Local File Upload Dropzone + Direct URL + Live Preview
 function MediaUploadInput({ label, value, onChange, placeholder = 'Paste image/video URL or select local file...' }) {
@@ -468,6 +469,38 @@ export default function AdminPortal({ onNavigate }) {
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [enlargedMediaUrl, setEnlargedMediaUrl] = useState(null);
   const [auditRemovedItemKeys, setAuditRemovedItemKeys] = useState(new Set());
+  const [adminServerDocuments, setAdminServerDocuments] = useState([]);
+  const [adminDocsLoading, setAdminDocsLoading] = useState(false);
+  const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [docTypeFilter, setDocTypeFilter] = useState('ALL');
+  const [previewConfidentialDoc, setPreviewConfidentialDoc] = useState(null);
+
+  const fetchAdminDocuments = React.useCallback(async () => {
+    setAdminDocsLoading(true);
+    try {
+      const res = await fetch('/api/admin/documents');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.documents)) {
+          setAdminServerDocuments(data.documents);
+        }
+      }
+    } catch (e) {
+      // Fallback gracefully to property-attached documents
+    } finally {
+      setAdminDocsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdminDocuments();
+  }, [fetchAdminDocuments]);
+
+  useEffect(() => {
+    if (activeTab === 'documents') {
+      fetchAdminDocuments();
+    }
+  }, [activeTab, fetchAdminDocuments]);
 
   // 1-Minute Site Visitor Leads (PostgreSQL /api/visitors)
   const [visitorLeads, setVisitorLeads] = useState(() => {
@@ -1818,6 +1851,31 @@ export default function AdminPortal({ onNavigate }) {
       return title.includes(q) || ownerName.includes(q) || ownerEmail.includes(q) || ownerPhone.includes(q) || city.includes(q) || locality.includes(q);
     });
   }, [allProperties, allPropSearchQuery, allPropStatusFilter]);
+
+  const allConfidentialDocuments = React.useMemo(() => {
+    return collectAllConfidentialDocuments(allProperties, adminServerDocuments);
+  }, [allProperties, adminServerDocuments]);
+
+  const filteredConfidentialDocuments = React.useMemo(() => {
+    const q = docSearchQuery.trim().toLowerCase();
+    return allConfidentialDocuments.filter((doc) => {
+      if (docTypeFilter !== 'ALL') {
+        const docTypeUpper = String(doc.type || 'OTHER').toUpperCase();
+        if (docTypeUpper !== docTypeFilter) return false;
+      }
+      if (!q) return true;
+      return (
+        String(doc.name || '').toLowerCase().includes(q) ||
+        String(doc.type || '').toLowerCase().includes(q) ||
+        String(doc.propertyTitle || '').toLowerCase().includes(q) ||
+        String(doc.propertyId || '').toLowerCase().includes(q) ||
+        String(doc.propertyLocation || '').toLowerCase().includes(q) ||
+        String(doc.ownerName || '').toLowerCase().includes(q) ||
+        String(doc.ownerPhone || '').toLowerCase().includes(q) ||
+        String(doc.ownerEmail || '').toLowerCase().includes(q)
+      );
+    });
+  }, [allConfidentialDocuments, docSearchQuery, docTypeFilter]);
 
   const handleDeletePropertyFromAdmin = async (targetProp, propObj = null) => {
     const propId = typeof targetProp === 'object' && targetProp !== null
@@ -3812,6 +3870,7 @@ export default function AdminPortal({ onNavigate }) {
                 { id: 'all-properties', label: 'All Properties (' + allProperties.length + ')', icon: Building2, badge: 0 },
                 { id: 'verification', label: 'Verification Queue (' + verificationQueue.length + ')', icon: Clock, badge: verificationQueue.length },
                 { id: 'workspace', label: 'Verification Workspace', icon: ShieldCheck },
+                { id: 'documents', label: 'Documents (' + allConfidentialDocuments.length + ')', icon: FileText },
                 { id: 'users', label: 'User Governance', icon: Users },
                 { id: 'visitors', label: 'Visitors Details (' + visitorLeads.length + ')', icon: UserCheck, badge: visitorLeads.filter(v => v.status === 'NEW').length },
                 { id: 'reports', label: 'Reports & Logs', icon: History },
@@ -7404,6 +7463,236 @@ export default function AdminPortal({ onNavigate }) {
                     className="max-w-full max-h-[85dvh] object-contain rounded-2xl border-2 border-slate-700 shadow-2xl"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* TAB: ALL UPLOADED CONFIDENTIAL DOCUMENTS VAULT */}
+            {activeTab === 'documents' && (
+              <div className="space-y-6">
+                {/* HEADER & SUMMARY */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h2 className="text-base sm:text-lg font-black text-brand-charcoal">
+                          Confidential Documents Vault ({allConfidentialDocuments.length})
+                        </h2>
+                        <p className="text-xs font-semibold text-gray-500">
+                          View and inspect all confidential property documents uploaded by owners across every listing status anytime.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchAdminDocuments}
+                    disabled={adminDocsLoading}
+                    className="px-4 py-2.5 rounded-xl bg-brand-charcoal hover:bg-brand-charcoalLight text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60 shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-brand-yellow ${adminDocsLoading ? 'animate-spin' : ''}`} />
+                    <span>{adminDocsLoading ? 'Refreshing...' : 'Refresh Documents'}</span>
+                  </button>
+                </div>
+
+                {/* SEARCH & FILTER BAR */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={docSearchQuery}
+                      onChange={(e) => setDocSearchQuery(e.target.value)}
+                      placeholder="Search by document name, property title, ID, owner name or phone..."
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                    />
+                  </div>
+                  <select
+                    value={docTypeFilter}
+                    onChange={(e) => setDocTypeFilter(e.target.value)}
+                    className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-extrabold text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+                  >
+                    <option value="ALL">All Document Types</option>
+                    <option value="TITLE_DEED">Title Deed / Sale Deed</option>
+                    <option value="LAYOUT_APPROVAL">Layout Approval</option>
+                    <option value="TAX_RECEIPT">Tax Receipt</option>
+                    <option value="ENCUMBRANCE_CERTIFICATE">Encumbrance Certificate</option>
+                    <option value="FIELD_MEASUREMENT">Field Measurement (FMB)</option>
+                    <option value="OTHER">Other Confidential Doc</option>
+                  </select>
+                </div>
+
+                {/* DOCUMENTS LIST */}
+                {filteredConfidentialDocuments.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center space-y-2">
+                    <FileText className="w-10 h-10 text-gray-300 mx-auto" />
+                    <p className="text-sm font-extrabold text-gray-700">
+                      {allConfidentialDocuments.length === 0
+                        ? 'No confidential documents uploaded yet.'
+                        : 'No confidential documents match your search or filter.'}
+                    </p>
+                    <p className="text-xs font-medium text-gray-500">
+                      Uploaded owner deeds, approvals, certificates, and supporting PDFs or images will appear here automatically.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredConfidentialDocuments.map((docItem, idx) => {
+                      const docUrl = docItem.url && docItem.url !== '#' ? docItem.url : '';
+                      const matchedProp = allProperties.find(
+                        (p) =>
+                          p &&
+                          (String(p.id || '') === String(docItem.propertyId) ||
+                            String(p.propertyId || '') === String(docItem.propertyId) ||
+                            String(p.referenceId || '') === String(docItem.propertyId))
+                      );
+                      const sizeLabel = docItem.size > 0
+                        ? (docItem.size >= 1024 * 1024
+                          ? (docItem.size / (1024 * 1024)).toFixed(2) + ' MB'
+                          : Math.max(1, Math.round(docItem.size / 1024)) + ' KB')
+                        : null;
+
+                      return (
+                        <div
+                          key={`${docItem.propertyId}-${docItem.docId}-${idx}`}
+                          className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col justify-between gap-4 hover:border-indigo-300 transition-all"
+                        >
+                          <div className="space-y-2.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
+                                  <FileText className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-sm font-black text-brand-charcoal truncate" title={docItem.name}>
+                                    {docItem.name}
+                                  </h3>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span className="text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded">
+                                      {docItem.type || 'OTHER'}
+                                    </span>
+                                    {sizeLabel && (
+                                      <span className="text-[10px] font-bold text-gray-500">
+                                        {sizeLabel}
+                                      </span>
+                                    )}
+                                    {docItem.isPendingReaudit && (
+                                      <span className="text-[10px] font-black uppercase bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded">
+                                        Pending Re-audit
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded shrink-0">
+                                {docItem.propertyStatus || 'UPLOADED'}
+                              </span>
+                            </div>
+
+                            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs space-y-1">
+                              <div className="font-extrabold text-brand-charcoal truncate" title={docItem.propertyTitle}>
+                                Property: {docItem.propertyTitle}
+                              </div>
+                              <div className="text-[11px] font-semibold text-gray-500 flex flex-wrap gap-x-3 gap-y-0.5">
+                                <span>ID: {docItem.propertyId}</span>
+                                {docItem.propertyLocation && <span>{docItem.propertyLocation}</span>}
+                              </div>
+                              {(docItem.ownerName || docItem.ownerPhone || docItem.ownerEmail) && (
+                                <div className="text-[11px] font-semibold text-gray-600 pt-0.5">
+                                  Owner: {[docItem.ownerName, docItem.ownerPhone, docItem.ownerEmail].filter(Boolean).join(' • ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-gray-100">
+                            {matchedProp && (
+                              <button
+                                type="button"
+                                onClick={() => handleInspectProperty(matchedProp)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-[11px] transition-all cursor-pointer"
+                              >
+                                Open in Workspace
+                              </button>
+                            )}
+                            {docUrl && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewConfidentialDoc(docItem)}
+                                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[11px] flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Preview</span>
+                                </button>
+                                <a
+                                  href={docUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] shadow-sm transition-all whitespace-nowrap"
+                                >
+                                  Open / Download ↗
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* INLINE DOCUMENT PREVIEW MODAL */}
+                {previewConfidentialDoc && (
+                  <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+                      <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-black truncate">{previewConfidentialDoc.name}</h3>
+                          <p className="text-[11px] text-slate-300 font-semibold truncate">
+                            {previewConfidentialDoc.propertyTitle} ({previewConfidentialDoc.propertyId})
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <a
+                            href={previewConfidentialDoc.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1.5 rounded-lg bg-brand-yellow text-brand-charcoal font-extrabold text-xs"
+                          >
+                            Open in New Tab ↗
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewConfidentialDoc(null)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
+                            aria-label="Close document preview"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex-1 bg-slate-100 overflow-auto p-3 flex items-center justify-center min-h-[60vh]">
+                        {String(previewConfidentialDoc.contentType || '').startsWith('image/') ||
+                        /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(String(previewConfidentialDoc.url || '')) ? (
+                          <img
+                            src={previewConfidentialDoc.url}
+                            alt={previewConfidentialDoc.name}
+                            className="max-w-full max-h-[75vh] rounded-xl shadow object-contain bg-white"
+                          />
+                        ) : (
+                          <iframe
+                            src={previewConfidentialDoc.url}
+                            title={previewConfidentialDoc.name}
+                            className="w-full h-[75vh] rounded-xl border border-slate-300 bg-white"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

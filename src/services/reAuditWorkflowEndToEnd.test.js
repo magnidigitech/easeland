@@ -312,5 +312,65 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
     assert.ok(classNames.includes('z-0'), 'Leaflet container must stay at z-0 below sticky navbar');
     assert.ok(classNames.includes('overflow-hidden'), 'Leaflet container must clip overflowing map layers');
   });
+
+  it('9. Admin Documents tab aggregates all uploaded confidential documents across properties and server records', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { collectAllConfidentialDocuments } = await import('../firebase/documentService.js');
+
+    const aggregated = collectAllConfidentialDocuments(
+      [
+        {
+          id: 'prop_live_1',
+          title: 'Amaravati Plot',
+          status: 'LIVE',
+          ownerName: 'Ramesh',
+          documents: [
+            { docId: 'doc1', documentName: 'Sale Deed.pdf', documentType: 'TITLE_DEED', publicUrl: '/uploads/documents/prop_live_1/sale.pdf', fileSize: 102400 }
+          ],
+          pendingReauditData: {
+            confidentialDocuments: [
+              { docId: 'doc2', name: 'Updated EC.pdf', type: 'ENCUMBRANCE_CERTIFICATE', url: '/uploads/documents/prop_live_1/ec.pdf' }
+            ]
+          }
+        }
+      ],
+      [
+        {
+          docId: 'doc1',
+          propertyId: 'prop_live_1',
+          documentName: 'Sale Deed.pdf',
+          documentType: 'TITLE_DEED',
+          publicUrl: '/uploads/documents/prop_live_1/sale.pdf'
+        },
+        {
+          docId: 'doc3',
+          propertyId: 'prop_archived_9',
+          propertyTitle: 'Guntur Farmland',
+          documentName: 'Tax Receipt.pdf',
+          documentType: 'TAX_RECEIPT',
+          publicUrl: '/uploads/documents/prop_archived_9/tax.pdf'
+        }
+      ]
+    );
+
+    assert.strictEqual(aggregated.length, 3, 'Should deduplicate shared docs and keep all unique confidential documents');
+    assert.strictEqual(aggregated.some(d => d.name === 'Sale Deed.pdf' && d.propertyId === 'prop_live_1'), true);
+    assert.strictEqual(aggregated.some(d => d.name === 'Updated EC.pdf' && d.isPendingReaudit === true), true);
+    assert.strictEqual(aggregated.some(d => d.name === 'Tax Receipt.pdf' && d.propertyTitle === 'Guntur Farmland'), true);
+
+    const adminSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'pages', 'AdminPortal.jsx'),
+      'utf8'
+    );
+    const serverSource = fs.readFileSync(
+      path.join(process.cwd(), 'server.js'),
+      'utf8'
+    );
+
+    assert.ok(adminSource.includes("id: 'documents'"), 'AdminPortal sidebar must include Documents tab');
+    assert.ok(adminSource.includes("activeTab === 'documents'"), 'AdminPortal must render Documents tab view');
+    assert.ok(serverSource.includes("app.get('/api/admin/documents'"), 'server.js must expose /api/admin/documents endpoint');
+  });
 });
 

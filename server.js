@@ -2264,6 +2264,105 @@ app.get('/api/properties/:id/documents', async (req, res) => {
   }
 });
 
+// API Endpoint: Admin Global Confidential Documents Vault
+app.get('/api/admin/documents', async (req, res) => {
+  try {
+    const collected = [];
+    const seen = new Set();
+
+    const addPropertyDocs = (prop, propIdFallback = '') => {
+      if (!prop || typeof prop !== 'object') return;
+      const propertyId = String(prop.id || prop.propertyId || prop.referenceId || propIdFallback || '').trim();
+      const ownerObj = prop.owner || prop.ownerDetails || prop.contact || {};
+      const propMeta = {
+        propertyId,
+        propertyTitle: prop.title || prop.propertyTitle || `Property ${propertyId}`,
+        propertyStatus: prop.status || prop.listingStatus || 'UNKNOWN',
+        ownerName: prop.ownerName || ownerObj?.name || ownerObj?.fullName || '',
+        ownerPhone: prop.ownerPhone || ownerObj?.phone || ownerObj?.mobile || '',
+        ownerEmail: prop.ownerEmail || ownerObj?.email || ''
+      };
+
+      const pushRaw = (d, isPendingReaudit = false) => {
+        if (!d || typeof d !== 'object') return;
+        const urlStr = String(d.publicUrl || d.url || d.storagePath || '').trim();
+        const nameStr = String(d.documentName || d.name || d.fileName || d.title || 'Confidential Property Document').trim();
+        const key = `${propertyId.toLowerCase()}::${(urlStr || nameStr || d.docId || d.id || '').toLowerCase()}`;
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        collected.push({
+          ...d,
+          ...propMeta,
+          name: nameStr,
+          documentName: nameStr,
+          url: urlStr || '#',
+          publicUrl: urlStr || '#',
+          isPendingReaudit
+        });
+      };
+
+      [prop.documents, prop.propertyDocuments, prop.confidentialDocuments].forEach((arr) => {
+        if (Array.isArray(arr)) arr.forEach((d) => pushRaw(d, false));
+      });
+      const pending = prop.pendingReauditData || prop.pendingEdits || {};
+      [pending.documents, pending.propertyDocuments, pending.confidentialDocuments].forEach((arr) => {
+        if (Array.isArray(arr)) arr.forEach((d) => pushRaw(d, true));
+      });
+    };
+
+    localPropsMap.forEach((prop, key) => addPropertyDocs(prop, key));
+
+    try {
+      const pgRes = await pgPool.query('SELECT property_id, reference_id, raw_data FROM properties;');
+      pgRes.rows.forEach((row) => {
+        if (row.raw_data) {
+          addPropertyDocs(row.raw_data, row.property_id || row.reference_id || '');
+        }
+      });
+    } catch (e) { }
+
+    try {
+      if (fs.existsSync(documentsDir)) {
+        const propDirs = fs.readdirSync(documentsDir);
+        propDirs.forEach((propDirName) => {
+          const fullPropDir = path.join(documentsDir, propDirName);
+          if (!fs.statSync(fullPropDir).isDirectory()) return;
+          const files = fs.readdirSync(fullPropDir);
+          files.forEach((fname) => {
+            const urlStr = `/uploads/documents/${propDirName}/${fname}`;
+            const key = `${propDirName.toLowerCase()}::${urlStr.toLowerCase()}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            const matchedProp = localPropsMap.get(propDirName);
+            const stat = fs.statSync(path.join(fullPropDir, fname));
+            collected.push({
+              docId: fname,
+              propertyId: propDirName,
+              propertyTitle: matchedProp?.title || `Property ${propDirName}`,
+              propertyStatus: matchedProp?.status || matchedProp?.listingStatus || 'UPLOADED',
+              ownerName: matchedProp?.ownerName || matchedProp?.owner?.name || '',
+              ownerPhone: matchedProp?.ownerPhone || matchedProp?.owner?.phone || '',
+              ownerEmail: matchedProp?.ownerEmail || matchedProp?.owner?.email || '',
+              name: fname,
+              documentName: fname,
+              fileName: fname,
+              type: 'OTHER',
+              url: urlStr,
+              publicUrl: urlStr,
+              size: stat.size,
+              uploadedAt: stat.mtime?.toISOString?.() || null
+            });
+          });
+        });
+      }
+    } catch (e) { }
+
+    return res.json({ success: true, documents: collected });
+  } catch (err) {
+    return res.json({ success: true, documents: [] });
+  }
+});
+
 // In-Memory Site Configuration Cache (Authoritative state lives in PostgreSQL)
 let localSiteConfigMap = new Map();
 
