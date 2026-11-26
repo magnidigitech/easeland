@@ -370,6 +370,9 @@ describe('EaseLand Re-Audit & Modifications Lifecycle Regression Suite', () => {
 
     assert.ok(adminSource.includes("id: 'documents'"), 'AdminPortal sidebar must include Documents tab');
     assert.ok(adminSource.includes("activeTab === 'documents'"), 'AdminPortal must render Documents tab view');
+    assert.ok(!adminSource.includes('handleInspectProperty('), 'Documents tab must call openWorkspace, not nonexistent handleInspectProperty');
+    assert.ok(adminSource.includes('openWorkspace('), 'Documents tab must wire Open in Workspace to openWorkspace');
+    assert.ok(adminSource.includes('handleDownloadConfidentialDoc('), 'Documents tab and preview modal must provide Download action');
     assert.ok(serverSource.includes("app.get('/api/admin/documents'"), 'server.js must expose /api/admin/documents endpoint');
   });
 });

@@ -60,7 +60,8 @@ import {
   Star,
   Tag,
   Loader2,
-  Smartphone
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { mockApi, applySiteTheme, safeArray, isFakeProperty, DEFAULT_SITE_CONFIG } from '../services/mockApi';
 import { DEFAULT_SHOWCASE_PROPERTIES } from '../services/showcaseProperties.js';
@@ -353,7 +354,7 @@ export default function AdminPortal({ onNavigate }) {
         const stored = localStorage.getItem('easeland_admin_active_tab');
         if (stored) return stored;
       }
-    } catch (e) {}
+    } catch (e) { }
     return 'cms';
   });
 
@@ -362,7 +363,7 @@ export default function AdminPortal({ onNavigate }) {
       if (typeof window !== 'undefined' && activeTab) {
         localStorage.setItem('easeland_admin_active_tab', activeTab);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [activeTab]);
 
   // Admin Profile & Dedicated Security Credentials State
@@ -428,7 +429,7 @@ export default function AdminPortal({ onNavigate }) {
         const stored = localStorage.getItem('easeland_admin_cms_tab');
         if (stored) return stored;
       }
-    } catch (e) {}
+    } catch (e) { }
     return 'overview';
   });
 
@@ -437,7 +438,7 @@ export default function AdminPortal({ onNavigate }) {
       if (typeof window !== 'undefined' && cmsTab) {
         localStorage.setItem('easeland_admin_cms_tab', cmsTab);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [cmsTab]);
   const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
 
@@ -460,7 +461,7 @@ export default function AdminPortal({ onNavigate }) {
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
   const [allPropSearchQuery, setAllPropSearchQuery] = useState('');
@@ -502,6 +503,37 @@ export default function AdminPortal({ onNavigate }) {
     }
   }, [activeTab, fetchAdminDocuments]);
 
+  const handleDownloadConfidentialDoc = async (docItem) => {
+    const docUrl = docItem?.url;
+    if (!docUrl || docUrl === '#') return;
+    const downloadName = String(docItem?.fileName || docItem?.name || 'confidential-document').trim();
+    try {
+      const response = await fetch(docUrl);
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = downloadName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        return;
+      }
+    } catch (e) {
+      // Fallback to direct anchor download if fetch fails
+    }
+    const fallbackLink = document.createElement('a');
+    fallbackLink.href = docUrl;
+    fallbackLink.download = downloadName;
+    fallbackLink.target = '_blank';
+    fallbackLink.rel = 'noreferrer';
+    document.body.appendChild(fallbackLink);
+    fallbackLink.click();
+    fallbackLink.remove();
+  };
+
   // 1-Minute Site Visitor Leads (PostgreSQL /api/visitors)
   const [visitorLeads, setVisitorLeads] = useState(() => {
     try {
@@ -512,7 +544,7 @@ export default function AdminPortal({ onNavigate }) {
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
   const [visitorLoading, setVisitorLoading] = useState(false);
@@ -611,11 +643,11 @@ export default function AdminPortal({ onNavigate }) {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    
+
     let rawAdminName = user?.displayName || user?.name || profile?.displayName || localStorage.getItem('easeland_admin_name') || 'EaseLand Admin';
     if (rawAdminName.includes('Scarlett')) {
       rawAdminName = 'EaseLand Admin';
-      try { localStorage.setItem('easeland_admin_name', 'EaseLand Admin'); } catch(e){}
+      try { localStorage.setItem('easeland_admin_name', 'EaseLand Admin'); } catch (e) { }
     }
     const currentAdminName = rawAdminName;
     const logEntry = `[${timestamp}] Admin ${currentAdminName} ${actionMessage}`;
@@ -684,7 +716,7 @@ export default function AdminPortal({ onNavigate }) {
     if (!match) {
       try {
         match = mockApi.getPropertyById(id);
-      } catch (e) {}
+      } catch (e) { }
     }
     // 3. Try current featuredListings promotedProperties cache
     if (!match && Array.isArray(siteConfig?.featuredListings?.promotedProperties)) {
@@ -778,7 +810,7 @@ export default function AdminPortal({ onNavigate }) {
       try {
         localStorage.setItem('easeland_site_config', JSON.stringify(updatedConfig));
         localStorage.setItem('easeland_promoted_properties', JSON.stringify(cleanPromotedProperties));
-      } catch (e) {}
+      } catch (e) { }
       window.dispatchEvent(new CustomEvent('easeland-site-config-updated', { detail: updatedConfig }));
     }
 
@@ -984,7 +1016,7 @@ export default function AdminPortal({ onNavigate }) {
       setDeals([]);
       setFollowUps([]);
       setVisitorLeads([]);
-      
+
       logAdminActivity('authoritatively wiped all property listings, media, documents, enquiries, and CRM leads across PostgreSQL, Firestore, and Local Storage.');
       setPublishSuccessMessage('All properties and cascaded collections have been wiped clean across all 3 layers!');
       setPurgeResultSummary(res?.backendResult || { success: true });
@@ -1228,7 +1260,7 @@ export default function AdminPortal({ onNavigate }) {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return propsList.map(p => {
       if (!p) return p;
@@ -1258,7 +1290,7 @@ export default function AdminPortal({ onNavigate }) {
               const rawStored = localStorage.getItem('easeland_user_profile_' + oId);
               if (rawStored) matchedUser = JSON.parse(rawStored);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
 
@@ -1291,8 +1323,8 @@ export default function AdminPortal({ onNavigate }) {
         existing.owner.phone !== '+91 N/A' &&
         existing.owner.phone !== 'undefined' &&
         existing.owner.phone !== 'null'
-          ? existing.owner.phone
-          : null;
+        ? existing.owner.phone
+        : null;
 
       const rawPhone =
         matchedUser?.phone ||
@@ -1463,9 +1495,9 @@ export default function AdminPortal({ onNavigate }) {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ deletedProperties: parsedAdminDel })
-                }).catch(() => {});
+                }).catch(() => { });
               }
-            } catch (eSync) {}
+            } catch (eSync) { }
           }
         }
       } catch (e) { }
@@ -1530,17 +1562,17 @@ export default function AdminPortal({ onNavigate }) {
 
         // Check if property is actively pending verification audit or re-audit
         const isPendingAudit = st === 'PENDING_VERIFICATION' || lst === 'PENDING_VERIFICATION' ||
-                               st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' ||
-                               st === 'UNDER_AUDIT' || lst === 'UNDER_AUDIT' ||
-                               st === 'SUBMITTED' || lst === 'SUBMITTED' ||
-                               p.auditStatus === 'pending' ||
-                               p.verificationStatus === 'Pending Verification' ||
-                               p.verificationStatus === 'Under Review' ||
-                               p.reAuditStatus === 'PENDING_VERIFICATION' ||
-                               p.reAuditStatus === 'UNDER_REVIEW' ||
-                               p.reAuditStatus === 'PENDING' ||
-                               ((p.hasPendingEdits === true || Boolean(p.pendingReauditData)) && p.reAuditStatus !== 'EDITS_REJECTED') ||
-                               submittedIds.includes(pId);
+          st === 'UNDER_REVIEW' || lst === 'UNDER_REVIEW' ||
+          st === 'UNDER_AUDIT' || lst === 'UNDER_AUDIT' ||
+          st === 'SUBMITTED' || lst === 'SUBMITTED' ||
+          p.auditStatus === 'pending' ||
+          p.verificationStatus === 'Pending Verification' ||
+          p.verificationStatus === 'Under Review' ||
+          p.reAuditStatus === 'PENDING_VERIFICATION' ||
+          p.reAuditStatus === 'UNDER_REVIEW' ||
+          p.reAuditStatus === 'PENDING' ||
+          ((p.hasPendingEdits === true || Boolean(p.pendingReauditData)) && p.reAuditStatus !== 'EDITS_REJECTED') ||
+          submittedIds.includes(pId);
 
         if (isPendingAudit) return true;
 
@@ -1560,7 +1592,7 @@ export default function AdminPortal({ onNavigate }) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('easeland_admin_cached_properties', JSON.stringify(allMergedProps));
         }
-      } catch (eCache) {}
+      } catch (eCache) { }
 
       if (initialEnrichedQueue.length > 0) {
         setSelectedProperty(prev => {
@@ -1641,7 +1673,7 @@ export default function AdminPortal({ onNavigate }) {
             }
           }
         }
-      } catch (lErr) {}
+      } catch (lErr) { }
 
       let propertyOwnerUsers = [];
       allMergedProps.forEach(p => {
@@ -1976,7 +2008,7 @@ export default function AdminPortal({ onNavigate }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deletedProperties: parsedAdminDel })
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       const keys = ['easeland_properties', 'easeland_user_properties', 'easeland_owner_properties'];
@@ -2222,9 +2254,9 @@ export default function AdminPortal({ onNavigate }) {
         ? freshDefaults[canonicalKey]
         : (freshDefaults[moduleId] !== undefined ? freshDefaults[moduleId] : freshDefaults);
 
-      updateSiteModuleAdmin(canonicalKey, defaultData, adminUid).catch(() => {});
+      updateSiteModuleAdmin(canonicalKey, defaultData, adminUid).catch(() => { });
       if (canonicalKey !== moduleId) {
-        updateSiteModuleAdmin(moduleId, defaultData, adminUid).catch(() => {});
+        updateSiteModuleAdmin(moduleId, defaultData, adminUid).catch(() => { });
       }
     } catch (err) {
       console.warn('handleResetModule sync notice:', err);
@@ -2310,8 +2342,8 @@ export default function AdminPortal({ onNavigate }) {
 
       // 1. PostgreSQL database save FIRST (Authoritative Primary Source)
       const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            selectedProperty || {};
+        allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+        selectedProperty || {};
       const pendingEdits = currentTarget.pendingReauditData || currentTarget.pendingEdits || selectedProperty?.pendingReauditData || selectedProperty?.pendingEdits || {};
       const payload = {
         ...currentTarget,
@@ -2470,8 +2502,8 @@ export default function AdminPortal({ onNavigate }) {
 
       // 1. PostgreSQL Authoritative Update FIRST
       const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            selectedProperty || {};
+        allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+        selectedProperty || {};
       const payload = {
         ...currentTarget,
         propertyId: propId,
@@ -2629,8 +2661,8 @@ export default function AdminPortal({ onNavigate }) {
 
       // 1. PostgreSQL Authoritative Rejection FIRST
       const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            selectedProperty || {};
+        allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+        selectedProperty || {};
       const payload = {
         ...currentTarget,
         propertyId: propId,
@@ -2785,8 +2817,8 @@ export default function AdminPortal({ onNavigate }) {
 
       // 1. PostgreSQL Authoritative Changes Requested Save FIRST
       const currentTarget = verificationQueue.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
-                            selectedProperty || {};
+        allProperties.find(p => String(p.id) === String(propId) || String(p.propertyId) === String(propId) || String(p.referenceId) === String(propId)) ||
+        selectedProperty || {};
       const payload = {
         ...currentTarget,
         propertyId: propId,
@@ -3522,9 +3554,9 @@ export default function AdminPortal({ onNavigate }) {
       for (const prop of propertiesOfUser) {
         try {
           await deletePropertyListing(prop.id || prop.propertyId, targetUser.id || targetUser.uid, true, prop);
-        } catch (pDelErr) {}
+        } catch (pDelErr) { }
       }
-    } catch (importErr) {}
+    } catch (importErr) { }
 
     // 4. Persist user removal to Firestore with userEmail
     try {
@@ -3809,20 +3841,18 @@ export default function AdminPortal({ onNavigate }) {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer whitespace-nowrap ${
-                  isActive
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer whitespace-nowrap ${isActive
                     ? 'bg-brand-yellow text-brand-charcoal shadow-md scale-102 ring-2 ring-brand-yellow/30'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
-                }`}
+                  }`}
               >
                 <IconComponent className={`w-3.5 h-3.5 ${isActive ? 'text-brand-charcoal' : 'text-brand-yellow'}`} />
                 <span>{item.label}</span>
                 {(item.count !== undefined ? item.count > 0 : Boolean(item.badge)) && (
                   <span
                     style={isActive ? { color: '#ffffff', WebkitTextFillColor: '#ffffff', backgroundColor: '#0f172a' } : { color: '#020617', WebkitTextFillColor: '#020617', backgroundColor: '#fbbf24' }}
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black inline-flex items-center justify-center min-w-[18px] text-white ${
-                      isActive ? 'bg-slate-900 text-white shadow-xs' : 'bg-amber-400 text-slate-950'
-                    }`}
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black inline-flex items-center justify-center min-w-[18px] text-white ${isActive ? 'bg-slate-900 text-white shadow-xs' : 'bg-amber-400 text-slate-950'
+                      }`}
                   >
                     {item.count ?? item.badge}
                   </span>
@@ -3847,8 +3877,8 @@ export default function AdminPortal({ onNavigate }) {
               <button
                 onClick={() => setActiveTab('cms')}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-extrabold transition-all ${activeTab === 'cms'
-                    ? 'bg-brand-yellow text-brand-charcoal shadow-md'
-                    : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-brand-yellow text-brand-charcoal shadow-md'
+                  : 'text-gray-700 hover:bg-gray-100'
                   }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -3882,8 +3912,8 @@ export default function AdminPortal({ onNavigate }) {
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
                     className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all ${activeTab === item.id
-                        ? 'bg-brand-charcoal text-white shadow-md'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
+                      ? 'bg-brand-charcoal text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-brand-charcoal'
                       }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -3976,8 +4006,8 @@ export default function AdminPortal({ onNavigate }) {
                           key={mod.id}
                           onClick={() => setCmsTab(mod.id)}
                           className={`p-2.5 rounded-xl text-left border text-[11px] font-extrabold transition-all flex flex-col justify-between h-16 shrink-0 min-w-[125px] sm:min-w-0 ${cmsTab === mod.id
-                              ? 'bg-brand-charcoal text-white border-brand-charcoal shadow-md ring-2 ring-brand-yellow'
-                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                            ? 'bg-brand-charcoal text-white border-brand-charcoal shadow-md ring-2 ring-brand-yellow'
+                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                             }`}
                         >
                           <IconComp className={`w-4 h-4 ${cmsTab === mod.id ? 'text-brand-yellow' : 'text-gray-500'}`} />
@@ -4031,8 +4061,8 @@ export default function AdminPortal({ onNavigate }) {
                       <button
                         onClick={() => updateCmsConfig(prev => ({ ...prev, overview: { ...prev.overview, emergencyMaintenance: !prev.overview?.emergencyMaintenance } }))}
                         className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${siteConfig.overview?.emergencyMaintenance
-                            ? 'bg-red-600 text-white shadow'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-red-600 text-white shadow'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                       >
                         {siteConfig.overview?.emergencyMaintenance ? 'MAINTENANCE ACTIVE' : 'SYSTEM NORMAL'}
@@ -5424,8 +5454,8 @@ export default function AdminPortal({ onNavigate }) {
                               isPromoSettingsSaved
                                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                                 : isSavingPromoSettings
-                                ? 'bg-gray-400 text-white cursor-not-allowed'
-                                : 'bg-brand-charcoal hover:bg-slate-800 text-white'
+                                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                                  : 'bg-brand-charcoal hover:bg-slate-800 text-white'
                             )}
                           >
                             {isSavingPromoSettings ? (
@@ -5525,10 +5555,10 @@ export default function AdminPortal({ onNavigate }) {
                           isActivePromotionsSaved
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                             : isSavingActivePromotions
-                            ? 'bg-gray-400 text-white cursor-not-allowed'
-                            : hasUnsavedPromoChanges
-                            ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300 shadow-md'
-                            : 'bg-brand-charcoal hover:bg-slate-800 text-white'
+                              ? 'bg-gray-400 text-white cursor-not-allowed'
+                              : hasUnsavedPromoChanges
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300 shadow-md'
+                                : 'bg-brand-charcoal hover:bg-slate-800 text-white'
                         )}
                         title="Save active promoted customer properties to cloud database & public website"
                       >
@@ -6025,10 +6055,10 @@ export default function AdminPortal({ onNavigate }) {
                               {/* STATUS & ACTION */}
                               <div className="col-span-2 text-right flex flex-col items-end gap-1.5">
                                 <span className={`font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider ${isLive ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                                    isPending ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                                      isChanges ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                                        isRejected ? 'bg-red-100 text-red-800 border border-red-300' :
-                                          'bg-gray-100 text-gray-700 border border-gray-300'
+                                  isPending ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                                    isChanges ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                                      isRejected ? 'bg-red-100 text-red-800 border border-red-300' :
+                                        'bg-gray-100 text-gray-700 border border-gray-300'
                                   }`}>
                                   {isLive ? 'PLATFORM VERIFIED' : isPending ? 'PENDING AUDIT' : isChanges ? 'CHANGES REQD' : isRejected ? 'REJECTED' : 'DRAFT'}
                                 </span>
@@ -6625,8 +6655,8 @@ export default function AdminPortal({ onNavigate }) {
                                       {diffs.photos.newCount > 0
                                         ? (diffs.photos.newCount + ' New Photo' + (diffs.photos.newCount > 1 ? 's' : '') + ' Uploaded by Owner')
                                         : (diffs.photos.removedCount > 0
-                                            ? (diffs.photos.removedCount + ' Photo' + (diffs.photos.removedCount > 1 ? 's' : '') + ' Removed by Owner')
-                                            : 'Photos Modified by Owner')}
+                                          ? (diffs.photos.removedCount + ' Photo' + (diffs.photos.removedCount > 1 ? 's' : '') + ' Removed by Owner')
+                                          : 'Photos Modified by Owner')}
                                     </div>
                                   </div>
                                 )}
@@ -7149,31 +7179,31 @@ export default function AdminPortal({ onNavigate }) {
                                             </span>
                                           )}
 
-                                        {/* Admin Remove Button */}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleAdminRemoveMediaItem('photo', imgUrl, propId);
-                                          }}
-                                          className="absolute top-1.5 right-1.5 z-20 bg-red-600 hover:bg-red-700 text-white p-1 rounded-md shadow-md transition-all flex items-center gap-1 text-[10px] font-bold"
-                                          title="Remove non-compliant photo"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5 text-white" />
-                                          <span className="hidden group-hover:inline pr-0.5">Remove</span>
-                                        </button>
+                                          {/* Admin Remove Button */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleAdminRemoveMediaItem('photo', imgUrl, propId);
+                                            }}
+                                            className="absolute top-1.5 right-1.5 z-20 bg-red-600 hover:bg-red-700 text-white p-1 rounded-md shadow-md transition-all flex items-center gap-1 text-[10px] font-bold"
+                                            title="Remove non-compliant photo"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 text-white" />
+                                            <span className="hidden group-hover:inline pr-0.5">Remove</span>
+                                          </button>
 
-                                        {/* Hover Overlay with Enlarge */}
-                                        <div
-                                          onClick={() => setEnlargedMediaUrl(imgUrl)}
-                                          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1 cursor-pointer"
-                                        >
-                                          <Eye className="w-3.5 h-3.5" />
-                                          <span>Click to Enlarge</span>
+                                          {/* Hover Overlay with Enlarge */}
+                                          <div
+                                            onClick={() => setEnlargedMediaUrl(imgUrl)}
+                                            className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1 cursor-pointer"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                            <span>Click to Enlarge</span>
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -7608,15 +7638,21 @@ export default function AdminPortal({ onNavigate }) {
                           </div>
 
                           <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-gray-100">
-                            {matchedProp && (
-                              <button
-                                type="button"
-                                onClick={() => handleInspectProperty(matchedProp)}
-                                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-[11px] transition-all cursor-pointer"
-                              >
-                                Open in Workspace
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => openWorkspace(matchedProp || {
+                                id: docItem.propertyId,
+                                propertyId: docItem.propertyId,
+                                title: docItem.propertyTitle,
+                                status: docItem.propertyStatus,
+                                ownerName: docItem.ownerName,
+                                ownerPhone: docItem.ownerPhone,
+                                ownerEmail: docItem.ownerEmail
+                              })}
+                              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-[11px] transition-all cursor-pointer"
+                            >
+                              Open in Workspace
+                            </button>
                             {docUrl && (
                               <>
                                 <button
@@ -7627,14 +7663,14 @@ export default function AdminPortal({ onNavigate }) {
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Preview</span>
                                 </button>
-                                <a
-                                  href={docUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] shadow-sm transition-all whitespace-nowrap"
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadConfidentialDoc(docItem)}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] flex items-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap"
                                 >
-                                  Open / Download ↗
-                                </a>
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download</span>
+                                </button>
                               </>
                             )}
                           </div>
@@ -7656,6 +7692,14 @@ export default function AdminPortal({ onNavigate }) {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadConfidentialDoc(previewConfidentialDoc)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download</span>
+                          </button>
                           <a
                             href={previewConfidentialDoc.url}
                             target="_blank"
@@ -7676,7 +7720,7 @@ export default function AdminPortal({ onNavigate }) {
                       </div>
                       <div className="flex-1 bg-slate-100 overflow-auto p-3 flex items-center justify-center min-h-[60vh]">
                         {String(previewConfidentialDoc.contentType || '').startsWith('image/') ||
-                        /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(String(previewConfidentialDoc.url || '')) ? (
+                          /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(String(previewConfidentialDoc.url || '')) ? (
                           <img
                             src={previewConfidentialDoc.url}
                             alt={previewConfidentialDoc.name}
@@ -7790,8 +7834,8 @@ export default function AdminPortal({ onNavigate }) {
                           setUserCurrentPage(1);
                         }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 ${userStatusFilter === st
-                            ? 'bg-brand-charcoal text-white shadow'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? 'bg-brand-charcoal text-white shadow'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                           }`}
                       >
                         {st}
@@ -7876,146 +7920,146 @@ export default function AdminPortal({ onNavigate }) {
                       <div className="w-full overflow-x-auto no-scrollbar">
                         <div className="min-w-[680px]">
                           <table className="w-full text-left border-collapse table-auto">
-                          <thead>
-                            <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                              <th className="py-3 px-3">User & Auth Details</th>
-                              <th className="py-3 px-3">Auth Method</th>
-                              <th className="py-3 px-3">Platform Role</th>
-                              <th className="py-3 px-3">Contact Phone</th>
-                              <th className="py-3 px-3 text-center">Account Status</th>
-                              <th className="py-3 px-3 text-right">Governance Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 text-xs">
-                            {paginatedUsers.length === 0 ? (
-                              <tr>
-                                <td colSpan={6} className="py-10 text-center text-gray-400 font-semibold text-xs">
-                                  No registered users found matching your filters.
-                                </td>
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <th className="py-3 px-3">User & Auth Details</th>
+                                <th className="py-3 px-3">Auth Method</th>
+                                <th className="py-3 px-3">Platform Role</th>
+                                <th className="py-3 px-3">Contact Phone</th>
+                                <th className="py-3 px-3 text-center">Account Status</th>
+                                <th className="py-3 px-3 text-right">Governance Actions</th>
                               </tr>
-                            ) : (
-                              paginatedUsers.map((u) => (
-                                <tr key={u.id || u.email || u.uid} className="hover:bg-gray-50/80 transition-colors">
-                                  <td className="py-3 px-3">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-8 h-8 rounded-xl bg-brand-charcoal text-brand-yellow font-black text-xs flex items-center justify-center shadow-sm shrink-0">
-                                        {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="font-extrabold text-brand-charcoal block truncate text-xs">{u.name}</span>
-                                          {u.emailVerified && (
-                                            <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center gap-0.5" title="Firebase Email Verified">
-                                              ✓ Verified
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-xs">
+                              {paginatedUsers.length === 0 ? (
+                                <tr>
+                                  <td colSpan={6} className="py-10 text-center text-gray-400 font-semibold text-xs">
+                                    No registered users found matching your filters.
+                                  </td>
+                                </tr>
+                              ) : (
+                                paginatedUsers.map((u) => (
+                                  <tr key={u.id || u.email || u.uid} className="hover:bg-gray-50/80 transition-colors">
+                                    <td className="py-3 px-3">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-xl bg-brand-charcoal text-brand-yellow font-black text-xs flex items-center justify-center shadow-sm shrink-0">
+                                          {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-extrabold text-brand-charcoal block truncate text-xs">{u.name}</span>
+                                            {u.emailVerified && (
+                                              <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center gap-0.5" title="Firebase Email Verified">
+                                                ✓ Verified
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-[10px] text-gray-500 font-medium block truncate">{u.email}</span>
+                                          {(u.uid || u.id) && (
+                                            <span className="text-[9px] text-slate-400 font-mono block truncate" title={'Firebase Auth UID: ' + (u.uid || u.id)}>
+                                              UID: {String(u.uid || u.id).length > 18 ? (String(u.uid || u.id).substring(0, 16) + '...') : String(u.uid || u.id)}
                                             </span>
                                           )}
                                         </div>
-                                        <span className="text-[10px] text-gray-500 font-medium block truncate">{u.email}</span>
-                                        {(u.uid || u.id) && (
-                                          <span className="text-[9px] text-slate-400 font-mono block truncate" title={'Firebase Auth UID: ' + (u.uid || u.id)}>
-                                            UID: {String(u.uid || u.id).length > 18 ? (String(u.uid || u.id).substring(0, 16) + '...') : String(u.uid || u.id)}
-                                          </span>
-                                        )}
                                       </div>
-                                    </div>
-                                  </td>
+                                    </td>
 
-                                  <td className="py-3 px-3">
-                                    <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
+                                    <td className="py-3 px-3">
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-flex items-center gap-1 ${u.authProvider?.includes('Google') || u.email?.endsWith('@gmail.com')
                                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                         : 'bg-slate-100 text-slate-700 border border-slate-200'
-                                      }`}>
-                                      {u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password')}
-                                    </span>
-                                  </td>
+                                        }`}>
+                                        {u.authProvider || (u.email?.endsWith('@gmail.com') ? 'Google OAuth' : 'Email/Password')}
+                                      </span>
+                                    </td>
 
-                                  <td className="py-3 px-3">
-                                    <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${u.role === 'ADMIN' || u.email === 'admin@easeland.in'
+                                    <td className="py-3 px-3">
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase inline-block ${u.role === 'ADMIN' || u.email === 'admin@easeland.in'
                                         ? 'bg-purple-100 text-purple-900 border border-purple-200'
                                         : u.role?.includes('VERIFIED') || u.postedListingsCount > 0
                                           ? 'bg-amber-100 text-amber-900 border border-amber-200'
                                           : 'bg-gray-100 text-gray-700'
-                                      }`}>
-                                      {u.role === 'ADMIN' || u.email === 'admin@easeland.in' ? 'ADMINISTRATOR' : (u.postedListingsCount > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : u.role)}
-                                    </span>
-                                  </td>
-
-                                  <td className="py-3 px-3 font-semibold text-gray-700 text-xs">
-                                    {u.phone ? (
-                                      <span>{u.phone}</span>
-                                    ) : (
-                                      <span className="text-gray-400 italic text-[10px]">Not Provided</span>
-                                    )}
-                                  </td>
-
-                                  <td className="py-3 px-3 text-center">
-                                    {(u.status === 'SUSPENDED' || u.accountStatus === 'SUSPENDED') ? (
-                                      <div>
-                                        <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
-                                          <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                          SUSPENDED
-                                        </span>
-                                        {u.suspension?.suspendedUntil && (
-                                          <span className="block text-[9px] text-amber-700 font-semibold mt-0.5">
-                                            Until: {new Date(u.suspension.suspendedUntil).toLocaleDateString('en-IN')}
-                                          </span>
-                                        )}
-                                      </div>
-                                    ) : (u.status === 'ADMIN' || u.role === 'ADMIN' || u.email === 'admin@easeland.in') ? (
-                                      <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
-                                        <ShieldCheck className="w-3 h-3 text-purple-600" />
-                                        ADMIN
+                                        }`}>
+                                        {u.role === 'ADMIN' || u.email === 'admin@easeland.in' ? 'ADMINISTRATOR' : (u.postedListingsCount > 0 ? 'VERIFIED PROPERTY OWNER & BUYER' : u.role)}
                                       </span>
-                                    ) : (
-                                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                        ACTIVE
-                                      </span>
-                                    )}
-                                  </td>
+                                    </td>
 
-                                  <td className="py-3 px-3 text-right">
-                                    {u.status !== 'ADMIN' && u.role !== 'ADMIN' && u.email !== 'admin@easeland.in' && (
-                                      <div className="flex items-center justify-end gap-1.5">
-                                        {(u.status === 'SUSPENDED' || u.accountStatus === 'SUSPENDED') ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleUnsuspendUser(u)}
-                                            className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                                            title="Lift suspension and restore account status to ACTIVE"
-                                          >
-                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                            <span>Lift Suspension</span>
-                                          </button>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleSuspendUserModalOpen(u)}
-                                            className="bg-amber-100 text-amber-900 hover:bg-amber-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                                            title="Temporarily restrict user access and capabilities"
-                                          >
+                                    <td className="py-3 px-3 font-semibold text-gray-700 text-xs">
+                                      {u.phone ? (
+                                        <span>{u.phone}</span>
+                                      ) : (
+                                        <span className="text-gray-400 italic text-[10px]">Not Provided</span>
+                                      )}
+                                    </td>
+
+                                    <td className="py-3 px-3 text-center">
+                                      {(u.status === 'SUSPENDED' || u.accountStatus === 'SUSPENDED') ? (
+                                        <div>
+                                          <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
                                             <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                            <span>Suspend Account</span>
-                                          </button>
-                                        )}
+                                            SUSPENDED
+                                          </span>
+                                          {u.suspension?.suspendedUntil && (
+                                            <span className="block text-[9px] text-amber-700 font-semibold mt-0.5">
+                                              Until: {new Date(u.suspension.suspendedUntil).toLocaleDateString('en-IN')}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (u.status === 'ADMIN' || u.role === 'ADMIN' || u.email === 'admin@easeland.in') ? (
+                                        <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
+                                          <ShieldCheck className="w-3 h-3 text-purple-600" />
+                                          ADMIN
+                                        </span>
+                                      ) : (
+                                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-xs">
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                          ACTIVE
+                                        </span>
+                                      )}
+                                    </td>
 
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveUserModalOpen(u)}
-                                          className="bg-red-100 text-red-800 hover:bg-red-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                                          title="Permanently remove user account"
-                                        >
-                                          <Trash2 className="w-3 h-3 text-red-600" />
-                                          <span>Remove Account</span>
-                                        </button>
-                                      </div>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                                    <td className="py-3 px-3 text-right">
+                                      {u.status !== 'ADMIN' && u.role !== 'ADMIN' && u.email !== 'admin@easeland.in' && (
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          {(u.status === 'SUSPENDED' || u.accountStatus === 'SUSPENDED') ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleUnsuspendUser(u)}
+                                              className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                                              title="Lift suspension and restore account status to ACTIVE"
+                                            >
+                                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                              <span>Lift Suspension</span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSuspendUserModalOpen(u)}
+                                              className="bg-amber-100 text-amber-900 hover:bg-amber-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                                              title="Temporarily restrict user access and capabilities"
+                                            >
+                                              <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                              <span>Suspend Account</span>
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveUserModalOpen(u)}
+                                            className="bg-red-100 text-red-800 hover:bg-red-200 font-extrabold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                                            title="Permanently remove user account"
+                                          >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                            <span>Remove Account</span>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
 
@@ -8075,11 +8119,10 @@ export default function AdminPortal({ onNavigate }) {
                                     <button
                                       type="button"
                                       onClick={() => setUserCurrentPage(page)}
-                                      className={`w-7 h-7 rounded-lg text-xs font-black transition-all ${
-                                        currentPageClamped === page
+                                      className={`w-7 h-7 rounded-lg text-xs font-black transition-all ${currentPageClamped === page
                                           ? 'bg-brand-charcoal text-brand-yellow shadow'
                                           : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
-                                      }`}
+                                        }`}
                                     >
                                       {page}
                                     </button>
@@ -8259,8 +8302,8 @@ export default function AdminPortal({ onNavigate }) {
                                   <div className="flex items-center gap-2">
                                     <span className="font-black text-sm text-brand-charcoal">{vis.name || 'Site Visitor'}</span>
                                     <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${vis.status === 'CONVERTED' ? 'bg-purple-100 text-purple-800' :
-                                        vis.status === 'QUALIFIED' ? 'bg-emerald-100 text-emerald-800' :
-                                          vis.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                                      vis.status === 'QUALIFIED' ? 'bg-emerald-100 text-emerald-800' :
+                                        vis.status === 'CONTACTED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
                                       }`}>
                                       {vis.status || 'NEW'}
                                     </span>
@@ -8633,8 +8676,8 @@ export default function AdminPortal({ onNavigate }) {
                         setSuspensionHours(preset.h);
                       }}
                       className={'py-2 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ' + (suspensionDays === preset.d && suspensionHours === preset.h
-                          ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow'
-                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100')}
+                        ? 'bg-brand-charcoal text-brand-yellow border-brand-charcoal shadow'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100')}
                     >
                       {preset.label}
                     </button>
@@ -8801,8 +8844,8 @@ export default function AdminPortal({ onNavigate }) {
                   <div
                     key={stg}
                     className={`p-1.5 rounded-lg border shrink-0 min-w-[90px] sm:min-w-0 ${selectedDealForDossier.stage === stg
-                        ? 'bg-brand-yellow text-brand-charcoal border-brand-yellow font-extrabold shadow'
-                        : 'bg-white/10 text-gray-300 border-white/10'
+                      ? 'bg-brand-yellow text-brand-charcoal border-brand-yellow font-extrabold shadow'
+                      : 'bg-white/10 text-gray-300 border-white/10'
                       }`}
                   >
                     {stg.replace('_', ' ')}
